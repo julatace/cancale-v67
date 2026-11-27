@@ -90,14 +90,19 @@ async function partieP(nav, W, th) {
   dit(!compte.carte, `${T} P4 plus de carte « Protège ton compte » (§2.10)`);
   dit(/Désactivée/.test(compte.double), `${T} P4 la rangée « Double vérification » dit « Désactivée »`, compte.double);
   if (W < 600) {
-    const barre = await pg.evaluate(() => { const b = document.querySelector('[data-categorie-retour]'); const fil = [...document.querySelectorAll('.vg-pm-nav-txt small')].filter((e) => e.getClientRects().length).length;
-      const hb = (() => { const h = document.querySelector('.n-barre-titre'); return h ? h.getBoundingClientRect().bottom : 0; })(); const rb = b ? b.getBoundingClientRect() : null;
-      return { libre: !!(rb && rb.top >= hb - 1), texte: b ? b.innerText.trim() : null, natif: !!(b && (b.classList.contains('n-barre-retour') || b.classList.contains('n-bouton'))), fil, retours: document.querySelectorAll('[data-categorie-retour], [data-sous-retour]').length, titre: (document.querySelector('[data-ux-pm-titre]') || {}).innerText || '' }; });
-    dit(barre.libre && barre.natif && /Paramètres/.test(barre.texte || '') && barre.fil === 0 && barre.retours === 1, `${T} P5 sous-page : UN retour « ‹ Paramètres » en texte, aucun fil d'Ariane`, barre);
+    // (26 nov., zero-rouge-bancs-2) Depuis le 22 nov. (App.jsx, `data-n-retour-reglages` : « une catégorie ou un panneau de Paramètres
+    // ouvert : la barre porte SON retour ») le « ‹ Paramètres » VISIBLE est celui de la barre de titre, comme une page poussée
+    // d'iPhone ; celui de la page (`data-categorie-retour`) est caché. On juge le retour VU (un seul), sa place (dans la barre de
+    // titre, plus « sous » elle), son texte et l'absence de fil d'Ariane.
+    const barre = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+      const vus = [...document.querySelectorAll('[data-n-retour-reglages], [data-categorie-retour], [data-sous-retour]')].filter(vis); const b = vus[0] || null;
+      const fil = [...document.querySelectorAll('.vg-pm-nav-txt small')].filter((e) => e.getClientRects().length).length;
+      return { dansBarre: !!(b && b.closest('.n-barre-titre')), texte: b ? b.innerText.trim() : null, natif: !!(b && (b.classList.contains('n-barre-retour') || b.classList.contains('n-bouton'))), fil, retours: vus.length, titre: (document.querySelector('[data-ux-pm-titre]') || {}).innerText || '' }; });
+    dit(barre.dansBarre && barre.natif && /Paramètres/.test(barre.texte || '') && barre.fil === 0 && barre.retours === 1, `${T} P5 sous-page : UN retour « ‹ Paramètres » en texte (dans la barre de titre), aucun fil d'Ariane`, barre);
     const g = await pg.evaluate(() => { const e = document.querySelector('[data-categorie-ecran] .vrm-set-liste, [data-categorie-ecran] .n-groupe-carte'); return e ? Math.round(e.getBoundingClientRect().left) : null; });
     dit(g != null && racine.gauche != null && Math.abs(g - racine.gauche) <= 2, `${T} P6 les groupes de la sous-page ont la même marge que le premier écran`, { sous: g, racine: racine.gauche });
     await capture(pg, `p-compte-${W}-${th}`);
-    await pg.locator('[data-categorie-retour]').first().click().catch(() => {});
+    await pg.locator('[data-n-retour-reglages], [data-categorie-retour], [data-sous-retour]').filter({ visible: true }).first().click().catch(() => {});   // le retour VU (barre de titre)
     await pg.waitForTimeout(800);
   }
   // Apparence : trois choix, aucun interrupteur « Mode sombre ».
@@ -261,7 +266,9 @@ async function partieN(nav, W, th) {
   // Une ligne ouvre son écran.
   const p = await H.ouvrir(nav, { PORT, W, sombre: th === 'sombre', base: { lignes: [MAIN({}, { nouveau: true })], comptes: H.COMPTE, panne: null }, tab: 'journee', creeLe: iso(4) });
   await H.attendre(p.pg, async () => (await visibles(p.pg, '[data-ux-nouveau-ligne]')) > 0, 16000);
-  const ecran = () => p.pg.evaluate(() => { const e = document.querySelector('.vrm-main .vrm-ecran-vivant[data-espace], .vrm-main [data-espace]'); return e ? e.getAttribute('data-espace') : ''; });
+  // (26 nov., zero-rouge-bancs-2) L'écran ouvert se lit sur `.vrm-main[data-ecran]` (posé par la coque sur TOUT écran) : les écrans natifs
+  // (Extension, ouverte par « Nouveau ») ne portent plus `data-espace` — la ligne fermait la feuille et ouvrait bien « extension ».
+  const ecran = () => p.pg.evaluate(() => { const m = document.querySelector('.vrm-main[data-ecran]'); if (m) return m.getAttribute('data-ecran'); const e = document.querySelector('.vrm-main .vrm-ecran-vivant[data-espace], .vrm-main [data-espace]'); return e ? e.getAttribute('data-espace') : ''; });
   const avant = await ecran();
   await p.pg.locator('[data-ux-nouveau-ligne]').first().click().catch(() => {});
   await p.pg.waitForTimeout(2000);

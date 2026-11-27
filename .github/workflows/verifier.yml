@@ -69,7 +69,7 @@ jobs:
           # (11 nov., ci-vert) Les miroirs apt d'Ubuntu échouent parfois (« Temporary failure resolving ») :
           # tous les jobs de la PR #1131 sont tombés là, aucun contrôle lancé. Réessais bornés, puis rouge.
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3 4; do npx playwright install --with-deps chromium && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           # Les audits et les bancs visent /opt/pw-browsers/chromium (le conteneur des sessions).
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
@@ -127,7 +127,7 @@ jobs:
           # (11 nov., ci-vert) Les miroirs apt d'Ubuntu échouent parfois (« Temporary failure resolving ») :
           # tous les jobs de la PR #1131 sont tombés là, aucun contrôle lancé. Réessais bornés, puis rouge.
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3 4; do npx playwright install --with-deps chromium && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
@@ -171,7 +171,7 @@ jobs:
           # (11 nov., ci-vert) Les miroirs apt d'Ubuntu échouent parfois (« Temporary failure resolving ») :
           # tous les jobs de la PR #1131 sont tombés là, aucun contrôle lancé. Réessais bornés, puis rouge.
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3 4; do npx playwright install --with-deps webkit && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          bash scripts/ci-installer-navigateurs.sh webkit   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
       - name: Lancer les bancs sous WebKit
         env:
           NAVIGATEUR: webkit
@@ -214,7 +214,7 @@ jobs:
           # (11 nov., ci-vert) Les miroirs apt d'Ubuntu échouent parfois (« Temporary failure resolving ») :
           # tous les jobs de la PR #1131 sont tombés là, aucun contrôle lancé. Réessais bornés, puis rouge.
           echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
-          for essai in 1 2 3 4; do npx playwright install --with-deps chromium && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
           echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"

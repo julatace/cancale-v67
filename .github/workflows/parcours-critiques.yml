@@ -35,7 +35,7 @@ jobs:
           NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
       - name: Installer le navigateur de contrôle
         run: |
-          npx playwright install --with-deps chromium
+          bash scripts/ci-installer-navigateurs.sh chromium   # sans la source apt de Microsoft, 4 essais (scripts/ci-installer-navigateurs.sh)
           # Des bancs visent /opt/pw-browsers/chromium (le conteneur des sessions), comme dans verifier.yml.
           sudo mkdir -p /opt/pw-browsers
           sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
@@ -167,6 +167,7 @@ jobs:
           NODE_OPTIONS: --require=${{ github.workspace }}/scripts/bancs/_garde-reseau.cjs
       - name: Vérifier les politiques SQL sur une base jetable
         run: |
+          bash scripts/ci-sans-source-microsoft.sh   # « 403 … no longer signed » de packages.microsoft.com (PR #1437)
           sudo apt-get update
           sudo apt-get install -y postgresql
           node scripts/audit-confidentialite-sql.cjs
