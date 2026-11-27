@@ -30,6 +30,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., retour-fonctions — Julien : trois fonctions d'avant les écrans natifs) src/filtrePlateforme.js, src/ecrans/Stats.jsx, src/filUnique.js
+  { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : filtre par compte au téléphone', phrase: 'Tous les comptes, ou un seul : retenu pour toi.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
   { id: 'favoris-requetes', date: '2026-11-26', titre: 'Favoris envoyés sans clic', phrase: 'Extension 5.455.0 : plus fiable.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'observation-fichier', date: '2026-11-26', titre: 'Observer Vinted : enregistrer un fichier', phrase: 'Extension 5.454.1 : la frise en fichier.', tab: 'extension', pour: 'tous', mode: 'tous' },

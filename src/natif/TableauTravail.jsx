@@ -105,6 +105,29 @@ function ChoixMenu({ choisi, onClick, libelle, n = null, attrs = null, indisponi
   );
 }
 
+// (27 nov.) UN filtre du tableau, seul, hors du tableau (au téléphone, la liste de « Terminées » de Ventes n'est pas un
+// TableauTravail) : le MÊME bouton de la barre d'outils, les MÊMES choix, la MÊME feuille qu'au téléphone dans le tableau,
+// les MÊMES `data-tt-*`. `filtre` : { cle, libelle, valeur, onChange, options: [{ cle, libelle, n? }] } (la forme de `filtres`).
+export function FiltreSeul({ filtre: f, attrs = null }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  if (!f || !Array.isArray(f.options) || f.options.length < 2) return null;
+  const o = f.options.find((x) => x.cle === f.valeur);
+  const actif = !!(o && f.options[0] && o.cle !== f.options[0].cle);
+  return (
+    <span className="n-tt-ancre n-tt-filtre-seul" data-tt-ancre="" {...(attrs || {})}>
+      <button type="button" data-n-famille="second" className="n-tt-bouton" data-tt-ouvre={'filtre:' + f.cle} data-tt-actif={actif ? '1' : undefined} aria-haspopup="true" aria-expanded={ouvert ? 'true' : 'false'}
+        aria-label={actif ? f.libelle + ' · ' + o.libelle : f.libelle} onClick={() => setOuvert(true)} data-tt-filtre={f.cle} data-tt-filtre-valeur={f.valeur}>
+        <span className="n-tt-bouton-libelle">{actif ? o.libelle : (f.options[0] || {}).libelle || f.libelle}</span><span className="n-tt-chevron" aria-hidden="true"/>
+      </button>
+      <Feuille ouverte={ouvert} onFermer={() => setOuvert(false)} titre={f.libelle} attrs={{ 'data-tt-feuille': 'filtre:' + f.cle }}>
+        <div className="n-tt-pop-liste" role="menu" aria-label={f.libelle}>
+          {f.options.map((x) => <ChoixMenu key={x.cle} choisi={f.valeur === x.cle} libelle={x.libelle} n={x.n != null ? x.n : null} onClick={() => { f.onChange(x.cle); setOuvert(false); }} attrs={{ 'data-tt-filtre-choix': f.cle + ':' + x.cle }}/>)}
+        </div>
+      </Feuille>
+    </span>
+  );
+}
+
 function Etiquette({ ton = 'neutre', children }) {
   if (!children) return <span className="n-tt-vide-cellule">—</span>;
   return <span className="n-tt-etiquette" data-tt-ton={ton}>{children}</span>;

@@ -49,4 +49,8 @@ export default {
   "tableau.etat.attente": "En attente de validation",
   "tableau.etat.corriger": "À corriger",
   "tableau.etat.refusee": "Refusée par Vestiaire",
+  "annul.alerte": "{compte} annule plus : {taux} contre {autres}",
+  "annul.alertePourquoi": "{a} annulations sur {n} ventes ({taux}), contre {aA} sur {nA} ({autres}) sur tes autres comptes, sur la période choisie. VRM le signale dès {minVentes} ventes et {minAnnulees} annulations, quand la part est au moins {facteur} fois celle des autres comptes et la dépasse de {points} points.",
+  "annul.alertePasLu": "Pas comparé : {comptes} pas lu",
+  "annul.alertePasLuPourquoi": "Un compte pas lu n’a aucun chiffre : VRM ne compare pas tes comptes tant qu’il manque, plutôt que de le compter à 0.",
 };

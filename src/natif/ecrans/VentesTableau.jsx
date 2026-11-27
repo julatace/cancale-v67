@@ -9,6 +9,7 @@
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
+export { FiltreSeul } from '../TableauTravail.jsx';   // (27 nov.) le filtre « Compte » de « Terminées » au téléphone
 import { Plaque } from '../Plaque.jsx';
 import { CATEGORIES_VENTE, categorieVente } from '../../ventesEcran.js';
 import { celluleAchat } from './celluleAchat.jsx';

@@ -49,4 +49,8 @@ export default {
   "tableau.etat.attente": "Wartet auf Freigabe",
   "tableau.etat.corriger": "Zu korrigieren",
   "tableau.etat.refusee": "Von Vestiaire abgelehnt",
+  "annul.alerte": "{compte} storniert mehr: {taux} gegen {autres}",
+  "annul.alertePourquoi": "{a} Stornierungen bei {n} Verkäufen ({taux}), gegen {aA} bei {nA} ({autres}) auf deinen anderen Konten, im gewählten Zeitraum. VRM meldet es ab {minVentes} Verkäufen und {minAnnulees} Stornierungen, wenn der Anteil mindestens {facteur}-mal so hoch ist wie bei den anderen Konten und {points} Punkte darüber liegt.",
+  "annul.alertePasLu": "Nicht verglichen: {comptes} nicht gelesen",
+  "annul.alertePasLuPourquoi": "Ein nicht gelesenes Konto hat keine Zahlen: VRM vergleicht deine Konten nicht, solange es fehlt, statt es als 0 zu zählen.",
 };

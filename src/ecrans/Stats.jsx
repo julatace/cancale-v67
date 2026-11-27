@@ -9,6 +9,7 @@ import { lienVenteVinted } from '../annulationsCompte.js';
 import { ventesAnnulees, bilanAnnulees } from '../ventesAnnulees.js';   // (22 nov.) les annulées de TOUTES les plateformes
 import { etatCommandeEbay } from '../../api/_lib/ebay-etat-commande.js';
 import { LogoSite } from '../SelecteurSites.jsx';
+import { comptesQuiAnnulent, SEUILS_ANNULATIONS, pctFr } from '../ventesEcran.js';   // (27 nov.) « un compte annule plus que les autres », la règle du 5 nov.
 import { modeleSur, classementRapporte, eclaterReleveLots } from '../ceQuiRapporte.js';
 import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBrutCompte, SEUIL_CONCLUSION } from '../vendrePlus.js';   // (9 nov., « vendre plus »)
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
@@ -1374,6 +1375,29 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   const pasLues = A.plateformes ? A.plateformes.filter((p) => p.etat === 'passu').map((p) => p.plateforme) : [];
   const enCoursA = A.plateformes ? A.plateformes.filter((p) => p.etat === 'encours').map((p) => p.plateforme) : [];
   const manquantsV = A.plateformes ? ((A.plateformes.find((p) => p.plateforme === 'Vinted') || {}).manquants || []) : [];
+  // (27 nov., Julien : rendre l'alerte du 5 nov. de l'ancien écran Ventes · Vinted) UN COMPTE QUI ANNULE NETTEMENT PLUS QUE
+  // LES AUTRES. La MÊME règle, importée (jamais recopiée) : `comptesQuiAnnulent` et ses seuils `SEUILS_ANNULATIONS`
+  // (src/ventesEcran.js : au moins 5 ventes et 2 annulations, des autres comptes à au moins 5 ventes, une part ≥ 2× celle des
+  // autres ET ≥ 15 points au-dessus). Elle juge les lignes que la carte MONTRE (mêmes comptes, même période, mêmes chiffres :
+  // la phrase vient de la source de ses chiffres). « Pas su » n'est pas 0 (§5) : un compte connu mais pas lu (`manquants`)
+  // rend la comparaison partielle ⇒ la règle ne compare rien, et la ligne dit qu'il n'est pas lu. Un compte exclu n'a pas de
+  // ligne (écarté par `ventesAnnulees`) : jamais comparé, jamais nommé.
+  const manquantsIdsA = A.etat === 'lu' ? A.plateformes.filter((p) => p.etat === 'lu').flatMap((p) => (p.manquants || []).map((u) => ({ site: p.plateforme, uid: String(u) }))) : [];
+  const manquantsA = manquantsIdsA.map((x) => (x.site === 'Vinted' ? nomDe(x.uid) : x.uid));
+  const alertesA = A.etat === 'lu' ? comptesQuiAnnulent({ etat: 'lu', partiel: manquantsA.length > 0, comptes: lignesA.map((g) => ({ ...g, uid: g.cle })) }) : [];
+  const ligneDe = (x) => lignesA.find((g) => g.cle === x.uid) || {};
+  const alerteAnnul = alertesA.length ? alertesA.map((x) => (
+    <div key={x.uid} className="vrm-sv-annul-alerte" role="status" data-sv-annul-alerte={ligneDe(x).uid} data-sv-annul-alerte-site={SITE_A[ligneDe(x).plateforme]} data-taux={x.taux} data-taux-autres={x.tauxAutres}>
+      <Icon name="info" size={16}/>
+      <span className="vrm-sv-annul-alerte-texte">{tr('annul.alerte', { compte: String(x.compte), taux: pctFr(x.taux), autres: pctFr(x.tauxAutres) })}</span>
+      <Pourquoi>{tr('annul.alertePourquoi', { a: x.annulees, n: x.n, taux: pctFr(x.taux), aA: x.annuleesAutres, nA: x.nAutres, autres: pctFr(x.tauxAutres), minVentes: SEUILS_ANNULATIONS.minVentes, minAnnulees: SEUILS_ANNULATIONS.minAnnulees, facteur: SEUILS_ANNULATIONS.facteur, points: SEUILS_ANNULATIONS.ecartPoints })}</Pourquoi>
+    </div>))
+    : manquantsA.length && lignesA.some((g) => g.n > 0) ? <div className="vrm-sv-annul-alerte" role="status" data-sv-annul-alerte="passu" data-sv-annul-alerte-manque={manquantsIdsA.map((x) => x.uid).join(',')}>
+      <Icon name="info" size={16}/><span className="vrm-sv-annul-alerte-texte">{tr('annul.alertePasLu', { comptes: manquantsA.join(', ') })}</span>
+      <Pourquoi>{tr('annul.alertePasLuPourquoi')}</Pourquoi>
+    </div> : null;
+  // Un compte pas lu se dit UNE fois : nommé par la ligne d'alerte, le pied ne le redit pas.
+  const manquantsPied = !alertesA.length && alerteAnnul ? [] : manquantsV;
   // « Annulations » se dit UNE fois : le total d'en-tête n'apparaît que s'il additionne PLUSIEURS lignes.
   const annul = carte('sv-annulations', tr('annul.titre'),
     A.etat === 'lu' && T && T.n && lignesA.length > 1 ? <span data-sv-annul-total={`${T.annulees}/${T.n}`}>{tr('annul.surN', { a: T.annulees, n: T.n })}{A.partiel ? '' : ` · ${pctTxt(T.taux)}`}</span> : null,
@@ -1381,6 +1405,7 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
       : A.etat !== 'lu' ? vide(tr('annul.passu'), { 'data-sv-annul': 'passu' })
         : !lignesA.length ? vide([tr('annul.aucune'), pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : ''].filter(Boolean).join(' '), { 'data-sv-annul': 'lu', 'data-sv-annul-pas-lues': pasLues.join(',') })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
+          {alerteAnnul}
           {lignesA.map((g) => (
             <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-sv-annul-site={SITE_A[g.plateforme]} data-n={g.n} data-annulees={g.annulees} data-retours={g.retours} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
@@ -1408,9 +1433,9 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
               <span className="vrm-sv-annul-etat">{m.eurAnnule ? fmt(m.eurAnnule) : ''}</span>
             </div>)}
           </details>}
-          {(pasLues.length > 0 || enCoursA.length > 0 || manquantsV.length > 0 || A.sansDate > 0 || A.roleInconnu > 0 || A.demandees > 0) && <div className="vrm-sv-note" data-sv-annul-manque={manquantsV.join(',')} data-sv-annul-pas-lues={pasLues.join(',')} data-sv-annul-role={A.roleInconnu} data-sv-annul-demandees={A.demandees} style={{ marginTop: 8 }}>
+          {(pasLues.length > 0 || enCoursA.length > 0 || manquantsPied.length > 0 || A.sansDate > 0 || A.roleInconnu > 0 || A.demandees > 0) && <div className="vrm-sv-note" data-sv-annul-manque={manquantsV.join(',')} data-sv-annul-pas-lues={pasLues.join(',')} data-sv-annul-role={A.roleInconnu} data-sv-annul-demandees={A.demandees} style={{ marginTop: 8 }}>
             {[pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : '', enCoursA.length ? tr('annul.enCours', { sites: enCoursA.join(', ') }) : '',
-              manquantsV.length ? tr('stats.lu', { x: String(manquantsV.map(nomDe).join(', ')) }) : '', A.sansDate ? tr('annul.sansDate', { n: A.sansDate }) : '',
+              manquantsPied.length ? tr('stats.lu', { x: String(manquantsPied.map(nomDe).join(', ')) }) : '', A.sansDate ? tr('annul.sansDate', { n: A.sansDate }) : '',
               A.roleInconnu ? tr('annul.roleInconnu', { n: A.roleInconnu }) : '', A.demandees ? tr('annul.demandees', { n: A.demandees }) : ''].filter(Boolean).join(' · ')}
           </div>}
         </div>),

@@ -549,6 +549,7 @@ async function lireCopieArrivee(compte, ou) {
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 // (21 nov., ventes-lisibles) Terminées au téléphone : la rangée native de Ventes (vignette 64, titre entier, l'achat en un toucher).
 const VentesListeTel = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.VentesListeTel })));
+const FiltreSeulVentes = aLaDemandeDiscret(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.FiltreSeul })));   // (27 nov.) « Compte » au téléphone
 // ⟦→ ecrans/Comptabilite.jsx #38⟧
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
@@ -1729,8 +1730,8 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./designV2/LigneAnnonce.
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/LigneAnnonce.jsx, gardé à sa place (son écran est chargé à la demande)
 import './designV2/signature.css'; // (8 nov.) style de ./designV2/Signature.jsx, gardé à sa place (son écran est chargé à la demande)
 import * as Natif from "./natif/index.js";
-import { FiltrePlateformes, useFiltrePlateforme, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
-import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme } from "./filtrePlateforme.js";
+import { FiltrePlateformes, useFiltrePlateforme, useFiltreCompte, filtreTableau } from "./natif/FiltrePlateformes.jsx";   // (25 nov.) le filtre par plateforme des onglets
+import { TOUTES as TOUTES_PLATEFORMES, nombresPlateformes, optionsPlateformes, choixEffectif as choixPlateformeEffectif, filtrerPlateforme, comptesDeLignes, choixCompteEffectif, filtrerCompte } from "./filtrePlateforme.js";
 import { FiltreAchats, MorceauSite } from "./achats/FiltreAchats.jsx";   // (25 nov.) le filtre par plateforme d'Achats
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
@@ -34078,7 +34079,17 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   const [choixP, choisirP] = useFiltrePlateforme('ventes');
   const optionsP = React.useMemo(() => optionsPlateformes(nombresPlateformes(lignesTous)), [lignesTous]);
   const effP = choixPlateformeEffectif(choixP, optionsP);
-  const lignes = React.useMemo(() => filtrerPlateforme(lignesTous, effP), [lignesTous, effP]);
+  const lignesP = React.useMemo(() => filtrerPlateforme(lignesTous, effP), [lignesTous, effP]);
+  // (27 nov., Julien : rendre au téléphone le filtre « Compte » du tableau) UNE règle avec l'ordinateur (src/filtrePlateforme.js :
+  // le compte que SA lecture a posé sur la ligne, jamais le titre) ; « Tous les comptes » par défaut ; retenu PAR VENDEUR sur cet
+  // appareil, comme le site. À l'ordinateur, le tableau garde SON filtre (état de l'écran, inchangé) : ce choix ne s'applique pas.
+  const ordiT = Natif.useOrdinateur();
+  const [choixC, choisirC] = useFiltreCompte('ventes', AUTH.user?.id || '');
+  const comptesC = React.useMemo(() => comptesDeLignes(lignesP), [lignesP]);
+  const effC = ordiT || comptesC.length < 2 ? '' : choixCompteEffectif(choixC, comptesC);
+  const lignes = React.useMemo(() => filtrerCompte(lignesP, effC), [lignesP, effC]);
+  const filtreCompteTel = !ordiT && comptesC.length > 1 ? { cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: effC || 'tous', onChange: (v) => choisirC(v === 'tous' ? '' : v),
+    options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...comptesC.map((x) => ({ cle: x, libelle: x, n: lignesP.filter((l) => l.compte === x).length }))] } : null;
   // Au téléphone : la liste d'abord (sans les annulées), puis le groupe « Annulées » (les annulations, pas les retours :
   // un retour a déjà son groupe « Retours et litiges »).
   const lignesTel = React.useMemo(() => lignes.filter((l) => !(l.annul && l.annul.sorte === 'annulee')), [lignes]);
@@ -34089,7 +34100,6 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   const sansDateT = React.useMemo(() => ({ i: debutSansDate(lignesTel, (x) => x.t), n: nbSansDate(lignesTel, (x) => x.t) }), [lignesTel]);
   const [n, setN] = React.useState(60);
   // (19 nov. soir) Le tableau de l'ordinateur : ses filtres et l'heure de la dernière lecture des ventes reçue.
-  const ordiT = Natif.useOrdinateur();
   const [filtreT, setFiltreT] = React.useState({ site: 'tous', compte: '', periode: 'tout' });
   const [majLeT, setMajLeT] = React.useState(undefined);
   React.useEffect(() => { if (Array.isArray(ventesVinted)) setMajLeT(Date.now()); else if (ventesVinted === null) setMajLeT(null); }, [ventesVinted, lbcVentes, ebayTous]);
@@ -34175,10 +34185,10 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // lignes, la même étiquette d'état, le même ordre ; ce qui change : Statut à compteurs, colonnes, tri, sélection, et
   // « Imprimer les bordereaux » des ventes cochées (le chemin `imprimerLot` des colis, `vrm:imprimer-choix`).
   if (ordiT) {
-    const cptsT = [...new Set(lignes.filter((l) => filtreT.site === 'tous' || l.site === filtreT.site).map((l) => l.compte).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+    const cptsT = comptesDeLignes(lignes.filter((l) => filtreT.site === 'tous' || l.site === filtreT.site));
     const depuisT = { tout: null, j7: 7, j30: 30 }[filtreT.periode];
     const lignesT = enCours && !lignes.length ? undefined : (visibles.some((e) => e[1] === 'pas-su') && !lignes.length ? null
-      : lignes.filter((l) => (filtreT.site === 'tous' || l.site === filtreT.site) && (!filtreT.compte || l.compte === filtreT.compte)
+      : filtrerCompte(lignes, filtreT.compte).filter((l) => (filtreT.site === 'tous' || l.site === filtreT.site)
         && (depuisT == null || (l.t != null && Date.now() - l.t <= depuisT * 86400000))));
     const filtreSiteT = filtreTableau(optionsP, effP, (v) => { choisirP(v); setFiltreT((f) => ({ ...f, compte: '' })); });
     const filtresT = [
@@ -34205,6 +34215,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
       <FiltrePlateformes ecran="ventes" options={optionsP} valeur={effP} onChange={choisirP} className="n-fp-nu"/>
+      {filtreCompteTel ? <div className="n-vt-compte-tel" data-ventes-compte-tel={effC || 'tous'}><FiltreSeulVentes filtre={filtreCompteTel}/></div> : null}
       {visibles.length > 0 && (
         <div className="vrm-toutes-etats" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
           {visibles.map(([s, k, txt]) => <div key={s} data-toutes-etat-site={s} data-etat={k} style={{ color: (k === 'pas-su' || k === 'partiel') ? C.warn : C.muted }}>{txt}</div>)}

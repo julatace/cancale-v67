@@ -30,4 +30,5 @@ export default {
   "verre2.msg.propose": "{qui} propose",
   "verre2.fiche.histoire": "Historique",
   "verre2.fiche.toutVoir": "Tout voir",
+  "verre2.msg.aRepondre": "À répondre",
 };

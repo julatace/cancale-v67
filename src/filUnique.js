@@ -24,6 +24,8 @@ const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().
 // l'écran ouvre alors CETTE conversation dans son propre fil, avec ses règles
 // d'envoi (extension, recette APPRISE, 50 actions/h) — ce module n'envoie rien.
 
+import { estQuestion, sansReponse } from './questionsEbay.js';   // (27 nov.) « à répondre » : la règle des questions eBay
+
 export const CLE_FILS_RELIES = 'vrm_fils_relies';
 export const PLATEFORMES_FIL = ['vinted', 'leboncoin', 'vestiaire', 'ebay'];
 
@@ -46,7 +48,7 @@ export const instantFil = (v) => {
 
 // ── Les conversations, une forme pour toutes ─────────────────────────────────
 // { cle, plateforme, compte, conv, interlocuteur, annonce, tx, num, at, apercu,
-//   deMoi, nonLu, titre, photo, nom }
+//   deMoi, nonLu, titre, photo, nom, aRepondre }
 // `interlocuteur`, `annonce`, `tx` sont préfixés par la plateforme : un id Vinted
 // n'est jamais égal à un id Leboncoin.
 const entree = (o) => ({
@@ -59,6 +61,7 @@ const entree = (o) => ({
   at: instantFil(o.at), apercu: txt(o.apercu), deMoi: o.deMoi === true ? true : o.deMoi === false ? false : null,
   nonLu: o.nonLu === true ? true : o.nonLu === false ? false : null,
   titre: txt(o.titre), photo: o.photo || null, nom: txt(o.nom),
+  aRepondre: o.aRepondre === true,
 });
 // Vinted : la conversation de la boîte (`opposite_user.id`) et sa paire PAR IDENTITÉ
 // (`paireDeConv` de l'app : transaction → annonce → N° posé sur CETTE annonce).
@@ -100,7 +103,26 @@ export function convEbay(m, compte, num = '') {
   const rep = Array.isArray(m.responses) ? m.responses.filter(Boolean) : [];
   return entree({ plateforme: 'ebay', compte: compte || 'principal', conv: m.id, annonce: m.itemId, interlocuteur: m.sender, num,
     at: m.date, apercu: rep.length ? rep[rep.length - 1] : (m.body || m.subject || ''), deMoi: rep.length > 0,
-    nonLu: /^unanswered$/i.test(String(m.status || '')) ? true : rep.length ? false : null, titre: m.titre, nom: '' });
+    nonLu: /^unanswered$/i.test(String(m.status || '')) ? true : rep.length ? false : null, titre: m.titre, nom: '', aRepondre: estQuestion(m) && sansReponse(m) });
+}
+
+// ── (27 nov., Julien) LES QUESTIONS eBAY SANS RÉPONSE D'ABORD, dans Messages « Tous » ─────────────────────────────────────
+// Un fil « à répondre » porte une conversation eBay qui est une QUESTION d'acheteur sur une annonce (`estQuestion`) sans
+// AUCUNE réponse (`sansReponse` : la règle de src/questionsEbay.js, la même que « non lu » de Ma journée). Ces fils passent
+// en tête, la plus ANCIENNE attente d'abord (sans date lue : en dernier parmi elles) ; tout le reste garde SON ordre (la
+// règle du 12 nov. : du plus récent au plus ancien). L'identité du fil ne change pas (`ebay:{compte}:{id}`).
+export const attenteARepondre = (f) => {
+  const q = (f && Array.isArray(f.convs) ? f.convs : []).filter((c) => c && c.plateforme === 'ebay' && c.aRepondre === true);
+  if (!q.length) return null;
+  const t = q.map((c) => c.at).filter((x) => x != null);
+  return t.length ? Math.min(...t) : Infinity;
+};
+export function ordreARepondre(fils) {
+  const L = Array.isArray(fils) ? fils : [];
+  const avec = [], sans = [];
+  for (const f of L) (attenteARepondre(f) != null ? avec : sans).push(f);
+  avec.sort((a, b) => attenteARepondre(a) - attenteARepondre(b) || String(a.cle).localeCompare(String(b.cle)));
+  return [...avec, ...sans];
 }
 // Les identités de paire d'une conversation (vide ⇒ aucune).
 export const identitesPaire = (e) => [e.annonce && 'a:' + e.annonce, e.tx && 't:' + e.tx, e.num && 'n:' + e.num].filter(Boolean);
