@@ -30,6 +30,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., compta-export — Julien : « Fait la compta », « l'export comptable pour l'URSSAF ») src/exportComptable.js, src/exportUrssaf.js
+  { id: 'export-urssaf', date: '2026-11-27', titre: 'L’URSSAF : ta déclaration prête à recopier', phrase: 'Le montant, la ligne, le taux et les ventes, en PDF.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  { id: 'export-comptable-detail', date: '2026-11-27', titre: 'Export comptable : bénéfice vente par vente', phrase: 'Prix, achat, port, bénéfice ; un fichier pour Pennylane, Tiime, Indy.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (27 nov., retour-fonctions — Julien : trois fonctions d'avant les écrans natifs) src/filtrePlateforme.js, src/ecrans/Stats.jsx, src/filUnique.js
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
