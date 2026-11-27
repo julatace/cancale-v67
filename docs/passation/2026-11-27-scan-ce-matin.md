@@ -25,8 +25,9 @@ seulement (`lignesArrivee`, source `recu`), colis noté retiré (`opsRetire`), u
 
 **Deux scans** : le 2e scan du même code désigne le même achat ⇒ l'écran dit « Déjà rangé · N°… » ; aucune 2e paire.
 
-Preuves : `scripts/audit-scan-retrait.cjs` (20 verts, `--prouve` 10/10, rouge sur origin/main), dont 2 colis au même
-titre et 50 identiques. `audit-arrivee-scan` B3 et `audit-scan-achat-suite` B mis à jour (la caméra lit le code à
+Preuves : `scripts/audit-scan-retrait.cjs` (19 verts, `--prouve` 10/10, rouge sur origin/main), dont 2 colis au même
+titre et 50 identiques. Banc `arrivee-scan` scénario C (caméra simulée, QR du code de retrait, deux colis au même titre,
+« Écris N°13 », rescan sans 2e paire) : 256 verts aux 4 vues, C1 rouge sur le build d'origin/main. `audit-arrivee-scan` B3 et `audit-scan-achat-suite` B mis à jour (la caméra lit le code à
 l'arrivée ; la transaction reste tapée).
 
 ## 2. « Ce matin »
