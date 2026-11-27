@@ -323,6 +323,7 @@ async function tournee(nav, { W, theme, scenario }) {
   if (['annul', 'exclu', 'ko', 'egal'].includes(scenario)) {
     const A = await ANNUL(o.pg);
     await capture(o.pg, `e2-${scenario}-${W}-${theme}-annulations`);
+    if (SHOTS) await o.pg.locator('[data-stats-carte="sv-annulations"]').first().screenshot({ path: path.join(SHOTS, `e2-${scenario}-${W}-${theme}-carte-annulations.png`) }).catch(() => {});
     const de = (uid) => (A && A.comptes.find((c) => c.uid === uid && c.site === 'vinted')) || null;
     if (scenario === 'annul') {
       const b = de('222'), a = de('111');
@@ -350,7 +351,10 @@ async function tournee(nav, { W, theme, scenario }) {
     if (scenario === 'ko') {
       dit(!!A && !de('333'), 'A', `${T} un compte pas lu : aucune ligne inventée pour lui`, JSON.stringify(A));
       // Le compte pas lu est NOMMÉ par son identité dans la note de la carte (`data-sv-annul-manque`) : jamais un total qui se dit complet.
-      dit(!!A && (A.etat !== 'lu' || String(A.manque || '').split(',').includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
+      // (27 nov.) Nommé UNE fois : dans la note de la carte, ou — quand la ligne d'alerte le dit déjà (« Pas comparé : … pas lu ») —
+      // par elle seule (`data-sv-annul-alerte-manque`), la note ne le redit pas.
+      const nommes = [...String(A && A.manque || '').split(','), ...((A && A.alertes) || []).flatMap((x) => String(x.manque || '').split(','))];
+      dit(!!A && (A.etat !== 'lu' || nommes.includes('333')), 'A', `${T} un compte pas lu : nommé, la carte ne se présente pas comme complète`, JSON.stringify(A));
     }
   }
   dit(!o.journal.erreurs.length, 'V0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));

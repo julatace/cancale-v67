@@ -456,7 +456,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                               <span className="vg-fil-2">
                                 {f.num ? <span className="sb-plaque vg-fil-plaque"><small>N°</small>{f.num}</span> : null}
                                 <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? <span className="vg-fil-puce-offre" data-fil-offre-puce=""><Icon name="tag" size={13}/><span>{tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) })}</span></span> : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
-                                {attenteARepondre(f) != null ? <span className="vrm-msg-etat vg-fil-etat vg-fil-a-repondre" data-fil-a-repondre="">{tr('verre2.msg.aRepondre')}</span> : null}
+                                {attenteARepondre(f) != null ? <span className="vg-fil-etat vg-fil-a-repondre" data-fil-a-repondre="">{tr('verre2.msg.aRepondre')}</span> : null}
                                 {f.convs.length > 1 ? <span className="vrm-msg-etat vg-fil-etat" data-fil-relie="">{trj('messages.conv', { x: f.convs.length })}</span> : null}
                                 <PastilleArnaque motif={motif}/>
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}

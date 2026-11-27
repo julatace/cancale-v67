@@ -300,12 +300,13 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         // `confirme:true` sur CETTE question ; un message qui n'en est pas une : aucun champ, « Voir sur eBay » ; 44 px,
         // contraste d'Envoyer, aucun débordement.
         await aller(pg, 'tab=ebay_messages', '[data-fil^="ebay:"]');
-        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-fil^="ebay:"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => { const m = x.querySelector('[data-fil-a-repondre]'); return { fil: x.getAttribute('data-fil'), num: x.getAttribute('data-fil-num'), nonlu: x.getAttribute('data-nonlu'), aRep: !!(m && m.getClientRects().length), attente: x.getAttribute('data-fil-attente') }; }));
+        const L = await pg.evaluate(() => [...document.querySelectorAll('[data-fil^="ebay:"]')].filter((x) => x.getBoundingClientRect().height > 0).map((x) => { const m = x.querySelector('[data-fil-a-repondre]'); const cs = m ? getComputedStyle(m) : null; return { fil: x.getAttribute('data-fil'), num: x.getAttribute('data-fil-num'), nonlu: x.getAttribute('data-nonlu'), aRep: !!(m && m.getClientRects().length), attente: x.getAttribute('data-fil-attente'), fw: cs ? Number(cs.fontWeight) : null, fond: cs ? cs.backgroundColor : null, coul: cs ? cs.color : null, cls: m ? m.className : '' }; }));
         const ids = L.map((x) => x.fil).join(',');
         // (27 nov., Julien) Les QUESTIONS sans réponse d'abord, la plus ANCIENNE en tête (q1 il y a 20 h, puis q2 il y a 3 h) ; le reste
         // garde la règle du 12 nov., du plus récent au plus ancien (q4 qui n'est pas une question, q3 répondue). L'identité ne change pas.
         dit(ids === 'ebay:principal:q1,ebay:principal:q2,ebay:principal:q4,ebay:principal:q3', '« Tous » : un fil par échange eBay, par SON identité ; les questions sans réponse d’abord (la plus ancienne), puis du plus récent au plus ancien', ids);
         dit(L.filter((x) => x.aRep).map((x) => x.fil.split(':')[2]).join(',') === 'q1,q2' && L.filter((x) => x.attente === '1').length === 2, '« À répondre » sur les deux questions sans réponse, et elles seules (ni q4, message sans question, ni q3 répondue)', JSON.stringify(L));
+        dit(L.filter((x) => x.aRep).every((x) => x.fw >= 600), '« À répondre » se voit : en gras (le geste à faire, §7)', JSON.stringify(L.filter((x) => x.aRep)));
         const premier = await pg.evaluate(() => { const f = [...document.querySelectorAll('[data-fil]')].filter((x) => x.getBoundingClientRect().height > 0)[0]; return f ? f.getAttribute('data-fil') : ''; });
         dit(premier === 'ebay:principal:q1', '« Tous » : la plus ancienne question sans réponse est en TÊTE de la liste (avant les autres comptes)', premier);
         const num = Object.fromEntries(L.map((x) => [x.fil.split(':')[2], x.num]));
