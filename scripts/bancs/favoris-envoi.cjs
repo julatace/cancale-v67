@@ -138,7 +138,9 @@ let FP_CTX = null;
 try {
   const code = [blocBG('// <reglages-auto-ligne>', '// </reglages-auto-ligne>'), blocBG('// <message-sur-regle>', '// </message-sur-regle>'), blocBG('// <favoris-perso-regle>', '// </favoris-perso-regle>'),
     fonctionBG('prixTexteFavori'), fonctionBG('personnaliserMessageFavori'), fonctionBG('fpJugerTexte'), fonctionBG('fpApercu'), fonctionBG('favorisPersoCarte'),
-    fonctionBG('prixOffreFavori'), fonctionBG('offreFavoriDetail'), fonctionBG('plancherFavori'), fonctionBG('plancherBaisse'), fonctionBG('centimesPoses'), fonctionBG('favPersoCompte')].join('\n');
+    fonctionBG('prixOffreFavori'), fonctionBG('offreFavoriDetail'), fonctionBG('plancherFavori'), fonctionBG('plancherBaisse'), fonctionBG('centimesPoses'), fonctionBG('favPersoCompte'),
+    // 5.437 : `plancherFavori` superpose le prix mini posé à la publication (`pmSuperposer`, ligne des réglages) — le vrai bloc.
+    blocBG('// <prix-mini-pose-regle>', '// </prix-mini-pose-regle>'), fonctionBG('prixMiniPoseLu'), fonctionBG('cleNum')].join('\n');
   if (!/offreFavoriDetail/.test(code) || !/quoi === 'envoi'/.test(code)) throw new Error('la feuille d’envoi (favorisPerso · envoi) est absente du fond');
   const ctx = { Intl, Date, Math, Number, String, Array, Object, Set, Map, JSON, RegExp, isFinite, encodeURIComponent, FAVORIS_CARTE_MAX: 15, REGLE_MARGE_ACHAT: 110, noterDiag: () => {},
     ongletCarte: () => ({ url: 'https://www.vinted.fr/' }), compteConnecte: async () => '111', chrome: { storage: { local: { get: async () => ({}) } } },

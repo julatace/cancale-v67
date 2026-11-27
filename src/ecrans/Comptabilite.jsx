@@ -284,7 +284,8 @@ import { resumeVenteLot, titreDitLot } from "../venteLot.js";
 // ⟦← App.jsx #29⟧
 import CoutsVente from "../CoutsVente.jsx";
 // ⟦← App.jsx #30⟧
-import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "../faitsAchat.js";   // (17 nov., lot relier-taille)
+import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "../faitsAchat.js";
+import { lireFamilleCopiee, VERSION_META } from '../App.jsx';   // (26 nov., vitesse-webkit) offres des conversations gardées sur l'appareil   // (17 nov., lot relier-taille)
 import { FaitsAchat, NoteTailleAchats } from "../FaitsAchat.jsx";
 // ⟦← App.jsx #31⟧   // (17 nov., lot relier-tout-achat) la feuille « Relier un achat »
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "../fournisseurs.js";
@@ -792,7 +793,9 @@ function FichesNeuves({ annonces = null }) {
   const [prep, setPrep] = React.useState(null);
   const [deposees, setDeposees] = React.useState(() => new Set());
   React.useEffect(() => { let mort = false;
-    lireTout('id=like.vinted_brouillon_*&select=id,f:data->>ficheId').then((r) => { if (!mort && Array.isArray(r)) setDeposees(new Set(r.map((x) => String((x && x.f) || '')).filter(Boolean))); }).catch(() => {});
+    // (26 nov., vitesse-webkit) Deux listes de fiches montées ensemble (Annonces) relisaient la même famille : partagée 20 s
+    // (`cachedRow` : la lecture EN COURS aussi ; un « pas su » n'est jamais gardé).
+    cachedRow(`brouillons-fiches:${AUTH.user?.id || ''}`, () => lireTout('id=like.vinted_brouillon_*&select=id,f:data->>ficheId'), 20000).then((r) => { if (!mort && Array.isArray(r)) setDeposees(new Set(r.map((x) => String((x && x.f) || '')).filter(Boolean))); }).catch(() => {});
     return () => { mort = true; }; }, []);
   const toutes0 = load('vrm_fiches_neuves', {}) || {};
   // Le brouillon créé DEPUIS une fiche porte le N° de cette fiche (par l'identifiant rendu
@@ -1145,7 +1148,8 @@ const transpParSuivi = (transp) => (Array.isArray(transp) ? indexTranspParSuivi(
 // Mondial Relay, 3 en Shop2Shop) — se limiter aux 3 plus récentes faisait donc
 // disparaître un transporteur sur deux, et avec lui les points où Julien dépose
 // réellement la moitié de ses colis.
-const fetchDropOffPoints = async (uidsVivants) => {
+const fetchDropOffPoints = (uidsVivants) => capturePartagee('depot:' + [...(uidsVivants || [])].map(String).sort().join(','), () => fetchDropOffPointsBase(uidsVivants));
+const fetchDropOffPointsBase = async (uidsVivants) => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,cap:meta->>capturedAt`, { headers: sbAuth() });
     if (!res.ok) return { carriers: [], capturedAt: null };
@@ -1348,7 +1352,53 @@ const fetchCapturedLabelMetas = async (uid) => {
 // Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (21 nov., lot 77) Les lignes du colis RETOUR rangées par l'extension (5.431, `harvest_{uid}_retour_{tx}`) : 2 min.
-const LIGNES_RETOUR_CACHE = { v: undefined, at: 0 };
+const LIGNES_RETOUR_CACHE = { v: undefined, at: 0, p: null };
+// (26 nov., vitesse-webkit) LES LECTURES DE « VENDUS AILLEURS » (`chargerRetraitsMulti`) : la garde des offres, « masquer
+// ailleurs / retirer partout » et la carte « Vendus ailleurs » les lancent chacune, et chaque écran monté (Aujourd'hui,
+// Ventes…) aussi — Leboncoin et Vestiaire (blobs `items`/`ventes`) relus deux fois à l'ouverture (banc budget-vitesse,
+// Ma journée). Les QUATRE lectures sont partagées 15 s pour le MÊME vendeur ; une lecture ratée (un seul rejet) ou
+// une écriture vers ces lignes, un signal de l'extension (tout vidé, src/lecturesPartagees.js) ⇒ relue. Le calcul,
+// lui, reste fait par chaque appelant sur SES ventes et annonces.
+// (26 nov., vitesse-webkit) UNE LECTURE DE CAPTURES PARTAGÉE ENTRE LES ÉCRANS MONTÉS (points relais, détails des achats) :
+// chaque `Comptabilite` monté (Aujourd'hui, Achats, Colis…) la lançait à son tour (banc budget-vitesse, Achats : ×2 et ×3).
+// La lecture EN COURS et sa réponse servent 20 s, pour le MÊME vendeur ; oubliées à tout signal de l'extension, au retour du
+// réseau et à toute écriture qui peut porter des captures (`lecturesPartagees`). Une réponse « pas su » (`null`) n'est
+// jamais gardée.
+const _capturesPartagees = new Map();   // cle -> { qui, at, p }
+const oublierCapturesPartagees = () => _capturesPartagees.clear();
+try {
+  const lp0 = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp0 && typeof lp0.abonner === 'function') lp0.abonner('app_data?id=like.harvest_*', oublierCapturesPartagees);
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierCapturesPartagees); window.addEventListener('online', oublierCapturesPartagees); }
+} catch (_) {}
+const capturePartagee = (cle, lire) => {
+  const qui = AUTH.user?.id || '';
+  const e = _capturesPartagees.get(cle);
+  if (e && e.qui === qui && Date.now() - e.at < 20000) return e.p;
+  const p = Promise.resolve().then(lire);
+  const n = { qui, at: Date.now(), p };
+  _capturesPartagees.set(cle, n);
+  p.then((v) => { if (v == null && _capturesPartagees.get(cle) === n) _capturesPartagees.delete(cle); }, () => { if (_capturesPartagees.get(cle) === n) _capturesPartagees.delete(cle); });
+  return p;
+};
+const LECTURES_AILLEURS = { owner: '', at: 0, p: null };
+const oublierLecturesAilleurs = () => { LECTURES_AILLEURS.p = null; LECTURES_AILLEURS.at = 0; };
+try {
+  const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp && typeof lp.abonner === 'function') {
+    lp.abonner('app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_listings,vc_ventes)', oublierLecturesAilleurs);
+    lp.abonner('app_data?id=like.ebay_*', oublierLecturesAilleurs);
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierLecturesAilleurs); window.addEventListener('online', oublierLecturesAilleurs); }
+} catch (_) {}
+const lireLecturesAilleurs = (owner, lire) => {
+  const c = LECTURES_AILLEURS;
+  if (c.p && c.owner === owner && Date.now() - c.at < 15000) return c.p;
+  const p = Promise.allSettled(lire());
+  c.owner = owner; c.at = Date.now(); c.p = p;
+  p.then((r) => { if (c.p === p && r.some((x) => x.status !== 'fulfilled')) oublierLecturesAilleurs(); });
+  return p;
+};
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
 // ⟦← App.jsx #152⟧
@@ -1472,7 +1522,8 @@ const extractPickupPoints = (payload) => {
 // Lit les points relais OFFICIELS captés par l'extension quand Vinted les charge
 // (lignes harvest_{uid}_pickup_points). C'est LA liste que Vinted utilise, autour
 // de l'adresse de livraison. Fusionne tous les comptes, sans doublon.
-const fetchHarvestPickupPoints = async () => {
+const fetchHarvestPickupPoints = () => capturePartagee('points-vinted', fetchHarvestPickupPointsBase);
+const fetchHarvestPickupPointsBase = async () => {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_*_pickup_points&select=id,data`, {
       headers: sbAuth(),
@@ -1582,7 +1633,13 @@ const fetchOffresConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
     const filtre=uid==null?'id=like.harvest_%25_conv_%25':`id=like.harvest_${uid}_conv_%25`;
-    const rows = await lireTout(`${filtre}&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
+    // (26 nov., vitesse-webkit) Toutes les conversations (Aujourd'hui, Messages) : la famille GARDÉE sur l'appareil et revalidée
+    // par sa version (`lireFamilleCopiee`, src/copieLignes.js — le nombre de lignes, puis seulement celles écrites depuis ; un
+    // compte qui ne tombe pas juste ⇒ relue entière ; ratée ⇒ `null`). Avec leurs messages entiers, elle pesait ~300 Ko à
+    // CHAQUE ouverture d'Aujourd'hui (banc budget-vitesse, 2e ouverture). Les mêmes champs, la même règle ensuite.
+    const rows = uid == null
+      ? await lireFamilleCopiee('offresconv', `${filtre}&${OFFRES_CONV_FILTRE}`, `${VERSION_META},${OFFRES_CONV_SELECT.replace(/^select=id,/, '')}`)
+      : await lireTout(`${filtre}&${OFFRES_CONV_FILTRE}&${OFFRES_CONV_SELECT}`, { strict: true });
     if (rows === null) return null;
     const mr = messagesRetires();
     const out = new Map();
@@ -12581,20 +12638,30 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     (async () => {
       const c = LIGNES_RETOUR_CACHE;
       if (c.v !== undefined && Date.now() - c.at < 2 * 60 * 1000 && !lignesRetourV) { if (vivant) setLignesRetour(c.v); return; }
-      let v;
-      try {
-        const rows = await lireTout('id=like.harvest_*_retour_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sc:meta->>suiviCourant,sv:meta->>suivisVinted,transporteur:meta->>transporteur,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,cap:meta->>capturedAt,etapes:data->etapes', { strict: true });
-        if (!Array.isArray(rows)) v = null;
-        else {
-          v = {};
-          for (const r of rows) {
-            const m = RE_LIGNE_RETOUR.exec(String((r && r.id) || '')); if (!m) continue;
-            if (r.tx && String(r.tx) !== m[2]) continue;          // une ligne qui contredit son identifiant ne relie rien
-            v[m[2]] = { ...r, uid: m[1], tx: m[2], etapes: Array.isArray(r.etapes) ? r.etapes.slice(0, 30) : [] };
+      // (26 nov., vitesse-webkit) Plusieurs écrans montés ensemble (Aujourd'hui, Achats, Ventes…) partaient chacun lire la
+      // MÊME famille avant que la première réponse soit rangée (banc budget-vitesse, Achats : ×2). La lecture EN COURS est
+      // partagée ; un « relire » demandé (`lignesRetourV`) relit toujours.
+      if (c.p && !lignesRetourV) { const v0 = await c.p; if (vivant) setLignesRetour((prev) => (v0 === null && prev && typeof prev === 'object' ? prev : v0)); return; }
+      const lecture = (async () => {
+        let v;
+        try {
+          const rows = await lireTout('id=like.harvest_*_retour_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sc:meta->>suiviCourant,sv:meta->>suivisVinted,transporteur:meta->>transporteur,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,cap:meta->>capturedAt,etapes:data->etapes', { strict: true });
+          if (!Array.isArray(rows)) v = null;
+          else {
+            v = {};
+            for (const r of rows) {
+              const m = RE_LIGNE_RETOUR.exec(String((r && r.id) || '')); if (!m) continue;
+              if (r.tx && String(r.tx) !== m[2]) continue;          // une ligne qui contredit son identifiant ne relie rien
+              v[m[2]] = { ...r, uid: m[1], tx: m[2], etapes: Array.isArray(r.etapes) ? r.etapes.slice(0, 30) : [] };
+            }
           }
-        }
-      } catch (_) { v = null; }
-      if (v !== null || c.v === undefined) { c.v = v; c.at = Date.now(); }
+        } catch (_) { v = null; }
+        if (v !== null || c.v === undefined) { c.v = v; c.at = Date.now(); }
+        return v;
+      })();
+      c.p = lecture;
+      lecture.finally(() => { if (c.p === lecture) c.p = null; }).catch(() => {});
+      const v = await lecture;
       if (vivant) setLignesRetour((prev) => (v === null && prev && typeof prev === 'object' ? prev : v));
     })();
     return () => { vivant = false; };
@@ -12691,12 +12758,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     let vivant = true;
     (async () => {
       try {
-        const r = await fetch('/api/email-rattacher?mode=reclasser', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}' });
+        // (26 nov., vitesse-webkit) `vrmInvalideSiChange` : le passage ne vide plus TOUTES les lectures partagées au départ et
+        // au retour (banc budget-vitesse : empreintes de photos, reçus… relus à l'ouverture d'Achats) ; c'est ICI qu'elles
+        // sont vidées, et seulement s'il a rangé quelque chose (il peut rejouer un e-mail : tout est vidé, comme avant).
+        const r = await fetch('/api/email-rattacher?mode=reclasser', { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: '{}', vrmInvalideSiChange: true });
         if (!r.ok) return;
         const j = await r.json().catch(() => null);
         try { localStorage.setItem('vrm_reclasse_retours_at', String(Date.now())); } catch (_) {}
         // (15 nov., lot retour-parfait) + un transporteur lu sur l'étiquette d'un bordereau de retour d'avant : relu.
         if (vivant && j && ((Array.isArray(j.faits) && j.faits.length) || (Array.isArray(j.transporteurs) && j.transporteurs.length))) {
+          try { const lp = window.__vrmLecturesPartagees; if (lp && typeof lp.invalider === 'function') lp.invalider(); viderLecturesMemo(); } catch (_) {}
           RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; EMAILS_LITIGES_CACHE.v = undefined; EMAILS_LITIGES_CACHE.at = 0;
           setRetoursVersion((n) => n + 1);
         }
@@ -14132,7 +14203,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // une étiquette lue ⇒ les bordereaux sont relus (le transporteur apparaît sans recharger la page).
   useEffect(() => { if (Array.isArray(emailBords) && (curSub==='bordereaux'||curSub==='ventes'||curSub==='journee')) lireEtiquettesManquantes(emailBords); /* eslint-disable-next-line */ }, [emailBords, sub]);
   useEffect(() => {
-    const relire = () => { fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
+    const relire = () => { fetchEmailBordereaux({ force: true }).then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
     // (22 nov., défaut « Argent bloqué ») Un écran gardé CACHÉ ne recopie pas sa liste (React le rendrait quand même, en
     // arrière-plan, à chaque signal) : il note, et redessine UNE fois à son retour.
     let aRedessiner = false;
@@ -14528,7 +14599,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.
       else if (ev.quoi === 'suivi') relireSuivisVinted();
       // (21 nov., 5.431) Le colis RETOUR d'une vente relu par l'extension.
-      else if (ev.quoi === 'retour') { LIGNES_RETOUR_CACHE.at = 0; setLignesRetourV((n) => n + 1); }
+      else if (ev.quoi === 'retour') { LIGNES_RETOUR_CACHE.at = 0; LIGNES_RETOUR_CACHE.p = null; setLignesRetourV((n) => n + 1); }
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // (24 oct., 5.290) Un statut lu chez le transporteur par l'extension
@@ -16981,7 +17052,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (!besoinDetailsAchats || detailsAchats !== undefined) return undefined;
     let stop = false;
     (async () => {
-      const rows = await lireTout(SELECT_DETAILS_ACHATS, { strict: true }).catch(() => null);
+      const rows = await capturePartagee('details-achats', () => lireTout(SELECT_DETAILS_ACHATS, { strict: true }).catch(() => null));
       if (!stop) setDetailsAchats(detailsDeLignes(rows));
     })();
     return () => { stop = true; };
@@ -21827,7 +21898,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const annonces = [],
       ventes = [],
       completes = [];
-    const resultats = await Promise.allSettled([
+    const resultats = await lireLecturesAilleurs(owner, () => [
       lireTout(
         `owner=eq.${encodeURIComponent(owner)}&id=in.(lbc_listings,lbc_ventes,lbc_accounts)&select=id,owner,items:data->items,ventes:data->ventes,accounts:data->accounts,lectures:data->lectures`,
         { strict: true },
