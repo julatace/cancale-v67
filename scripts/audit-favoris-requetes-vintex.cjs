@@ -63,6 +63,9 @@ const MUTATIONS = {
   'sans-page-annonce': ["const h = await vintedGetHtml(acc, `/items/${encodeURIComponent(itemId)}`);", "const h = null;"],
   'sans-jeton-lecture': ["+(raw&&k<2?'?read_after_write_token='+encodeURIComponent(raw):'')", ""],
   'sans-prix-demande': ["const b = prixDansObjet(reponseDemande); if (b) return Object.assign(b, { source: 'demande' });", ""],
+  'sans-bail': ["  tour();\n  try { return await fn(); }", "  try { return await fn(); }"],
+  'carte-sans-bail': ["try { r = await avecBailFavori(st.uid, t.jeton, () => executerPourAppCoeur(", "try { r = await ((u, j, fn) => fn())(st.uid, t.jeton, () => executerPourAppCoeur("],
+  'auto-dressing-ancien': ["const pv=pl?await prixFavoriVivant(acc,uid,body.itemId,null).catch(()=>null):null;const px=pv&&!pv.frein&&pv.devise==='EUR'?pv.montant:null;", "const lu=pl?await dressingLu(String(uid)).catch(()=>null):null;const it=lu&&Array.isArray(lu.items)?lu.items.find(x=>x&&String(x.id)===String(body.itemId)):null;const px=it?prixCarte(it.price):null;"],
   'autorisation-incertaine': ["}catch{noterDiag('favori_autorisation_injoignable');return rep('refuse',0,'autorisation_expiree','autorisation');}", "}catch{return rep('incertain');}"],
   'variable-bloque': ["if (manques.size && [...manques].every((k) => NEUTRES.includes(k) && !val[k])) {", "if (false) {"],
   'sans-historique': ['if(ecritsAvant>0||(cv.pagination', 'if(false&&(cv.pagination'],
@@ -282,6 +285,18 @@ const court = (f, r) => JSON.stringify({ r: r && (r.json || r.erreur), v: f.j.vi
     dit(garde === 1 && apres === 0 && (f.appels || []).filter((a) => a === 'terminer').length === 2, `V33 compte rendu perdu (503) ⇒ rangé (${garde}) puis rejoué (${apres} restant)`, JSON.stringify(f.appels)); }
   { const src = fs.readFileSync(BG, 'utf8'); const i = src.indexOf('async function tickFavorisCarte'), k = src.indexOf("apiFavorisCarte(st.uid, 'suivant')", i);
     dit(i > 0 && k > i && /rejouerTerminers\(\)/.test(src.slice(i, k)), 'V34 la carte rejoue un compte rendu en souffrance AVANT de réserver le favori suivant'); }
+  // 5.455.5 : le pré-contrôle « sous prix mini » du mode auto lit le prix MAINTENANT, jamais un dressing ancien.
+  { const f = monter(Object.assign({}, MESUREE, { auto: true, dressing: [{ id: 101, title: 'B', price: { amount: '38.0', currency_code: 'EUR' } }], dressingAncien: true, article: { status: 200, body: { item: { id: 101, price: { amount: '60.0', currency_code: 'EUR' } } } } })); const r = await jouer(f);
+    dit(res(r).resultat === 'envoye' && parti(f), 'V44 auto : dressing ANCIEN à 38 € (sous le mini 40) mais l’article lu à 60 € ⇒ pas sauté à tort, envoyé', court(f, r)); }
+  { const f = monter(Object.assign({}, MESUREE, { auto: true, article: { status: 200, body: { item: { id: 101, price: { amount: '39.0', currency_code: 'EUR' } } } } })); const r = await jouer(f);
+    dit(res(r).resultat === 'ignore' && res(r).raison === 'sous_prix_mini' && !ecr(f).length, 'V44b auto : l’article lu à 39 € (sous le mini 40) ⇒ sauté AVANT toute écriture', court(f, r)); }
+  // 5.455.5 (C7/C8) : le bail renouvelé tant que la tentative est menée, plus rien après ; la carte ET le mode auto le tiennent.
+  { const f = monter(MESUREE); f.ctx.__vrmBailFavoriMs = 40; f.ctx.globalThis && (f.ctx.globalThis.__vrmBailFavoriMs = 40);
+    await f.ctx.avecBailFavori(UID, JETON, () => new Promise((ok) => setTimeout(ok, 230)));
+    const n1 = (f.appels || []).filter((x) => x === 'prolonger').length; await new Promise((ok) => setTimeout(ok, 100)); const n2 = (f.appels || []).filter((x) => x === 'prolonger').length;
+    dit(n1 >= 3 && n2 === n1, `V42 le bail est renouvelé pendant la tentative (${n1} fois) et plus après (${n2})`, JSON.stringify(f.appels)); }
+  { const src = fs.readFileSync(BG, 'utf8'); const tc = src.slice(src.indexOf('async function tickFavorisCarte'), src.indexOf('async function favorisPourCarte')); const pi = src.slice(src.indexOf('async function piloteFavorisTick'), src.indexOf('// ══ 5.410 — LA VEILLE DES REPUBLICATIONS'));
+    dit(/avecBailFavori\(st\.uid, t\.jeton, \(\) => executerPourAppCoeur/.test(tc) && /avecBailFavori\(uid, tr\.jeton, \(\) => executerPourAppCoeur/.test(pi), 'V43 la carte et le mode auto tiennent le bail de bout en bout'); }
   console.log(ko ? `❌ favoris par requêtes comme Vintex : ${ko} rouge(s), ${ok} vert(s)` : `✅ favoris par requêtes comme Vintex : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);
 })();

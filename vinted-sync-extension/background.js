@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.455.4';
+const CODE_VERSION = '5.455.5';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -22642,7 +22642,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
   // 5.437 (mode AUTO) : une annonce dont le prix est déjà AU plancher ou dessous (prix mini, sinon achat + 10 %) ne reçoit
   //    rien — l'offre « part toujours » ne pourrait pas être sous le prix. Jugé AVANT toute écriture (aucune conversation).
-  if(body&&body.auto===true&&offre){const pl=await plancherFavori(body.itemId).catch(()=>null);const lu=pl?await dressingLu(String(uid)).catch(()=>null):null;const it=lu&&Array.isArray(lu.items)?lu.items.find(x=>x&&String(x.id)===String(body.itemId)):null;const px=it?prixCarte(it.price):null;if(pl&&Number(px)>0&&pl.c>=Math.round(Number(px)*100)){noterDiag('favori_auto_sous_prix_mini');return rep('ignore',0,'sous_prix_mini');}}
+  //    5.455.5 : le prix LU MAINTENANT (`prixFavoriVivant` : article, page, dressing de moins de 10 min), jamais un dressing ancien ;
+  //    pas su ⇒ rien n'est conclu ici (la transaction de la demande tranchera, plancher compris).
+  if(body&&body.auto===true&&offre){const pl=await plancherFavori(body.itemId).catch(()=>null);const pv=pl?await prixFavoriVivant(acc,uid,body.itemId,null).catch(()=>null):null;const px=pv&&!pv.frein&&pv.devise==='EUR'?pv.montant:null;if(pl&&Number(px)>0&&pl.c>=Math.round(Number(px)*100)){noterDiag('favori_auto_sous_prix_mini');return rep('ignore',0,'sous_prix_mini');}}
   const nA=offre?3:2;
   // 5.410.4 : SES filtres des favoris (par article, même acheteur réécrit trop tôt) tenus aussi AU GESTE (mode auto compris).
   {const RBf=await bleamCompte(uid).catch(()=>null);if(RBf&&RBf.favoris&&RBf.favoris.actif){const rf=favoriFiltre({item:body.itemId,acheteur:body.recipientId},Object.assign({},RBf.favoris,{noteMin:0,apresMin:0,periodeJours:0}),await contactsFavoris(String(uid)),Date.now());if(rf){noterDiag('favori_filtre_'+rf);return rep('ignore',0,'filtre_'+rf);}}}
@@ -23137,8 +23139,10 @@ const BAIL_FAVORI_MS = 30000;
 async function avecBailFavori(uid, jeton, fn) {
   let fini = false, enVol = false;
   const ms = Number(globalThis.__vrmBailFavoriMs) > 0 ? Number(globalThis.__vrmBailFavoriMs) : BAIL_FAVORI_MS;
-  const t = setInterval(() => { if (fini || enVol) return; enVol = true; apiFavorisCarte(String(uid), 'prolonger', { jeton }).then((r) => noterDiag(r && r.ok ? 'favori_bail_renouvele' : 'favori_bail_refuse')).catch(() => {}).finally(() => { enVol = false; }); }, ms);
-  try { return await fn(); } finally { fini = true; clearInterval(t); }
+  let t = null;
+  const tour = () => { t = setTimeout(async () => { if (fini) return; if (!enVol) { enVol = true; try { const r = await apiFavorisCarte(String(uid), 'prolonger', { jeton }); noterDiag(r && r.ok ? 'favori_bail_renouvele' : 'favori_bail_refuse'); } catch (_) {} enVol = false; } if (!fini) tour(); }, ms); };
+  tour();
+  try { return await fn(); } finally { fini = true; try { clearTimeout(t); } catch (_) {} }
 }
 async function rejouerTerminers() {
   let l = []; try { l = (await chrome.storage.local.get(TERMINER_EN_ATTENTE))[TERMINER_EN_ATTENTE]; } catch (_) { return false; }

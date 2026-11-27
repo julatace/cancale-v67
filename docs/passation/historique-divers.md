@@ -2407,3 +2407,7 @@ puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passati
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (place pour la 5.455.4, sous 60 Ko)
 
 - **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (place pour la 5.455.5, sous 60 Ko)
+
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.

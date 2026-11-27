@@ -63,3 +63,28 @@ test('5.455.4 : « prix pas lu en euros » saute CE favori (refus local nommé)'
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'offre_prix_inconnu',ecrits:1,etape:'historique',maintenant:102000});
  assert.equal(f.valeur.active,true);assert.ok(f.valeur.raison.includes(MOTS_REFUS.offre_prix_inconnu));
 });
+// 5.455.5 (revue C7/C8) : le BAIL. Renouvelé, la tentative tient au-delà de 60 / 90 / 120 s (autorisation, vérification, abandon) ;
+//    sans renouvellement, l'abandon tombe comme avant ; un 2ᵉ Chrome ne réserve rien tant que le bail tient ; borne de 15 min.
+import {prolongerFile,verifierReservation,BAIL_MAX_MS} from '../../api/_lib/favoris-file.js';
+test('5.455.5 : le bail renouvelé tient l’autorisation et la tentative ; sans lui, l’abandon tombe à 2 min',()=>{
+ const owner='owner-fixture',targets=[1,2].map(i=>({notificationId:'n'+i,itemId:String(100+i),recipientId:String(200+i),initiator:'native-fixture'}));
+ let d=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot1'}).data;
+ d=reserverFile(d,{owner,maintenant:100000,jeton:'j1',suivi:'s'}).data;
+ d=prolongerFile(d,{owner,jeton:'j1',maintenant:150000}).data;
+ d=consommerFile(d,{owner,maintenant:195000,jeton:'j1'}).data;               // 95 s après la réservation : accepté (renouvelé à 50 s)
+ d=prolongerFile(d,{owner,jeton:'j1',maintenant:230000}).data;
+ assert.equal(verifierReservation(d,{owner,jeton:'j1',maintenant:300000}).valeur.autorise,true);   // 200 s après
+ d=prolongerFile(d,{owner,jeton:'j1',maintenant:330000}).data;
+ const autre=reserverFile(d,{owner,maintenant:400000,jeton:'j2'});             // un 2ᵉ Chrome, 300 s après : rien
+ assert.equal(autre.valeur.travail,undefined);assert.equal((autre.data||d).groupes[owner].jobs[0].etat,'reserve');
+ const f=terminerFile(d,{owner,jeton:'j1',resultat:'envoye',ecrits:3,maintenant:410000});assert.equal(f.valeur.jobs[0].etat,'envoye');
+ // sans renouvellement : 2 min ⇒ incertain (comme avant)
+ let e=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot2'}).data;
+ e=reserverFile(e,{owner,maintenant:100000,jeton:'k1'}).data;e=consommerFile(e,{owner,maintenant:100000,jeton:'k1'}).data;
+ const g=reserverFile(e,{owner,maintenant:221000,jeton:'k2'});assert.equal(g.data.groupes[owner].jobs[0].etat,'incertain');
+ assert.throws(()=>consommerFile(lancerFile(null,{owner,targets,message:'B',intervalleMinutes:0,maintenant:0,lot:'l3'}).data,{owner,maintenant:0,jeton:'x'}));
+ // borne absolue
+ let h=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot4'}).data;h=reserverFile(h,{owner,maintenant:100000,jeton:'m1'}).data;
+ for(let t=130000;t<100000+BAIL_MAX_MS;t+=60000)h=prolongerFile(h,{owner,jeton:'m1',maintenant:t}).data;
+ assert.throws(()=>prolongerFile(h,{owner,jeton:'m1',maintenant:100000+BAIL_MAX_MS+1000}));
+});
