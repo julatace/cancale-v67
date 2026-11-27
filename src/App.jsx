@@ -2573,7 +2573,13 @@ const detectSchema = async () => {
 // `photo_emprunte_{uid}`) : { 'vinted:<uid>': { [idAnnonce]: { [clé de photo]: empreinte } } }.
 // Une projection (jamais `select=data`), toutes les lignes (`Range`). Lecture ratée ⇒ `null`
 // (« pas vérifié », jamais « aucun doublon ») ; rien rangé ⇒ `{}`.
-const lireEmpreintesPhotos = async () => {
+// (26 nov., vitesse-webkit) Lue par Annonces (doublons de photos) ET par « même photo » : à l'ouverture, deux fois la même
+// famille à quelques secondes d'écart (banc budget-vitesse, Ma journée, Annonces, Achats). Une réponse RÉUSSIE sert 20 s
+// au voisin (src/memoCourt.js : jamais un « pas su », jamais un autre vendeur, oubliée à toute écriture, signal de
+// l'extension et au retour du réseau — voir `oublierMemosLectures`).
+const _memoEmpreintesPhotos = creerMemoCourt({ dureeMs: 20000 });
+const lireEmpreintesPhotos = () => _memoEmpreintesPhotos.lire((AUTH.user && AUTH.user.id) || '', lireEmpreintesPhotosBase);
+const lireEmpreintesPhotosBase = async () => {
   try {
     const out = {};
     for (let debut = 0; debut < 20000; debut += 1000) {
@@ -8482,7 +8488,14 @@ const lireRetoursAchat = async (c) => {
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
-const fetchEmailBordereaux = async () => {
+// (26 nov., vitesse-webkit) Lue par chaque écran monté (Aujourd'hui, Ventes, Achats… : un `Comptabilite` par onglet) et par
+// les colis sortants : à l'ouverture, la famille partait TROIS fois (banc budget-vitesse, Achats). Une réponse RÉUSSIE sert
+// 20 s aux voisins (src/memoCourt.js : jamais un « pas su », jamais un autre vendeur, oubliée à toute écriture et à tout
+// signal de l'extension) ; chaque appelant reçoit SA copie (lignes copiées). `force` relit (étiquettes lues).
+const _memoEmailBords = creerMemoCourt({ dureeMs: 20000 });
+const fetchEmailBordereaux = (opts = {}) => _memoEmailBords.lire((AUTH.user && AUTH.user.id) || '', fetchEmailBordereauxBase, { force: !!(opts && opts.force) })
+  .then((v) => (Array.isArray(v) ? v.map((x) => ({ ...x })) : v));
+const fetchEmailBordereauxBase = async () => {
   try {
     // ⚠️ SURTOUT PAS `select=data` : chaque bordereau embarque son PDF en
     // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
@@ -8773,6 +8786,17 @@ const publierVentesCoque = (ventes, ko) => {
 };
 // (22 nov.) Les mêmes, lues hors d'un composant (Annonces · « Vendue ») : `undefined` pas lu · `null` aucune lecture · tableau.
 const ventesCoqueLues = () => _ventesCoquePub.ventes;
+// (26 nov., vitesse-webkit) Les ventes de la coque PAR COMPTE, pour `lirePreuvesVenteVinted({ ventesConnues })` : seuls les
+// comptes dont la coque a LU des ventes (jamais un compte en échec, `ko` ; un compte sans vente lue n'y est pas ⇒ relu).
+// `null` tant que rien n'est lu. Annonces relisait sinon les ventes de tous les comptes (≈ 650 Ko) à chaque ouverture.
+const ventesConnuesCoque = () => {
+  const v = _ventesCoquePub.ventes;
+  if (!Array.isArray(v)) return null;
+  const ko = new Set((_ventesCoquePub.ko || []).map(String));
+  const out = {};
+  for (const o of v) { const u = o && o._acc && o._acc.vinted_user_id != null ? String(o._acc.vinted_user_id) : ''; if (!u || ko.has(u)) continue; (out[u] = out[u] || []).push(o); }
+  return out;
+};
 function useVentesCoque() {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -9083,7 +9107,13 @@ const fetchProInvoices = async ({metadata=false}={}) => {
 const SELECT_RECUS_ACHAT = 'id,subject:meta->>subject,article:meta->>article,prix:meta->>prix,transaction:meta->>transaction,'
   + 'account:meta->>account,uid:meta->>uid,receivedAt:meta->>receivedAt,filename:meta->>filename,type:meta->>type,'
   + 'texte:data->>texte,pdf:meta->>_pdf';
-const fetchEmailAchats = async () => {
+// (26 nov., vitesse-webkit) Achats, Ventes, la feuille du reçu… : chaque écran monté relisait les reçus à l'ouverture (banc
+// budget-vitesse, Achats : ×2). Une réponse RÉUSSIE sert 20 s aux voisins (src/memoCourt.js : jamais un « pas su », jamais un
+// autre vendeur, oubliée à toute écriture et à tout signal de l'extension) ; chaque appelant reçoit SES lignes (copiées).
+const _memoRecusAchat = creerMemoCourt({ dureeMs: 20000 });
+const fetchEmailAchats = () => _memoRecusAchat.lire((AUTH.user && AUTH.user.id) || '', fetchEmailAchatsBase)
+  .then((v) => (Array.isArray(v) ? v.map((x) => ({ ...x })) : v));
+const fetchEmailAchatsBase = async () => {
   try {
     // (1er nov.) Toutes les pages ; une page ratée = pas su (`null`).
     const rows = await lireTout(`id=like.email_achat_*&select=${SELECT_RECUS_ACHAT}`, { strict: true });
@@ -9530,15 +9560,23 @@ const lireTxnMeta = () => {
 const MEMO_LECTURES_MS = 20000;
 const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
 const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
-const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); };
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); _memoEmailBords.oublier(); _memoRecusAchat.oublier(); };
 try {
   const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
   if (lp && typeof lp.abonner === 'function') {
     lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
+    lp.abonner('app_data?id=like.photo_emprunte_*', () => _memoEmpreintesPhotos.oublier());
+    lp.abonner('app_data?id=like.email_bord_*', () => _memoEmailBords.oublier());
+    lp.abonner('app_data?id=like.email_achat_*', () => _memoRecusAchat.oublier());
+    lp.abonner(`app_data?id=eq.${ID_BORD_TRANSPORTEURS}`, () => _memoEmailBords.oublier());
     // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
     lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
   }
   if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
+  // Les empreintes de photos : oubliées au signal de l'extension et au retour du réseau, PAS à `onCloudReady` — leur lecture
+  // exige la session (sans elle : refusée, rien de gardé) et le nuage prêt ne change pas ces lignes ; oubliées là, la 1re
+  // lecture (avant le nuage) repartait une 2e fois à l'ouverture (banc budget-vitesse : Ventes, Achats, Messages ×2).
+  if (typeof window !== 'undefined') { const f = () => _memoEmpreintesPhotos.oublier(); window.addEventListener('vrm:ext', f); window.addEventListener('online', f); }
 } catch (_) {}
 onCloudReady(oublierMemosLectures);
 // Les transactions des preuves de vente (`lirePreuvesVenteVinted`) : la MÊME famille que `lireTxnMeta` (gardée sur
@@ -23893,7 +23931,10 @@ function SourceAgir({ comptesVinted }) {
   useEffect(() => {
     let mort = false;
     const lireEbay = async () => {
-      let j = null; try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }) }); j = r.ok ? await r.json() : null; } catch (_) { j = null; }
+      let j = null; try { const r = await fetch('/api/ebay', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ action: 'status' }),
+        // (26 nov., vitesse-webkit) « status » n'écrit que le registre `ebay_comptes` et les jetons `ebay_tokens*` (api/ebay.js,
+        // apprendrePrincipal / apprendreTypes / accessToken) : seules ces lectures sont oubliées, pas TOUTES (banc budget-vitesse).
+        vrmEcritLignes: ['ebay_comptes', 'ebay_tokens'] }); j = r.ok ? await r.json() : null; } catch (_) { j = null; }
       if (mort) return;
       if (!j || j.ok !== true) { setEbayJetons((x) => (x === undefined ? null : x)); return; }
       const m = {};
@@ -25596,17 +25637,20 @@ const dateCourteVc = (iso) => { const t = tempsVc(iso || ''); return t > 0 ? new
 // liste, avec son N° par IDENTITÉ (`ventesVcDe`). Trois états : `undefined` en
 // cours · `null` pas su (le total le NOMME) · liste ([] = aucune vente lue).
 // Relue quand l'extension dit qu'elle a rangé du Vestiaire.
-const _vcVentesLecture = { p: null, at: 0, d: undefined };
+const _vcVentesLecture = { p: null, at: 0, d: undefined, ok: false };
 function lireVentesVestiaire(force = false) {
-  if (!force && _vcVentesLecture.p && Date.now() - _vcVentesLecture.at < 5000) return _vcVentesLecture.p;
-  _vcVentesLecture.at = Date.now();
+  // (27 nov., vitesse-webkit) Un écran qui se MONTE plus tard (Argent, ~10 s après l'ouverture) reprend la dernière
+  // lecture RÉUSSIE de moins d'une minute au lieu de relire (banc budget-vitesse : lue 2 fois à l'ouverture d'Argent).
+  // Une lecture ratée ne pose rien (`d` reste tel quel) : la suivante relit. `force` (l'extension a rangé) relit toujours.
+  if (!force && _vcVentesLecture.p && Date.now() - _vcVentesLecture.at < (_vcVentesLecture.ok ? 60000 : 5000)) return _vcVentesLecture.p;
+  _vcVentesLecture.at = Date.now(); _vcVentesLecture.ok = false;
   _vcVentesLecture.p = (async () => {
     try {
       const j = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens`);
       if (!Array.isArray(j)) return null;
       const par = Object.fromEntries(j.map((x) => [x.id, x]));
       const d = { ventes: (par.vc_ventes && par.vc_ventes.ventes) || null, liens: (par.vc_listings && par.vc_listings.liens) || {} };
-      _vcVentesLecture.d = d;
+      _vcVentesLecture.d = d; _vcVentesLecture.ok = true;
       return d;
     } catch (_) { return null; }
   })();
@@ -39672,4 +39716,4 @@ export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabil
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
-export { ventesCoqueLues };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
+export { ventesCoqueLues, ventesConnuesCoque, lireFamilleCopiee, VERSION_META };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES
