@@ -20,7 +20,8 @@ Aucune donnée inventée en base, rien dans `vinted-sync-extension/`.
   `comptesQuiAnnulent` + `SEUILS_ANNULATIONS` (`src/ventesEcran.js` : ≥ 5 ventes et ≥ 2 annulations, autres comptes ≥ 5 ventes,
   part ≥ 2× ET ≥ 15 points au-dessus). Elle juge les **lignes de la carte** (toutes plateformes lues, la période choisie), pas une
   fenêtre de 30 jours à part : la phrase vient de la source de ses chiffres (§5).
-- Une ligne au-dessus des taux : « vendeuse_b annule plus : 50 % contre 0 % » + « Pourquoi ? » (chiffres et seuils).
+- Une ligne au-dessus des taux : « vendeuse_b annule nettement plus que tes autres comptes », SANS nombre (« même nombre jamais deux
+  fois » : la rangée dit déjà 50 %) ; « Pourquoi ? » donne les taux, « sur la période choisie » et les seuils.
 - **Pas su ≠ 0** : un compte connu mais pas lu (`manquants`) rend la comparaison partielle ⇒ rien n'est comparé ; la ligne dit
   « Pas comparé : X pas lu » (et la note du pied ne le redit pas). Une plateforme jamais lue n'a pas de comptes : rien de supposé.
 

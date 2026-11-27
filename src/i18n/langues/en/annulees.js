@@ -49,8 +49,8 @@ export default {
   "tableau.etat.attente": "Awaiting validation",
   "tableau.etat.corriger": "To fix",
   "tableau.etat.refusee": "Declined by Vestiaire",
-  "annul.alerte": "{compte} cancels more: {taux} vs {autres}",
-  "annul.alertePourquoi": "{a} cancellations out of {n} sales ({taux}), against {aA} out of {nA} ({autres}) on your other accounts, over the chosen period. VRM flags it from {minVentes} sales and {minAnnulees} cancellations, when the share is at least {facteur} times that of the other accounts and {points} points above it.",
+  "annul.alerte": "{compte} cancels much more than your other accounts",
+  "annul.alertePourquoi": "Over the chosen period: {a} cancellations out of {n} sales ({taux}), against {aA} out of {nA} ({autres}) on your other accounts. VRM flags it from {minVentes} sales and {minAnnulees} cancellations, when the share is at least {facteur} times that of the other accounts and {points} points above it.",
   "annul.alertePasLu": "Not compared: {comptes} not read",
   "annul.alertePasLuPourquoi": "An account that was not read has no figures: VRM does not compare your accounts while it is missing, rather than counting it as 0.",
 };

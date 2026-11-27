@@ -250,7 +250,7 @@ const ANNUL = async (pg) => {
       alertes: [...c.querySelectorAll('[data-sv-annul-alerte]')].filter((x) => x.getClientRects().length).map((x) => { const l = x.closest('[data-sv-annul]'); const premier = l && l.querySelector('[data-sv-annul-compte]');
         const pq = x.querySelector('[data-pourquoi]'); const r = (pq && pq.querySelector('summary') || x).getBoundingClientRect();
         return { uid: x.getAttribute('data-sv-annul-alerte'), site: x.getAttribute('data-sv-annul-alerte-site'), taux: x.getAttribute('data-taux'), autres: x.getAttribute('data-taux-autres'), manque: x.getAttribute('data-sv-annul-alerte-manque'),
-          avant: !!(premier && (x.compareDocumentPosition(premier) & Node.DOCUMENT_POSITION_FOLLOWING)), pourquoi: !!pq, pourquoiH: Math.round(r.height), pourquoiW: Math.round(r.width), texte: x.innerText.replace(/\s+/g, ' ').trim() }; }),
+          avant: !!(premier && (x.compareDocumentPosition(premier) & Node.DOCUMENT_POSITION_FOLLOWING)), pourquoi: !!pq, pourquoiTexte: pq ? (pq.querySelector('.vrm-pourquoi-texte') || pq).textContent.replace(/\s+/g, ' ').trim() : '', pourquoiH: Math.round(r.height), pourquoiW: Math.round(r.width), texte: x.innerText.replace(/\s+/g, ' ').trim() }; }),
       texte: c.textContent.replace(/\s+/g, ' ').slice(0, 300) };
   });
 };
@@ -341,7 +341,11 @@ async function tournee(nav, { W, theme, scenario }) {
     const al = (A && A.alertes) || [];
     if (scenario === 'annul') {
       dit(al.length === 1 && al[0].uid === '222' && al[0].site === 'vinted' && al[0].taux === '50' && al[0].autres === '0', 'A2', `${T} vendeuse_b annule nettement plus : UNE ligne, SON compte, 50 % contre 0 %`, JSON.stringify(al));
-      dit(al.length === 1 && al[0].avant && /vendeuse_b/.test(al[0].texte) && /50/.test(al[0].texte), 'A2', `${T} la ligne est AU-DESSUS des taux par compte et nomme le compte`, JSON.stringify(al));
+      dit(al.length === 1 && al[0].avant && /vendeuse_b/.test(al[0].texte), 'A2', `${T} la ligne est AU-DESSUS des taux par compte et nomme le compte`, JSON.stringify(al));
+      // (27 nov., « même nombre jamais deux fois ») La rangée du compte dit déjà 50 % : la ligne visible ne redit AUCUN taux ni nombre ;
+      // les chiffres, la période choisie et les seuils sont sous « Pourquoi ? ».
+      dit(al.length === 1 && !/\d/.test(al[0].texte), 'A2', `${T} la ligne visible ne redit aucun nombre (les taux sont sous « Pourquoi ? »)`, JSON.stringify(al));
+      dit(al.length === 1 && /50/.test(al[0].pourquoiTexte) && /\b0\b/.test(al[0].pourquoiTexte) && /période choisie/i.test(al[0].pourquoiTexte), 'A2', `${T} « Pourquoi ? » dit les taux et « sur la période choisie »`, JSON.stringify(al));
       dit(al.length === 1 && al[0].pourquoi && (!tel || (al[0].pourquoiH >= 44 && al[0].pourquoiW >= 44)), 'A2', `${T} « Pourquoi ? » donne le détail${tel ? ' (44 px au doigt)' : ''}`, JSON.stringify(al));
     }
     if (scenario === 'egal') dit(!al.length, 'A2', `${T} des parts proches : aucune alerte`, JSON.stringify(al));

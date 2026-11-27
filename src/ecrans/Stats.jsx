@@ -1378,7 +1378,8 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   // (27 nov., Julien : rendre l'alerte du 5 nov. de l'ancien écran Ventes · Vinted) UN COMPTE QUI ANNULE NETTEMENT PLUS QUE
   // LES AUTRES. La MÊME règle, importée (jamais recopiée) : `comptesQuiAnnulent` et ses seuils `SEUILS_ANNULATIONS`
   // (src/ventesEcran.js : au moins 5 ventes et 2 annulations, des autres comptes à au moins 5 ventes, une part ≥ 2× celle des
-  // autres ET ≥ 15 points au-dessus). Elle juge les lignes que la carte MONTRE (mêmes comptes, même période, mêmes chiffres :
+  // autres ET ≥ 15 points au-dessus). (27 nov., « même nombre jamais deux fois ») La ligne visible nomme le compte et le fait ;
+  // les taux, la période et les seuils sont sous « Pourquoi ? » (la rangée du compte dit déjà son taux). Elle juge les lignes que la carte MONTRE (mêmes comptes, même période, mêmes chiffres :
   // la phrase vient de la source de ses chiffres). « Pas su » n'est pas 0 (§5) : un compte connu mais pas lu (`manquants`)
   // rend la comparaison partielle ⇒ la règle ne compare rien, et la ligne dit qu'il n'est pas lu. Un compte exclu n'a pas de
   // ligne (écarté par `ventesAnnulees`) : jamais comparé, jamais nommé.
@@ -1389,7 +1390,7 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   const alerteAnnul = alertesA.length ? alertesA.map((x) => (
     <div key={x.uid} className="vrm-sv-annul-alerte" role="status" data-sv-annul-alerte={ligneDe(x).uid} data-sv-annul-alerte-site={SITE_A[ligneDe(x).plateforme]} data-taux={x.taux} data-taux-autres={x.tauxAutres}>
       <Icon name="info" size={16}/>
-      <span className="vrm-sv-annul-alerte-texte">{tr('annul.alerte', { compte: String(x.compte), taux: pctFr(x.taux), autres: pctFr(x.tauxAutres) })}</span>
+      <span className="vrm-sv-annul-alerte-texte">{tr('annul.alerte', { compte: String(x.compte) })}</span>
       <Pourquoi>{tr('annul.alertePourquoi', { a: x.annulees, n: x.n, taux: pctFr(x.taux), aA: x.annuleesAutres, nA: x.nAutres, autres: pctFr(x.tauxAutres), minVentes: SEUILS_ANNULATIONS.minVentes, minAnnulees: SEUILS_ANNULATIONS.minAnnulees, facteur: SEUILS_ANNULATIONS.facteur, points: SEUILS_ANNULATIONS.ecartPoints })}</Pourquoi>
     </div>))
     : manquantsA.length && lignesA.some((g) => g.n > 0) ? <div className="vrm-sv-annul-alerte" role="status" data-sv-annul-alerte="passu" data-sv-annul-alerte-manque={manquantsIdsA.map((x) => x.uid).join(',')}>
