@@ -2411,3 +2411,4 @@ puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passati
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (place pour la 5.455.5, sous 60 Ko)
 
 - **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
+- **27 nov. soir · FAVORIS RÉPARÉS (Julien : « tu dois faire comme les concurrents »), ext. 5.455.3** : l'identité est celle de la DEMANDE (`inquiries` article + personne) ; transaction rendue par la création ; relecture ×3 pour l'historique ; refus seulement sur contradiction LUE, raison nommée, CE favori sauté, la file continue. `2026-11-27-favoris-identite.md`. Geste : installer 5.455.3.

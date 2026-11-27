@@ -487,7 +487,6 @@ sans la fonction.
 ## 9. État actuel et décisions récentes
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
 - **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
-- **27 nov. soir · FAVORIS RÉPARÉS (Julien : « tu dois faire comme les concurrents »), ext. 5.455.3** : l'identité est celle de la DEMANDE (`inquiries` article + personne) ; transaction rendue par la création ; relecture ×3 pour l'historique ; refus seulement sur contradiction LUE, raison nommée, CE favori sauté, la file continue. `2026-11-27-favoris-identite.md`. Geste : installer 5.455.3.
 - **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
