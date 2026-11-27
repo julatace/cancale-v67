@@ -2255,6 +2255,7 @@ function vrmVerifVisible(sel) {
     if (x.envoi === 'en_cours') return TU('fl_e_encours');
     if (x.envoi === 'a_verifier') return TU('fl_e_verifier');
     if (x.envoi === 'pas_envoye') return TU('fl_e_pas');
+    if (x.raison === 'sans_acheteur') return TU('fl_e_sans_acheteur');   // 5.455.6 : la notification ne porte pas de personne
     if (x.raison === 'non_prouve') return TU('fl_e_prouve');
     if (x.raison === 'offre_prix') return TU('fl_e_prix');
     return TU('fl_e_pas');
@@ -2604,7 +2605,7 @@ function vrmVerifVisible(sel) {
   const mot6 = (k, d) => { const v = TU(k); return v === k ? TU(d) : v; };
   const RAISON_F6 = { annonce_indisponible: 'vendu', article_vendu: 'vendu', conversation_deja_contactee: 'deja', conversation_existante: 'deja', offre_sous_plancher: 'sous_mini',
     conversation_refusee: 'conv', texte_interdit: 'texte', texte_refuse: 'texte', vinted_robot: 'robot', vinted_frein: 'frein', pause_vinted: 'frein', offre_refusee: 'offre_refusee',
-    non_prouve: 'non_prouve', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
+    non_prouve: 'non_prouve', sans_acheteur: 'sans_acheteur', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
   const raison6 = (c) => mot6('f6_r_' + (RAISON_F6[c] || c || 'autre'), 'f6_r_autre');
   // La file qui compte pour les rangées : en cours, ou finie depuis moins de 6 h (la même borne que la ligne d'envoi).
   const fileVue6 = (e) => { const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };

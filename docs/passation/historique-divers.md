@@ -2446,3 +2446,8 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. soir (ameliorations-27nov, 2ᵉ fusion, place sous 60 Ko)
 
 - **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
+
+## Lignes de CLAUDE.md §9 déplacées telles quelles le 27 nov. nuit (place pour la 5.455.6, sous 60 Ko)
+
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
+- **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
