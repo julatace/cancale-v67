@@ -2392,3 +2392,7 @@ puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passati
 ## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. (place sous 60 Ko)
 
 - **26 nov. soir · FAVORIS PAR REQUÊTES « comme Vintex » (Julien : « A, fais comme Vintex »), ext. 5.455.0** : inquiries → conversation → transaction → offre → message, depuis la page, SEULES écritures permises (`ECRITURES_FAVORI`) ; garde-fous inchangés ; clics en réserve (`vrmFavorisChemin: 'interface'`). Bleam fait pareil (ancienne messagerie). `historique-divers.md`, fin. Geste : installer 5.455.0.
+
+## Ligne déplacée telle quelle de CLAUDE.md §9 (27 nov., < 60 000)
+
+- **27 nov. · « 978 216 » deux fois, un point en deux cartes** : un colis = ses identités (code lu aussi dans SA commande, n°, transaction), « à vérifier » compris ; un point = son adresse. `historique-colis-retraits.md`, fin. Geste : aucun (après fusion).
