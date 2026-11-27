@@ -232,7 +232,14 @@ const lignesToutes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[d
       console.log(`── ${qui} : A. la navigation`);
       await essaie(`${qui} : navigation`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() }, vrm_colis_retirer: { total: 3, prets: 3, sansCode: 0, aVerifier: 0, urgents: 0, at: maintenant.getTime() } } });
-        const pub = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } });
+        // (27 nov.) Le nombre publié BOUGE : posé à 2 par le banc, Ventes le republie à 3 (ses trois ventes à envoyer) — lu une fois
+        // au début, il donnait « pastille 3 ≠ publié 2 » quand la republication passait entre les deux lectures (rouge à tort, sous
+        // charge). On attend que la pastille dise le nombre publié DU MOMENT (10 s au plus), puis on relit les deux ensemble.
+        const lirePub = () => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } });
+        await pg.waitForFunction((tel) => { let p = null; try { p = JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) {}
+          const e = document.querySelector(tel ? 'nav[data-n-onglets] > .n-onglet[data-nav-entree="ventes"] .n-onglet-pastille' : '[data-n-laterale] [data-n-entree="ventes"] .n-pastille');
+          return !!e && e.textContent.trim() === String(p); }, tel, { timeout: 10000 }).catch(() => {});
+        let pub = await lirePub();
         if (tel) {
           // ⚠️ (26 nov., bancs natifs) LA BARRE NATIVE (NATIF.md §2 ; 21 nov., Julien : « garde les onglets ») : Aujourd'hui ·
           // Annonces · Ventes · Achats · Argent — plus de « Plus » (le Menu s'ouvre par la photo du compte, en haut à droite).
@@ -244,6 +251,7 @@ const lignesToutes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[d
           dit(barre.map((x) => x.entree).join('|') === 'journee|paires|ventes|achats|compta' && attendu.every(Boolean) && barre.map((x) => x.lib).join('|') === attendu.join('|'), `A. la barre du bas : Aujourd’hui · Annonces · Ventes · Achats · Argent (21 nov., onglets-menu ; langue ${langue})`, JSON.stringify({ barre, attendu }));
           dit(barre.length === 5 && barre.every((x) => x.h >= 44), 'A. chaque onglet ≥ 44 px', JSON.stringify(barre.map((x) => x.h)));
           const nVentes = (barre.find((x) => x.entree === 'ventes') || {}).n || '';
+          pub = await lirePub();
           dit(nVentes !== '' && nVentes === String(pub) && Number(nVentes) > 0, 'H. pastille de Ventes (colis à poster) = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify({ n: nVentes, pub }));
           // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre (dernière demande au navigateur).
           const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
@@ -285,6 +293,7 @@ const lignesToutes = (pg) => pg.evaluate(() => [...document.querySelectorAll('[d
           dit(!!col && ['garage', 'messages', 'emails', 'communaute'].every((x) => toutes.includes(x)), 'J. la colonne porte Stock, Messages, E-mails, Communauté', toutes.join('|'));
           // (21 nov., onglets-menu) UNE source par pastille, la même sur tous les écrans : Ventes = à poster, Achats = à retirer
           // (`badgesStables`) ; Annonces ne porte plus de nombre (pas un geste) ; rien sans nombre publié.
+          pub = await lirePub();
           const pubR = await pg.evaluate(() => { try { return String(JSON.parse(localStorage.getItem('vrm_colis_retirer')).total); } catch (_) { return null; } });
           dit(!!col && col.nombres.ventes === String(pub) && Number(pub) > 0, 'H. pastille de Ventes (colonne) = le nombre publié des colis à poster', JSON.stringify({ n: col && col.nombres, pub }));
           dit(!!col && Object.keys(col.nombres).every((k) => (k === 'ventes' && col.nombres[k] === String(pub)) || (k === 'achats' && col.nombres[k] === pubR)), 'J. aucun compteur sans nombre publié (Annonces, Messages, sites : rien) ; Achats = les colis à retirer publiés', JSON.stringify({ n: col && col.nombres, pubR }));
