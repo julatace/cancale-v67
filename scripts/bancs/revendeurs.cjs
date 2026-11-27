@@ -166,13 +166,14 @@ async function brancher(p){
    //  des sous-onglets de la tâche. On juge que l'ancien lien mène à la tâche du site, son
    //  filtre allumé (À traiter eBay : Ventes · eBay · À traiter ; Achats : Achats · site).
    {const t=site==='ebay'?'ventes':'achats';await p.goto(base+'/?tab='+tab+'&section='+(site==='ebay'?'agent':'achats'));
-    await p.locator(`[data-tache="${t}"][data-tache-site="${site}"]`).waitFor();
-    // (27 nov.) Le sélecteur à logos se tait quand un seul site a des données (SelecteurSites : moins de 2 options ⇒ rien) :
-    //  le filtre posé se lit sur la tâche elle-même (`data-tache-site`, la règle), le bouton allumé seulement s'il est montré.
-    const pr=await p.evaluate(()=>{const b=document.querySelector('[data-filtre-site] button[aria-pressed="true"]');return b?b.getAttribute('data-site'):(document.querySelector('[data-tache]')||{dataset:{}}).dataset.tacheSite||'';});
-    const sec=await p.locator('[data-tache]').getAttribute('data-tache-section');
-    check(pr===site && (site!=='ebay'||sec==='agent'),'ancien lien de section '+nom+' : la tâche du site, son filtre allumé');}
-   await p.goto(base+'/?tab='+tab);await p.locator(`[data-tache="ventes"][data-tache-site="${site}"]`).waitFor();
+    // (20 nov. soir, App.jsx rendreTache : « un lien &site=… d'hier ne fige plus personne sur un site ») L'ancien lien de
+    //  section mène à SA tâche ; seule une sous-section propre à un site (eBay · À traiter) garde ce site et sa section.
+    await p.locator(`[data-tache="${t}"]`).waitFor();
+    const st=await p.locator('[data-tache]').getAttribute('data-tache-site'),sec=await p.locator('[data-tache]').getAttribute('data-tache-section');
+    check(site!=='ebay'||(st==='ebay'&&sec==='agent'),'ancien lien de section '+nom+' : sa tâche'+(site==='ebay'?', eBay · À traiter':''));}
+   // (20 nov. soir, « plus de sélecteur de plateforme », App.jsx rendreTache) Une tâche montre TOUJOURS tous ses sites :
+   //  l'ancien lien d'un site ouvre Ventes, sans le figer sur ce site (seule une sous-section propre, eBay · À traiter, le garde).
+   await p.goto(base+'/?tab='+tab);await p.locator('[data-tache="ventes"]').waitFor();
    // La tâche est montée avant ses chiffres : on attend qu'ils soient RENDUS (résumé ou cases), borné.
    await p.locator('[data-tache="ventes"] .vrm-platform-summary, [data-tache="ventes"] [data-ventes-kpi]').first().waitFor({timeout:15000}).catch(()=>{});
    const sansNom=await p.locator('.vrm-app-shell button').evaluateAll(es=>es.filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&!e.getAttribute('aria-label')&&!e.getAttribute('title')&&!e.textContent.trim()&&!e.querySelector('img[alt]');}).length);
