@@ -120,6 +120,24 @@ const Jw = '11111111-1111-1111-1111-111111111111';
     const k1 = route.cleNotifColis({ ...l1, status: 'available' }, avant[0][0]), k2 = route.cleNotifColis({ ...l2, status: 'available' }, apres[0][0]);
     dit(k1 === k2, `${f.nom} : la clé de notification du rappel est celle de l'arrivée (pas de 2e notification)`, J([k1, k2]));
   }
+  // (27 nov., capture de Julien : « 978 216 » deux fois au même point) UN RAPPEL SEUL, sans arrivée connue : UNE ligne,
+  // celle de SON n° (une identité : l'arrivée qui viendra après tombera dessus), et rien d'inventé — ni code, ni QR. Sans
+  // code ni QR, l'app ne le compte jamais « à retirer » (pickupUnion, `emailSansCode` ⇒ « à vérifier », contrôlé plus bas).
+  for (const f of FORMES) {
+    base = new Map();
+    await envoyer(f.rappel, '2026-11-15T08:00:00Z');
+    const l = lignes(); const v = l.length === 1 ? l[0][1] : null;
+    dit(!!v && l[0][0] === `email_track_${f.carrier}_${f.suivi}` && !v.code && !v.qrB64 && !v.qrUrl, `${f.nom} : un rappel SEUL ⇒ une ligne, celle de son n°, sans code ni QR inventé`, J(l.map(([k, x]) => [k, x.status, x.code])));
+    // puis l'arrivée (traitée après, plus ancienne) : la MÊME ligne, le code de l'arrivée.
+    await envoyer(f.arrivee, '2026-11-13T08:00:00Z');
+    const l2 = lignes();
+    dit(l2.length === 1 && l2[0][1].code === f.code, `${f.nom} : rappel puis arrivée (lue après) ⇒ toujours UNE ligne, avec le code`, J(l2.map(([k, x]) => [k, x.status, x.code])));
+  }
+  {
+    const app = fs.readFileSync(path.join(R, 'src/ecrans/Comptabilite.jsx'), 'utf8');
+    dit(/const emailSansCode = emailList\.filter\(t => !codeRetrait\(t\.code\) && !qrImage\(t\) && !codeDeSaCommande\(t\)\);/.test(app) && /for \(const t of emailSansCode\) aVerifier\.push\(/.test(app), 'app : un colis d’e-mail sans code ni QR (un rappel seul) n’est jamais compté « à retirer » — « à vérifier »');
+    dit(/if \(nJuges\.has\(kc\) \|\| codesDispo\.has\(codeLigne\(t\)\)/.test(app), 'app : un « disponible » SANS n° au code d’un colis connu est ce colis (jamais un 2e) ; inconnu ⇒ « à vérifier » avec son code');
+  }
   // Un colis RETIRÉ ne se réveille pas : ni par un rappel plus ancien traité après, ni par un plus récent.
   for (const [quand, date] of [['plus ancien (traité après)', '2026-11-13T09:00:00Z'], ['plus récent', '2026-11-16T09:00:00Z']]) {
     base = new Map();

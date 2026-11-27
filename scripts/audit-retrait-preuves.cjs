@@ -67,18 +67,66 @@ async function controles(src, dit) {
   const F = P.fusionnerParCode(L, { codeDe, suiviDe, fusion: (m, s) => ({ ...s, ...m, fusion: [m.id, s.id] }) });
   dit(F.length === 3 && F.some((t) => t.id === 'b' && t.fusion) && !F.some((t) => t.id === 'a'), 'A6 une ligne par code de retrait (celle qui a le n° garde la place)', JSON.stringify(F.map((t) => t.id)));
   dit(F.some((t) => t.id === 'c') && F.some((t) => t.id === 'd'), 'A7 même code, deux n° différents : rien n\'est fusionné');
-  // (26 nov., capture de Julien) « 978 216 » compté au point, et la MÊME paire au MÊME code sous « Pas compté » (QR, limite dépassée).
-  if (typeof P.absorberAVerifierParCode !== 'function') { dit(false, 'A8 src/retraitPreuves.js exporte absorberAVerifierParCode'); }
+  // ── A8–A20 (27 nov., capture de Julien, Achats, point « Joubert Peintures ») ─────────────────────────────
+  // La MÊME paire, au MÊME code 978 216, deux fois : la moitié Vinted (« ton achat t'attend », SANS code écrit, sans limite,
+  // reliée à SA commande par la conversation) comptée « Au point · 20 nov. », et l'e-mail Vinted Go (n°, code « 978 216 »,
+  // QR, arrivé le 19, limite LUE le 25) sous « Pas compté ». Forme réelle (passation du 23 nov.), valeurs inventées.
+  if (typeof P.reunirParIdentite !== 'function') { dit(false, 'A8 src/retraitPreuves.js exporte reunirParIdentite (une moitié « à vérifier » et une moitié comptée du même colis : un colis)'); }
   else {
-    const fus = (m, s) => ({ ...s, ...m, qr: m.qr || s.qr, fusion: [m.id, s.id] });
-    const compte = [{ id: 'v', code: '978216', suivi: '', lieu: 'point' }];
-    const av = [{ kind: 'email', t: { id: 'q', code: '978216', suivi: '', qr: 'img' }, e: { etat: 'garde_depassee' } }, { kind: 'email', t: { id: 'z', code: '111111', suivi: '' }, e: {} }];
-    const r = P.absorberAVerifierParCode(compte, av, { codeDe, suiviDe, fusion: fus });
-    dit(r.liste.length === 1 && r.liste[0].qr === 'img' && r.aVerifier.length === 1 && r.aVerifier[0].t.id === 'z', 'A8 « à vérifier » au code d\'un colis compté : une carte (son QR la complète), plus rien sous « Pas compté »', JSON.stringify(r));
-    const r2 = P.absorberAVerifierParCode([{ id: 'v', code: '5', suivi: '1' }], [{ kind: 'email', t: { id: 'q', code: '5', suivi: '2' }, e: {} }], { codeDe, suiviDe, fusion: fus });
-    dit(r2.aVerifier.length === 1 && r2.liste[0].id === 'v' && !r2.liste[0].fusion, 'A9 même code, deux n° différents : rien n\'est fusionné');
-    const r3 = P.absorberAVerifierParCode(compte, [{ kind: 'email', t: { id: 'q', code: '978216', suivi: '' }, e: { etat: 'transporteur' } }], { codeDe, suiviDe, fusion: fus });
-    dit(r3.aVerifier.length === 1, 'A10 un incident du transporteur reste « à vérifier »');
+    const NOW = Date.UTC(2026, 10, 27, 8);
+    const POINT = 'Relais Vinted Go, Commerce du Banc, 1 Rue Imaginaire';
+    const convCode = new Map([['900001', '978216']]);                 // le code lu dans la conversation de SA commande
+    const cmdDe = (t) => (t && t.conv === 'c-900001' ? '900001' : (t && t.tx) || '');
+    const codesDe = (t) => [norm(t && t.code), convCode.get(cmdDe(t)) || ''];
+    const txDe = (t) => cmdDe(t);
+    const score = (t) => (norm(t.code) ? 4 : 0) + (t.lieu ? 2 : 0) + (t.qr ? 1 : 0);
+    const fiable = (t) => t.source !== 'vinted-commande';
+    const fus = (m, s) => ({ ...s, ...m, code: m.code || s.code, qr: m.qr || s.qr, lieu: m.lieu || s.lieu, limite: m.limite || s.limite });
+    const juger = (now) => (t) => (t.limite && Date.parse(t.limite + 'T23:59:59Z') < now ? { etat: 'delai_depasse' } : null);
+    const cle = (t) => t.suivi || t.cleLigne || '';
+    const opts = (now = NOW, extra = {}) => ({ codesDe, suiviDe, txDe, score, fiable, fusion: fus, juger: juger(now), cle, ...extra });
+    const moitieVinted = () => ({ id: 'v', source: 'vinted-commande', conv: 'c-900001', cleLigne: 'vc-1', code: '', suivi: '', lieu: POINT, status: 'available', arriveLe: '2026-11-20T09:00:00Z', limite: null });
+    // (A10) l'e-mail Vinted Go sans lieu écrit : la moitié Vinted, plus « complète » au score, ne doit pas faire foi pour la date.
+    const vintedGo = () => ({ id: 'g', carrier: 'vinted', suivi: '1792000000000099', code: '978 216', qr: 'img', lieu: '', status: 'available', arriveLe: '2026-11-19T08:00:00Z', limite: '2026-11-25' });
+    const avGo = () => ({ kind: 'email', t: vintedGo(), e: { etat: 'delai_depasse' }, o: null });
+    const moitieAvecCode = () => ({ ...moitieVinted(), code: '978216' });
+    const r = P.reunirParIdentite([moitieVinted()], [avGo()], opts());
+    const u = r.aVerifier[0] && r.aVerifier[0].t;
+    dit(r.liste.length === 0 && r.aVerifier.length === 1, 'A8 capture de Julien : la moitié Vinted (code de SA conversation) et l\'e-mail Vinted Go « 978 216 » sont UN colis — une ligne, plus de doublon', JSON.stringify({ l: r.liste.map((t) => t.id), v: r.aVerifier.map((x) => x.t.id) }));
+    dit(!!u && u.suivi === '1792000000000099' && u.qr === 'img' && u.lieu === POINT && Array.isArray(u.clesMoities) && u.clesMoities.includes('1792000000000099') && u.clesMoities.includes('vc-1'), 'A9 le colis réuni porte les identités des deux moitiés (n°, QR, le point, et les deux clés : « Retiré » marque les deux)', JSON.stringify(u));
+    const r10 = P.reunirParIdentite([moitieAvecCode()], [avGo()], opts());
+    const u10 = r10.aVerifier[0] && r10.aVerifier[0].t;
+    dit(!!u10 && u10.arriveLe === '2026-11-19T08:00:00Z' && u10.limite === '2026-11-25' && u.arriveLe === '2026-11-19T08:00:00Z', 'A10 sa date est celle du TRANSPORTEUR (19 nov., pas l\'estimation Vinted du 20) et sa limite celle qui a été LUE (25 nov.)', JSON.stringify(u10 && [u10.arriveLe, u10.limite]));
+    dit(!!r.aVerifier[0] && r.aVerifier[0].e && r.aVerifier[0].e.etat === 'delai_depasse', 'A11 limite LUE et passée ⇒ le colis réuni est « à vérifier » (badge « Date limite dépassée »), jamais compté');
+    const rAvant = P.reunirParIdentite([moitieVinted()], [{ kind: 'email', t: vintedGo(), e: { etat: 'sans_suivi' }, o: null }], opts(Date.UTC(2026, 10, 22, 8)));
+    dit(rAvant.liste.length === 1 && rAvant.aVerifier.length === 0 && rAvant.liste[0].suivi === '1792000000000099', 'A12 limite LUE pas encore passée ⇒ le colis réuni est compté « à retirer », une fois');
+    // Le code écrit différemment sur chaque moitié (« 978 216 » / « 978216 ») : la normalisation de l'appelant les égale.
+    const rFmt = P.reunirParIdentite([{ ...moitieAvecCode(), conv: '' }], [avGo()], opts());
+    dit(rFmt.liste.length === 0 && rFmt.aVerifier.length === 1, 'A13 « 978 216 » et « 978216 » écrits sur les deux moitiés : le même code, un colis');
+    // La transaction seule (le code pas lu dans la conversation) suffit aussi.
+    convCode.delete('900001');
+    const rTx = P.reunirParIdentite([moitieVinted()], [{ ...avGo(), t: { ...vintedGo(), code: '', tx: '900001' } }], opts());
+    dit(rTx.liste.length === 0 && rTx.aVerifier.length === 1, 'A14 la même transaction (sans code commun) : un colis');
+    convCode.set('900001', '978216');
+    // ── Les garanties gardées (esprit d'audit-identite : 50 paires identiques) ──
+    // 50 paires au même titre, au même point, aux mêmes dates, codes et commandes DIFFÉRENTS : jamais réunies.
+    const L50 = [], V50 = [];
+    for (let k = 0; k < 50; k++) {
+      L50.push({ id: 'v' + k, source: 'vinted-commande', titre: 'Nike Air Zoom Alphafly NEXT%', tx: String(800000 + k), code: String(100000 + k), suivi: '', lieu: POINT, status: 'available', arriveLe: '2026-11-20T09:00:00Z' });
+      V50.push({ kind: 'email', t: { id: 'g' + k, titre: 'Nike Air Zoom Alphafly NEXT%', suivi: String(1792000000000100 + k), code: String(200000 + k), qr: 'img', lieu: POINT, status: 'available', arriveLe: '2026-11-19T08:00:00Z', limite: '2026-11-25' }, e: { etat: 'delai_depasse' } });
+    }
+    const r50 = P.reunirParIdentite(L50, V50, opts());
+    dit(r50.liste.length === 50 && r50.aVerifier.length === 50 && r50.liste === L50, 'A15 50 paires identiques (titre, point, dates), codes et commandes différents : AUCUNE réunie', `${r50.liste.length}/${r50.aVerifier.length}`);
+    const rSans = P.reunirParIdentite([{ id: 'a', source: 'vinted-commande', code: '', suivi: '', lieu: POINT, titre: 'X' }], [{ kind: 'email', t: { id: 'b', code: '', suivi: '', lieu: POINT, titre: 'X' }, e: { etat: 'sans_suivi' } }], opts());
+    dit(rSans.liste.length === 1 && rSans.aVerifier.length === 1, 'A16 deux moitiés SANS identité commune (même titre, même point) : jamais réunies');
+    const rN = P.reunirParIdentite([{ id: 'v', code: '5', suivi: '1' }], [{ kind: 'email', t: { id: 'q', code: '5', suivi: '2' }, e: {} }], opts());
+    dit(rN.aVerifier.length === 1 && rN.liste.length === 1 && rN.liste[0].id === 'v', 'A17 même code, deux n° différents, aucune commande commune : rien n\'est réuni (on ne choisit pas)');
+    const rT = P.reunirParIdentite([{ id: 'v', code: '5', tx: '1' }], [{ kind: 'email', t: { id: 'q', code: '5', tx: '2' }, e: {} }], opts());
+    dit(rT.aVerifier.length === 1 && rT.liste.length === 1, 'A18 même code, deux commandes différentes : deux colis');
+    const rI = P.reunirParIdentite([moitieVinted()], [{ ...avGo(), e: { etat: 'transporteur' } }], opts());
+    dit(rI.aVerifier.length === 1 && rI.liste.length === 1, 'A19 un incident du transporteur reste à part « à vérifier »');
+    const rD = P.reunirParIdentite([vintedGo()], [{ kind: 'email', t: moitieVinted(), e: { etat: 'doute_meme_relais' } }], opts());
+    dit(rD.aVerifier.length === 1 && rD.liste.length === 1, 'A20 un « peut-être en double » reste à part (il n\'a pas d\'identité commune par définition)');
   }
 
   // ── B. Le doute « même point » ───────────────────────────────────────────
@@ -127,7 +175,11 @@ function cablage(dit) {
   const pu = app.slice(app.indexOf('const pickupUnion = useMemoParesseux('), app.indexOf('const groupesRelais = useMemoParesseux(') > 0 ? app.indexOf('const groupesRelais = useMemoParesseux(') : app.indexOf('const pickupUnion = useMemoParesseux(') + 40000);
   dit(/finParIdentite\(t, preuvesIdentite\(t, cmd\)\)/.test(pu) && /fi === 'retire'/.test(pu), 'D1 pickupUnion juge la fin par les autres identités (commande, code)');
   dit(/fusionnerParCode\(emailList/.test(pu), 'D2 pickupUnion : une ligne par code de retrait');
-  dit(/absorberAVerifierParCode\(emailList, aVerifier/.test(pu), 'D2b pickupUnion : un « à vérifier » au code d\'un colis compté est ce colis');
+  dit(/reunirParIdentite\(emailList, aVerifier, \{ codesDe: codesLigne, suiviDe: suiviDeLigne, txDe: txLigne/.test(pu), 'D2b pickupUnion : une moitié « à vérifier » et une moitié comptée de la même identité sont un colis');
+  dit(/const codesLigne = \(t\) => \{ const o = commandeLigne\(t\); return \[codeLigne\(t\), o \? normCode\(\(colisRelais\[String\(o\.transaction_id\)\]/.test(pu), 'D2c le code d\'une ligne est aussi celui lu dans la conversation de SA commande (la moitié Vinted n\'en écrit pas)');
+  dit(/fiable: \(t\) => t\.source !== 'vinted-commande'/.test(pu) && /juger: jugerReuni/.test(pu), 'D2d la ligne du transporteur fait foi, le colis réuni est rejugé (limite lue et passée ⇒ « à vérifier »)');
+  const cc = app.slice(app.indexOf('const gesteCollecte = (t, oui) =>'), app.indexOf('const gesteCollecte = (t, oui) =>') + 600);
+  dit(/clesDuColis\(t\)/.test(cc), 'D2e « Retiré » marque toutes les moitiés du colis réuni (`clesMoities`)');
   dit(/regrouperArrivees\(emailList, \{[^}]*temoins, sansIdentite(?:, temoinActif: [^}]*)? \}\)/.test(pu), 'D3 pickupUnion donne les témoins (finis compris) et la règle « sans identité »');
   dit(/enDouble/.test(pu) && /doute_meme_relais/.test(pu), 'D4 les doubles possibles sont à part : ni « à retirer », ni « à vérifier »');
   const tfb = app.slice(app.indexOf('const colisParTx = useLecteurParesseux('), app.indexOf('const achatStage ='));
@@ -153,8 +205,15 @@ function cablage(dit) {
       ['fin par la commande ignorée', 'preuves', (s) => s.replace('if (commande) for (const s of suivisDeAchat(commande) || []) if (s) out.add(s);', '')],
       ['fin par le code ignorée', 'preuves', (s) => s.replace('if (c && codes.has(c)) for (const s of codes.get(c)) out.add(s);', '')],
       ['pas de fusion par code', 'preuves', (s) => s.replace('if (!retire.size) return liste;', 'return liste;')],
-      ['« à vérifier » jamais absorbé par son code', 'preuves', (s) => s.replace('if (!parCode.size) return { liste, aVerifier };', 'return { liste, aVerifier };')],
-      ['« à vérifier » absorbé malgré deux n°', 'preuves', (s) => s.replace('if (sm && sv && sm !== sv) { garde.push(x); continue; }', '')],
+      ['le code ne relie plus (règle du 26 nov. : seulement le code écrit)', 'preuves', (s) => s.replace('const tx = croise(a.txs, b.txs), su = croise(a.suivis, b.suivis), co = croise(a.codes, b.codes);', 'const tx = croise(a.txs, b.txs), su = croise(a.suivis, b.suivis), co = false;')],
+      ['la transaction ne relie plus', 'preuves', (s) => s.replace('if (!(tx || su || co)) return false;', 'if (!(su || co)) return false;')],
+      ['deux n° de suivi réunis', 'preuves', (s) => s.replace('if (a.suivis.size && b.suivis.size && !su && !tx) return false;', '')],
+      ['deux commandes réunies', 'preuves', (s) => s.replace('if (a.txs.size && b.txs.size && !tx) return false;', '')],
+      ['réunies par ressemblance (toute paire au même point)', 'preuves', (s) => s.replace("const g = (id.codes.size || id.suivis.size || id.txs.size) ? groupes.find((x) => memeColisParIdentite(x.id, id)) : null;", 'const g = groupes[0] || null;')],
+      ['colis réuni pas rejugé', 'preuves', (s) => s.replace('const e = juger(f);', 'const e = null;')],
+      ['la date Vinted fait foi', 'preuves', (s) => s.replace('(fiable(b.t) ? 1 : 0) - (fiable(a.t) ? 1 : 0) || ', '')],
+      ['une seule clé pour « Retiré »', 'preuves', (s) => s.replace("...(cles.length ? { clesMoities: cles } : {})", '')],
+      ['incident du transporteur réuni', 'preuves', (s) => s.replace("if (et === 'transporteur' || et === 'doute_meme_relais') return;", "if (et === 'doute_meme_relais') return;")],
       ['témoins finis ignorés (règle d\'avant)', 'arrivee', (s) => s.replace('const doute = Array.isArray(temoins)', 'const doute = false')],
       ['adresse de réception ignorée', 'arrivee', (s) => s.replace('if (a.a && b.a) return a.a === b.a;\n  if (a.r && b.r) return a.r === b.r;', '')],
       ['fenêtre de jours ignorée', 'arrivee', (s) => s.replace('Math.abs(aw - at) <= fenetreJ * 86400000', 'true')],
