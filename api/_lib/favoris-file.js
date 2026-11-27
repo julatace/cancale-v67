@@ -128,12 +128,26 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
   return {data:d,valeur:vueFile(d,owner)};
 }
+// 5.455.5 (revue C7/C8) : LE BAIL d'une tentative. La file d'un compte Vinted n'a qu'UNE tentative en cours (`d.enCours`), quel
+// que soit le Chrome : c'est le verrou du compte. Tant que l'extension qui la mène est vivante, elle le RENOUVELLE (`prolonger`,
+// toutes les 30 s) : les fenêtres d'autorisation (60 s pour `consommer`, 90 s pour `verifier`) et l'abandon (120 s ⇒ « incertain »)
+// se comptent depuis le DERNIER renouvellement — une attente derrière une autre action, un envoi long, ne sont plus pris pour une
+// panne. Un worker tué ne renouvelle plus : l'abandon tombe 120 s après, comme avant. Borne absolue : BAIL_MAX_MS.
+export const BAIL_MAX_MS=15*60000;
+const depuisBail=e=>Math.max(Number(e.at)||0,Number(e.renouvele)||0);
+const bailExpire=(e,maintenant)=>maintenant-depuisBail(e)>120000||maintenant-(Number(e.at)||0)>BAIL_MAX_MS;
+export function prolongerFile(d,{owner,jeton,maintenant}){
+  d=initialiserFile(d);const e=d.enCours;
+  if(!e||e.owner!==owner||e.jeton!==jeton||!d.groupes[owner]?.active||bailExpire(e,maintenant))throw new RefusFavoris('La tentative n’est plus en cours.');
+  e.renouvele=maintenant;
+  return {data:d,valeur:{prolonge:true}};
+}
 export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
   if(Object.values(d.groupes).some(x=>x.jobs.some(j=>j.etat==='incertain')))return {valeur:{vue:{...vueFile(d,owner),raison:'Une tentative sur ce compte doit être vérifiée sur Vinted avant la suite.'}}};
   if(d.enCours){
-    if(maintenant-d.enCours.at>120000){
+    if(bailExpire(d.enCours,maintenant)){
       const autre=d.groupes[d.enCours.owner],j=autre?.jobs.find(x=>x.id===d.enCours.id);
       if(j)j.etat='incertain';if(autre){autre.active=false;autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';}
       // Keep the token: a late, exact receipt may still settle this attempt.
@@ -250,7 +264,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
 export const exige5280=j=>!!j?.offre||Number.isInteger(j?.pourcentage)&&j.pourcentage>0;
 export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version5280=true,version5309=true}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
-  if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
+  if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-depuisBail(e)>60000||maintenant-e.at>BAIL_MAX_MS)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
   const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
   if(!version5280&&exige5280(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci n’envoie pas la vraie offre Vinted aux favoris. Rien n’a été envoyé.');
   if(!version5281&&exige5281(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci ne sait pas faire les variables du message ni cette offre. Rien n’a été envoyé.');
@@ -266,7 +280,7 @@ export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;
-  if(!e||e.owner!==owner||e.jeton!==jeton||!e.autorise||!d.groupes[owner]?.active||maintenant<e.at||maintenant-e.at>90000)throw new RefusFavoris('La file est arrêtée ou l’autorisation a expiré.');
+  if(!e||e.owner!==owner||e.jeton!==jeton||!e.autorise||!d.groupes[owner]?.active||maintenant<e.at||maintenant-depuisBail(e)>90000||maintenant-e.at>BAIL_MAX_MS)throw new RefusFavoris('La file est arrêtée ou l’autorisation a expiré.');
   return {valeur:{autorise:true}};
 }
 export function arreterFile(d,owner){
@@ -304,7 +318,7 @@ export function cloreIncertains(d,{owner,maintenant}){
   if(!g.jobs.some(x=>['incertain','reserve'].includes(x.etat)))throw new RefusFavoris('Aucune tentative incertaine à clôturer.');
   const intervalle=Math.max(...g.jobs.filter(x=>['incertain','reserve'].includes(x.etat)).map(x=>x.intervalleMinutes));
   if(d.enCours?.owner===owner){
-    if(maintenant-d.enCours.at<=120000)throw new RefusFavoris('La tentative peut être encore en cours. Attends deux minutes avant de la clôturer.');
+    if(!bailExpire(d.enCours,maintenant))throw new RefusFavoris('La tentative peut être encore en cours. Attends deux minutes avant de la clôturer.');
     d.enCours=null;
   }
   for(const j of g.jobs){if(['incertain','reserve'].includes(j.etat))j.etat='verifie';else if(j.etat==='attente')j.etat='annule';}

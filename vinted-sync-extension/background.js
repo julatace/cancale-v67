@@ -23129,6 +23129,17 @@ async function terminerFavoriServeur(uid, jeton, brut) {
   }
   return r;
 }
+// 5.455.5 (revue C7/C8) : le BAIL de la tentative chez VRM, renouvelé toutes les 30 s tant que CE worker la mène (de la
+//    réservation au compte rendu) : une attente derrière une autre action ou un envoi long ne périment plus l'autorisation et ne
+//    passent plus pour « incertain » ; deux Chrome sur le même compte attendent le bail de l'autre. Worker tué ⇒ plus de
+//    renouvellement ⇒ abandon au bout de 2 min, comme avant (jamais un renvoi).
+const BAIL_FAVORI_MS = 30000;
+async function avecBailFavori(uid, jeton, fn) {
+  let fini = false, enVol = false;
+  const ms = Number(globalThis.__vrmBailFavoriMs) > 0 ? Number(globalThis.__vrmBailFavoriMs) : BAIL_FAVORI_MS;
+  const t = setInterval(() => { if (fini || enVol) return; enVol = true; apiFavorisCarte(String(uid), 'prolonger', { jeton }).then((r) => noterDiag(r && r.ok ? 'favori_bail_renouvele' : 'favori_bail_refuse')).catch(() => {}).finally(() => { enVol = false; }); }, ms);
+  try { return await fn(); } finally { fini = true; clearInterval(t); }
+}
 async function rejouerTerminers() {
   let l = []; try { l = (await chrome.storage.local.get(TERMINER_EN_ATTENTE))[TERMINER_EN_ATTENTE]; } catch (_) { return false; }
   if (!Array.isArray(l) || !l.length) return true;
@@ -25241,7 +25252,7 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     const s2 = await apiFavorisCarte(uid, 'suivant');
     const tr = s2.ok && s2.json && s2.json.travail;
     if (!tr || typeof tr.jeton !== 'string') return fin('pret', { uid });
-    let x = null; try { x = await executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true }); } catch (_) { x = null; }
+    let x = null; try { x = await avecBailFavori(uid, tr.jeton, () => executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true })); } catch (_) { x = null; }
     const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
     await terminerFavoriServeur(uid, tr.jeton, brut);
     // 5.437 : le BILAN du mode auto (par compte et par jour) — envoyés, sautés avec leur raison (vendu, sous le prix mini,
@@ -25478,7 +25489,7 @@ async function tickFavorisCarte() {
       let r = null;
       // 5.419 : le 1er message de CE lot part avec le temps d'écriture de son clic ; le message modifié pour cet envoi suit.
       const premierIci = !st.premierFait;
-      try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true, __manuel: t.auto !== true, __premier: premierIci, __texte: typeof st.texteEnvoi === 'string' ? st.texteEnvoi : null }); } catch (_) { r = null; }
+      try { r = await avecBailFavori(st.uid, t.jeton, () => executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true, __manuel: t.auto !== true, __premier: premierIci, __texte: typeof st.texteEnvoi === 'string' ? st.texteEnvoi : null })); } catch (_) { r = null; }
       const brut = r ? { ok: !!r.ok, code: r.code || undefined, data: r.data || null } : {};
       const f = await terminerFavoriServeur(st.uid, t.jeton, brut);
       const st2 = (await lireEtatFavorisCarte()) || st;
