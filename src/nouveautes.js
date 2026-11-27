@@ -30,6 +30,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., compta-export — Julien : « Fait la compta », « l'export comptable pour l'URSSAF ») src/exportComptable.js, src/exportUrssaf.js
+  { id: 'export-urssaf', date: '2026-11-27', titre: 'L’URSSAF : ta déclaration prête à recopier', phrase: 'Le montant, la ligne, le taux et les ventes, en PDF.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  { id: 'export-comptable-detail', date: '2026-11-27', titre: 'Export comptable : bénéfice vente par vente', phrase: 'Prix, achat, port, bénéfice ; un fichier pour Pennylane, Tiime, Indy.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (27 nov., lot scan-ce-matin — choix de Julien) src/aujourdhui/ceMatin.js, src/arriveeAchat.js `achatDuRetraitScan`
   { id: 'ce-matin', date: '2026-11-27', titre: '« Ce matin » en tête d’Aujourd’hui', phrase: 'Acheteurs, bordereaux, colis, offres, comptes : dans l’ordre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'scan-point-relais', date: '2026-11-27', titre: 'Scanne au point relais : la paire en stock', phrase: 'Le code de retrait suffit : retiré, numéroté, « Écris N° ».', tab: 'achats', pour: 'tous', mode: 'tous',
