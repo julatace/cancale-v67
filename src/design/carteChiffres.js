@@ -408,9 +408,11 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
       const R2 = regles.beneficeDesJours(pub.encours, new Date(B.de), new Date(B.a == null ? maintenant + 86400000 : B.a));
       const T = { n: R.n + R2.n, nCout: R.nCout + R2.nCout, brut: Math.round((R.brut + R2.brut) * 100) / 100, net: R.net == null || R2.net == null ? null : Math.round((R.net + R2.net) * 100) / 100 };
       const cb = regles.chiffreBrut(T), cn = regles.chiffreApresFrais ? regles.chiffreApresFrais(T) : { valeur: null };
-      vendus = { n: T.n, nCout: T.nCout, enCours: R2.n, brut: cb.valeur, partiel: !!cb.partiel, net: cn.valeur };
+      vendus = { n: T.n, nCout: T.nCout, enCours: R2.n, brut: cb.valeur, partiel: !!cb.partiel, net: cn.valeur, prixManquants: Math.max(0, T.n - T.nCout) };
     }
-    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs, n: R.n, vendus };
+    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs, n: R.n, vendus,
+      // (27 nov., « Bénéfice — » sur Aujourd'hui) Le NOMBRE de ventes sans prix d'achat : la porte dit « N prix manquants » (§5).
+      prixManquants: Math.max(0, R.n - R.nCout) };
   }
   if (id === 'recu') {
     const ym = `${new Date(maintenant).getFullYear()}-${String(new Date(maintenant).getMonth() + 1).padStart(2, '0')}`;

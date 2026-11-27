@@ -30,6 +30,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., ameliorations-27nov — Julien : « Vas-y fais tout ») src/ecrans/Comptabilite.jsx fusionLignesMemeSuivi,
+  // src/aujourdhui/modele.js prixManquants, src/aujourdhui/LigneLectureAncienne.jsx, src/aDistance/LigneOrdinateur.jsx
+  { id: 'retrait-contenu-code', date: '2026-11-27', titre: 'À retirer : la photo de l’achat', phrase: 'Relié par le code de retrait de sa commande.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'benefice-prix-manquants', date: '2026-11-27', titre: 'Bénéfice : « N prix manquants »', phrase: 'Touche-le pour saisir les prix d’achat qui manquent.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'lecture-ancienne', date: '2026-11-27', titre: 'Un site pas lu depuis longtemps : dit', phrase: 'Une ligne, le geste, « Compris » la range.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'ordinateur-eteint-pourquoi', date: '2026-11-27', titre: 'Ordinateur éteint : ce qui attend', phrase: 'Ce qui ne marche pas, et quoi faire, sous « Pourquoi ? ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (27 nov., compta-export — Julien : « Fait la compta », « l'export comptable pour l'URSSAF ») src/exportComptable.js, src/exportUrssaf.js
   { id: 'export-urssaf', date: '2026-11-27', titre: 'L’URSSAF : ta déclaration prête à recopier', phrase: 'Le montant, la ligne, le taux et les ventes, en PDF.', tab: 'compta', pour: 'pro', mode: 'tous' },
   { id: 'export-comptable-detail', date: '2026-11-27', titre: 'Export comptable : bénéfice vente par vente', phrase: 'Prix, achat, port, bénéfice ; un fichier pour Pennylane, Tiime, Indy.', tab: 'compta', pour: 'tous', mode: 'tous' },

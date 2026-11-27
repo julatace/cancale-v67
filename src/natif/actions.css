@@ -7,6 +7,8 @@
   .n-actions .n-bouton-bloc { display: flex; width: 100%; min-width: 0; }
   .n-actions .n-bouton { width: 100%; justify-content: center; gap: 6px; min-height: 40px; border-radius: 12px; font: var(--n-t-controle); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (pointer: coarse) { .n-actions .n-bouton { min-height: var(--n-cible); } }
+  /* (27 nov.) Une action seule qui range une ligne (« Compris ») : 44 px partout, souris comprise. */
+  .n-actions.n-actions-cible .n-bouton { min-height: var(--n-cible); }
   .n-pourquoi { margin: 0; padding: 0 14px 10px; }
   .n-pourquoi > summary { display: inline-flex; align-items: center; min-height: var(--n-cible); list-style: none; cursor: pointer; font: var(--n-t-second-fort); color: var(--n-encre-2); }
   .n-pourquoi > summary::-webkit-details-marker { display: none; }

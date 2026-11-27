@@ -92,13 +92,16 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
     const attrs = { 'data-v2-stat': cle, 'data-benef-notion': cle === 'net' ? 'benefice' : 'brut', 'data-benef-valeur': X ? cents(X.valeur) : '' };
     if (X && X.valeur != null) return <Tuile libelle={lib} valeur={coupe(montant(X.valeur))[0]} unite={coupe(montant(X.valeur))[1]} detail={detail} onClick={ouvrir} graphe={cle === 'brut' ? etincelle('b') : null} attrs={attrs}/>;
     const rien = !!S && S.ventes.valeur === 0;
-    const achats = !!X && (X.raison === 'achats' || /achat/.test(String(X.note || '')));
+    // (27 nov., Julien : « Bénéfice — ») Le NOMBRE de prix d'achat manquants (ventes sans prix, jamais deviné, un lot = une
+    // vente) est LA porte : « 3 prix manquants » ouvre la saisie en série (§5 « le chiffre faux est la porte »).
+    const nPrix = X && Number.isFinite(X.prixManquants) && X.prixManquants > 0 ? X.prixManquants : 0;
+    const achats = !!X && (X.raison === 'achats' || /achat/.test(String(X.note || '')) || nPrix > 0);
     if (!S || rien) return <Tuile libelle={lib} valeur={null} detail={!S ? (etat === 'encours' ? tr('v2.jour.lecture') : '') : tr('v2.stats.aucune')} attrs={attrs}/>;
     const porte = achats ? onSaisirPrix : onVentes;
     // (22 nov., style-clarte) Une tuile ne montre JAMAIS un lien comme valeur (« Ouvrir Ventes » écrit en grand se lisait
     // comme un chiffre) : « — » en valeur, la porte en petit dessous (ambre quand c'est un geste à faire : des prix d'achat).
-    return <Tuile libelle={lib} valeur={null} detail={achats ? tr('v2.ben.prixManquentGeste') : tr('v2.ben.seCalculeGeste')} ton={achats ? 'ambre' : 'neutre'} onClick={porte}
-      attrs={{ ...attrs, 'data-v2-porte': achats ? 'prix' : 'ventes' }}/>;
+    return <Tuile libelle={lib} valeur={null} detail={achats ? (nPrix ? tr('jour.prixManquantsN', { n: nPrix }) : tr('v2.ben.prixManquentGeste')) : tr('v2.ben.seCalculeGeste')} ton={achats ? 'ambre' : 'neutre'} onClick={porte}
+      attrs={{ ...attrs, 'data-v2-porte': achats ? 'prix' : 'ventes', 'data-v2-prix-manquants': achats && nPrix ? String(nPrix) : undefined }}/>;
   };
   // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
   const resume = !stats || etat !== 'lu' ? '' : JSON.stringify(Object.fromEntries(PERIODES.map((k) => { const x = stats[k]; return [k, {
@@ -184,13 +187,16 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
     : ecartTxt ? <><span className={W.ecart > 0 ? 'n-heros-hausse' : W.ecart < 0 ? 'n-heros-baisse' : 'n-heros-egal'} data-pil-ecart={String(W.ecart)} title={ecartTxt}>
         {W.ecart !== 0 ? <span aria-hidden="true">{W.ecart > 0 ? '▲ ' : '▼ '}</span> : null}<span aria-hidden="true">{signe(W.ecart)}</span><span className="n-lu-seul">{ecartTxt}</span></span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen;
   const benefFen = W && W.brut != null ? montant(W.brut) : null;
+  const nPrixFen = W && Number.isFinite(W.prixManquants) ? W.prixManquants : 0;
   const trio = [
     { cle: 'benef', libelle: tr('pil.t.benef', { n: f }) + (W && W.brutCouv ? ' · ' + tr('pil.t.sur', { c: W.brutCouv }) : ''),
       valeur: benefFen, attrs: { 'data-pil-benef-fen': W ? cents(W.brut) : '', 'data-pil-couv': W && W.brutCouv ? W.brutCouv : undefined },
       // (23 nov.) « — » dit POURQUOI, et le chiffre faux est la porte pour le corriger (CLAUDE.md §5) : il ouvre la saisie des prix.
       // (23 nov., iPhone) au téléphone, la porte est une puce courte « Saisis 5 prix › » (le nombre de ventes sans prix d'achat
       // de la fenêtre, quand il est su) — plus de bouton pleine largeur dans le héros.
-      ...(benefFen == null && manquePrix && onSaisirPrix ? { pourquoi: telephone ? (W && W.manque > 0 ? tr('pil.t.saisisN', { n: W.manque }) : tr('pil.t.saisis')) : tr('pil.t.prixManquants'), onClick: onSaisirPrix } : {}) },
+      // (27 nov., Julien : « Bénéfice — ») Le NOMBRE de prix d'achat manquants de la fenêtre, quand il est su : « 3 prix manquants ».
+      ...(benefFen == null && (manquePrix || nPrixFen > 0) && onSaisirPrix ? { pourquoi: nPrixFen > 0 ? tr('jour.prixManquantsN', { n: nPrixFen }) : telephone ? (W && W.manque > 0 ? tr('pil.t.saisisN', { n: W.manque }) : tr('pil.t.saisis')) : tr('pil.t.prixManquants'), onClick: onSaisirPrix,
+        attrs: { 'data-pil-benef-fen': W ? cents(W.brut) : '', 'data-pil-couv': W && W.brutCouv ? W.brutCouv : undefined, 'data-pil-prix-manquants': nPrixFen > 0 ? String(nPrixFen) : undefined } } : {}) },
     // (25 nov., captures de Julien : « Reçu · novembre au moins 1… » coupé) « au moins » en forme courte « ≥ » (auMoinsCourt).
     { cle: 'recu', libelle: tr('pil.t.recu', { mois: moisCourt }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? auMoinsCourt(montant(Rc.valeur)) : montant(Rc.valeur)) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '', 'data-pil-recu-partiel': Rc && Rc.partiel ? '1' : undefined } },
     { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? auMoinsCourt(montant(aVenir.valeur)) : montant(aVenir.valeur)) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
@@ -280,7 +286,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, porteMonnaie = undefined, ligneOrdi = null, aRepublier = null, offresSR = null, photoDouble = null, ceMatin = undefined }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, porteMonnaie = undefined, ligneOrdi = null, ligneLecture = null, aRepublier = null, offresSR = null, photoDouble = null, ceMatin = undefined }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -681,6 +687,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {/* (23 nov., Julien : « on n'a jamais d'extension sur iPhone ») au téléphone, plus rien de l'extension ici. */}
         {ligneOrdi ? <Colonne pleine>{ligneOrdi}</Colonne> : null}
+        {/* (27 nov.) « Vestiaire pas lu depuis 5 jours » + le geste, une fois (src/aujourdhui/LigneLectureAncienne.jsx). */}
+        {ligneLecture ? <Colonne pleine>{ligneLecture}</Colonne> : null}
         {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} aVenir={aVenir && aVenir.valeur != null ? aVenir : stats2 ? stats2.avenir : null} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes} telephone={!ordinateur}/></Colonne> : null}
         {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
             colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}

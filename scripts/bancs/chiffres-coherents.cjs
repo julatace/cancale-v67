@@ -280,6 +280,10 @@ async function widget() {
         await attendre(pg, () => { const e = document.querySelector('[data-fu-colis-envoyer]') || document.querySelector('[data-carte-chiffre="aposter"]'); return !!e && !!document.querySelector('[data-colis-onglet-choix="envoyer"]'); }, null, 40000);
         await pg.click('[data-colis-onglet-choix="envoyer"]').catch(() => {});
         await attendre(pg, () => !!document.querySelector('[data-colis-recap]'), null, 20000);
+        // (27 nov., CI de la PR #1451 : « onglet [vide] » à 1512 sous charge) Le nombre de l'onglet arrive avec les ventes LUES
+        // (`nEnvP` : null tant qu'il n'est pas su ⇒ attribut vide). On attend l'état RÉEL (§6.5), jamais un délai fixe ; resté
+        // vide après 20 s, le contrôle le dit rouge comme avant.
+        await attendre(pg, () => { const o = document.querySelector('[data-colis-onglet-choix="envoyer"]'); return !!o && (o.getAttribute('data-colis-onglet-n') || '') !== ''; }, null, 20000);
         await pg.waitForTimeout(800);
         const carte = (await attr(pg, '[data-fu-colis-envoyer]', 'data-fu-colis-envoyer')) ?? (await attr(pg, '[data-carte-chiffre="aposter"]', 'data-carte-valeur'));
         const ong = await attr(pg, '[data-colis-onglet-choix="envoyer"]', 'data-colis-onglet-n');

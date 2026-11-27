@@ -488,6 +488,8 @@ sans la fonction.
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
 - **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
 - **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
+- **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
