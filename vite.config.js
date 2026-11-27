@@ -97,6 +97,7 @@ const listeHorsLigne = () => ({
 // le reste remplit src/i18n/langues/fr-reste.js, importé EN PREMIER par chaque module chargé
 // à la demande qui peut en lire une clé. Règle et prudences : scripts/_francais-differe.cjs ;
 // garde : scripts/audit-francais-differe.cjs. Le dépôt garde fr.js complet.
+const francaisSections = new Map();   // morceau d'une section de Comptabilite -> son français (sectionsDifferees)
 const francaisDiffere = () => {
   const FR = resoudreChemin(RACINE, 'src/i18n/langues/fr.js');
   const RESTE = resoudreChemin(RACINE, 'src/i18n/langues/fr-reste.js');
@@ -110,7 +111,15 @@ const francaisDiffere = () => {
     enforce: 'pre',
     async buildStart() {
       const F = exiger('./scripts/_francais-differe.cjs');
-      a = F.analyser(RACINE, await F.dictionnaire(RACINE));
+      const dico = await F.dictionnaire(RACINE);
+      // (27 nov., budget-vitesse) Le démarrage se juge sur le Comptabilite LIVRÉ (ses sections découpées,
+      // `sectionsDifferees`) : le français que seules les sections lisent part avec elles (`francaisSections`).
+      const COMPTA = resoudreChemin(RACINE, 'src/ecrans/Comptabilite.jsx');
+      const S = process.env.VRM_SANS_SECTIONS === '1' ? null : exiger('./scripts/_sections-differees.cjs');
+      const rs = S ? S.decouperUneFois(RACINE, COMPTA, readFileSync(COMPTA, 'utf8')) : null;
+      a = F.analyser(RACINE, dico, rs && rs.faites.length ? { [COMPTA]: rs.code } : undefined);
+      francaisSections.clear();
+      if (rs && rs.faites.length) for (const [f, d] of Object.entries(S.francaisDesMorceaux(RACINE, rs, dico, a.base))) francaisSections.set(f, d);
     },
     async resolveId(source, importer) {
       if (!a || !importer || resoudreChemin(importer.split('?')[0]) !== APP) return null;
@@ -144,7 +153,7 @@ const sectionsDifferees = () => {
     enforce: 'pre',
     transform(code, id) {
       if (process.env.VRM_SANS_SECTIONS === '1' || resoudreChemin(id.split('?')[0]) !== COMPTA) return null;
-      const r = exiger('./scripts/_sections-differees.cjs').decouper(RACINE, COMPTA, code);
+      const r = exiger('./scripts/_sections-differees.cjs').decouperUneFois(RACINE, COMPTA, code);
       for (const x of r.refus) this.warn(`section « ${x.nom} » gardée dans Comptabilite : ${x.raison}`);
       for (const [f, c] of Object.entries(r.morceaux)) morceaux.set(join(r.dirMorceau, f), c);
       // l'écran d'ouverture de chaque section (Aujourd'hui, Ventes) : index.html la précharge quand il s'ouvre sur lui
@@ -156,7 +165,12 @@ const sectionsDifferees = () => {
       const abs = resoudreChemin(importer.split('?')[0], '..', source);
       return morceaux.has(abs) ? abs : null;
     },
-    load(id) { return morceaux.has(id) ? morceaux.get(id) : null; },
+    load(id) {
+      if (!morceaux.has(id)) return null;
+      const d = francaisSections.get(id);
+      // son français d'abord (avant que le morceau ne s'évalue), comme fr-reste pour un écran à la demande
+      return d ? `import { ajouterSourceSection as __vrmFr } from ${JSON.stringify(resoudreChemin(RACINE, 'src/i18n/index.js'))};\n__vrmFr(${JSON.stringify(d)});\n` + morceaux.get(id) : morceaux.get(id);
+    },
   };
 };
 // (17 nov., lot vitesse-poids) LES NOMS COURTS, DONNÉS PAR FRÉQUENCE. esbuild minifie bien

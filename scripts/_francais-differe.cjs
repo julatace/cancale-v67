@@ -128,7 +128,9 @@ function analyser(R, fr, textes) {
   // `data-js-ensuite`) : src/ecrans/Comptabilite.jsx rend Aujourd'hui — son français est celui du démarrage.
   // (27 nov., budget-vitesse) « À relancer » de Ventes (src/natif/ecrans/RelancesVentes.jsx, monté par Comptabilite dès que
   // la liste a une ligne) : quelques clés, qui faisaient télécharger TOUT le reste du français (≈ 150 Ko) à l'ouverture de Ventes.
-  for (const p of [path.join(R, 'src', 'ecrans', 'Comptabilite.jsx'), path.join(R, 'src', 'natif', 'ecrans', 'RelancesVentes.jsx')]) { try { if (fs.statSync(p).isFile()) for (const g of fermer([p])) demarrage.add(g); } catch (_) {} }
+  // Et la feuille « Depuis ta dernière visite » (src/capteNotif/FeuilleArrivee.jsx), montée par la coque dès la connexion :
+  // selon le moment où elle arrive, elle faisait télécharger le reste du français à l'ouverture de n'importe quel écran.
+  for (const p of [path.join(R, 'src', 'ecrans', 'Comptabilite.jsx'), path.join(R, 'src', 'natif', 'ecrans', 'RelancesVentes.jsx'), path.join(R, 'src', 'capteNotif', 'FeuilleArrivee.jsx')]) { try { if (fs.statSync(p).isFile()) for (const g of fermer([p])) demarrage.add(g); } catch (_) {} }
   // toutes les entrées à la demande atteignables
   const entrees = new Set();
   const aVoir = [...demarrage];

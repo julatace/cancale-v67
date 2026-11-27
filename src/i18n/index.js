@@ -61,6 +61,14 @@ export function ajouterSourceDifferee(d) {
   if (d && typeof d === 'object') for (const k of Object.keys(d)) if (fr[k] == null) fr[k] = d[k];
   if (enAttente.size) { enAttente.clear(); emettre(); }
 }
+// (27 nov., budget-vitesse) Le français d'une SECTION de Comptabilite découpée au build (scripts/_sections-differees.cjs),
+// posé par son morceau avant qu'il ne s'évalue. Ce n'est pas le reste : le filet ci-dessous reste armé.
+export function ajouterSourceSection(d) {
+  if (!d || typeof d !== 'object') return;
+  let attendue = false;
+  for (const k of Object.keys(d)) { if (fr[k] == null) fr[k] = d[k]; if (enAttente.has(k)) { enAttente.delete(k); attendue = true; } }
+  if (attendue) emettre();
+}
 // Le filet : une clé absente demandée dans l'app avant l'arrivée du reste est notée
 // (`window.__vrmClesEnAttente`, lu par les bancs) et le reste est chargé, une fois.
 function cleEnAttente(cle) {

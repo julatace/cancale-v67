@@ -42,6 +42,7 @@ const SECTIONS = [
   { nom: 'Rapport', cond: 'showReport' },
   { nom: 'Journee', cond: "curSub==='journee'", ouverture: 'journee' },
   { nom: 'Envoyer', cond: "ongletColisVu==='envoyer'", tous: true, discret: true, ouverture: 'ventes' },
+  { nom: 'Retirer', cond: "onglet==='retirer'", discret: true, ouverture: 'achats' },
   { nom: 'Envoyes', cond: "curSub==='bordereaux'&&ongletColisVu==='envoyes'&&!(colisDans==='ventes'&&VENTES_NATIF)" },
   // les fenêtres (ouvertes d'un geste) : la pastille d'une feuille pendant le chargement
   { nom: 'Annuel', cond: 'showAnnual', feuille: true },
@@ -231,44 +232,60 @@ function decouper(R, fichier, src, sections = SECTIONS) {
     pris.forEach((p, k) => {
       const cible = p.get('expression.right');
       if (!cible.isExpression()) { refus.push({ nom: s.nom, raison: 'droite du && inattendue' }); return; }
-      cibles.push({ s, nom: s.nom + (k ? String(k + 1) : ''), cible, t: cible.node });
+      // la section est-elle évaluée UNE fois par rendu de Comptabilite (seulement des fonctions appelées sur place, aucune boucle) ?
+      let auRenduSeul = true;
+      for (let q = cible.parentPath; q && q.node !== fonc.node; q = q.parentPath) {
+        if (q.isLoop()) auRenduSeul = false;
+        if (q.isFunction() && !(q.parentPath && q.parentPath.isCallExpression() && q.parentPath.node.callee === q.node)) auRenduSeul = false;
+      }
+      cibles.push({ s, nom: s.nom + (k ? String(k + 1) : ''), cible, t: cible.node, auRenduSeul });
     });
   }
-  // Les aides que SEULES des sections (ou d'autres aides parties) lisent : point fixe.
-  let partantes = new Set(aidesPossibles.keys());
-  for (let tour = 0; tour < 100; tour++) {
-    const plages = [...cibles.map((c) => c.t), ...[...partantes].map((st) => st.node)];
-    let change = false;
-    for (const st of [...partantes]) {
-      const ok = aidesPossibles.get(st).every((nm) => st.scope.getBinding(nm).referencePaths.every((rp) => plages.some((t) => dedans(rp.node, t))));
-      if (!ok) { partantes.delete(st); change = true; }
-    }
-    if (!change) break;
-  }
-  const aideDe = new Map(); for (const st of partantes) for (const nm of aidesPossibles.get(st)) aideDe.set(nm, st);
-  const acceptees = [];
-  for (const c of cibles) {
-    // les aides de CETTE section (et celles qu'elles lisent)
-    const siennes = new Set(); const pile = [c.cible];
-    while (pile.length) { const ch = pile.pop(); ch.traverse({ 'Identifier|JSXIdentifier'(p) { if (!p.isReferencedIdentifier()) return; const st = aideDe.get(p.node.name); if (st && p.scope.getBinding(p.node.name) === st.scope.getBinding(p.node.name) && !siennes.has(st)) { siennes.add(st); pile.push(st); } } }); }
-    const aides = [...siennes].sort((a, b) => a.node.start - b.node.start);
-    const plages = [c.t, ...aides.map((st) => st.node)];
-    const { raisons, libres } = examiner([c.cible, ...aides], plages);
-    const parValeur = [], deTete = [];
-    for (const [nom, b] of libres) {
-      if (b.scope === prog.scope) { deTete.push(nom); continue; }
-      if (b.scope.block !== fonc.node) { raisons.push(`« ${nom} » vient d'une portée intermédiaire`); continue; }
-      // Une variable du rendu : passée par valeur. Refusée si elle est réaffectée DANS la section, dans un rappel
-      // (après le rendu : la section garderait la valeur du rendu), ou au rendu APRÈS la section.
-      for (const cv of b.constantViolations) {
-        if (plages.some((t) => dedans(cv.node, t))) raisons.push(`« ${nom} » est réaffectée dans la section (ligne ${cv.node.loc.start.line})`);
-        else if (!auRendu(cv)) raisons.push(`« ${nom} » est réaffectée dans un rappel (ligne ${cv.node.loc.start.line})`);
-        else if (cv.node.end > c.t.start) raisons.push(`« ${nom} » est réaffectée au rendu après la section (ligne ${cv.node.loc.start.line})`);
+  // Une section refusée garde ses aides dans Comptabilite : on recommence sans elle (ses aides ne partent plus).
+  let enJeu = cibles.slice(), acceptees = [], refusesTour = [], aideDe = new Map();
+  for (let passe = 0; passe < 50; passe++) {
+    // Les aides que SEULES des sections (ou d'autres aides parties) lisent : point fixe.
+    let partantes = new Set(aidesPossibles.keys());
+    const plagesCibles = enJeu.map((c) => c.t);
+    for (let tour = 0; tour < 100; tour++) {
+      const plages = [...plagesCibles, ...[...partantes].map((st) => st.node)];
+      let change = false;
+      for (const st of [...partantes]) {
+        const ok = aidesPossibles.get(st).every((nm) => st.scope.getBinding(nm).referencePaths.every((rp) => plages.some((t) => dedans(rp.node, t))));
+        if (!ok) { partantes.delete(st); change = true; }
       }
-      parValeur.push(nom);
+      if (!change) break;
     }
-    if (raisons.length) { refus.push({ nom: c.nom, raison: [...new Set(raisons)].join(' ; ') }); continue; }
-    acceptees.push({ s: { ...c.s, nom: c.nom }, t: c.t, aides, parValeur: parValeur.sort(), deTete });
+    aideDe = new Map(); for (const st of partantes) for (const nm of aidesPossibles.get(st)) aideDe.set(nm, st);
+    acceptees = []; refusesTour = [];
+    for (const c of enJeu) {
+      // les aides de CETTE section (et celles qu'elles lisent)
+      const siennes = new Set(); const pile = [c.cible];
+      while (pile.length) { const ch = pile.pop(); ch.traverse({ 'Identifier|JSXIdentifier'(p) { if (!p.isReferencedIdentifier()) return; const st = aideDe.get(p.node.name); if (st && p.scope.getBinding(p.node.name) === st.scope.getBinding(p.node.name) && !siennes.has(st)) { siennes.add(st); pile.push(st); } } }); }
+      const aides = [...siennes].sort((a, b) => a.node.start - b.node.start);
+      const plages = [c.t, ...aides.map((st) => st.node)];
+      const { raisons, libres } = examiner([c.cible, ...aides], plages);
+      const parValeur = [], deTete = [];
+      for (const [nom, b] of libres) {
+        if (b.scope === prog.scope) { deTete.push(nom); continue; }
+        // une variable d'une portée intermédiaire (une fonction appelée sur place, `(() => { … })()`, ou un bloc, dans le
+        // rendu) : la section y est évaluée pendant le rendu, une fois — sa valeur est celle du moment (mêmes règles)
+        if (b.scope.block !== fonc.node && !c.auRenduSeul) { raisons.push(`« ${nom} » vient d'une portée intermédiaire`); continue; }
+        // Une variable du rendu : passée par valeur. Refusée si elle est réaffectée DANS la section, dans un rappel
+        // (après le rendu : la section garderait la valeur du rendu), ou au rendu APRÈS la section.
+        for (const cv of b.constantViolations) {
+          if (plages.some((t) => dedans(cv.node, t))) raisons.push(`« ${nom} » est réaffectée dans la section (ligne ${cv.node.loc.start.line})`);
+          else if (!auRendu(cv)) raisons.push(`« ${nom} » est réaffectée dans un rappel (ligne ${cv.node.loc.start.line})`);
+          else if (cv.node.end > c.t.start) raisons.push(`« ${nom} » est réaffectée au rendu après la section (ligne ${cv.node.loc.start.line})`);
+        }
+        parValeur.push(nom);
+      }
+      if (raisons.length) { refusesTour.push({ c, raison: { nom: c.nom, raison: [...new Set(raisons)].join(' ; ') } }); continue; }
+      acceptees.push({ s: { ...c.s, nom: c.nom }, t: c.t, aides, parValeur: parValeur.sort(), deTete });
+    }
+    if (!refusesTour.length) break;
+    for (const x of refusesTour) refus.push(x.raison);
+    enJeu = enJeu.filter((c) => !refusesTour.some((x) => x.c === c));
   }
   if (!acceptees.length) return { code: src, morceaux, faites, refus, deplacees: [], imports: { retires: [], nus: [] } };
   // une aide qu'une section refusée lisait reste (son nom ne serait plus défini dans Comptabilite)
@@ -429,4 +446,33 @@ function decouper(R, fichier, src, sections = SECTIONS) {
   return { code, morceaux, faites, refus, deplacees: iDeplacees.flatMap((i) => nomsDe[i]), epinglees: [...epingles].map((i) => nomsDe[i].join('+') || body[i].type), imports: { retires, nus }, dirMorceau };
 }
 
-module.exports = { decouper, SECTIONS, DOSSIER, FONCTION, examinerModule };
+// Une découpe par texte source (le français différé et le greffon de build la lisent tous les deux).
+let _dernier = null;
+function decouperUneFois(R, fichier, src) {
+  if (_dernier && _dernier.src === src && _dernier.fichier === fichier) return _dernier.r;
+  const r = decouper(R, fichier, src);
+  _dernier = { src, fichier, r };
+  return r;
+}
+
+// (27 nov.) LE FRANÇAIS DES SECTIONS, AVEC ELLES. Le français du démarrage (scripts/_francais-differe.cjs) se juge
+// sur le Comptabilite LIVRÉ (sans ses sections) ; chaque morceau porte les clés que SON texte peut lire et que le
+// démarrage n'a pas (même règle « peut lire » : clé exacte, préfixe, suffixe). fr-reste les garde aussi (le filet).
+function francaisDesMorceaux(R, r, fr, base) {
+  const F = require(path.join(R, 'scripts', '_francais-differe.cjs'));
+  const out = {};
+  const textes = {};
+  for (const [f, c] of Object.entries(r.morceaux)) textes[path.join(r.dirMorceau, f)] = c;
+  const { lire } = F.creer(R);
+  for (const abs of Object.keys(textes)) {
+    const o = lire(abs, textes);
+    const P = [...o.prefixes], S = [...o.suffixes];
+    const d = {};
+    for (const [k, v] of Object.entries(fr)) if (!(k in base) && (o.exacts.has(k) || P.some((x) => k.startsWith(x)) || S.some((x) => k.endsWith(x)))) d[k] = v;
+    for (const k of Object.keys(d)) if (fr[k + '.art'] != null && !(k + '.art' in base)) d[k + '.art'] = fr[k + '.art'];
+    if (Object.keys(d).length) out[abs] = d;
+  }
+  return out;
+}
+
+module.exports = { decouper, decouperUneFois, francaisDesMorceaux, SECTIONS, DOSSIER, FONCTION, examinerModule };
