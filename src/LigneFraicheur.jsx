@@ -176,6 +176,8 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
             </div>); })}
           {f.etat === 'retard' && f.passu.length ? <div className="vrm-fraicheur-rangee" data-fraicheur-rangee="passu"><div className="vrm-fraicheur-rangee-texte"><span>{trj('commun.puVerifierRien', { n: f.passu.length, x: f.passu.join(', ') })}</span></div></div> : null}
           {f.verifieAt ? <div className="vrm-fraicheur-pied">{tr('commun.verifie2')} {quandReluCourt(f.verifieAt, maintenant)}{f.passu.length ? '.' : tr('commun.resteJour')}</div> : null}
+          {/* (27 nov., lot tout-va-bien) chaque morceau, un par un : Paramètres → Tout va bien ? */}
+          <div className="vrm-fraicheur-pied"><button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" data-fraicheur-toutvabien="" onClick={voirToutVaBien}>{tr('tvb.s.lienFraicheur')}</button></div>
         </div>
       ) : null}
     </div>

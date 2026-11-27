@@ -31,6 +31,8 @@ export default function LigneLectureAncienne({ Icon = null }) {
   const titre = tr('lectAnc.titre', { site, n: x.jours });
   const autres = liste.slice(1).map((y) => tr('lectAnc.autre', { site: nomPlateforme(y.plateforme) || y.plateforme, nom: y.nom, n: y.jours }));
   const compris = () => { const r = ranger(ranges, x); setRanges(r); ecrireRanges(r); };
+  // (27 nov., lot tout-va-bien) « Tout va bien ? » : chaque morceau (extension, sites, e-mails, capture, favoris, serveur).
+  const toutVaBien = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=toutvabien' })); } catch (_) {} };
   return (
     <Groupe attrs={{ 'data-lecture-ancienne': x.cle, 'data-lecture-ancienne-jours': String(x.jours), 'data-lecture-ancienne-n': String(liste.length) }}>
       <Rangee icone={Icon ? <Icon name="clock" size={22}/> : null} titre={titre} sousTitre={tr('lectAnc.geste')} sousLignes={2} ton="neutre"
@@ -39,7 +41,8 @@ export default function LigneLectureAncienne({ Icon = null }) {
         <p>{tr('lectAnc.pourquoi', { site, nom: x.nom || site, date: dateCourte(x.depuisMs) })}</p>
         {autres.length ? <p data-lecture-ancienne-autres={String(autres.length)}>{tr('lectAnc.aussi')} {autres.join(' · ')}</p> : null}
       </Pourquoi>
-      <Actions className="n-actions-cible" elements={[{ cle: 'compris', icone: Icon ? <Icon name="check" size={18}/> : null, libelle: tr('lectAnc.compris'), onClick: compris, attrs: { 'data-lecture-ancienne-compris': x.cle } }]}/>
+      <Actions className="n-actions-cible" elements={[{ cle: 'compris', icone: Icon ? <Icon name="check" size={18}/> : null, libelle: tr('lectAnc.compris'), onClick: compris, attrs: { 'data-lecture-ancienne-compris': x.cle } },
+        { cle: 'toutvabien', icone: Icon ? <Icon name="heart" size={18}/> : null, libelle: tr('tvb.s.lienFraicheur'), onClick: toutVaBien, attrs: { 'data-lecture-ancienne-toutvabien': '' } }]}/>
     </Groupe>
   );
 }
