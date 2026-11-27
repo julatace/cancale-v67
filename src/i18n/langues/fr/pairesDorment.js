@@ -29,4 +29,8 @@ export default {
   "pdo.baisse.desc": "{avant} → {apres} · ton plancher : {plancher}.",
   "pdo.baisse.garde": "Grosse baisse : vérifie le chiffre.",
   "pdo.baisse.oui": "Baisser",
+  "pdo.titre.art": "Articles qui dorment",
+  "pdo.entree.sous.art": {"one": "{n} article · plus de {j} j", "other": "{n} articles · plus de {j} j"},
+  "pdo.vide.art": "Aucun article en ligne depuis plus de {j} jours.",
+  "pdo.sansDate.art": {"one": "{n} article sans date de mise en ligne lue.", "other": "{n} articles sans date de mise en ligne lue."},
 };

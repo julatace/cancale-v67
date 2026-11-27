@@ -29,4 +29,8 @@ export default {
   "pdo.baisse.desc": "{avant} → {apres} · tu mínimo: {plancher}.",
   "pdo.baisse.garde": "Bajada grande: revisa la cifra.",
   "pdo.baisse.oui": "Bajar",
+  "pdo.titre.art": "Artículos dormidos",
+  "pdo.entree.sous.art": {"one": "{n} artículo · más de {j} d", "other": "{n} artículos · más de {j} d"},
+  "pdo.vide.art": "Ningún artículo en línea desde hace más de {j} días.",
+  "pdo.sansDate.art": {"one": "{n} artículo sin fecha de publicación leída.", "other": "{n} artículos sin fecha de publicación leída."},
 };

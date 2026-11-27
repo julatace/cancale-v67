@@ -29,4 +29,8 @@ export default {
   "pdo.baisse.desc": "{avant} → {apres} · dein Minimum: {plancher}.",
   "pdo.baisse.garde": "Starker Rückgang: Betrag prüfen.",
   "pdo.baisse.oui": "Senken",
+  "pdo.titre.art": "Schlafende Artikel",
+  "pdo.entree.sous.art": {"one": "{n} Artikel · über {j} T.", "other": "{n} Artikel · über {j} T."},
+  "pdo.vide.art": "Kein Artikel seit mehr als {j} Tagen online.",
+  "pdo.sansDate.art": {"one": "{n} Artikel ohne gelesenes Einstelldatum.", "other": "{n} Artikel ohne gelesenes Einstelldatum."},
 };

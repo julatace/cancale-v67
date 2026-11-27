@@ -29,4 +29,8 @@ export default {
   "pdo.baisse.desc": "{avant} → {apres} · your floor: {plancher}.",
   "pdo.baisse.garde": "Big drop: check the figure.",
   "pdo.baisse.oui": "Lower",
+  "pdo.titre.art": "Sleeping items",
+  "pdo.entree.sous.art": {"one": "{n} item · over {j} days", "other": "{n} items · over {j} days"},
+  "pdo.vide.art": "No item online for more than {j} days.",
+  "pdo.sansDate.art": {"one": "{n} item with no listing date read.", "other": "{n} items with no listing date read."},
 };
