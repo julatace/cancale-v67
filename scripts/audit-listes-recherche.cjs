@@ -23,6 +23,7 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const TR = require('./_travail-recherche.cjs');
 const SRC = path.join(__dirname, '..', 'src');
 const FICHIERS = ['recherchePhrase.js', 'epingles.js', 'glisserSelection.js', 'comparerPaires.js', 'fusionNuage.js', 'dateParis.js'];   // (16 nov.) recherchePhrase importe le jour de Paris
 
@@ -240,11 +241,13 @@ if (arg.includes('--prouve')) {
   // ── C. La vitesse : < 50 ms sur 2 000 paires (analyser + filtrer), à froid puis à chaud ──
   essaie('vitesse', () => {
     const marques = [...new Set(ANN.map((x) => x.brand).filter(Boolean))];
-    const mesure = () => { const t0 = process.hrtime.bigint(); const a = P.analyserPhrase('nike 42 pas vendue depuis 2 mois < 100 €', { maintenant: M, marques }); P.filtrerPhrase(ANN, a.filtres, { acces, quoi: 'annonce', etats: ['en-ligne'] }); return Number(process.hrtime.bigint() - t0) / 1e6; };
+    // (26 nov.) Le temps CPU du fil (scripts/_travail-recherche.cjs), plus le temps mural : rouge en CI à 55 ms quand
+    // 4 audits se partageaient 4 cœurs, vert seul — l'attente d'un cœur n'est pas la vitesse du filtre.
+    const mesure = () => TR.mesureCpu(() => { const a = P.analyserPhrase('nike 42 pas vendue depuis 2 mois < 100 €', { maintenant: M, marques }); P.filtrerPhrase(ANN, a.filtres, { acces, quoi: 'annonce', etats: ['en-ligne'] }); }).ms;
     const froid = mesure(); const chauds = Array.from({ length: 20 }, mesure).sort((a, b) => a - b);
     const med = chauds[10];
-    dit(froid < 50, `à froid : ${froid.toFixed(1)} ms sur 2 000 paires (< 50 ms)`);
-    dit(med < 50, `à chaud : ${med.toFixed(1)} ms (médiane de 20, < 50 ms)`);
+    dit(froid < 50, `à froid : ${froid.toFixed(1)} ms de ${TR.SOURCE_CPU} sur 2 000 paires (< 50 ms)`);
+    dit(med < 50, `à chaud : ${med.toFixed(1)} ms de ${TR.SOURCE_CPU} (médiane de 20, < 50 ms)`);
   });
 
   // ── D. Les épingles ──

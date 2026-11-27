@@ -26,6 +26,7 @@
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
+const TR = require('./_travail-recherche.cjs');
 const RACINE = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 
 let ko = 0, ok = 0;
@@ -44,6 +45,9 @@ const MUTATIONS = [
   ['src/lieuxVentes.js', "const ville = nomVille(adr.city);", "const ville = nomVille(adr.city) + ' · ' + ins.shippingStep.shipTo.fullName;", 'L3 nom de l’acheteur dans la sortie'],
   ['src/lieuxVentes.js', "if (typeof ecarte === 'function' && ecarte(l)) continue;", "", 'L4 compte écarté sorti'],
   ['src/lieuxVentes.js', "compter(bulle(P, lieu.pays, { pays: lieu.pays, lat: rep ? rep[0] : null, lon: rep ? rep[1] : null, horsCarte: !rep }), v);", "compter(bulle(P, lieu.pays, { pays: lieu.pays, lat: rep ? rep[0] : 0, lon: rep ? rep[1] : 0, horsCarte: false }), v);", 'L5 pays inconnu placé au hasard'],
+  // (26 nov.) L6 la vitesse : le lieu eBay cherché en balayant les ventes eBay à CHAQUE vente (au lieu de la table par
+  // n° de commande) — quadratique.
+  ['src/lieuxVentes.js', "    const lieu = lieuDeVente(l, { paysVinted, ebayParId });", "    const lieu = lieuDeVente(l, { paysVinted, ebayParId: new Map((Array.isArray(ebay) ? ebay : []).filter((o) => o && o.orderId != null).map((o) => [String(o.orderId), o])) });", 'L6 table eBay refaite à chaque vente (quadratique)'],
 ];
 
 async function charger(racine) {
@@ -164,10 +168,11 @@ async function verifier(racine) {
     if (i % 5 === 0) { big.push({ plateforme: 'eBay', ts: j(i % 300 - 150), eur: 50 + (i % 90), tx: 'O' + i }); eb.push({ orderId: 'O' + i, ...adr(['Lyon', 'Paris', 'Lille', 'Nantes'][i % 4], ['69001', '75011', '59000', '44000'][i % 4], 'FR') }); }
     else { big.push({ plateforme: 'Vinted', ts: j(i % 300 - 150), eur: 40 + (i % 70), tx }); if (i % 7) pv[tx] = PAYS[i % PAYS.length]; }
   }
-  const t0 = process.hrtime.bigint();
-  const G = L.lieuxVentes({ lignes: big, paysVinted: pv, ebay: eb, releve: [], de: -Infinity, a: Infinity });
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  dit(ms < 50 && G.n === 2000 && G.pays.reduce((t, x) => t + x.n, 0) + G.sansLieu.n === 2000, `L6 2 000 ventes agrégées en ${ms.toFixed(1)} ms (< 50), rien perdu`, { ms, n: G.n });
+  // (26 nov.) Le temps CPU du fil (scripts/_travail-recherche.cjs), plus le temps mural : l'attente d'un cœur quand
+  // 4 audits se partagent 4 cœurs n'est pas la vitesse de l'agrégation. Même seuil (50 ms).
+  const mG = TR.mesureCpu(() => L.lieuxVentes({ lignes: big, paysVinted: pv, ebay: eb, releve: [], de: -Infinity, a: Infinity }));
+  const G = mG.r, ms = mG.ms;
+  dit(ms < 50 && G.n === 2000 && G.pays.reduce((t, x) => t + x.n, 0) + G.sansLieu.n === 2000, `L6 2 000 ventes agrégées en ${ms.toFixed(1)} ms de ${TR.SOURCE_CPU} (< 50), rien perdu`, { ms, n: G.n });
 
   // ── S : le code ──────────────────────────────────────────────────────────
   const lire = (f) => { try { return fs.readFileSync(path.join(racine, f), 'utf8'); } catch (_) { return ''; } };

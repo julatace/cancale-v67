@@ -14,6 +14,7 @@
 //   node scripts/audit-recherche-partout.cjs [--prouve]
 'use strict';
 require('./_source-app.cjs').brancher();
+const T = require('./_travail-recherche.cjs');
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const RAC = path.join(__dirname, '..');
@@ -39,6 +40,11 @@ const MUTATIONS = {
   'msg-autres-numero': ['regle', "      numero: str(m.numero).trim(), numK: str(m.numero).trim() ? cleNumero(m.numero) : '', photo: urlPhoto(m.photo),", "      numero: '', numK: '', photo: urlPhoto(m.photo),"],
   'msg-autres-cle': ['regle', "const cle = 'message:' + (m.site === 'leboncoin' || m.site === 'vestiaire' ? m.site + ':' : '') + str(m.uid) + '_' + str(m.conv);", "const cle = 'message:' + str(m.uid);"],
   'msg-cible': ['fils', "data-cible={attrCible(", "data-cible-x={attrCible("],
+  // (26 nov.) LA VITESSE, sans horloge murale : le vocabulaire des fautes recalculé pour CHAQUE objet (quadratique) ;
+  // les mots d'un objet redécoupés à chaque frappe (linéaire, plus lourd) ; l'index qui cherche ses doublons en balayant
+  // tout ce qu'il a déjà fait (quadratique).
+  'frappe-quadratique': ['regle', "tests.every((f, k) => f(e.t) || presDe(e, proches[k]))", "tests.every((f, k) => f(e.t) || presDe(e, prochesDe(index, mots[k])))"],
+  'index-quadratique': ['regle', "if (tx && vus.has(cle)) return;", "if (tx && entrees.some((x) => x.cle === cle)) return;"],
   'approx-tu': ['app', "if (r && r.approx) return <span className=\"vrm-recherche-par\" data-recherche-approx=\"\"", "if (false) return <span className=\"vrm-recherche-par\" data-recherche-approx=\"\""],
 };
 
@@ -49,7 +55,7 @@ async function charger(src) {
 }
 
 const pad = (n, k) => String(n).padStart(k, '0');
-function jeu() {
+function jeu(x = 1) {   // `x` : le volume multiplié (P6 compare le travail d'une frappe à n et à 2n)
   const fiches = {};
   const fiche = (id, numero, title, extra = {}) => { fiches[id] = { numero: String(numero), title, accountId: '111', brand: extra.brand || '', size: extra.size || '', price: extra.price || '40' }; };
   fiche('a7', '7', 'Nike Dunk Low Panda', { size: '42' });
@@ -63,27 +69,30 @@ function jeu() {
   // 50 paires au MÊME titre (N°1 à 50 — sauf 7, 17 déjà pris : 300+ pour eux).
   for (let i = 1; i <= 50; i++) { const num = i === 7 || i === 17 ? 300 + i : i; fiche('m' + i, num, 'Nike Air Force 1 blanche taille 42', { size: '42' }); }
   // Du volume : 4 000 fiches, 3 000 ventes, 2 800 achats, 400 colis.
-  for (let i = 0; i < 4000; i++) fiche('v' + i, 1000 + i, ['Salomon XT-6 noir', 'Nike P-6000 gris', 'Converse Chuck 70 haute', 'Puma Suede rouge'][i % 4] + ' taille ' + (38 + (i % 8)));
+  for (let i = 0; i < 4000 * x; i++) fiche('v' + i, 1000 + i, ['Salomon XT-6 noir', 'Nike P-6000 gris', 'Converse Chuck 70 haute', 'Puma Suede rouge'][i % 4] + ' taille ' + (38 + (i % 8)));
   const ventes = [], achats = [], pseudos = [], bordereaux = [], colis = [];
-  for (let i = 0; i < 3000; i++) { const tx = '9' + pad(i, 9); ventes.push({ transaction_id: tx, title: 'Vente ' + (i % 97) + ' Nike', price: { amount: '40.0' }, date: '2026-11-' + pad(1 + (i % 20), 2) }); pseudos.push({ tx, pseudo: 'acheteur_' + i }); bordereaux.push({ tx, suivi: 'XW' + pad(i, 9) + 'FR' }); }
-  for (let i = 0; i < 2800; i++) achats.push({ transaction_id: '8' + pad(i, 9), title: 'Achat Adidas ' + (i % 53), price: { amount: '25.0' }, date: '2026-10-' + pad(1 + (i % 28), 2) });
-  for (let i = 0; i < 400; i++) colis.push({ id: 'c' + i, suivi: '1Z' + pad(i, 12), code: 'K' + pad(i, 5), art: 'Colis ' + i, status: 'available', sens: 'entrant', carrier: 'Mondial Relay', at: '2026-11-1' + (i % 10) });
+  for (let i = 0; i < 3000 * x; i++) { const tx = '9' + pad(i, 9); ventes.push({ transaction_id: tx, title: 'Vente ' + (i % 97) + ' Nike', price: { amount: '40.0' }, date: '2026-11-' + pad(1 + (i % 20), 2) }); pseudos.push({ tx, pseudo: 'acheteur_' + i }); bordereaux.push({ tx, suivi: 'XW' + pad(i, 9) + 'FR' }); }
+  for (let i = 0; i < 2800 * x; i++) achats.push({ transaction_id: '8' + pad(i, 9), title: 'Achat Adidas ' + (i % 53), price: { amount: '25.0' }, date: '2026-10-' + pad(1 + (i % 28), 2) });
+  for (let i = 0; i < 400 * x; i++) colis.push({ id: 'c' + i, suivi: '1Z' + pad(i, 12), code: 'K' + pad(i, 5), art: 'Colis ' + i, status: 'available', sens: 'entrant', carrier: 'Mondial Relay', at: '2026-11-1' + (i % 10) });
   const autres = [{ site: 'ebay', id: '12-34567-89012', ref: '12-34567-89012', titre: 'Nike Dunk eBay', pseudo: 'ebayer_1', montant: 5500, date: '2026-11-10', numero: '' }, { site: 'leboncoin', id: 'lbc777', titre: 'Samba Leboncoin', pseudo: '', date: '2026-11-09' }];
   const messages = [{ uid: '111', conv: '555001', tx: ventes[5].transaction_id, titre: 'Vente 5 Nike', pseudo: 'acheteur_5', date: '2026-11-11' }];
   const stock = [{ numero: '7', lieu: 'Étagère 70 · case 2' }];
   return { fiches, annonces: [], ventes, achats, pseudos, bordereaux, colis, autres, messages, stock, factures: [], retours: [] };
 }
 
+const ROUGES = [];
 async function audit(src, bavard) {
   let ko = 0;
-  const dit = (c, m, d) => { if (!c) ko++; if (bavard) console.log((c ? '✅ ' : '❌ ') + m + (!c && d !== undefined ? ' — ' + JSON.stringify(d).slice(0, 400) : '')); };
+  const dit = (c, m, d) => { if (!c) { ko++; ROUGES.push(m.slice(0, 90)); } if (bavard) console.log((c ? '✅ ' : '❌ ') + m + (!c && d !== undefined ? ' — ' + JSON.stringify(d).slice(0, 400) : '')); };
   let R;
   try { R = await charger(src.regle); } catch (e) { dit(false, 'le module se charge', e.message); return ko || 1; }
   const S = jeu();
-  const t0 = process.hrtime.bigint();
-  const idx = R.indexRecherche(S);
+  // (26 nov.) Le temps CPU du fil, plus le temps mural : 4 audits sur 4 cœurs rougissaient P6 sans que la règle change
+  // (scripts/_travail-recherche.cjs).
+  const mi = T.mesureCpu(() => R.indexRecherche(S));
+  const idx = mi.r;
   const ch = (q, o) => R.chercherPartout(idx, q, { max: 500, ...(o || {}) });
-  const tIndex = Number(process.hrtime.bigint() - t0) / 1e6;
+  const tIndex = mi.ms;
   const nums = (r, g = 'paire') => r.groupes[g].map((x) => x.e.numero);
   const tous = (r) => Object.values(r.groupes).flat();
   // P1
@@ -126,12 +135,20 @@ async function audit(src, bavard) {
   r = ch('71'); dit(!nums(r).includes('7') && !nums(r).includes('17') && !tous(r).some((x) => x.approx), 'P5 « 71 » ne trouve ni le N°7 ni le N°17 (un N° ne tolère aucune faute)', nums(r).slice(0, 5));
   r = ch('52 €'); dit(!tous(r).some((x) => x.approx), 'P5 un montant n\'est jamais « à peu près »', tous(r).length);
   // P6
-  const t1 = process.hrtime.bigint(); ch('air force'); const tRech = Number(process.hrtime.bigint() - t1) / 1e6;
+  const tRech = T.mesureCpu(() => ch('air force')).ms;
   ch('premiere frappe');   // le vocabulaire de l'index se fait UNE fois (l'index est mémorisé dans l'app)
-  const fr = []; for (const q of ['zzzzqx', 'qwertyuiop', 'nikr dumk', 'samab']) { const ts = []; for (let k = 0; k < 7; k++) { const a = process.hrtime.bigint(); ch(q); ts.push(Number(process.hrtime.bigint() - a) / 1e6); } ts.sort((x, y) => x - y); fr.push(ts[3]); }   // la médiane de 7 frappes (machine partagée)
-  dit(idx.n > 9000 && tIndex + tRech < 300, `P6 index de ${idx.n} objets + recherche : ${Math.round(tIndex + tRech)} ms (< 300)`, { tIndex, tRech });
+  const FRAPPES = ['zzzzqx', 'qwertyuiop', 'nikr dumk', 'samab'];
+  const fr = []; for (const q of FRAPPES) { const ts = []; for (let k = 0; k < 7; k++) ts.push(T.mesureCpu(() => ch(q)).ms); ts.sort((x, y) => x - y); fr.push(ts[3]); }   // la médiane de 7 frappes
+  dit(idx.n > 9000 && tIndex + tRech < 300, `P6 index de ${idx.n} objets + recherche : ${Math.round(tIndex + tRech)} ms de ${T.SOURCE_CPU} (< 300)`, { tIndex, tRech });
   const frMax = Math.max(...fr);
-  dit(frMax < 16, `P6 une frappe sans résultat (fautes cherchées partout) : ${frMax.toFixed(1)} ms (< 16)`, fr);
+  dit(frMax < 16, `P6 une frappe sans résultat (fautes cherchées partout) : ${frMax.toFixed(1)} ms de ${T.SOURCE_CPU} (< 16)`, fr);
+  // P6 sans aucune horloge : le travail EXACT d'une frappe (lectures comptées), à n puis à 2n objets. Linéaire : chaque
+  // entrée lue un nombre borné de fois (le même à 2n), l'index lu un nombre de fois qui ne dépend pas de n.
+  const idx2 = R.indexRecherche(jeu(2));
+  const w = FRAPPES.map((q) => ({ q, a: T.travailFrappe(R, idx, q, { max: 500 }), b: T.travailFrappe(R, idx2, q, { max: 500 }) }));
+  if (bavard) console.log('   travail d’une frappe (lectures) : ' + w.map((x) => `${x.q} ${x.a.entrees}/${x.a.n} → ${x.b.entrees}/${x.b.n} (index ${x.a.index} → ${x.b.index})`).join(' · '));
+  dit(idx2.n > 1.9 * idx.n && w.every((x) => x.b.parEntree <= x.a.parEntree * 1.15 + 0.5), 'P6 une frappe lit chaque objet un nombre BORNÉ de fois : à 2n, par objet, au plus le facteur log du tri (×1,15), jamais ×2 (aucune horloge)', w.map((x) => [x.q, +x.a.parEntree.toFixed(2), +x.b.parEntree.toFixed(2)]));
+  dit(w.every((x) => x.b.index <= x.a.index && x.a.index <= 20), 'P6 l’index lui-même est lu un nombre de fois qui ne dépend pas de n (vocabulaire des fautes fait UNE fois, pas par objet)', w.map((x) => [x.q, x.a.index, x.b.index]));
   // P7 (l'écran)
   const A = src.app;
   dit(/const siteDe = \(type, e\) => \(e && e\.site \? e\.site : SITE_VINTED_TYPES\[type\] \? 'vinted' : null\);/.test(A) && /\{vignette\}\{ligneTexte\(titre, info, siteDe\(type, e\)\)\}/.test(A) && /<LogoSiteRang site=\{site\} taille=\{14\}\/>/.test(A),
@@ -191,8 +208,9 @@ async function audit(src, bavard) {
     let t = base[cible], manque = false;
     for (let i = 0; i < paires.length; i += 2) { if (!t.includes(paires[i])) manque = true; else t = t.replace(paires[i], paires[i + 1]); }
     if (manque) { console.log(`❌ mutation ${nom} : ancre introuvable`); rates++; continue; }
+    ROUGES.length = 0;
     const k = await audit({ ...base, [cible]: t }, false);
-    console.log(k ? `✅ mutation ${nom} : ${k} rouge(s)` : `❌ mutation ${nom} : RESTE VERTE`); if (!k) rates++;
+    console.log(k ? `✅ mutation ${nom} : ${k} rouge(s) — ${ROUGES.join(' | ')}` : `❌ mutation ${nom} : RESTE VERTE`); if (!k) rates++;
   }
   console.log(rates ? `\n❌ ${rates} mutation(s) non attrapée(s)` : `\n✅ ${Object.keys(MUTATIONS).length}/${Object.keys(MUTATIONS).length} mutations attrapées`);
   process.exit(rates ? 1 : 0);
