@@ -2079,6 +2079,23 @@ function vrmVerifVisible(sel) {
   };
   const ETAT_FAV = { envoye: 'déjà écrit', en_cours: 'message en cours', a_verifier: 'à vérifier sur Vinted', pas_envoye: 'pas envoyé' };
   const eurosFav = (n) => { const x = Number(n); if (!isFinite(x) || x <= 0) return ''; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
+  // 5.455.4 (« le chronomètre ne marche pas ») : UNE horloge pour tout ce que le panneau montre — la carte (même fermée,
+  //    le grand panneau, la page principale, les rangées de la liste) : chaque `[data-fav-dans]` de l'ombre, chaque seconde.
+  //    Avant : un minuteur posé sur la seule carte, arrêté dès qu'elle n'était pas ouverte ; ailleurs, un temps figé.
+  //    À zéro : le panneau se relit (une fois par échéance), pour montrer l'envoi qui part.
+  let horlogeFavId = null, horlogeFavRelu = 0;
+  function tourHorlogeFav() {
+    let l = []; try { l = [...ombre.querySelectorAll('[data-fav-dans]')]; } catch (_) { l = []; }
+    if (!l.length) return 0;
+    let echu = 0;
+    for (const el of l) { const t = Number(el.getAttribute('data-fav-dans')); if (!(t > 0)) continue; if (t <= Date.now()) { echu = Math.max(echu, t); el.textContent = dansFav(t); continue; } const x = dansFav(t); if (el.textContent !== x) el.textContent = x; }
+    if (echu && echu !== horlogeFavRelu) { horlogeFavRelu = echu; try { rafraichir(); } catch (_) {} }
+    return l.length;
+  }
+  // Toujours là (une lecture de l'ombre par seconde, rien si aucun compte à rebours n'est affiché) : quel que soit l'écran qui
+  //    a dessiné le compte à rebours, il avance.
+  function horlogeFav() { if (horlogeFavId == null) horlogeFavId = setInterval(tourHorlogeFav, 1000); tourHorlogeFav(); }
+  horlogeFav();
   const dansFav = (t) => { const s = Math.max(0, Math.round((Number(t) - Date.now()) / 1000)); if (s < 60) return s + ' s'; const m = Math.round(s / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
   const plurielFav = (n, un, plusieurs) => `${Number(n).toLocaleString('fr-FR')} ${Number(n) > 1 ? plusieurs : un}`;
   const fileFavActive = (e) => !!(e && e.site && e.site.favoris && e.site.favoris.file && e.site.favoris.file.actif);
@@ -2600,7 +2617,9 @@ function vrmVerifVisible(sel) {
       if (et === 'reserve' || (st.actif && st.enCours && st.cours === x.id)) return { k: 'encours', t: TU('f6_e_encours'), ton: 'accent' };
       if (et === 'attente') {
         const premier = st.actif && !st.enCours && Number(st.prochain) > Date.now() && st.jobs.find((r) => r && r[1] === 'attente') === j;
-        return { k: 'attente', t: premier ? TU('f6_e_attente_h', { h: heureFl(st.prochain) }) : TU('f6_e_attente') };
+        // 5.455.4 (Julien, 27 nov. 18:42 : « le chronomètre ne marche pas ») : le prochain favori dit « dans 42 s », compté en
+        //    direct (`data-fav-dans`, la même horloge que tout le panneau), plus une heure figée.
+        return { k: 'attente', t: TU('f6_e_attente'), ...(premier ? { dans: Number(st.prochain) } : {}) };
       }
       if (et === 'incertain') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
       return { k: 'ignore', t: TU('f6_e_ignore'), raison: raison6(j[2] || et) };
@@ -2640,7 +2659,7 @@ function vrmVerifVisible(sel) {
     // 5.453.2 (Julien, 26 nov. : file bloquée sur « Vérifie les envois incertains », sans geste) : un envoi À VÉRIFIER se tranche
     //    sur SA ligne — il regarde la conversation sur Vinted, puis « C'est parti » ou « Pas parti ». Jamais renvoyé seul.
     const tranche = et.k === 'verifier' ? `<span class="tr6" data-fav6-trancher-ligne="${esc(x.id)}"><button type="button" class="vu-btn" data-fav6-trancher="parti" data-id="${esc(x.id)}">${esc(TU('f6_parti'))}</button><button type="button" class="vu-btn" data-fav6-trancher="pas" data-id="${esc(x.id)}">${esc(TU('f6_pas_parti'))}</button></span>` : '';
-    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
+    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.dans ? ` <small class="rs6" data-fav-prochain6>${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(et.dans)}">${esc(dansFav(et.dans))}</span>`)}</small>` : ''}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
   }
   // ══ 5.420 (Julien, 21 nov. : « sauf si j'ai activé les messages aux favoris automatiques ») — L'AUTOMATIQUE ═══════════
   // Allumé pour ce compte : les NOUVEAUX favoris reçoivent le message sans passer par les étapes (le pilote de toujours,
@@ -3223,9 +3242,7 @@ function vrmVerifVisible(sel) {
     const okB = carte.querySelector('[data-fav-ok]');
     if (okB) okB.addEventListener('click', () => demander('oublier', null, () => { apercuFav = null; apercuFavAt = 0; rafraichir(); }));
     // « prochain dans … » suit l'horloge tant que la carte est ouverte (aucune requête).
-    clearInterval(minuteurFav); minuteurFav = null;
-    const dans = carte.querySelector('[data-fav-dans]');
-    if (dans) minuteurFav = setInterval(() => { if (!dans.isConnected || !carte.classList.contains('on')) { clearInterval(minuteurFav); minuteurFav = null; return; } const t = Number(dans.getAttribute('data-fav-dans')); if (t <= Date.now()) { clearInterval(minuteurFav); minuteurFav = null; rafraichir(); return; } dans.textContent = dansFav(t); }, 1000);
+    horlogeFav();
   }
 
   // ══ 5.377 — FAVORIS · ANNONCES · VENTES, LE COMPTE DE L'ONGLET D'ABORD ══════════

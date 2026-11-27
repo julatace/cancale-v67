@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris} from './favoris-file.js';
+import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -307,6 +307,9 @@ export async function routeFavoris(req,res){
         const version5280=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=280;
         const version5309=Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=309;
         decision=d=>consommerFile(d,{owner,jeton:c.jeton,maintenant,version5281,version5280,version5309});
+      }else if(c.action==='prolonger'){
+        if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
+        decision=d=>prolongerFile(d,{owner,jeton:c.jeton,maintenant});
       }else if(c.action==='verifier'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         decision=d=>verifierReservation(d,{owner,jeton:c.jeton,maintenant});
