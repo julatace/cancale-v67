@@ -82,7 +82,7 @@ export default {
   "tete.chercher": "Search (No., username, tracking…)",
   "tete.notifs": "Notifications",
   "tete.notifsN": "Notifications · {n} unread",
-  "lat.comptes": "{n} Vinted accounts",
+  "lat.comptes": {"one": "{n} Vinted account", "other": "{n} Vinted accounts"},
   "ext.maj.titre": "An update is ready",
   "ext.maj.texte": "It installs in your browser; your settings stay.",
   "ext.maj.retard": "This version is too old to act from VRM.",

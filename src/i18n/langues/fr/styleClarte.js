@@ -82,7 +82,7 @@ export default {
   "tete.chercher": "Chercher (N°, pseudo, suivi…)",
   "tete.notifs": "Notifications",
   "tete.notifsN": "Notifications · {n} non lues",
-  "lat.comptes": "{n} comptes Vinted",
+  "lat.comptes": {"one": "{n} compte Vinted", "other": "{n} comptes Vinted"},
   "ext.maj.titre": "Une mise à jour est prête",
   "ext.maj.texte": "Elle s’installe dans ton navigateur, tes réglages restent.",
   "ext.maj.retard": "Cette version est trop ancienne pour agir depuis VRM.",
