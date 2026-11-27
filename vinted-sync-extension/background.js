@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.455.1';
+const CODE_VERSION = '5.455.2';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -35604,6 +35604,7 @@ var __gardesApp = (() => {
     phraseBilanFavoris: () => phraseBilanFavoris,
     planSite: () => planSite,
     pointureExacte: () => pointureExacte,
+    poserSourceVend: () => poserSourceVend,
     prendreDepart: () => prendreDepart,
     prixAussi: () => prixAussi,
     problemesAnnonce: () => problemesAnnonce,
@@ -35851,6 +35852,9 @@ var __gardesApp = (() => {
   };
   var motsArticle = (vend) => MOTS[vend === "sneakers" ? "sneakers" : "autre"];
   var sourceVend = null;
+  var poserSourceVend = (f) => {
+    sourceVend = typeof f === "function" ? f : null;
+  };
   var vendCourant = () => {
     try {
       const v2 = sourceVend ? sourceVend() : "sneakers";
@@ -38214,6 +38218,7 @@ ${desc}`);
   return __toCommonJS(stdin_exports);
 })();
 const GARDES_APP = __gardesApp;
+GARDES_APP.poserSourceVend(() => (motsExt() === MOTS_ARTICLE.autre ? 'autre' : 'sneakers'));
 // </gardes-app>
 // 5.410 — LA LECTURE DE `main` PASSE PAR LA LIGNE DES RÉGLAGES quand elle en demande un (une seule règle :
 // `superposerReglagesAuto`, la même que l'app). Ligne illisible ⇒ null : le moteur ne fait rien (« pas su »).
