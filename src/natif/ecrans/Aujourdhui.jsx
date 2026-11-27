@@ -662,7 +662,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>
           {/* (22 nov., « en noir ») LES GESTES DU JOUR en disques : Imprimer (LE plein, avec son nombre), Scanner, Annonces,
               Messages, Statistiques — le geste « Imprimer » n'est plus répété dans l'en-tête de Colis. */}
-          <ActionsRondes libelle={tr('pil.a.libelle')} elements={[
+          <ActionsRondes libelle={tr('pil.a.libelle')} dock elements={[
             { cle: 'imprimer', libelle: tr('pil.a.imprimer'), icone: <Icon name="printer" size={22}/>, n: plein ? plein.n : 0, plein: true, onClick: plein ? plein.faire : null, attrs: plein ? { 'data-v2-principal': String(plein.n), 'data-v2-principal-exact': plein.exact === false ? '0' : '1' } : { 'data-v2-imprimer-rien': '' } },
             onScanner ? { cle: 'scanner', libelle: tr('pil.a.scanner'), icone: <Icon name="scan" size={22}/>, onClick: onScanner, attrs: { 'data-v2-scanner': '' } } : null,
             // (23 nov., maquettes de Julien) Publier (le parcours existant : choisir l'article) et Relier (la feuille d'Achats) ;

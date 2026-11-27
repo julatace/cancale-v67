@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., Julien sur « ● En pause · Reprendre » : « je ne comprends pas à quoi ça sert ») src/Discretion.jsx ToutArreter
+  { id: 'tout-arrete-clair', date: '2026-11-27', titre: 'Gestes automatiques arrêtés : dit clairement', phrase: 'Ce qui ne part plus, depuis quand, « Tout relancer ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (26 nov., fiabilite-vc-lbc — Julien : « les données doivent être fiables, pense à Vestiaire Co et Leboncoin ») src/enLigneVc.js
   { id: 'favoris-requetes', date: '2026-11-26', titre: 'Favoris envoyés sans clic', phrase: 'Extension 5.455.0 : plus fiable.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'observation-fichier', date: '2026-11-26', titre: 'Observer Vinted : enregistrer un fichier', phrase: 'Extension 5.454.1 : la frise en fichier.', tab: 'extension', pour: 'tous', mode: 'tous' },
