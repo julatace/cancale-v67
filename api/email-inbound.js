@@ -2786,6 +2786,15 @@ export async function traiterEmail(req, res) {
       // suivi, il donne SA ligne à l'e-mail : deux ventes au même sujet (« Ton colis est en route ») ne
       // partagent plus une ligne (la seconde effaçait la preuve de la première).
       const txLu = txDuTexteEmail(`${mail.subject || ''}\n${texteUtile(mail)}\n${String(mail.html || '')}`);
+      // (28 nov., MESURÉ au banc audit-expedie-sans-extension) Le dernier repli du n° de suivi (« 8 à 14 chiffres »)
+      // prenait le n° de la TRANSACTION (10 chiffres, dans le lien de la commande) pour un n° de suivi : la ligne
+      // portait un faux n° (aucun transporteur ne le connaît) et deux identités se confondaient. Le n° lu comme
+      // transaction n'est jamais un n° de suivi ; sans autre n°, l'e-mail n'a pas d'identité de colis (un « arrivé »
+      // sans n° ni code redevient « info », comme toute arrivée sans n°).
+      if (txLu && track.suivi && String(track.suivi).replace(/\s+/g, '') === txLu) {
+        track.suivi = null;
+        if ((track.status === 'available' && !track.code) || track.status === 'retour') { track.status = 'info'; track.label = 'Info'; }
+      }
       const rowId = `email_track_${carrier}_${track.suivi || (txLu && !(track.sansSuivi && track.code) ? `tx${txLu}` : shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject))}`;
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un

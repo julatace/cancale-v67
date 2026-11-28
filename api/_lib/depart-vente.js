@@ -91,7 +91,7 @@ export function preuveDeLigne(l) {
 // un rappel (« Expédie-le », « N'oublie pas », « avant le… », « bordereau », « étiquette ») : le
 // même e-mail qui demande d'envoyer porte aussi le n° de la transaction.
 const SUJET_CONSTATE_TX = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|(?:a\s+[ée]t[ée]|est\s+(?:bien\s+)?)\s*(?:d[ée]pos[ée]e?|exp[ée]di[ée]e?|envoy[ée]e?|livr[ée]e?|re[çc]ue?|retir[ée]e?|arriv[ée]e?|pris\s+en\s+charge)(?![a-zà-ÿ])|est\s+en\s+(?:route|chemin|transit|cours\s+de\s+livraison)|(?:a|ont)\s+(?:bien\s+)?re[çc]u/i;
-const SUJET_PAS_ENCORE_TX = /n['’]oublie|pense\s+[àa]|exp[ée]diez|exp[ée]die[\s-]+(?:le|la|ton|ta|votre)\b|[àa]\s+exp[ée]dier|avant\s+le|rappel|bordereau|[ée]tiquette|dernier\s+jour|il\s+(?:te|vous)\s+reste|d[ée]lai|bient[ôo]t|va\s+[êe]tre|sera\b|annul|rembours|\?/i;
+const SUJET_PAS_ENCORE_TX = /n['’]oublie|pense\s+[àa]|exp[ée]diez|exp[ée]die[\s-]+(?:le|la|ton|ta|votre)\b|[àa]\s+exp[ée]dier|avant\s+le|rappel|bordereau|[ée]tiquette|dernier\s+jour|il\s+(?:te|vous)\s+reste|d[ée]lai|bient[ôo]t|va\s+[êe]tre|sera\b|annul|rembours|pas\s+(?:encore|été|ete)|n['’](?:a|est)\s+pas|\?/i;
 export const txDeLigne = (l) => { const t = String((l && (l.transaction != null ? l.transaction : l.tx)) || '').trim(); return /^\d{6,20}$/.test(t) ? t : ''; };
 export const sujetConstateDepart = (sujet) => { const s = String(sujet || ''); return !!s && SUJET_CONSTATE_TX.test(s) && !SUJET_PAS_ENCORE_TX.test(s); };
 // Une ligne d'e-mail ⇒ { tx, status, sujet, carrier, at } ou null : son n° de transaction, un état
