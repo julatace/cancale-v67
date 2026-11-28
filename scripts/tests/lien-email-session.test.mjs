@@ -10,10 +10,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const racine = path.resolve(ici, '..', '..');
-const source = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+// (28 nov.) App.jsx et ses écrans découpés (src/ecrans/*.jsx), recollés par _source-app : l'écran de
+// connexion a quitté App.jsx (scripts/decouper-app.cjs).
+const source = createRequire(import.meta.url)(path.join(racine, 'scripts', '_source-app.cjs')).sourceAppCode(racine);
 const debut = source.indexOf('const consumeAuthRedirect = async');
 const fin = source.indexOf("// Le jeton ne dit pas l'email en clair", debut);
 assert.ok(debut > 0 && fin > debut, 'consumeAuthRedirect introuvable');
