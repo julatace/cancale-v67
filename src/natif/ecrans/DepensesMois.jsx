@@ -77,18 +77,25 @@ function FeuilleDepense({ ouverte, depense, onFermer, onEnregistrer, onRetirer, 
 
 // `etat` : 'encours' | 'lu' ; `moisLong` ; `chargesMois` : { total, sansDepenses } de la règle des charges ; `lignes` : les
 // dépenses du mois (src/depensesRapides.js `depensesDuMois`) ; `montant` : le format de l'app.
-export default function DepensesMois({ etat = 'encours', moisLong = '', chargesMois = null, lignes = [], montant = (x) => String(x), onEnregistrer, onRetirer, onPhoto, ouvrirDemande = 0 }) {
+// (28 nov., Julien : « fais tout le reste parfaitement » — compta-finitions, point 1) `jamais` : rien n'a JAMAIS été noté et il
+// n'a pas répondu (`depensesEtat` = 'jamais', règle du 22 oct.) ⇒ le bénéfice n'est qu'un net AVANT ses dépenses : UNE phrase le
+// dit (à la place du « 0 € de charges », un zéro qui ne veut pas dire zéro, §5) et UN bouton « Je n'ai pas de dépenses »
+// (`onAucune`, `repondreSansDepenses`) ; « + Dépense » reste en tête. Sa réponse posée (ou une dépense notée), plus rien n'est
+// redemandé (§2.10 : aucune carte de reproche récurrente).
+export default function DepensesMois({ etat = 'encours', moisLong = '', chargesMois = null, lignes = [], montant = (x) => String(x), onEnregistrer, onRetirer, onPhoto, ouvrirDemande = 0, jamais = false, onAucune = null }) {
   const [ouverte, setOuverte] = React.useState(false);
   const [edite, setEdite] = React.useState(null);
   React.useEffect(() => { if (ouvrirDemande) { setEdite(null); setOuverte(true); } }, [ouvrirDemande]);
   const total = chargesMois && chargesMois.total != null ? chargesMois.total : null;
-  const sous = etat !== 'lu' ? tr('dep.lecture') : total == null ? '' : tr('dep.chargesMois', { m: montant(total) });
+  const choix = etat === 'lu' && jamais && !lignes.length;
+  const sous = etat !== 'lu' ? tr('dep.lecture') : choix ? tr('dep.jamais') : total == null ? '' : tr('dep.chargesMois', { m: montant(total) });
   return (
     <>
       <Carte className="n-dep-carte" titre={tr('dep.titre', { mois: moisLong })} n={etat === 'lu' ? lignes.length : undefined} sousTitre={sous}
         action={<Bouton variante="texte" onClick={() => { setEdite(null); setOuverte(true); }} indisponible={etat !== 'lu'} raison={etat !== 'lu' ? tr('dep.err.pasLu') : ''} attrs={{ 'data-dep-plus': '' }}>{tr('dep.plus')}</Bouton>}
-        attrs={{ 'data-dep-mois': etat, 'data-dep-n': String(lignes.length), 'data-dep-charges': total == null ? '' : String(Math.round(total * 100)) }}>
-        {etat === 'lu' && !lignes.length ? <Rangee titre={tr('dep.aucune')} sousTitre={tr('dep.aucuneSous')}/> : null}
+        attrs={{ 'data-dep-mois': etat, 'data-dep-n': String(lignes.length), 'data-dep-charges': total == null || choix ? '' : String(Math.round(total * 100)), 'data-dep-jamais': choix ? '' : undefined }}>
+        {choix && onAucune ? <Rangee titre={tr('dep.sansDepenses')} fin="chevron" onClick={onAucune} attrs={{ 'data-depenses-aucune': '', 'data-depenses-choix': '' }}/>
+          : etat === 'lu' && !lignes.length ? <Rangee titre={tr('dep.aucune')} sousTitre={tr('dep.aucuneSous')}/> : null}
         {lignes.map((d) => (
           <Rangee key={d.id} titre={d.libelle && d.libelle !== d.cat ? d.libelle : tr('dep.cat.' + idCat(d.cat))}
             sousTitre={[d.libelle && d.libelle !== d.cat ? tr('dep.cat.' + idCat(d.cat)) : '', d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '', d.ticket ? tr('dep.avecTicket') : ''].filter(Boolean).join(' · ')}

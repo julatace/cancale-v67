@@ -33,7 +33,7 @@ html body .vrm-app-shell .vrm-compte-puces .vrm-compte-puce:focus-visible { outl
 .vrm-sec-titre { font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-sec-sous { font: 400 13px/1.35 var(--vrm-police); color: var(--fu-gris2, #6e6e73); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-sec-etat { flex: none; padding: 2px 8px; border-radius: 999px; font: 600 12px/1.4 var(--vrm-police); background: var(--fu-case, rgba(118,118,128,.12)); color: var(--fu-gris, #6e6e73); white-space: nowrap; }
-.vrm-sec-etat.is-verifier { background: var(--fu-ambre-fond, #fff4e0); color: var(--fu-ambre-txt, #8a5a00); }
+.vrm-sec-etat.is-verifier { background: var(--fu-ambre-fond, var(--n-ambre-fond)); color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-sec-etat.is-ici { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
 .vrm-sec-jour { font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris, #6e6e73); margin: 16px 4px 6px; text-transform: none; }
 .vrm-sec-filtres { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 10px; }
@@ -49,4 +49,4 @@ html body .vrm-app-shell .vrm-sec-ligne .vrm-sec-bouton:disabled { opacity: .5; 
 /* (8 nov., confiance) La preuve d'une ligne du journal : plus petite, sur sa ligne,
    peut aller à la ligne (jamais coupée : c'est elle qui fait la confiance). */
 .vrm-sec-sous.vrm-sec-preuve { font-size: 12px; white-space: normal; color: var(--fu-gris, #6e6e73); }
-.vrm-sec-preuve[data-journal-preuve="pas-su"] { color: var(--fu-ambre-txt, #8a5a00); }
+.vrm-sec-preuve[data-journal-preuve="pas-su"] { color: var(--fu-ambre-txt, var(--n-ambre)); }

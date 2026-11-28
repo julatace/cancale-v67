@@ -181,8 +181,8 @@
   .n-rp-carte { border: .5px solid var(--n-trait); border-radius: 16px; background: var(--n-carte); overflow: hidden; }
   .n-rp-tete { gap: 6px; padding: 12px 14px 10px; background: var(--n-rp-teinte, rgb(120 120 128 / .08)); }
   .n-rp-tete[data-rp-teinte="chronopost"] { --n-rp-teinte: rgb(120 120 128 / .08);   /* (22 nov.) plus aucun bleu (style-vintex) : gris neutre */ }
-  .n-rp-tete[data-rp-teinte="colissimo"], .n-rp-tete[data-rp-teinte="laposte"] { --n-rp-teinte: rgb(255 196 0 / .12); }
-  .n-rp-tete[data-rp-teinte="relaiscolis"] { --n-rp-teinte: rgb(255 149 0 / .10); }
+  .n-rp-tete[data-rp-teinte="colissimo"], .n-rp-tete[data-rp-teinte="laposte"] { --n-rp-teinte: var(--n-ambre-fond); }
+  .n-rp-tete[data-rp-teinte="relaiscolis"] { --n-rp-teinte: var(--n-ambre-fond); }
   .n-rp-tete[data-rp-teinte="vintedgo"] { --n-rp-teinte: rgb(0 128 128 / .09); }
   .n-rp-tete[data-rp-teinte="ups"] { --n-rp-teinte: rgb(140 100 50 / .10); }
   .n-rp-tete-ligne { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; }

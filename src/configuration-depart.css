@@ -173,7 +173,7 @@
 }
 .vrm-cfg-principal[data-repondu="0"] { background: var(--cfg-remplir); color: var(--cfg-encre); }
 .vrm-cfg-principal:disabled { opacity: .6; cursor: default; }
-.vrm-cfg-erreur { margin: 0 auto 10px; max-width: 420px; font-size: 14px; line-height: 1.4; color: var(--d-warn, #B25000); text-align: center; }
+.vrm-cfg-erreur { margin: 0 auto 10px; max-width: 420px; font-size: 14px; line-height: 1.4; color: var(--d-warn, var(--n-ambre)); text-align: center; }
 
 @media (min-width: 900px) {
   .vrm-cfg-panneau { padding-top: 24px; }

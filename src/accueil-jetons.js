@@ -23,8 +23,8 @@ export const K = {
   cta: '#16181D',          // cobalt : le bouton principal, texte blanc (8,6:1)
   accent: '#16181D',
   accentSoft: 'rgba(22, 24, 29,0.10)',
-  warn: '#B25000',         // ambre lisible sur clair (texte)
-  warnDot: '#F0B44C',      // la pastille ambre (décor, pas du texte)
+  warn: '#3D4B5B',         // ambre lisible sur clair (texte)
+  warnDot: '#3D4B5B',      // la pastille ambre (décor, pas du texte)
   paper: '#FFFFFF',
   ink: '#1D1D1F',
   // ── L'encre des aplats sombres (le film) ──

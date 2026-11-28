@@ -187,13 +187,15 @@ async function regleEcran(pg, nom, tel, errs) {
   // ── U. chaque montant une fois
   const t = await texteEcran(pg);
   // (27 nov.) U compte les CHIFFRES de l'écran : les lignes d'une liste (« À venir » : chaque vente, son prix, le sous-total de son groupe,
-  // `[data-a-venir-ligne]`, `[data-av-vente]`, `.vg-av-groupe-eur`) détaillent un total, pas un chiffre redit. La base écrite sous l'URSSAF (« 12,4 % de
-  // 60 € reçus ») est rapportée à part (« À DÉCIDER ») quand elle redit un autre montant de l'écran.
+  // `[data-a-venir-ligne]`, `[data-av-vente]`, `.vg-av-groupe-eur`) détaillent un total, pas un chiffre redit. La base de l'URSSAF (« 12,4 % de
+  // 60 € reçus ») ne doit redire aucun montant de l'écran (28 nov. : elle vit sous « Pourquoi ? »).
   const tU0 = await pg.evaluate(() => { const e = document.querySelector('.vrm-finance-page'); if (!e) return ''; const c = e.cloneNode(true); c.querySelectorAll('[data-a-venir-ligne], [data-av-vente], .vg-av-groupe-eur').forEach((x) => x.remove()); c.style.cssText = 'position:absolute;left:-99999px;top:0;width:' + e.clientWidth + 'px'; document.body.appendChild(c); const r = c.innerText; c.remove(); return r; });
   const base = [...tU0.matchAll(/\d+(?:,\d+)?[\u202f\u00a0 ]?% de (-?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*(?:,\d{2})?[\u202f\u00a0 ]?€) reçus/g)].map((m) => m[1].replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
   const tU = tU0.replace(/\d+(?:,\d+)?[\u202f\u00a0 ]?% de -?\d{1,3}(?:[\u202f\u00a0 ]\d{3})*(?:,\d{2})?[\u202f\u00a0 ]?€ reçus/g, '');
   const montants = (tU.match(MONTANT) || []).map((x) => x.replace(/[\u202f\u00a0 ]/g, ' ').replace(/\s?€/, ' €'));
-  for (const x of base) if (montants.includes(x)) console.log(`À DÉCIDER  ${nom} — U la base de l'URSSAF (« … % de ${x} reçus ») redit un montant déjà écrit sur l'écran`);
+  // (28 nov., décidé par Julien) La base n'est plus écrite sous l'URSSAF : elle s'ouvre sous « Pourquoi ? » (src/ecrans/Compta.jsx).
+  const rediteBase = base.filter((x) => montants.includes(x));
+  check(rediteBase.length === 0, `${nom} — U la base de l'URSSAF ne redit aucun montant de l'écran${rediteBase.length ? ' : ' + rediteBase.join(' · ') : ''}`);
   const doubles = [...new Set(montants.filter((x, i) => montants.indexOf(x) !== i))];
   // (2 nov., 22 h : l'écran a moins de montants depuis la maquette FusionCompta — au moins 2.)
   check(montants.length >= 2 && doubles.length === 0, `${nom} — U chaque montant visible écrit une fois (${montants.length} montants${doubles.length ? ', redits : ' + doubles.join(' · ') : ''})`);

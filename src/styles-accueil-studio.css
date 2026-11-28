@@ -171,7 +171,7 @@
 /* Les plateformes ne sont pas des boutons : une pastille de couleur et le nom. */
 .acc-plateformes>span{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:0 12px 0 0;font-size:13px;color:#D1D1D6;}
 .acc-plateformes>span:before{content:"";width:8px;height:8px;border-radius:50%;background:#09B1BA;}
-.acc-plateformes>span:nth-child(2):before{background:#F56B2A;}
+.acc-plateformes>span:nth-child(2):before{background:var(--n-ambre);}
 .acc-plateformes>span:nth-child(3):before{background:#86B817;}
 /* Le titre respire, la phrase dessous se lit. */
 .acc .acc-h1{font-weight:700;}

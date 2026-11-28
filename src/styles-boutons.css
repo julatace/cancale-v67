@@ -203,8 +203,8 @@
 .vrm-avancement-barre { height: 8px; border-radius: 99px; background: var(--vrm-b-teinte-f); overflow: hidden; }
 .vrm-avancement-barre > span { display: block; height: 100%; border-radius: 99px; background: var(--vrm-accent, #16181D); transition: width .4s cubic-bezier(.23, 1, .32, 1); }
 .vrm-avancement-phrase { font-size: 13px; color: var(--vrm-ink, #38383A); line-height: 1.45; }
-.vrm-avancement-erreur { font-size: 13px; color: #B25000; line-height: 1.45; }
-:root[data-theme="dark"] .vrm-avancement-erreur { color: #EBC080; }
+.vrm-avancement-erreur { font-size: 13px; color: var(--n-ambre); line-height: 1.45; }
+:root[data-theme="dark"] .vrm-avancement-erreur { color: var(--n-ambre); }
 @media (prefers-reduced-motion: reduce) { .vrm-avancement-barre > span { transition: none; } }
 
 /* ── Achats (30 oct.) : « J'ai retiré » à la forme secondaire ────────────────
@@ -234,7 +234,7 @@
    un regard (pas faite, à vérifier) en ambre hachuré à la suite, le reste vide. */
 .vrm-avancement-barre { display: flex; }
 .vrm-avancement-barre > span { flex: 0 0 auto; }
-.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, #B25000 0 4px, rgba(201, 138, 20, .45) 4px 8px); }
+.vrm-avancement-barre > span.vrm-avancement-rate { border-radius: 0 99px 99px 0; background: repeating-linear-gradient(135deg, var(--n-ambre) 0 4px, var(--n-ambre-fond) 4px 8px); }
 /* (30 oct.) Les réductions de Republier : un CHOIX, pas une action. L'actif se lit
    en surface élevée cernée d'accent — jamais plein comme le bouton principal. */
 .vrm-app-shell [data-republier-reductions].vrm-filtres > button[aria-pressed="true"],

@@ -485,10 +485,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
 - **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
 - **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
-- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
-- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

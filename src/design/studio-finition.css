@@ -150,7 +150,7 @@
 
 /* ── 19. LE NUAGE BARRÉ DE LA TÊTE : il dit son mot (« Pas enregistré », « À recharger ») — une pastille, plus un rond muet. */
 .vrm-hbtn.vrm-sync-status:has(.vrm-sync-mot) { width: auto !important; min-width: 44px !important; padding: 0 12px 0 10px !important; gap: 6px !important; border-radius: 22px !important; display: inline-flex !important; align-items: center !important; }
-.vrm-sync-mot { font: 600 13px/1 var(--sb-police-texte, inherit) !important; color: var(--sb-ambre, #965900) !important; white-space: nowrap !important; }
+.vrm-sync-mot { font: 600 13px/1 var(--sb-police-texte, inherit) !important; color: var(--sb-ambre, var(--n-ambre)) !important; white-space: nowrap !important; }
 
 /* ── 20. LA FICHE D'UN COLIS À RETIRER : « Point » — le nom, l'adresse entière dessous, alignés à droite comme les autres valeurs. */
 [data-rpf-point] .vrm-rpf-fiche-v { flex: 1 1 auto !important; min-width: 0 !important; background: none !important; box-shadow: none !important; padding: 0 !important; white-space: normal !important; }

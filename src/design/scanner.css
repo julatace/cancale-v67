@@ -10,7 +10,7 @@
 .vrm-scan-vue video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vrm-scan-viseur { position: absolute; left: 8%; right: 8%; top: 32%; bottom: 32%; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.85); transition: border-color .15s ease; }
 .vrm-scan-vue.is-trouve .vrm-scan-viseur { border-color: #FFFFFF; animation: vrmScanOk .5s ease-out; }
-.vrm-scan-vue:is(.is-inconnu, .is-ambigu, .is-vide) .vrm-scan-viseur { border-color: #ff9f0a; animation: vrmScanNon .35s ease-in-out; }
+.vrm-scan-vue:is(.is-inconnu, .is-ambigu, .is-vide) .vrm-scan-viseur { border-color: var(--n-ambre); animation: vrmScanNon .35s ease-in-out; }
 .vrm-scan-vue.is-deja .vrm-scan-viseur { border-color: #8e8e93; }
 @keyframes vrmScanOk { 0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
 @keyframes vrmScanNon { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
@@ -19,7 +19,7 @@
 .vrm-scan-res:empty { background: transparent; }
 .vrm-scan-etat { font-size: 17px; font-weight: 700; }
 .vrm-scan-etat.is-fait { color: #FFFFFF; }
-.vrm-scan-etat:is(.is-inconnu, .is-ambigu, .is-vide) { color: #ff9f0a; }
+.vrm-scan-etat:is(.is-inconnu, .is-ambigu, .is-vide) { color: var(--n-ambre); }
 .vrm-scan-etat.is-deja { color: #aeaeb2; }
 .vrm-scan-quoi { display: flex; gap: 8px; font-size: 15px; color: #d1d1d6; min-width: 0; }
 .vrm-scan-quoi > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -65,10 +65,10 @@
 .vrm-scan-serie li b { font-variant-numeric: tabular-nums; }
 .vrm-scan-serie em { font-style: normal; flex: 0 0 auto; font-size: 13px; }
 .vrm-scan-serie em.is-fait { color: #FFFFFF; }
-.vrm-scan-serie em.is-attente { color: #ff9f0a; }
+.vrm-scan-serie em.is-attente { color: var(--n-ambre); }
 .vrm-scan-serie em.is-non { color: #8e8e93; }
-.vrm-scan-vue.is-sansVente .vrm-scan-viseur { border-color: #ff9f0a; }
-.vrm-scan-etat.is-sansVente { color: #ff9f0a; }
+.vrm-scan-vue.is-sansVente .vrm-scan-viseur { border-color: var(--n-ambre); }
+.vrm-scan-etat.is-sansVente { color: var(--n-ambre); }
 .vrm-scan-vue.is-fait .vrm-scan-viseur { border-color: #FFFFFF; }
 @media (max-height: 700px) { .vrm-scan.a-paire .vrm-scan-vue { flex-basis: 22vh; min-height: 110px; } }
 .vrm-achats-scan { display: flex; justify-content: flex-end; margin: 0 0 8px; }
