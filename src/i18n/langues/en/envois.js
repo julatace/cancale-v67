@@ -33,4 +33,10 @@ export default {
   "envois.sansNumero": "tracking number not read yet",
   "envois.ouvrirSuivi": "Open tracking for parcel {n}",
   "envois.vide": "No parcel in this group.",
+  // (28 nov., « expédié sans l’extension ») réimprimer un colis parti ; « à expédier » sur une lecture ancienne.
+  "envois.dejaParti.titre": "This parcel has already left",
+  "envois.dejaParti.desc": "{raison}. Print its label again?",
+  "envois.dejaParti.ok": "Print anyway",
+  "envois.aConfirmer": "To confirm · Vinted not re-read on {compte} for {heures} h",
+  "envois.aConfirmerGeste": "Open Vinted on {compte}",
 };

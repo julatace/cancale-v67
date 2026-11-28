@@ -33,4 +33,10 @@ export default {
   "envois.sansNumero": "Sendungsnummer noch nicht gelesen",
   "envois.ouvrirSuivi": "Sendungsverfolgung für Paket {n} öffnen",
   "envois.vide": "Kein Paket in dieser Gruppe.",
+  // (28 nov., « expédié sans l’extension ») réimprimer un colis parti ; « à expédier » sur une lecture ancienne.
+  "envois.dejaParti.titre": "Dieses Paket ist schon unterwegs",
+  "envois.dejaParti.desc": "{raison}. Das Etikett trotzdem erneut drucken?",
+  "envois.dejaParti.ok": "Trotzdem drucken",
+  "envois.aConfirmer": "Zu bestätigen · Vinted auf {compte} seit {heures} h nicht neu gelesen",
+  "envois.aConfirmerGeste": "Öffne Vinted auf {compte}",
 };
