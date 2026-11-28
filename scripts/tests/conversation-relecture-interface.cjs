@@ -22,7 +22,7 @@ const { build } = require("esbuild"),
     stdin: {
       resolveDir: root,
       loader: "jsx",
-      contents: `import React from'react';import{createRoot}from'react-dom/client';import{fusionnerConversation}from'./src/conversations.js';import'./src/styles-mineral.css';
+      contents: `import React from'react';import{createRoot}from'react-dom/client';import{fusionnerConversation}from'./src/conversations.js';import'./src/styles-mineral.css';/* (28 nov., main-vert) l'en-tête du fil porte la photo de profil (messages-parfaits) : le VRAI composant */import{AvatarPersonne}from'./src/messages/AvatarPersonne.jsx';
  const AUTH={user:{id:'a'}},C={text:'#233c40',muted:'#607074',accent:'#245b61',card:'#fff',border:'#dce3e2'};
  const Icon=()=> <span aria-hidden="true">↻</span>,PhotoVinted=()=>null,accName=()=> 'Mon compte Vinted',offrePartieDuFil=()=>true;
  /* (21 nov.) l'en-tête du fil porte l'article (par identité) et le retour : servis vides, ce test juge l'actualisation */const BandeauLectureSeule=()=>null;/* (24 nov.) le bandeau « lecture seule » (src/agir) a son propre banc : servi vide ici */const paireDeConv=()=>null,ficheDeConv=()=>null,motsVendeur=()=>[],phraseRetour=()=>'',retirerConvDeLaListe=()=>{};
