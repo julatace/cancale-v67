@@ -71,7 +71,7 @@ export const MINERAL_DARK = Object.freeze({
  bg:'#22262B',haut:'#22262B',surface:'#2E3339',card:'#2E3339',card2:'#383E45',
  border:'#474E56',text:'#FFFFFF',muted:'#A8B1AC',faint:'#A8B1AC',
  accent:'#5BD68F',accentTexte:'#5BD68F',accentSoft:'#A9E9C4',onAccent:'#13241A',
- danger:'#FFC266',doublon:'#FF7A6E',warn:'#FFC266',onWarn:'#1C1300',warnSoft:'#3A3020',gold:'#FFC266',blue:'#A8B1AC',purple:'#A8B1AC',
+ danger:'#F1F4F2',doublon:'#FF7A6E',warn:'#F1F4F2',onWarn:'#18181B',warnSoft:'#383E45',gold:'#F1F4F2',blue:'#A8B1AC',purple:'#A8B1AC',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
  ring:'rgba(244,244,245,.30)',glass:'#2E3339',bar:'#22262B',hair:'rgba(255,255,255,.10)',
  sidebar:'#2E3339',chrome:'#22262B',onChrome:'#FFFFFF',chromeMuted:'#A8B1AC',chromeLine:'#474E56',

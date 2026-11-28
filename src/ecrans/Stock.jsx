@@ -24,7 +24,8 @@ import { casesProposees, caseEnMots, caseLibreDans, premiereCaseLibre } from '..
 // (17 nov., lot stock-rangement) Le nouveau design (essai, `vrm_design_v2`) : le Stock « Ranger » en séance (src/stockV2/).
 import { useDesignV2 } from '../designV2/reglage.js';
 import StockV2 from '../stockV2/StockV2.jsx';
-import { methodeDe, CLE_ETIQUETAGE } from '../etiquetage/methode.js';   // (19 nov., lot stock-etiquetage) la méthode choisie, LUE (jamais écrite ici)
+import { methodeDe, CLE_ETIQUETAGE, ecrituresMethode } from '../etiquetage/methode.js';
+import { appliquerPlan as appliquerPlanRangement } from '../rangement/plan.js';   // (28 nov., agent-rangement) l'assistant de rangement : le plan VALIDÉ, recalculé avant d'écrire   // (19 nov., lot stock-etiquetage) la méthode choisie, LUE (jamais écrite ici)
 import { imprimerEtiquettes } from '../etiquetage/impression.js';
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
@@ -39,7 +40,7 @@ import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
 import { CLE_STOCK_IMPORTE } from '../importStock.js';
 import { importeesAuStock } from '../stockImporteVue.js';   // (16 nov., lot ecrans-restes) le stock importé d'un autre outil, montré
-import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, extractSize, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { enTeteSession, achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, extractSize, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -1658,6 +1659,35 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // « La pièce » : l'ordre des meubles (la même écriture `ordre` que Monter / Descendre).
     placerMeubleA: (id, vers) => { const u = placerMeuble(meubles, id, vers); if (u) ecrireMeubles(u); },
     limitesMeuble: { cols: COLS_MAX, rows: RANGEES_MAX },
+    // (28 nov., lot agent-rangement) L'ASSISTANT DE RANGEMENT (src/rangement/AssistantRangement.jsx) : il lit les meubles et les
+    // cases, propose un plan ; rien n'est écrit avant SON « Appliquer ce plan ». Alors le plan est RECALCULÉ sur l'état le plus
+    // frais (`appliquerPlan`, src/rangement/plan.js) : si les déplacements ne sont plus ceux qu'il a vus (une pose, une sortie
+    // entre-temps), RIEN n'est écrit et c'est dit. Puis les écritures d'hier : `vrm_meubles` (meubles augmentés de `piece` /
+    // `porte`), `vrm_slots` (seulement m et i — aucun N° créé, changé ni réattribué, §5), et la méthode de numérotation par
+    // `ecrituresMethode` (la lettre d'archive refusée) — toutes par `save` ⇒ lire-fusionner-réécrire de `cloudPush`.
+    assistant: {
+      meubles, slots, enTete: enTeteSession, archive: archiveNumeros() || '',
+      articles: aa && aa.su ? new Set([...Object.keys(slots || {}), ...aRanger.map(cleDeFiche)].filter(Boolean)).size : null,
+      methode: methodeDe({ numeroEcrit: load('vrm_numero_ecrit', null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load(CLE_ETIQUETAGE, null) }),
+      appliquer: async (vu, plan) => {
+        const ms = Array.isArray(meubles) ? meubles : null, ss = slotsRef.current;
+        if (!ms || !ss || typeof ss !== 'object') { toast(tr('rgt.pasLu')); return false; }
+        const r = appliquerPlanRangement({ meubles: ms, slots: ss, plan, idNeuf: (k) => (vu && vu.nouveaux && vu.nouveaux[k]) || ('m' + Date.now().toString(36) + k) });
+        const sig = (x) => JSON.stringify(x ? [x.deplacements, x.aRanger, x.meubles.map((m) => String(m.id))] : null);
+        if (!r || sig(r) !== sig(vu)) { toast(tr('rgt.change')); return false; }
+        ecrireMeubles(r.meubles);
+        ecrireSlots(r.slots, r.meubles, r.meubles.map((m) => String(m.id)));
+        if (plan.etiquetage) {
+          const e = plan.etiquetage;
+          const { ecritures, refus } = ecrituresMethode({ numeroEcrit: load('vrm_numero_ecrit', null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load(CLE_ETIQUETAGE, null) },
+            e.qui === 'moi' ? { qui: 'moi' } : { qui: 'vrm', serie: e.serie || 'chiffres', lettre: e.lettre || '' }, { archive: archiveNumeros() || '' });
+          for (const w of ecritures) save(w.cle, w.valeur);
+          if (refus) toast(tr('rgt.etiqRefus'));
+        }
+        toast(tr('rgt.applique'));
+        return true;
+      },
+    },
     ouvrirPhoto: ouvrirRecherchePhoto, ouvrirInventaire: () => setInventaire(true),
     blocs: { inventaire: elInventaire, annuel: elAnnuel, horsLigne: blocHorsLigne, explication: <StockExplication sneakers={motsStock.nom === 'paire'} />,
       aFaire: sectionAFaire, liste: blocListe, importees: blocImportees, aPart: blocAPart, plus: sectionPlus, modale: Modale(),
@@ -1924,7 +1954,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   const [blockMode,setBlockMode]=useState(false);
   const [colorMode,setColorMode]=useState(false);
   const [addMode,setAddMode]=useState(false); // masquer les cases vides par défaut
-  const [activeColor,setActiveColor]=useState('#ffb830');
+  const [activeColor,setActiveColor]=useState('#ffb830');   // couleur-objet : la couleur qu'il PEINT sur ses cases (son choix), pas un accent
   const [focusedCell,setFocusedCell]=useState(null); // {zid, ci, si}
   const highlightRef=React.useRef(null);
   // Rangement lancé DEPUIS le garage (bouton « Ranger » sur une paire à ranger),
@@ -2284,7 +2314,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
           <h3 style={{fontSize:15,fontWeight:600,margin:'0 0 8px',color:C.warn,display:'flex',alignItems:'center',gap:6}}><Icon name="alert" size={15}/>{tr('stock.incoherencesAvecStock')}</h3>
 
           {enLignePasGarage.length>0&&(
-            <div style={{marginBottom:10,padding:10,background:'rgba(156,106,31,0.10)',borderRadius:12}}>
+            <div style={{marginBottom:10,padding:10,background:'var(--n-ambre-fond)',borderRadius:12}}>
               <div style={{fontSize:13,fontWeight:400,marginBottom:4}}>{trj('stock.ligneMaisAbsent', { enLignePasGarageN: enLignePasGarage.length })}</div>
               <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:6}}>{tr('stock.cesAnnoncesSont')}</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -2338,7 +2368,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
             return (
               <span key={n} style={{
                 display:'inline-flex',alignItems:'center',gap:6,
-                background:absentGarage?'rgba(156,106,31,0.12)':(C.card2||'rgba(0,0,0,0.05)'),
+                background:absentGarage?'var(--n-ambre-fond)':(C.card2||'rgba(0,0,0,0.05)'),
                 border:absentGarage?`1px solid ${C.warn}`:'1px solid transparent',
                 borderRadius:12,padding:'5px 8px 5px 10px',fontSize:13,fontWeight:400
               }}>

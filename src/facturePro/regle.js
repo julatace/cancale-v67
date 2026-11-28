@@ -67,7 +67,7 @@ export const estSociete = (forme) => !!(FORMES.find((f) => f.v === forme) || {})
 // Les couleurs proposées pour personnaliser la facture (une seule, discrète :
 // le filet du tableau et le numéro). Jamais une couleur libre qui rendrait le
 // texte illisible à l'impression.
-export const COULEURS = ['#1d1d1f', '#16181D', '#1f6f4a', '#8a3b12', '#48484a', '#b0103a'];
+export const COULEURS = ['#1d1d1f', '#16181D', '#1f6f4a', '#8a3b12', '#48484a', '#b0103a'];   // couleur-objet : les teintes qu'il CHOISIT pour SA facture (pas l'app)
 
 const txt = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v == null ? '' : String(v).replace(/\s+/g, ' ').trim());
 const lignes = (v) => String(v == null ? '' : v).split(/\r?\n/).map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);

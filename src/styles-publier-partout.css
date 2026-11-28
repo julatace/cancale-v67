@@ -36,13 +36,13 @@
 .vrm-pp-resume { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-pp-etat { flex: 1 1 100%; display: flex; flex-direction: column; font-size: 15px; font-weight: 700; color: var(--fu-encre, #1d1d1f); }
 .vrm-pp-etat small { font-weight: 400; font-size: 13px; color: var(--fu-gris, #6e6e73); overflow-wrap: anywhere; line-height: 1.35; }
-.vrm-pp-etat.is-refuse, .vrm-pp-etat.is-pas-envoye, .vrm-pp-etat.is-a-finir { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-etat.is-refuse, .vrm-pp-etat.is-pas-envoye, .vrm-pp-etat.is-a-finir { color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-pp-etat.is-envoi, .vrm-pp-etat.is-attente { color: var(--fu-gris, #6e6e73); }
 .vrm-pp-raison { margin: 0 0 6px; font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.4; overflow-wrap: anywhere; }
-.vrm-pp-raison.is-geste { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-raison.is-geste { color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-pp-manques { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .vrm-pp-manques li { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); }
-.vrm-pp-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, var(--n-ambre-fond)); color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-pp-manques b { font-size: 13px; font-weight: 700; }
 .vrm-pp-manques small { font-size: 12px; color: var(--fu-gris, #6e6e73); }
 .vrm-pp-manques li[data-bloque="1"] small { color: inherit; }
@@ -84,7 +84,7 @@
 .vrm-pp-prix-annonce { width: 120px; font-variant-numeric: tabular-nums; }
 .vrm-pp-champ-fixe { font-size: 15px; }
 .vrm-pp-champ-note { grid-column: 2; font-size: 12px; color: var(--fu-gris, #6e6e73); line-height: 1.35; padding-bottom: 4px; }
-.vrm-pp-champ-note.is-geste, .vrm-pp-champ.is-demande > span { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pp-champ-note.is-geste, .vrm-pp-champ.is-demande > span { color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-pp-demande-mot { font-size: 12px; font-weight: 600; }
 /* Pendant l'envoi : une barre fine (le suivi commun, SuiviTravail, prend le relais quand il est là). */
 .vrm-pp-progres { display: flex; flex-direction: column; gap: 4px; margin: 0 4px 10px; }

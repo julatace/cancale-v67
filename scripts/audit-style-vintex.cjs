@@ -14,7 +14,14 @@
 //      (JSX) / `text-transform:uppercase` dans une chaîne HTML — sauf la PLAQUE du N° et le champ où
 //      l'on tape un N° (sélecteur qui dit `plaque` ou `vrm-inv-champ`) ;
 //   S5 pas de violet : `scripts/audit-violet.cjs` passe ; pas de rouge hors doublon de N° :
-//      `scripts/audit-rouge-doublon.cjs` passe (lancés d'ici, leur verdict est le nôtre).
+//      `scripts/audit-rouge-doublon.cjs` passe (lancés d'ici, leur verdict est le nôtre) ;
+//   S6 (28 nov., « pas d'orange » du 23 nov., redemandé le 28 : « fais tout le reste parfaitement ») plus AUCUN
+//      orange ni ambre écrit dans l'app (src/ : CSS, JS, JSX, styles en ligne compris) : teinte 18°–50°, saturation
+//      ≥ 55 %, luminosité 20–97 % (#B25000, #FF9F0A, #FFB340, #FFF4E5, rgba(255,159,10,.14)…). Un geste à faire = le
+//      gras + le jeton `--n-ambre` (l'ardoise/l'encre le jour, l'encre claire la nuit). Permis : les LOGOS de marque
+//      (MARQUES_FICHIERS, une ligne `logo-marque`), la couleur d'un OBJET (bois d'un meuble, carton, la teinte qu'il
+//      choisit : fichiers OBJETS_FICHIERS, une ligne `couleur-objet`, ou entre `couleur-objet:debut` et `couleur-objet:fin`),
+//      et un sélecteur `[style*="…"]` (il ne colore rien : il reconnaît un style en ligne pour le recouvrir).
 //  On juge la RÈGLE (teinte calculée), pas l'orthographe ; les commentaires ne jugent rien.
 //  `--mutation` remet un bleu, un jeton bleu, un plein bleu, un onglet rose, un titre en capitales :
 //  chacun DOIT rougir.
@@ -30,6 +37,10 @@ const MARQUES_FICHIERS = new Set([
   'src/visuelsReseaux.js',         // les teintes qu'IL choisit pour ses visuels de réseaux sociaux (pas la palette de l'app)
   'src/Room3D.jsx',                // décor de la pièce 3D (jeans, cartons) — pas l'interface
 ]);
+// (28 nov., S6) Les fichiers dont les couleurs sont celles d'un OBJET, pas de l'interface : la détection de la couleur d'une
+// paire sur sa photo (« orange » est une couleur de chaussure), le bois des meubles du stock, ses visuels de réseaux.
+const OBJETS_FICHIERS = new Set(['src/couleurPhoto.js', 'src/stockV2/meubles.css', 'src/visuelsReseaux.js', 'src/Room3D.jsx', 'src/natif/logo-site.css', 'src/transporteursVisuels.js']);
+const estOrange = (rgb) => { const { h, s, l } = hsl(rgb); return h >= 18 && h <= 50 && s >= 0.55 && l >= 0.2 && l <= 0.97; };
 // Les couleurs de MARQUE écrites hors de ces fichiers (un logo posé dans un écran) : Discord (#5865F2, « blurple »).
 const MARQUES_COULEURS = new Set(['#5865f2']);
 const hex6 = (h) => { h = h.replace('#', ''); if (h.length === 3 || h.length === 4) h = h.slice(0, 3).split('').map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
@@ -68,6 +79,8 @@ function juger(depot = {}, { sousAudits = true } = {}) {
     const lignes = net.split('\n');
     const lignesBrutes = brut.split('\n');
     vus++;
+    // S6 — les zones « couleur-objet:debut » … « couleur-objet:fin » (lues sur le texte BRUT : le marqueur est un commentaire).
+    const objet = new Set(); { let dedans = false; lignesBrutes.forEach((l, i) => { if (/couleur-objet:debut/.test(l)) dedans = true; if (dedans || /couleur-objet|logo-marque/.test(l)) objet.add(i); if (/couleur-objet:fin/.test(l)) dedans = false; }); }
     lignes.forEach((l, i) => {
       // S1 — un bleu vif.
       if (!MARQUES_FICHIERS.has(rel) && !/logo-marque/.test(lignesBrutes[i] || '')) {
@@ -77,6 +90,16 @@ function juger(depot = {}, { sousAudits = true } = {}) {
           if (rgb.some((x) => x > 255)) continue;
           if (m[1] && MARQUES_COULEURS.has(('#' + rgb.map((x) => x.toString(16).padStart(2, '0')).join('')))) continue;
           if (estBleuVif(rgb)) dit(false, `S1 ${rel}:${i + 1} un bleu vif (${m[0]}) — l'accent est le vert sapin, le bleu est retiré`, l.trim().slice(0, 140));
+        }
+      }
+      // S6 — un orange / ambre (hors logos, objets, et sélecteurs `[style*="…"]`).
+      if (!MARQUES_FICHIERS.has(rel) && !OBJETS_FICHIERS.has(rel) && !objet.has(i)) {
+        const ls = l.replace(/\[style\*?\^?\$?="[^"]*"\]/g, (m) => ' '.repeat(m.length));
+        COULEUR.lastIndex = 0; let m;
+        while ((m = COULEUR.exec(ls))) {
+          const rgb = m[1] ? hex6(m[1]) : [+m[2], +m[3], +m[4]];
+          if (rgb.some((x) => x > 255 || Number.isNaN(x))) continue;
+          if (estOrange(rgb)) dit(false, `S6 ${rel}:${i + 1} un orange / ambre (${m[0]}) — plus d'orange (23 nov.) : un geste à faire = le gras + var(--n-ambre)`, l.trim().slice(0, 140));
         }
       }
       // S4 — un texte en capitales (JSX, chaîne HTML).
@@ -146,9 +169,12 @@ function mutations() {
   const cas = [
     ['un bleu vif dans une feuille', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.x-mutation { color: #0068D6; }\n' }, /S1/],
     ['un bleu vif en rgb() dans un style en ligne', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ color: 'rgb(0, 113, 227)' }}/>;\n" }, /S1/],
-    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #3D4B5B;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
-    ['le plein remis au noir', { 'src/natif/jetons.css': jet.replace('--n-plein: #3D4B5B;', '--n-plein: #16181D;') }, /S2 le bouton plein \(clair\)/],
-    ['l\'orange revenu', { 'src/natif/jetons.css': jet.replace('--n-ambre: #3D4B5B;', '--n-ambre: #874600;') }, /S2 plus d'orange/],
+    ['l\'accent remis au bleu', { 'src/natif/jetons.css': jet.replace('--n-accent: #000000;', '--n-accent: #0068D6;') }, /S2 --n-accent \(clair\)/],
+    ['le plein remis au noir', { 'src/natif/jetons.css': jet.replace('--n-plein: #000000;', '--n-plein: #16181D;') }, /S2 le bouton plein \(clair\)/],
+    ['l\'orange revenu', { 'src/natif/jetons.css': jet.replace('--n-ambre: #000000;', '--n-ambre: #874600;') }, /S2 plus d'orange/],
+    ['un orange dans une feuille (S6)', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.x-mutation-orange { color: #B25000; }\n' }, /S6/],
+    ['une teinte ambre en rgba() dans un style en ligne (S6)', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ background: 'rgba(255,159,10,.14)' }}/>;\n" }, /S6/],
+    ['le fond crème ambre (S6)', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.x-mutation-orange { background: #FFF4E5; }\n' }, /S6/],
     ['l\'onglet actif en rose', { 'src/natif/natif.css': nat.replace('.n-onglet[aria-current="page"] { color: var(--n-accent);', '.n-onglet[aria-current="page"] { color: #C02D55;') }, /S3/],
     ['un titre en capitales (CSS)', { 'src/natif/complements.css': lire('src/natif/complements.css') + '\n.n-carte-titre-mutation { text-transform: uppercase; }\n' }, /S4/],
     ['un titre en capitales (JSX)', { 'src/mutation-vintex.jsx': "export const X = () => <b style={{ textTransform: 'uppercase' }}>À envoyer</b>;\n" }, /S4/],
@@ -168,7 +194,7 @@ if (require.main === module) {
   for (const r of rouges.slice(0, 80)) console.log('❌ ' + r);
   if (rouges.length > 80) console.log(`… et ${rouges.length - 80} de plus`);
   let ok = rouges.length === 0;
-  console.log(ok ? '✅ audit-style-vintex : gris clair étagé, accent ardoise, plus d’orange (23 nov.), aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
+  console.log(ok ? '✅ audit-style-vintex : gris clair étagé, accent ardoise, plus d’orange (23 nov. ; S6 : aucun orange écrit, 28 nov.), aucun bleu vif, aucun titre en capitales, ni violet ni rouge hors doublon' : `\n❌ audit-style-vintex : ${rouges.length} rouge(s)`);
   if (process.argv.includes('--mutation')) ok = mutations() && ok;
   process.exit(ok ? 0 : 1);
 }

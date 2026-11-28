@@ -1,5 +1,6 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
 import ecran_textes_restes from './it/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './it/rangement.js';   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './it/suiviVente.js';
@@ -131,7 +132,8 @@ import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './it/actionsExt.js';
 import ecran_ebay_series from './it/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './it/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_ameliorations27 from './it/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_ameliorations27 from './it/ameliorations27.js';
+import ecran_compta_finitions from './it/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './it/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './it/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -140,6 +142,7 @@ import ecran_loupe_num from './it/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -578,7 +581,7 @@ export default {
   "reglages.depannage.statut.q": "VRM sembra non funzionare",
   "reglages.depannage.statut.r": "Guarda la pagina di stato. Tutto funziona? Ricarica questa pagina.",
   "reglages.donnees.confidentialite": "informativa sulla privacy",
-  "reglages.donnees.desc": "Vendite, acquisti e annunci in un file, per te.",
+  "reglages.donnees.desc": "Vendite, acquisti, annunci: un file, per te.",
   "reglages.donnees.droits": "I tuoi altri diritti:",
   "reglages.donnees.exporter": "Esporta",
   "reglages.donnees.exporterOu.dessous": "«Backup completo» qui sotto",
@@ -2479,6 +2482,7 @@ export default {
   ...ecran_offres_photos,
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
+  ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
 };

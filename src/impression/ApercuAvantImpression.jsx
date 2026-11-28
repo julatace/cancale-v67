@@ -45,7 +45,7 @@ export default function ApercuAvantImpression({ onMonte, Feuille, Bouton, etat, 
         <input type="checkbox" data-impr-apercu-tous={etat.tous ? '1' : '0'} checked={!!etat.tous} onChange={(e) => onTous(e.target.checked)}/>
         {tr('tampons.apercu.tous')}
       </label>
-      {refus ? <p role="alert" data-tampons-refus={refus} className="vrm-impr-sous" style={{ color: 'var(--vrm-warn, #B25E00)' }}>{tr(`tampons.refus.${['qr', 'code', 'adresse'].includes(refus) ? refus : 'code'}`)}</p> : null}
+      {refus ? <p role="alert" data-tampons-refus={refus} className="vrm-impr-sous" style={{ color: 'var(--vrm-warn, var(--n-ambre))' }}>{tr(`tampons.refus.${['qr', 'code', 'adresse'].includes(refus) ? refus : 'code'}`)}</p> : null}
       {entree && entree.etat === 'echec' ? <p role="alert" className="vrm-impr-sous">{tr('tampons.apercu.ko')}</p> : null}
       {!res && enCours ? <p className="vrm-impr-sous" role="status" data-impr-apercu-prepare="">{tr('impr.enCours', { fait: '…', total: n })}</p> : null}
       <div className="vrm-tampons-apercu-liste" role="list">

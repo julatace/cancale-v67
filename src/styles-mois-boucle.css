@@ -15,14 +15,14 @@
   --mb-sep: rgba(60,60,67,.14);
   --mb-accent: var(--w-accent, #16181D);
   --mb-ombre: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
-  --mb-ambre: #A35200;
-  --mb-ambre-fond: rgba(255,149,0,.14);
+  --mb-ambre: var(--n-ambre);
+  --mb-ambre-fond: var(--n-ambre-fond);
   --mb-police: var(--vrm-police, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif);
 }
 :root[data-theme="dark"] {
   --mb-sep: rgba(235,235,245,.14);
-  --mb-ambre: #FFB340;
-  --mb-ambre-fond: rgba(255,159,10,.18);
+  --mb-ambre: var(--n-ambre);
+  --mb-ambre-fond: var(--n-ambre-fond);
 }
 
 @layer vrm-premium {

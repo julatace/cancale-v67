@@ -15,8 +15,8 @@ import { alerteArnaque } from './antiArnaque.js';
 import './design/arnaque.css';
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
-const AMBRE = 'var(--sb-ambre-point, var(--vrm-warn, #B25000))';   // un POINT, un trait (jamais un texte)
-const AMBRE_TXT = 'var(--vrm-warn, #B25000)';   // un texte ambre (la pastille de la liste), comme avant
+const AMBRE = 'var(--n-ambre)';   // un POINT, un trait (jamais un texte)
+const AMBRE_TXT = 'var(--vrm-warn, var(--n-ambre))';   // un texte ambre (la pastille de la liste), comme avant
 
 export function AlerteArnaque({ messages, site, lien = '', style }) {
   const a = React.useMemo(() => alerteArnaque(messages), [messages]);

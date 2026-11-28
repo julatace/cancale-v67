@@ -725,7 +725,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
 // couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
 // lecteurs d'écran).
-const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#16181D' };
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#16181D' };   // logo-marque : la couleur de chaque site
 // ⟦← App.jsx #7⟧
 // ── RELIER UN ACHAT : SUGGESTIONS PUIS TOUS LES ACHATS (3 nov., Julien) ─────
 // 1 à 3 suggestions (marque + taille + couleur, `src/suggestionsAchat.js`), puis

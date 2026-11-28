@@ -128,7 +128,7 @@
   font: 600 15px/1.2 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; -webkit-tap-highlight-color: transparent; transition: transform var(--d-m-appui, 100ms) ease-out !important;
 }
 :root:root:root:root:root:root body .vrm-ui-afaire:active { transform: var(--d-appui, scale(.97)) !important; }
-:root:root:root:root:root:root body .vrm-ui-afaire-point { flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-point { flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, var(--n-ambre)) !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-mots { flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-n { font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire > svg { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
@@ -142,8 +142,8 @@
 }
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule > svg { display: none !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-mots { overflow: visible !important; }
-:root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--d-ambre, #B25000) !important; font-weight: 600 !important; }
-:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; outline: 0; background-clip: padding-box !important; background-color: var(--d-ambre-fond, #FFF4E5) !important; border-radius: 999px !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--d-ambre, var(--n-ambre)) !important; font-weight: 600 !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border-top: 5px solid transparent !important; border-bottom: 5px solid transparent !important; border-left: 0 !important; border-right: 0 !important; outline: 0; background-clip: padding-box !important; background-color: var(--d-ambre-fond, var(--n-ambre-fond)) !important; border-radius: 999px !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule:active { transform: var(--d-appui, scale(.97)) !important; }
 
 /* ── Ligne : la rangée d'une liste longue (64–72 px, vignette 52) ── */
@@ -162,7 +162,7 @@
 :root:root:root:root:root:root body .vrm-ui-ligne-titre > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne-sous { font: 400 13px/18px var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste { color: var(--d-encre, #1D1D1F) !important; }
-:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste::before { content: '' !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-sous.is-geste::before { content: '' !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--d-point-ambre, var(--n-ambre)) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne-valeur { flex: none !important; font: 600 15px/20px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--d-encre, #1D1D1F) !important; text-align: right !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne > svg.vrm-ui-chevron { flex: none !important; color: var(--d-glyphe, #AEAEB2) !important; }
 @media (prefers-reduced-motion: reduce) { :root:root body :is(.vrm-ui-voile, .vrm-ui-feuille) { animation: none !important; } }
