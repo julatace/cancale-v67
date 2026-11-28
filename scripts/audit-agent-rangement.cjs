@@ -12,11 +12,15 @@
 //       retirer un meuble plein ⇒ ses cartons reçoivent des DÉPLACEMENTS proposés ; AUCUN N° changé (mêmes clés de
 //       `vrm_slots`, seules m et i bougent), aucune paire non concernée déplacée ; meuble rétréci, pile tassée ;
 //   V   validerPlan refuse : clé inconnue, type faux, étages hors bornes, ref inconnue, ref en double, gardé ET retiré ;
-//   I1  le chemin IA : une réponse de modèle SIMULÉE (question puis plan) passe `handleRangement` puis `lireReponseIA` ;
-//   I2  une réponse INVALIDE (texte libre, JSON tronqué, plan faux, question sans réponse possible) est REFUSÉE proprement ;
-//   I3  le contexte envoyé au modèle ne contient ni titre, ni N°, ni prix (seulement les meubles et leurs comptes) ;
-//   K   api/ai.js : le mode rangement ne lit JAMAIS une clé du corps, prend la clé du COFFRE, la clé du serveur pour le
-//       SEUL propriétaire ; « pas su » ⇒ 503 (jamais un repli).
+//   (28 nov., lot ia-sans-cle : « je ne veux pas avoir à mettre de clé » — l'IA est celle du NAVIGATEUR, src/iaNavigateur.js)
+//   I1  le chemin IA : un FAUX `LanguageModel` (l'API Prompt de Chrome) rend une question puis un plan ; la consigne part
+//       en `initialPrompts` (system), le schéma en `responseConstraint` ; `lireReponseIA` les valide ;
+//   I2  une réponse INVALIDE (texte libre, JSON tronqué, type inconnu, plan faux, question sans réponse possible) est
+//       REFUSÉE ; une panne du modèle est « panne », jamais une réponse ;
+//   I3  le premier message au modèle ne contient ni titre, ni N°, ni prix (seulement les meubles et leurs comptes) ;
+//   I4  sans `LanguageModel` (Safari, Firefox), « unavailable », une exception ⇒ 'absente' ⇒ l'assistant guidé ;
+//       « downloadable » ⇒ 'telechargeable' (proposé, jamais lancé seul) ;
+//   K   aucune clé, aucun réseau : ni fetch ni champ de clé dans l'assistant, api/ai.js n'appelle aucun fournisseur d'IA.
 // `--mutation` : réaffaiblit chaque règle dans une copie et vérifie que l'audit rougit.
 const fs = require('fs'), path = require('path'), os = require('os');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
@@ -28,7 +32,7 @@ function charger(racine) {
   fs.writeFileSync(entree, `export * as plan from ${JSON.stringify(path.join(racine, 'src/rangement/plan.js'))};
 export * as ent from ${JSON.stringify(path.join(racine, 'src/rangement/entretien.js'))};
 export * as ia from ${JSON.stringify(path.join(racine, 'src/rangement/moteurIA.js'))};
-export * as srv from ${JSON.stringify(path.join(racine, 'api/_lib/rangement-ia.js'))};`);
+export * as nav from ${JSON.stringify(path.join(racine, 'src/iaNavigateur.js'))};`);
   const out = path.join(dir, 'b.cjs');
   esbuild.buildSync({ entryPoints: [entree], bundle: true, platform: 'node', format: 'cjs', outfile: out, logLevel: 'silent', nodePaths: [path.join(__dirname, '..', 'node_modules')] });
   return require(out);
@@ -39,7 +43,7 @@ async function juger(racine, bavard = true) {
   const dit = (c, nom, detail) => { if (c) { ok++; if (bavard) console.log('  ✓ ' + nom); } else { ko++; rouges.push(nom); if (bavard) console.log('  ✗ ' + nom + (detail ? '\n     ' + detail : '')); } };
   let M;
   try { M = charger(racine); } catch (e) { dit(false, 'les modules se chargent', String(e.message || e).slice(0, 200)); return { ok, ko, rouges }; }
-  const { plan: P, ent: E, ia: IA, srv: S } = M;
+  const { plan: P, ent: E, ia: IA, nav: N } = M;
   const dire = (cle, v) => (cle === 'rgt.nom.meuble' ? `${v.type} ${v.n}` : cle.startsWith('etag.type.') ? cle.slice(10) : cle.startsWith('rgt.piece.') ? cle.slice(10) : cle);
   // Joue une suite de réponses ; chaque réponse est { attendu: id de question, v | texte }.
   const jouer = (ctx, reponses) => {
@@ -173,29 +177,40 @@ async function juger(racine, bavard = true) {
     dit(P.validerPlan(bon(), { existants: ex }).ok, 'V un plan juste passe', '');
     for (const [nom, f] of cas) { const p = bon(); f(p); dit(!P.validerPlan(p, { existants: ex }).ok, 'V refusé : ' + nom, JSON.stringify(P.validerPlan(p, { existants: ex }))); }
   }
-  // ── I ──
+  // ── I (le modèle du navigateur, SIMULÉ : un faux `LanguageModel`) ──
   {
     const existants = [{ id: 'm1', name: 'Étagère garage', cols: 4, rows: 2, piece: 'Garage' }];
-    const faux = (texte, status = 200, extra = {}) => async (url, opts) => { faux.dernier = { url, corps: JSON.parse(opts.body) }; return { ok: status < 300, status, json: async () => ({ content: [{ type: 'text', text: texte }], stop_reason: 'end_turn', ...extra }) }; };
-    const res = () => { const r = { code: 0, corps: null, status(c) { r.code = c; return r; }, json(o) { r.corps = o; return r; } }; return r; };
-    const corps = IA.corpsRequete({ historique: [{ role: 'assistant', texte: 'Combien de pièces ?' }, { role: 'user', texte: '2' }], contexte: IA.contexteIA({ meubles: existants, slots: { '12': { m: 'm1', i: 0 } }, articles: 30, methode: { qui: 'vrm' } }) });
-    const r1 = res();
-    await S.handleRangement(r1, 'sk-ant-test', corps, { appel: faux('```json\n{"type":"question","texte":"Combien d\'étages a l\'étagère du garage ?","choix":["2","3","4"],"saisie":"nombre","photo":true}\n```') });
-    const q = r1.corps && r1.corps.ok ? IA.lireReponseIA(r1.corps.reponse, { existants }) : null;
-    dit(q && q.ok && q.type === 'question' && q.choix.length === 3 && q.saisie === 'nombre', 'I1 réponse simulée « question » : lue, validée, prête à afficher', JSON.stringify(r1.corps));
-    const envoye = JSON.stringify(faux.dernier && faux.dernier.corps);
-    dit(faux.dernier && faux.dernier.corps.messages[0].role === 'user' && faux.dernier.corps.messages[faux.dernier.corps.messages.length - 1].role === 'user', 'I1 les messages commencent et finissent par l\'utilisateur (exigé par l\'API)', envoye.slice(0, 200));
-    dit(!/"12"/.test(JSON.stringify(corps.contexte)) && !/title|titre|prix|price|"numero"|"num"/i.test(JSON.stringify(corps.contexte)), 'I3 le contexte envoyé : ni N°, ni titre, ni prix (les meubles et leurs comptes seulement)', JSON.stringify(corps.contexte));
+    // Un faux modèle : `sorties` rendues une à une ; on retient ce que l'app lui passe.
+    const fauxModele = (sorties, { dispo = 'available', jette = false } = {}) => {
+      const vu = { creations: [], prompts: [] };
+      const LanguageModel = {
+        availability: async () => { if (jette === 'availability') throw new Error('x'); return dispo; },
+        create: async (o) => { vu.creations.push(o); return { prompt: async (t, opts) => { vu.prompts.push({ t, opts }); if (jette === 'prompt') throw new Error('x'); return sorties.shift(); }, destroy() { vu.detruite = true; } }; },
+      };
+      return { w: { LanguageModel }, vu };
+    };
+    const ctxIA = IA.contexteIA({ meubles: existants, slots: { '12': { m: 'm1', i: 0 } }, articles: 30, methode: { qui: 'vrm' } });
+    const premier = IA.premierMessage(ctxIA);
     const planIA = { type: 'plan', explication: 'Deux pièces.', plan: { version: 1, pieces: [{ nom: 'Garage', meubles: [{ ref: 'm1', nom: 'Étagère garage', type: 'etagere', etages: 3, casesParEtage: 4, porte: true }] }, { nom: 'Chambre', meubles: [{ ref: null, nom: 'Armoire A', type: 'armoire', etages: 5, casesParEtage: 3 }] }], etiquetage: null } };
-    const r2 = res(); await S.handleRangement(r2, 'k', corps, { appel: faux(JSON.stringify(planIA)) });
-    const p = r2.corps && r2.corps.ok ? IA.lireReponseIA(r2.corps.reponse, { existants }) : null;
-    dit(p && p.ok && p.type === 'plan' && p.plan.pieces.length === 2, 'I1 réponse simulée « plan » : validée par validerPlan', JSON.stringify(p));
-    const invalides = [
-      ['texte libre', 'Bien sûr ! Voici ma question : combien de pièces ?', 'format'],
-      ['JSON tronqué', '{"type":"question","texte":"Combien', 'format'],
-      ['type inconnu', '{"type":"action","faire":"supprimer"}', 'format'],
-    ];
-    for (const [nom, t, raison] of invalides) { const r = res(); await S.handleRangement(r, 'k', corps, { appel: faux(t) }); dit(r.corps && r.corps.ok === false && r.corps.reason === raison && r.corps.facture === true, 'I2 refusé au serveur : ' + nom + ' (et l\'appel payé est DIT)', JSON.stringify(r.corps)); }
+    const f1 = fauxModele(['```json\n{"type":"question","texte":"Combien d\'étages a l\'étagère du garage ?","choix":["2","3","4"],"saisie":"nombre"}\n```', JSON.stringify(planIA)]);
+    dit(await N.etatModele({ w: f1.w }) === 'disponible', 'I1 un modèle « available » ⇒ disponible', '');
+    const s1 = await N.ouvrirSession({ systeme: IA.consigne('fr'), langue: 'fr', w: f1.w });
+    const c0 = f1.vu.creations[0] || {};
+    dit(!!s1 && Array.isArray(c0.initialPrompts) && c0.initialPrompts[0] && c0.initialPrompts[0].role === 'system' && /assistant de rangement/.test(c0.initialPrompts[0].content), 'I1 la consigne part en `initialPrompts` (system), sur l\'appareil', JSON.stringify(c0).slice(0, 160));
+    const j1 = await N.demanderJSON(s1, premier, IA.SCHEMA_REPONSE);
+    const q = j1.ok ? IA.lireReponseIA(j1.objet, { existants }) : null;
+    dit(q && q.ok && q.type === 'question' && q.choix.length === 3 && q.saisie === 'nombre', 'I1 réponse simulée « question » : lue, validée, prête à afficher', JSON.stringify(j1));
+    dit(f1.vu.prompts[0] && f1.vu.prompts[0].opts && f1.vu.prompts[0].opts.responseConstraint === IA.SCHEMA_REPONSE, 'I1 la sortie est CONTRAINTE par le schéma (`responseConstraint`)', JSON.stringify(f1.vu.prompts[0] && f1.vu.prompts[0].opts).slice(0, 120));
+    const j2 = await N.demanderJSON(s1, '3', IA.SCHEMA_REPONSE);
+    const p = j2.ok ? IA.lireReponseIA(j2.objet, { existants }) : null;
+    dit(p && p.ok && p.type === 'plan' && p.plan.pieces.length === 2, 'I1 réponse simulée « plan » : validée par validerPlan', JSON.stringify(p).slice(0, 200));
+    dit(!/"12"/.test(premier) && !/title|titre|prix|price|"numero"|"num"/i.test(premier), 'I3 le premier message au modèle : ni N°, ni titre, ni prix (les meubles et leurs comptes seulement)', premier.slice(0, 200));
+    // Le schéma lui-même ne permet que question | plan, sans clé en plus.
+    const sch = IA.SCHEMA_REPONSE;
+    dit(Array.isArray(sch.anyOf) && sch.anyOf.length === 2 && sch.anyOf.every((x) => x.additionalProperties === false) && sch.anyOf[1].properties.plan.additionalProperties === false, 'I1 le schéma imposé : question OU plan, aucune clé en plus', '');
+    const invalides = [['texte libre', 'Bien sûr ! Voici ma question : combien de pièces ?'], ['JSON tronqué', '{"type":"question","texte":"Combien']];
+    for (const [nom, t] of invalides) { const f = fauxModele([t]); const s = await N.ouvrirSession({ w: f.w }); const j = await N.demanderJSON(s, 'x', IA.SCHEMA_REPONSE); dit(j.ok === false && j.raison === 'forme', 'I2 refusé : ' + nom + ' (« forme », rien affiché)', JSON.stringify(j)); }
+    { const f = fauxModele(['{"type":"action","faire":"supprimer"}']); const s = await N.ouvrirSession({ w: f.w }); const j = await N.demanderJSON(s, 'x', IA.SCHEMA_REPONSE); const l = j.ok ? IA.lireReponseIA(j.objet, { existants }) : null; dit(l && l.ok === false, 'I2 refusé : type inconnu', JSON.stringify(l)); }
     const mauvais = [
       ['plan à ref inconnue', { ...planIA, plan: { ...planIA.plan, pieces: [{ nom: 'G', meubles: [{ ref: 'mZZ', nom: 'X', type: 'etagere', etages: 3, casesParEtage: 3 }] }] } }],
       ['plan qui renumérote (clé en plus)', { ...planIA, plan: { ...planIA.plan, numeros: { 12: 99 } } }],
@@ -205,26 +220,23 @@ async function juger(racine, bavard = true) {
       ['question avec une action', { type: 'question', texte: 'OK ?', choix: ['oui'], executer: 'retirer m1' }],
     ];
     for (const [nom, o] of mauvais) { const l = IA.lireReponseIA(o, { existants }); dit(l && l.ok === false, 'I2 refusé au navigateur : ' + nom, JSON.stringify(l)); }
-    const r3 = res(); await S.handleRangement(r3, 'k', corps, { appel: faux('', 401) });
-    dit(r3.corps && r3.corps.reason === 'cle-refusee', 'I2 clé refusée par Anthropic (401) : dit, rien d\'inventé', JSON.stringify(r3.corps));
-    const r4 = res(); await S.handleRangement(r4, 'k', corps, { appel: faux('{}', 200, { stop_reason: 'refusal' }) });
-    dit(r4.corps && r4.corps.ok === false && r4.corps.reason === 'refus', 'I2 refus du modèle : dit', JSON.stringify(r4.corps));
-    const r5 = res(); await S.handleRangement(r5, 'k', IA.corpsRequete({ historique: [], contexte: {}, photo: 'data:image/jpeg;base64,QUJD' }), { appel: faux('{"type":"question","texte":"Je vois 4 étages ?","choix":["Oui","Non"]}') });
-    const dern = faux.dernier.corps.messages[faux.dernier.corps.messages.length - 1];
-    dit(Array.isArray(dern.content) && dern.content[0].type === 'image' && dern.content[0].source.media_type === 'image/jpeg', 'I1 la photo jointe part avec la dernière réponse (image base64)', JSON.stringify(dern).slice(0, 160));
+    { const f = fauxModele([], { jette: 'prompt' }); const s = await N.ouvrirSession({ w: f.w }); const j = await N.demanderJSON(s, 'x', IA.SCHEMA_REPONSE); dit(j.ok === false && j.raison === 'panne', 'I2 une panne du modèle ⇒ « panne » (l\'assistant guidé prend la suite)', JSON.stringify(j)); }
+    // I4 : sans modèle ⇒ l'assistant guidé.
+    dit(await N.etatModele({ w: {} }) === 'absente', 'I4 sans `LanguageModel` (Safari, Firefox) ⇒ absente ⇒ assistant guidé', '');
+    dit(await N.etatModele({ w: fauxModele([], { dispo: 'unavailable' }).w }) === 'absente', 'I4 « unavailable » ⇒ absente', '');
+    dit(await N.etatModele({ w: fauxModele([], { jette: 'availability' }).w }) === 'absente', 'I4 « pas su » (exception) ⇒ absente, jamais une promesse', '');
+    dit(await N.etatModele({ w: fauxModele([], { dispo: 'downloadable' }).w }) === 'telechargeable', 'I4 « downloadable » ⇒ téléchargeable (proposé à son toucher)', '');
+    dit(await N.ouvrirSession({ w: {} }) === null, 'I4 sans modèle, aucune session (rien ne part ailleurs)', '');
   }
-  // ── K (lu dans le code, commentaires retirés) ──
+  // ── K (lu dans le code, commentaires retirés) : aucune clé, aucun réseau ──
   {
-    const src = fs.readFileSync(path.join(racine, 'api/ai.js'), 'utf8').replace(/\/\/.*$/gm, '');
-    const bloc = (src.match(/if \(b\.mode === 'rangement'\) \{[\s\S]*?return handleRangement\(res, k, b\);\s*\}/) || [''])[0];
-    dit(!!bloc, 'K api/ai.js porte le mode rangement', '');
-    dit(bloc && !/b\.key|cleVendeur/.test(bloc), 'K le mode rangement ne lit JAMAIS une clé envoyée par le navigateur', bloc.slice(0, 200));
-    dit(/lireCleIa\(u\.id\)/.test(bloc) && /=== undefined\)[^\n]*503/.test(bloc), 'K la clé du COFFRE du vendeur ; « pas su » ⇒ 503, jamais un repli', '');
-    dit(/u\.id === proprio \? cleServeur : ''/.test(bloc) && /no-key/.test(bloc), 'K la clé du serveur pour le SEUL propriétaire ; sinon « no-key »', '');
-    const iaCle = fs.readFileSync(path.join(racine, 'api/_lib/ia-cle.js'), 'utf8');
-    dit(/chiffrerCoffre\(USAGE/.test(iaCle) && !/data:\s*\{[^}]*\bcle\s*[,}]/.test(iaCle.replace(/\{ cle \}/g, '')) && /return repondre\(res, 400, \{ erreur: 'refusee'/.test(iaCle),
-      'K la clé du vendeur est rangée CHIFFRÉE (jamais en clair), une clé refusée n\'est pas rangée', '');
-    dit(!/\bcle\b\s*:/.test((iaCle.match(/const publique = [^\n]*/) || [''])[0]), 'K ce que le navigateur apprend : jamais la clé (4 derniers caractères seulement)', '');
+    const sans = (f) => fs.readFileSync(path.join(racine, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/([^:])\/\/.*$/gm, '$1');
+    const ar = sans('src/rangement/AssistantRangement.jsx'), nav = sans('src/iaNavigateur.js'), mo = sans('src/rangement/moteurIA.js');
+    dit(!/fetch\s*\(/.test(ar + nav + mo), 'K l\'assistant et le moteur n\'appellent AUCUN réseau (fetch absent)', '');
+    dit(!/type="password"|ia-cle|rgt\.cle\.|sk-ant/.test(ar), 'K aucun champ ni carte de clé dans l\'assistant', '');
+    dit(/etatModele\(/.test(ar) && /lireReponseIA\(/.test(ar) && /demarrer\(ctx\)/.test(ar), 'K l\'assistant choisit le modèle du navigateur, valide sa sortie, sinon l\'assistant guidé', '');
+    const ai = sans('api/ai.js');
+    dit(!/anthropic|x-api-key|AI_API_KEY|lireCleIa/.test(ai), 'K api/ai.js : aucun fournisseur d\'IA, aucune clé lue', '');
   }
   return { ok, ko, rouges };
 }
@@ -242,8 +254,10 @@ const MUTATIONS = [
   ['src/rangement/entretien.js', "for (let a = 0; a < n; a++) suite.push({ q: 'nomPiece', a }, { q: 'nbMeubles', a });", "suite.push({ q: 'nomPiece', a: 0 }, { q: 'nbMeubles', a: 0 });", 'une seule pièce interrogée'],
   ['src/rangement/moteurIA.js', "if (!v.ok) err.push(...v.erreurs);", '', 'un plan IA invalide passe'],
   ['src/rangement/moteurIA.js', "for (const k of Object.keys(r)) if (!permis.includes(k)) err.push('cle:' + k);", '', 'une question IA porteuse d\'une action passe'],
-  ['api/_lib/rangement-ia.js', "if (!o || (o.type !== 'question' && o.type !== 'plan'))", "if (!o)", 'le serveur laisse passer un type inconnu'],
-  ['api/ai.js', "const k = cleV || (cleServeur && proprio && u.id === proprio ? cleServeur : '');", "const k = cleV || cleServeur;", 'la clé du serveur sert à tous (§2.9)'],
+  ['src/iaNavigateur.js', "return o ? { ok: true, objet: o } : { ok: false, raison: 'forme' };", "return { ok: true, objet: o || { type: 'question', texte: String(sortie), choix: ['ok'] } };", 'une sortie illisible du modèle passe pour une question'],
+  ['src/iaNavigateur.js', "return ETATS[a] || 'absente';", "return ETATS[a] || 'disponible';", '« unavailable » promet le modèle'],
+  ['src/iaNavigateur.js', "...(schema ? { responseConstraint: schema } : {}), ", "", 'la sortie n\'est plus contrainte par le schéma'],
+  ['src/rangement/moteurIA.js', "return `Contexte (JSON) : ${JSON.stringify({ articles: c.articles ?? null, numerotation: c.numerotation ?? null, meubles: Array.isArray(c.meubles) ? c.meubles.slice(0, 60) : [] }).slice(0, 12000)}", "return `Contexte (JSON) : ${JSON.stringify({ ...c, titres: ['N°12 Nike'] }).slice(0, 12000)}", 'un titre part au modèle'],
 ];
 
 (async () => {
@@ -253,8 +267,8 @@ const MUTATIONS = [
     let rouges = 0;
     for (const [f, de, vers, nom] of MUTATIONS) {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mut-rgt-'));
-      for (const x of ['src/rangement', 'api/_lib']) fs.cpSync(path.join(R, x), path.join(dir, x), { recursive: true });
-      for (const x of ['src/stockEtageres.js', 'src/ouRanger.js', 'src/stockRegles.js', 'src/stockSortie.js', 'api/ai.js']) { fs.mkdirSync(path.dirname(path.join(dir, x)), { recursive: true }); fs.copyFileSync(path.join(R, x), path.join(dir, x)); }
+      for (const x of ['src/rangement']) fs.cpSync(path.join(R, x), path.join(dir, x), { recursive: true });
+      for (const x of ['src/stockEtageres.js', 'src/ouRanger.js', 'src/stockRegles.js', 'src/stockSortie.js', 'src/iaNavigateur.js', 'api/ai.js']) { fs.mkdirSync(path.dirname(path.join(dir, x)), { recursive: true }); fs.copyFileSync(path.join(R, x), path.join(dir, x)); }
       const p = path.join(dir, f); const s = fs.readFileSync(p, 'utf8');
       if (!s.includes(de)) { console.log('  ? mutation introuvable : ' + nom); rouges--; continue; }
       fs.writeFileSync(p, s.replace(de, vers));
