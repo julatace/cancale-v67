@@ -21,6 +21,11 @@ import MeubleDessin from '../stockV2/MeubleDessin.jsx';
 import { demarrer, question, repondre, planDe } from './entretien.js';
 import { validerPlan, appliquerPlan, incoherences, capacite, placeDe } from './plan.js';
 import { contexteIA, corpsRequete, lireReponseIA } from './moteurIA.js';
+
+// (28 nov.) Une bulle du fil garde la même clé React tant qu'elle existe (objet ajouté une fois, jamais recréé) :
+// pas de clé d'index (audit-stockage-sur).
+const _idsBulles = new WeakMap(); let _nBulle = 0;
+const idBulle = (b) => { if (!_idsBulles.has(b)) _idsBulles.set(b, ++_nBulle); return _idsBulles.get(b); };
 import './assistant.css';
 
 // Une photo réduite (1024 px, JPEG) avant tout envoi — jamais l'original.
@@ -96,7 +101,7 @@ function Apercu({ plan, resultat, existants, articles }) {
   return (
     <div className="rgt-apercu" data-rgt-apercu={resultat.meubles.length} data-rgt-places={cap.places}>
       <p className="rgt-resume" data-rgt-resume="">{tr('rgt.resume', { n: cap.pieces, pieces: cap.pieces, meubles: cap.meubles, places: nombre(cap.places) })}{Number.isFinite(articles) ? ' ' + tr('rgt.resumeArticles', { n: nombre(articles) }) : ''}</p>
-      {inco.map((x, k) => <p key={k} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
+      {inco.map((x) => <p key={[x.k, x.piece || '', x.meuble || ''].join('|')} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
       {groupes.map((g) => (
         <Groupe key={g.nom} titre={g.nom} attrs={{ 'data-rgt-piece': g.nom }}>
           <div className="rgt-meubles">
@@ -230,8 +235,8 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
       {cleOuverte ? <CarteCle enTete={enTete} onChange={() => { setCleOuverte(false); recommencer(); }}/> : null}
       {!lu ? <p className="rgt-alerte" role="status" data-rgt-pas-lu="">{tr('rgt.pasLu')}</p> : null}
       <ol className="rgt-fil" aria-live="polite" data-rgt-fil={fil.length}>
-        {fil.map((b, k) => (
-          <li key={k} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
+        {fil.map((b) => (
+          <li key={idBulle(b)} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
             {b.photo ? <img className="rgt-bulle-photo" src={b.photo} alt={tr('rgt.photoJointe')}/> : null}
             {b.texte ? <span>{b.texte}</span> : null}
           </li>))}
@@ -239,7 +244,7 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
       </ol>
       {enQuestion ? (
         <div className="rgt-reponses" data-rgt-question={qR ? qR.id : 'ia'}>
-          {choix.length ? <div className="rgt-choix">{choix.map((c, k) => <button key={k} type="button" className="rgt-choix-b" data-rgt-choix={c.v !== undefined ? String(c.v) : c.libelle} onClick={() => envoyer(c)}>{c.libelle}</button>)}</div> : null}
+          {choix.length ? <div className="rgt-choix">{choix.map((c) => <button key={c.v !== undefined ? String(c.v) : c.libelle} type="button" className="rgt-choix-b" data-rgt-choix={c.v !== undefined ? String(c.v) : c.libelle} onClick={() => envoyer(c)}>{c.libelle}</button>)}</div> : null}
           <form className="rgt-saisie" onSubmit={(e) => { e.preventDefault(); if (texte.trim() || photo) envoyer({ texte: texte.trim() || tr('rgt.photoSeule') }); }}>
             {photoPermise ? <>
               <BoutonIcone libelle={tr('rgt.joindrePhoto')} icone={Icon ? <Icon name="camera" size={20}/> : '📷'} actif={!!photo} onClick={() => refPhoto.current && refPhoto.current.click()} attrs={{ 'data-rgt-photo': photo ? 'jointe' : '' }}/>
