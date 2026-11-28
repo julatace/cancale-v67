@@ -17789,6 +17789,11 @@ function DefilementPartout() {
       if (e.defaultPrevented || e.ctrlKey) return;
       const main = document.querySelector('main[data-defile]');
       if (!main) return;
+      // (28 nov., vitesse-fluide) Sous `<main>`, la boucle ci-dessous s'arrête TOUJOURS sans rien faire (elle rend la main au
+      // navigateur à `main` ou avant) — mais elle lisait le style et la hauteur de chaque ancêtre à CHAQUE cran de molette,
+      // une mise en page forcée par événement pendant le défilement (profil, banc iphone-rapide, Achats : 4,9 s au ×4 dans
+      // `peutDefiler` pour 6 balayages). Même décision, sans rien lire.
+      if (e.target instanceof Node && main.contains(e.target)) return;
       for (let el = e.target; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
         if (el === main) return;                       // le navigateur s'en charge
         if (peutDefiler(el, e.deltaY, e.deltaX)) return; // un autre conteneur défile

@@ -88,7 +88,8 @@ function jalons() {
     if (J.chiffres == null && document.querySelector('[data-v2-chiffres="lu"], [data-vendu-mois]:not([data-vendu-mois=""])')) J.chiffres = t;
   };
   // Les chiffres d'Aujourd'hui (« Vendu · mois » suivi d'un montant) : lus dans le texte, toutes les 100 ms.
-  const iv = setInterval(() => { if (J.chiffres != null) return clearInterval(iv); const m = document.querySelector('main') || document.body; if (m && /Vendu\s*·\s*mois\s*[\d\s\u202f\u00a0]+(,\d+)?\s*€/.test(m.innerText || '')) J.chiffres = Math.round(performance.now()); }, 100);
+  const iv = setInterval(() => { if (J.chiffres != null || performance.now() > 30000) return clearInterval(iv);   // (28 nov.) 30 s au plus : un `innerText` de tout <main> toutes les 100 ms pesait sur TOUTES les mesures suivantes quand le texte n'est jamais trouvé
+    const m = document.querySelector('main') || document.body; if (m && /Vendu\s*·\s*mois\s*[\d\s\u202f\u00a0]+(,\d+)?\s*€/.test(m.innerText || '')) J.chiffres = Math.round(performance.now()); }, 100);
   document.addEventListener('DOMContentLoaded', () => { voir(); new MutationObserver(voir).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-attente', 'data-v2-chiffres'] }); });
 }
 
