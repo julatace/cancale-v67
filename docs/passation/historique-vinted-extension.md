@@ -1267,3 +1267,6 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 
 (28 nov., déplacée telle quelle de CLAUDE.md §8 pour rester sous 60 Ko)
 | `panneautelephone` | `vrm-badge.js:barreTelephone6` | **5.413.0** (21 nov.) | le panneau au téléphone / Orion (≤ 760 px), style de ses photos : 5 onglets égaux en bas + « Plus » (feuille), rangées empilées (vignette 48, titre complet, méta prix · date · étiquette), menus en feuille du bas, champs 16 px ; ordinateur inchangé — présentation seule ; `2026-11-21-panneau-telephone.md` |
+
+(28 nov., déplacées telles quelles de CLAUDE.md §8 pour rester sous 60 Ko)
+| `toutinterface` | `interfaceVinted` | **5.414.0** (21 nov.) | plus AUCUNE écriture Vinted par requête : clic et saisie dans l'onglet de travail, vérifiés à l'écran ; « Directe » retirée — `2026-11-21-extension-interface.md` |
