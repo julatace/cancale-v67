@@ -2255,6 +2255,7 @@ function vrmVerifVisible(sel) {
     if (x.envoi === 'en_cours') return TU('fl_e_encours');
     if (x.envoi === 'a_verifier') return TU('fl_e_verifier');
     if (x.envoi === 'pas_envoye') return TU('fl_e_pas');
+    if (x.raison === 'sans_acheteur') return TU('fl_e_sans_acheteur');   // 5.455.6 : la notification ne porte pas de personne
     if (x.raison === 'non_prouve') return TU('fl_e_prouve');
     if (x.raison === 'offre_prix') return TU('fl_e_prix');
     return TU('fl_e_pas');
@@ -2604,33 +2605,66 @@ function vrmVerifVisible(sel) {
   const mot6 = (k, d) => { const v = TU(k); return v === k ? TU(d) : v; };
   const RAISON_F6 = { annonce_indisponible: 'vendu', article_vendu: 'vendu', conversation_deja_contactee: 'deja', conversation_existante: 'deja', offre_sous_plancher: 'sous_mini',
     conversation_refusee: 'conv', texte_interdit: 'texte', texte_refuse: 'texte', vinted_robot: 'robot', vinted_frein: 'frein', pause_vinted: 'frein', offre_refusee: 'offre_refusee',
-    non_prouve: 'non_prouve', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
+    non_prouve: 'non_prouve', sans_acheteur: 'sans_acheteur', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
   const raison6 = (c) => mot6('f6_r_' + (RAISON_F6[c] || c || 'autre'), 'f6_r_autre');
   // La file qui compte pour les rangées : en cours, ou finie depuis moins de 6 h (la même borne que la ligne d'envoi).
-  const fileVue6 = (e) => { const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };
+  const fileVue6 = (e) => { favFaits6 = (e && e.site && e.site.favoris && e.site.favoris.faits && typeof e.site.favoris.faits === 'object') ? e.site.favoris.faits : {}; const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };
+  // ══ 5.455.7 (Julien, 27 nov. 23:00 : « l'extension ne doit pas refuser d'elle-même », il ne comprend pas « Ignoré / Refusé ») ══
+  //  SIX états, pas un de plus : Pas encore contacté · En attente (compte à rebours, la raison) · Envoi en cours · Message envoyé
+  //  (+ l'offre ; « déjà contacté avant » compte comme envoyé) · Vendu / réservé · une erreur PRÉCISE seulement quand VINTED a
+  //  refusé (vérification, pause, texte, offre, téléphone…), avec le geste. Les gardes vraies (plafonds, pause, jamais deux fois)
+  //  se disent « En attente » avec leur raison. Plus aucun « Ignoré » ni « Refusé ».
+  //  Le DÉTAIL de chaque favori (`faits` du fond : offre faite 49,50 € · 18:42, message envoyé · 18:43 · version 2) vient du
+  //  registre écrit au geste, jamais deviné.
+  const R6_VENDU = new Set(['annonce_indisponible', 'article_vendu', 'vendue', 'vendu', 'reservee', 'fermee', 'en_pause']);
+  const R6_DEJA = new Set(['conversation_deja_contactee', 'conversation_existante', 'deja', 'deja_contacte', 'contacte_30j', 'conversation', 'confirme_vendeur']);
+  const R6_VINTED = new Set(['vinted_robot', 'pause_vinted', 'vinted_frein', 'texte_refuse', 'offre_refusee', 'telephone_a_verifier', 'conversation_refusee', 'vinted_refus']);
+  const R6_ATTENTE = new Set(['quota_extension', 'notification_pas_trouvee', 'fil_non_relu', 'autorisation_expiree', 'onglet_vinted', 'compte_vinted_absent', 'compte_vinted_different', 'tout_arrete', 'session_extension', 'extension_indisponible', 'element_introuvable', 'trop_tard', 'historique_non_verifie']);
+  let favFaits6 = {}, fileVue6Actif = false;
+  const heure6 = (t) => { try { return new Date(Number(t)).toLocaleTimeString(langue6(), { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const langue6 = () => { try { return (chrome.i18n && chrome.i18n.getUILanguage && chrome.i18n.getUILanguage()) || 'fr-FR'; } catch (_) { return 'fr-FR'; } };
+  function details6(id) {
+    const f = favFaits6 && favFaits6[id]; if (!f || typeof f !== 'object') return [];
+    const l = [];
+    if (Number(f.o) > 0) l.push(Number(f.px) > 0 ? TU('f6_d_offre', { p: eurosFav(Number(f.px)), h: heure6(f.o) }) : TU('f6_d_offre_sans', { h: heure6(f.o) }));
+    if (Number(f.m) > 0) l.push(Number.isInteger(f.v) && f.v > 0 ? TU('f6_d_message_v', { h: heure6(f.m), v: f.v }) : TU('f6_d_message', { h: heure6(f.m) }));
+    return l;
+  }
+  function etatRaison6(raison, base) {
+    const r = String(raison || '');
+    if (R6_DEJA.has(r)) return { k: 'envoye', t: TU('f6_e_envoye'), raison: TU('f6_r_deja_avant') };
+    if (R6_VENDU.has(r)) return { k: 'vendu', t: TU('f6_e_vendu') };
+    if (R6_VINTED.has(r)) return { k: 'vinted', t: TU('f6_e_vinted'), ton: 'ambre', raison: raison6(r) };
+    if (R6_ATTENTE.has(r)) return { k: 'attente', t: TU('f6_e_attente'), raison: raison6(r) };
+    return Object.assign({ k: 'nouveau', t: TU('f6_e_nouveau') }, r || base ? { raison: raison6(r || base) } : {});
+  }
   function etatFav6(x, st) {
-    if (favRefus && favRefus.ids.has(x.id)) return { k: 'refus', t: TU('f6_e_refus'), ton: 'ambre', raison: favRefus.raison };
+    if (favRefus && favRefus.ids.has(x.id)) return { k: 'attente', t: TU('f6_e_attente'), raison: favRefus.raison };
     const j = st && Array.isArray(st.jobs) ? st.jobs.find((r) => r && r[0] === x.id) : null;
+    const f = favFaits6 && favFaits6[x.id];
     if (j) {
       const et = j[1];
-      if (et === 'envoye') return { k: j[3] ? 'offre' : 'envoye', t: TU(j[3] ? 'f6_e_offre' : 'f6_e_envoye') };
+      if (et === 'envoye') return { k: j[3] || (f && f.o) ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
       if (et === 'reserve' || (st.actif && st.enCours && st.cours === x.id)) return { k: 'encours', t: TU('f6_e_encours'), ton: 'accent' };
       if (et === 'attente') {
         const premier = st.actif && !st.enCours && Number(st.prochain) > Date.now() && st.jobs.find((r) => r && r[1] === 'attente') === j;
-        // 5.455.4 (Julien, 27 nov. 18:42 : « le chronomètre ne marche pas ») : le prochain favori dit « dans 42 s », compté en
-        //    direct (`data-fav-dans`, la même horloge que tout le panneau), plus une heure figée.
+        // 5.455.4 (« le chronomètre ne marche pas ») : le prochain favori compte « dans 42 s » en direct.
         return { k: 'attente', t: TU('f6_e_attente'), ...(premier ? { dans: Number(st.prochain) } : {}) };
       }
       if (et === 'incertain') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
-      return { k: 'ignore', t: TU('f6_e_ignore'), raison: raison6(j[2] || et) };
+      if (et === 'annule') return { k: 'nouveau', t: TU('f6_e_nouveau') };
+      if (f && Number(f.m) > 0) return { k: f.o ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
+      return etatRaison6(j[2], et);
     }
+    if (f && Number(f.m) > 0) return { k: f.o ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
     if (x.cochable === true) return { k: 'nouveau', t: TU('f6_e_nouveau') };
-    if (x.envoi === 'envoye') return { k: x.offreFaite ? 'offre' : 'envoye', t: TU(x.offreFaite ? 'f6_e_offre' : 'f6_e_envoye') };
+    if (x.envoi === 'envoye') return { k: x.offreFaite ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
     if (x.envoi === 'en_cours') return { k: 'attente', t: TU('f6_e_attente') };
     if (x.envoi === 'a_verifier') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
-    return { k: 'ignore', t: TU('f6_e_ignore'), raison: x.raisonFiltre ? TU('f6_r_filtre') : raison6(x.raison || x.raisonEnvoi || x.envoi || '') };
+    if (x.raisonFiltre) return { k: 'nouveau', t: TU('f6_e_nouveau'), raison: TU('f6_r_filtre') };
+    return etatRaison6(x.raison || x.raisonEnvoi || '', x.envoi === 'pas_envoye' ? 'pas_envoye' : '');
   }
-  const GROUPE_F6 = { nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', ignore: 'ignores', verifier: 'ignores', refus: 'ignores' };
+  const GROUPE_F6 = { nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', vendu: 'ignores', verifier: 'ignores', vinted: 'ignores' };
   // L'offre prévue : seulement si une offre est réglée ; jamais sous le plancher (prix mini, sinon achat + 10 % — la règle
   // que le fond revérifie à l'envoi, `plancherFavori`) ; sans plancher, pas d'offre. Le plancher pas su ici est DIT.
   function offreFav6(x, a) {
@@ -2659,7 +2693,12 @@ function vrmVerifVisible(sel) {
     // 5.453.2 (Julien, 26 nov. : file bloquée sur « Vérifie les envois incertains », sans geste) : un envoi À VÉRIFIER se tranche
     //    sur SA ligne — il regarde la conversation sur Vinted, puis « C'est parti » ou « Pas parti ». Jamais renvoyé seul.
     const tranche = et.k === 'verifier' ? `<span class="tr6" data-fav6-trancher-ligne="${esc(x.id)}"><button type="button" class="vu-btn" data-fav6-trancher="parti" data-id="${esc(x.id)}">${esc(TU('f6_parti'))}</button><button type="button" class="vu-btn" data-fav6-trancher="pas" data-id="${esc(x.id)}">${esc(TU('f6_pas_parti'))}</button></span>` : '';
-    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${et.dans ? ` <small class="rs6" data-fav-prochain6>${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(et.dans)}">${esc(dansFav(et.dans))}</span>`)}</small>` : ''}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
+    const det = details6(x.id).map((t) => `<small class="rs6 det6" data-fav-fait6>${esc(t)}</small>`).join('');
+    const detOffre = et.k === 'offre' && !(favFaits6[x.id] && favFaits6[x.id].o) ? `<small class="rs6 det6" data-fav-fait6="offre">${esc(TU('f6_e_offre'))}</small>` : '';
+    // « Envoyer » sur CHAQUE favori pas encore contacté (Julien : « pour chaque favori ») : la même feuille de confirmation, pour
+    //    lui seul — le même chemin, les mêmes gardes ; rien ne part sans « Confirmer l'envoi ».
+    const un = et.k === 'nouveau' && x.cochable === true && !fileVue6Actif ? `<button type="button" class="vu-btn un6" data-fav6-un="${esc(x.id)}" aria-label="${esc(TU('f6_envoyer_un', { qui: x.pseudo || TU('fl_acheteur') }))}">${esc(TU('f6_envoyer'))}</button>` : '';
+    return `${etiquette5(et.k, et.t, et.ton === 'ambre' ? 'ambre' : et.ton === 'accent' ? 'accent' : '')}${un}${det}${detOffre}${et.dans ? ` <small class="rs6" data-fav-prochain6>${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(et.dans)}">${esc(dansFav(et.dans))}</span>`)}</small>` : ''}${et.raison ? `<small class="rs6" data-fav-raison6="${esc(et.k)}">${esc(et.raison)}</small>` : ''}${tranche}`;
   }
   // ══ 5.420 (Julien, 21 nov. : « sauf si j'ai activé les messages aux favoris automatiques ») — L'AUTOMATIQUE ═══════════
   // Allumé pour ce compte : les NOUVEAUX favoris reçoivent le message sans passer par les étapes (le pilote de toujours,
@@ -2762,10 +2801,16 @@ function vrmVerifVisible(sel) {
     const ligneN = `<div class="n6"><span data-fav6-n="${vus.length}">${esc(vus.length === 1 ? TU('f6_n1') : TU('f6_n', { n: vus.length.toLocaleString('fr-FR') }))}${total > tous.length ? ' · ' + esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') })) : ''}</span><span class="n6-d">${filtreAnnonce ? `<button type="button" class="vu-lien" data-fav6-annonce-tout>${esc(TU('fl_toutes'))}</button>` : ''}${cochablesVus.length ? `<button type="button" class="vu-lien tout6" data-fav-tout="${tout ? 'aucun' : 'tous'}">${esc(TU(tout ? 'fl_rien' : 'fl_tout'))}</button>` : ''}</span></div>`;
     const notes = [
       autoFavLigneHtml(),
+      // 5.455.7 (Julien, 27 nov. 23:10 : « sans crainte de se faire embêter ») : ses messages par défaut sont à lui seul, et les
+      //    protections actives, dites en clair (rien n'est réglé ici : ce sont celles de l'extension, inchangées).
+      `<p class="note5" data-fav6-uniques>${esc(TU('f6_uniques'))}</p><details class="sur6" data-fav6-sur><summary>${esc(TU('f6_sur_t'))}</summary><ul>${[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `<li>${esc(TU('f6_sur_' + i))}</li>`).join('')}</ul></details>`,
+      // 5.455.6 : un dressing ancien ne bloque plus — il est DIT (VRM relit l'annonce et son prix au moment d'envoyer).
+      /^dressing_/.test(String(a.avertissement || '')) ? `<p class="note5" data-fav6-avertissement="${esc(a.avertissement)}">${esc(TU('f6_avert_dressing'))}</p>` : '',
       a.ventesAilleurs === 'pas_su' ? '<p class="note5 ambre6" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</p>' : '',
       Number(a.retires) > 0 ? `<p class="note5" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</p>` : '',
       favErreur ? `<p class="note5 err6" role="alert" data-fav-erreur6>${esc(favErreur)}</p>` : '',
     ].join('');
+    fileVue6Actif = !!actif;
     const g6 = COLS_F6.map((c) => W6F[c]).join(' ');
     const enTete = `<div class="tr6 th6r" style="--n6:${COLS_F6.length};--g6:${g6}">${cochablesVus.length ? `<label class="case5"><input type="checkbox" data-fav-tout="${tout ? 'aucun' : 'tous'}"${tout ? ' checked' : ''} aria-label="${esc(TU('f6_tout'))}" title="${esc(TU('f6_tout'))}"></label>` : '<span></span>'}${enTeteF6('titre', TU('c5_article'))}<span class="cels6">${COLS_F6.map((c) => enTeteF6(c, TU('f6_c_' + c))).join('')}</span><span></span></div>`;
     const ligne = (x) => {
@@ -3058,6 +3103,7 @@ function vrmVerifVisible(sel) {
     const su = racine.querySelector('[data-fav-suite]'); if (su) su.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
     const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); fpOuvrir(apercuFav); rendre(); });
     if (favFeuille === 'reglages') brancherFp(apercuFav);   // 5.417
+    racine.querySelectorAll('[data-fav6-un]').forEach((bt) => bt.addEventListener('click', (ev) => { ev.stopPropagation(); const id = bt.getAttribute('data-fav6-un'); selFav = new Set([id]); garderSelection(uid); favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; envInit(apercuFav); if (!listes || !listes.automatisations) chargerListes(true); rendre(); envDemander(apercuFav, true); }));
     const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; envInit(apercuFav); if (!listes || !listes.automatisations) chargerListes(true); rendre(); envDemander(apercuFav, true); });
     if (favFeuille === 'confirmer') brancherEnv(apercuFav);   // 5.419
     { const sb = racine.querySelector('[data-fav6-stats]'); if (sb) sb.addEventListener('click', () => { favFeuille = 'stats'; lireStatsFav(true); rendre(); }); }
@@ -6181,7 +6227,9 @@ function vrmVerifVisible(sel) {
       const bouton = im.etat === 'encours' ? '' : '<button class="b sec" data-import-tout>Tout récupérer</button>';
       return `<div class="ligne" data-import="${esc(im.etat)}"><div class="lib">${im.horizonMois ? 'Import de ton passé' : 'Ton historique Vinted'}</div>${tete}${unType(im.ventes, 'ventes', false)}${unType(im.achats, 'achats', !(im.ventes && im.ventes.fini))}${bouton}</div>`;
     };
-    const historique = e.plateforme === 'vinted' && e.capte && e.site && e.site.id && e.site.choix !== 'non' && v && v.connecte ? ligneImport(e.site.import) : '';
+    // 5.455.7 (Julien : « enlève Importer le passé et Tout récupérer, l'extension doit tout récupérer dans tous les cas ») : la
+    //    ligne et son bouton ne sont plus montrés ; l'import lit tout, seul (background.js, `departImport`).
+    const historique = '' && ligneImport;
 
     // 5.335 (9 nov.) — Julien : « le "à confirmer" je ne comprends pas, ça doit
     // être beaucoup plus clair ». Sur Leboncoin : Compte · Annonces · Ventes, ce

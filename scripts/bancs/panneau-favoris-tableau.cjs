@@ -135,7 +135,7 @@ const FAV2 = Array.from({ length: 22 }, (_, k) => { const a = TOUTES[k % 10]; co
   return Object.assign({ id: 'f' + k, itemId: a.id, pseudo: 'acheteur_' + k, titre: a.titre, prix: a.prix, date: new Date(T0 - (k * 41 + 3) * MIN).toISOString(), photo: img('a' + (k % 10)), num: a.num || undefined,
     envoi: s.envoi || 'a_envoyer', cochable }, cochable ? { offre: k === 3 ? 40 : Math.round(a.prix * 90) / 100, texte: `Bonjour acheteur_${k}, une offre pour toi !` } : {}, s.offreFaite ? { offreFaite: true } : {}, s.raison ? { raison: s.raison } : {}, s.raisonFiltre ? { cochable: false, raisonFiltre: s.raisonFiltre } : {}); });
 FAV2.forEach((x) => { if (!x.num) delete x.num; });
-const AP2 = { etat: 'pret', total: FAV2.filter((x) => x.cochable).length, nonProuves: 1, ecartes: 0, selection: [], liste: FAV2.filter((x) => x.cochable).slice(0, 15), tous: FAV2, totalTous: FAV2.length, retires: 2, max: 15,
+const AP2 = { etat: 'pret', avertissement: 'dressing_ancien', total: FAV2.filter((x) => x.cochable).length, nonProuves: 1, ecartes: 0, selection: [], liste: FAV2.filter((x) => x.cochable).slice(0, 15), tous: FAV2, totalTous: FAV2.length, retires: 2, max: 15,
   message: { versions: 3, offre: { mode: 'pct', valeur: 10, arrondi: false }, intervalleMinutes: 1, intervalleMaxMinutes: 2, rythme: 'normal' }, reglages: { version: 1, message: 'Bonjour {pseudo}', pourcentage: 10, offreMode: 'pct' } };
 const COCHABLES = FAV2.filter((x) => x.cochable).map((x) => x.id);
 
@@ -163,7 +163,9 @@ const lireF = (pg) => pg.evaluate(() => {
     page: q('[data-vx]') && q('[data-vx]').getAttribute('data-page'), tableau: !!q('.fav6-table'), etapes: !!q('[data-fav-etape]'),
     entetes: Array.from(r.querySelectorAll('.fav6-table .th6r .th6')).filter(vis).map((b) => b.textContent.replace(/[↑↓↕]/g, '').trim()),
     ids: rangs.map((li) => li.getAttribute('data-fav-qui')), dates: rangs.map((li) => Date.parse(li.getAttribute('data-fav-date') || '')),
-    etats: Object.fromEntries(rangs.map((li) => [li.getAttribute('data-fav-qui'), li.getAttribute('data-fav-etat6') + '|' + ((li.querySelector('.et6') || {}).textContent || '') + '|' + ((li.querySelector('.rs6') || {}).textContent || '')])),
+    un: r.querySelectorAll('[data-fav6-un]').length,
+    avert: (r.querySelector('[data-fav6-avertissement]') || {}).textContent || '',
+    etats: Object.fromEntries(rangs.map((li) => [li.getAttribute('data-fav-qui'), li.getAttribute('data-fav-etat6') + '|' + ((li.querySelector('.et6') || {}).textContent || '') + '|' + [...li.querySelectorAll('.rs6')].map((x) => x.textContent).join(' ¦ ')])),
     offres: Object.fromEntries(rangs.map((li) => { const o = li.querySelector('[data-fav-offre6]'); return [li.getAttribute('data-fav-qui'), o ? o.getAttribute('data-fav-offre6') + ':' + (o.getAttribute('data-offre') || '') : '']; })),
     cases: rangs.map((li) => !!li.querySelector('input[data-fav-coche]')), coches: rangs.filter((li) => li.hasAttribute('data-coche')).map((li) => li.getAttribute('data-fav-qui')),
     hauteurs: rangs.filter(vis).filter((li) => !li.querySelector('[data-fav6-trancher-ligne]')).map((li) => Math.round(li.getBoundingClientRect().height)),
@@ -230,22 +232,37 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       if (!o.mobile) dit(a.entetes.join('|') === 'Article|Prix|Acheteur|Favori le|État', `${T} : colonnes Article · Prix · Acheteur · Favori le · État, triables`, a.entetes.join('|'));
       dit(a.ids.length === FAV2.length && a.dates.every((d, i) => i === 0 || a.dates[i - 1] >= d), `${T} : ${FAV2.length} rangées, du plus récent au plus ancien`, JSON.stringify(a.ids));
       dit(a.vignettes === FAV2.length && a.plaques === FAV2.filter((x) => x.num).length, `${T} : chaque rangée a sa photo, la plaque N° quand il y en a un`, `${a.vignettes} ${a.plaques}`);
-      dit(a.hauteurs.length > 0 && a.hauteurs.every((h) => h >= 56 && h <= (o.mobile ? 140 : 76)), `${T} : rangées de 56 à ${o.mobile ? 140 : 72} px`, a.hauteurs.join(','));
+      dit(a.hauteurs.length > 0 && a.hauteurs.every((h) => h >= 56 && h <= (o.mobile ? 190 : 76)), `${T} : rangées de 56 à ${o.mobile ? 190 : 72} px (5.455.7 : au téléphone, la touche « Envoyer » de la rangée)`, a.hauteurs.join(','));
       dit(a.tranche.length === 1 && a.tranche[0].id === 'f12' && a.tranche[0].b === 'parti,pas' && a.tranche[0].h >= 56 && a.tranche[0].h <= (o.mobile ? 140 : 76) + 48, `${T} : 5.453.2 : la rangée « À vérifier » (et elle seule) porte « C'est parti » · « Pas parti », une ligne de boutons de plus au plus`, JSON.stringify(a.tranche));
       const E = (id) => a.etats[id] || '';
-      dit(/^nouveau\|Pas encore contacté/.test(E('f0')) && /^offre\|Offre faite/.test(E('f4')) && /^envoye\|Message envoyé/.test(E('f7')) && /^ignore\|Ignoré\|acheteur pas encore confirmé/.test(E('f9')) && /^verifier\|À vérifier/.test(E('f12')) && /^ignore\|Ignoré\|écarté par tes filtres/.test(E('f15')),
-        `${T} : l’état en étiquette (pas encore contacté, offre faite, message envoyé, à vérifier, ignoré + raison)`, JSON.stringify([E('f0'), E('f4'), E('f7'), E('f9'), E('f12'), E('f15')]));
+      // 5.455.7 (Julien, 27 nov. 23:00 : « l'extension ne doit pas refuser d'elle-même ») : plus jamais « Ignoré » ni « Refusé ».
+      dit(/^nouveau\|Pas encore contacté/.test(E('f0')) && /^offre\|Message envoyé\|Offre faite/.test(E('f4')) && /^envoye\|Message envoyé/.test(E('f7')) && /^nouveau\|Pas encore contacté\|acheteur pas encore confirmé/.test(E('f9')) && /^verifier\|À vérifier/.test(E('f12')) && /^nouveau\|Pas encore contacté\|écarté par tes filtres/.test(E('f15')) && !Object.values(a.etats).some((v) => /Ignoré|Refusé|Pas parti/.test(v)),
+        `${T} : l’état en étiquette — pas encore contacté (+ raison), message envoyé (+ offre), à vérifier ; jamais « Ignoré » ni « Refusé »`, JSON.stringify([E('f0'), E('f4'), E('f7'), E('f9'), E('f12'), E('f15')]));
       dit(COCHABLES.every((id) => a.cases[a.ids.indexOf(id)]) && a.ids.filter((id, i) => a.cases[i]).length === COCHABLES.length, `${T} : une case seulement sur les favoris pas encore contactés`, '');
       // T3 : 7000 (achat 30 ⇒ plancher 33) offre ; 7001 (mini 46) offre ; 7002 (ni mini ni achat) sans offre ; f3 = 7003 offre 40 < mini 48 ⇒ sans offre.
       dit(a.offres.f0 === 'oui:49.5' && a.offres.f1 === 'oui:54' && a.offres.f2 === 'oui:58.5' && a.offres.f3 === 'remontee:48' && a.offres.f4 === '', `${T} : 5.410.8 : l’offre part toujours ; sans plancher au % réglé (58,50 €) ; sous le prix mini ⇒ REMONTÉE (48 €), jamais dessous`, JSON.stringify([a.offres.f0, a.offres.f1, a.offres.f2, a.offres.f3, a.offres.f4]));
-      dit(a.segs.join(' ') === `tous:22* nouveaux:${COCHABLES.length} envoyes:2 ignores:3`, `${T} : segments Tous · Pas encore contactés · Envoyés · Ignorés, avec leurs nombres`, a.segs.join(' '));
+      dit(a.segs.join(' ') === `tous:22* nouveaux:${COCHABLES.length + 2} envoyes:2 ignores:1` && a.un === COCHABLES.length, `${T} : segments Tous · Pas encore contactés · Envoyés · Vendus/Vinted, avec leurs nombres ; « Envoyer » sur chaque favori à contacter (${a.un})`, a.segs.join(' '));
+      dit(/relit chaque article au moment d’envoyer/.test(a.avert) && a.un > 0, `${T} : 5.455.6 : dressing ancien ⇒ DIT au-dessus de la liste, et la liste reste envoyable`, a.avert);
       dit(!a.debord && !a.petits.length, `${T} : rien ne déborde, cibles ≥ 44 px`, JSON.stringify({ d: a.debord, p: a.petits.slice(0, 6) }));
       await cap(t.pg, N('1-liste'));
+      // 5.455.7 (Julien : « montre les actions faites, avec l'heure, le montant de l'offre, la version ») : le DÉTAIL vient du
+      //    registre du fond (`faits`), jamais inventé ; et « Envoyer » d'une rangée ouvre la confirmation pour CE favori seul.
+      { const tO = Date.parse('2026-11-27T17:42:00Z'), tM = tO + 60000;
+        await t.pg.evaluate(({ tO, tM }) => { const e = JSON.parse(JSON.stringify(window.__etat || window.__etatBase)); e.site.favoris.faits = { f7: { o: tO, px: 49.5, m: tM, v: 2 } }; window.__etatBase.site.favoris.faits = e.site.favoris.faits; window.__etat = e; for (const l of window.__ecoutes || []) try { l({ vrmFavorisCarte: { newValue: e.site.favoris.file || null } }, 'local'); } catch (_) {} }, { tO, tM });
+        await t.pg.waitForTimeout(450); const d = await lireF(t.pg);
+        dit(/Offre faite 49,50 € · \d\d[:h]\d\d/.test(d.etats.f7 || '') && /Message envoyé · \d\d[:h]\d\d · version 2/.test(d.etats.f7 || ''), `${T} : le détail d'un favori : « Offre faite 49,50 € · hh:mm », « Message envoyé · hh:mm · version 2 »`, d.etats.f7);
+        const un = COCHABLES[0];
+        await clic(t.pg, `[data-fav6-un="${un}"]`); await t.pg.waitForTimeout(400);
+        const f = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { feuille: !!r.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'), n: (r.querySelector('[data-fav-coches]') || {}).getAttribute ? r.querySelector('[data-fav-coches]').getAttribute('data-fav-coches') : null, partis: window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer').length }; });
+        dit(f.feuille && f.partis === 0, `${T} : « Envoyer » sur une rangée ⇒ la confirmation de CE favori, rien n'est parti avant « Confirmer »`, JSON.stringify(f));
+        await cap(t.pg, N('1b-envoyer-un'));
+        await t.pg.keyboard.press('Escape'); await t.pg.waitForTimeout(200);
+        await clic(t.pg, '.fav6-feuille [data-fav-retour], .fav6-feuille [data-fermer6], .fav6-feuille [data-fav6-fermer]'); await t.pg.waitForTimeout(200); await clic(t.pg, '.fav6-bas [data-fav-tout="aucun"]'); await t.pg.waitForTimeout(200); }
       // T4 : filtres, recherche, tri
       await clic(t.pg, '[data-fav6-filtre="ignores"]'); a = await lireF(t.pg);
-      dit(a.ids.join(',') === 'f9,f12,f15', `${T} : « Ignorés » ne montre que les ignorés et à vérifier`, a.ids.join(','));
+      dit(a.ids.join(',') === 'f12', `${T} : « Vendus · Vinted » ne montre que les vendus, refus de Vinted et à vérifier`, a.ids.join(','));
       await clic(t.pg, '[data-fav6-filtre="nouveaux"]'); a = await lireF(t.pg);
-      dit(a.ids.length === COCHABLES.length && a.ids.every((id) => COCHABLES.includes(id)), `${T} : « Pas encore contactés »`, a.ids.join(','));
+      dit(a.ids.length === COCHABLES.length + 2 && [...COCHABLES, 'f9', 'f15'].every((id) => a.ids.includes(id)), `${T} : « Pas encore contactés » (les cochables, et ceux qui attendent une raison dite)`, a.ids.join(','));
       await clic(t.pg, '[data-fav6-filtre="tous"]');
       await t.pg.evaluate(() => { const i = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav6-cherche]'); i.value = 'acheteur_13'; i.dispatchEvent(new Event('input')); }); await t.pg.waitForTimeout(250); a = await lireF(t.pg);
       dit(a.ids.join(',') === 'f13', `${T} : la recherche trouve un acheteur`, a.ids.join(','));
@@ -298,7 +315,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       let a = await lireF(t2.pg);
       dit(a.coches.join(',') === 'f0,f1' && a.bas && a.bas.n === '2', `${T} : cocher la case, puis toucher la rangée entière : 2 cochés`, JSON.stringify({ c: a.coches, b: a.bas }));
       await clic(t2.pg, '[data-fav-envoyer]'); await etapes(t2.pg); await clic(t2.pg, '.fav6-feuille [data-fav-lancer]'); await t2.pg.waitForTimeout(300); a = await lireF(t2.pg);
-      dit(!a.feuille && /^refus\|Pas parti\|Ces destinataires ont déjà été préparés/.test(a.etats.f0) && /^refus\|/.test(a.etats.f1) && /^nouveau\|/.test(a.etats.f5) && /déjà été préparés/.test(a.erreur), `${T} : refus du serveur ⇒ dit SUR les deux rangées (et en haut), la feuille fermée, les autres intactes`, JSON.stringify({ f0: a.etats.f0, f5: a.etats.f5, e: a.erreur, fe: a.feuille }));
+      dit(!a.feuille && /^attente\|En attente\|Ces destinataires ont déjà été préparés/.test(a.etats.f0) && /^attente\|/.test(a.etats.f1) && /^nouveau\|/.test(a.etats.f5) && /déjà été préparés/.test(a.erreur), `${T} : refus du serveur ⇒ dit SUR les deux rangées (et en haut), la feuille fermée, les autres intactes`, JSON.stringify({ f0: a.etats.f0, f5: a.etats.f5, e: a.erreur, fe: a.feuille }));
       await cap(t2.pg, N('5-refus'));
       await clic(t2.pg, '[data-fav6-reglages]'); a = await lireF(t2.pg);
       dit(a.feuille && a.feuille.k === 'reglages' && a.feuille.textes >= 3, `${T} : « Réglages » ouvre une feuille (versions du message, rythme)`, JSON.stringify(a.feuille));

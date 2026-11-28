@@ -1,5 +1,6 @@
 import {preparerMessageFavori} from './favorisVinted.js';
 import {VARIANTES_MAX,variantesARanger} from './variantesMessage.js';
+import {defautsFavorisUniques} from './favorisDefauts.js';
 // (19 nov., ext. 5.409) `rythme` : 'normal' (40–90 s au hasard, le défaut — sa décision), 'prudent' (2–4 min), 'perso' (ses minutes).
 export const RYTHMES_REGLAGE=Object.freeze(['normal','prudent','perso']);
 const BASE={message:'',variantes:[],pourcentage:null,offreMode:null,offreValeur:null,arrondi:false,intervalleMinutes:6,intervalleMaxMinutes:null,rythme:'normal'};
@@ -32,7 +33,7 @@ export function offreFavori({pourcentage=null,offreMode=null,offreValeur=null,ar
   if(mode==='prix'&&!(v>=1&&v<=99999))throw Error('Le prix de l’offre doit être d’au moins 1\u00a0€.');
   return {pourcentage:null,offreMode:mode,offreValeur:v,arrondi:arrondi===true};
 }
-export function validerReglagesFavoris({message='',variantes=[],pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null,rythme='normal'}) {
+export function validerReglagesFavoris({message='',variantes=[],pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null,rythme='normal'},{graine=null,langue='fr'}={}) {
   if(!RYTHMES_REGLAGE.includes(rythme))throw Error('Choisis un rythme : au hasard (40 à 90 s), plus prudent (2 à 4 min), ou tes minutes.');
   if(typeof message!=='string')throw Error('Le message doit être du texte.');
   // (12 nov., ext. 5.369) Ses AUTRES versions du message (2 à 5) : VRM en tire une au
@@ -55,11 +56,16 @@ export function validerReglagesFavoris({message='',variantes=[],pourcentage=null
   // réduction partait avec « Je te propose une réduction… ». Message vide + offre ⇒ ce
   // texte par défaut (sans variable : toute extension sait l'envoyer). Sans offre, un
   // message vide n'a rien à envoyer : refusé.
-  const texte=message.trim()?message:(o.offreMode?MESSAGE_PAR_DEFAUT:'');
+  // 5.455.7 (Julien : « on ne doit pas pouvoir voir une même template d'un utilisateur à l'autre ») : rien d'écrit + une offre ⇒
+  //    SON jeu de versions par défaut (src/favorisDefauts.js, tiré de SA graine) ; sans graine (lecture d'un réglage d'avant) ⇒
+  //    le texte d'avant. Ce qu'IL a écrit gagne toujours.
+  const uniques=!message.trim()&&o.offreMode&&graine!=null&&String(graine)?defautsFavorisUniques(String(graine),langue,1+Math.min(2,VARIANTES_MAX-1)):null;
+  const texte=message.trim()?message:uniques?uniques[0]:(o.offreMode?MESSAGE_PAR_DEFAUT:'');
+  if(uniques&&!autres.length)autres.push(...uniques.slice(1));
   const m=preparerMessageFavori(texte,o.pourcentage);
   if(m.erreur)throw Error(m.erreur);
   if(!m.message)throw Error('Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.');
-  if(autres.length&&!message.trim())throw Error('Écris d’abord la 1re version du message.');
+  if(autres.length&&!message.trim()&&!uniques)throw Error('Écris d’abord la 1re version du message.');
   return {version:1,message:texte.trim(),...(autres.length?{variantes:autres.map(v=>v.trim())}:{}),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,rythme,envoisActifs:false};
 }
 export async function lireReglagesFavoris(opts) {
@@ -75,7 +81,7 @@ export async function lireReglagesFavoris(opts) {
   return {...validerReglagesFavoris(d),enregistres:true};
 }
 export async function sauverReglagesFavoris(opts,reglages) {
-  const id=identite(opts),data=validerReglagesFavoris(reglages),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;
+  const id=identite(opts),data=validerReglagesFavoris(reglages,{graine:opts.owner,langue:opts.langue||'fr'}),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;
   const r=await fetcher(`${base}/rest/v1/app_data?on_conflict=owner,id`,{method:'POST',headers:{...headers,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({id,owner,data})});
   if(!r.ok)throw Error('Enregistrement non confirmé. Relis les réglages avant de réessayer.');
   const rows=await r.json();
