@@ -15,7 +15,7 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, lireEbayTous, numEbayLu, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
+import { AUTH, C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, lireEbayTous, numEbayLu, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loupe mène à CE fil (Vinted, Leboncoin, Vestiaire)
@@ -23,7 +23,6 @@ import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
 import { Segmente } from '../natif/Segmente.jsx';
 import { Attente } from '../natif/Attente.jsx';   // (25 nov., chargement propre) le squelette à la forme des rangées
 import { Glyphe } from '../natif/icones.jsx';
-import { TuilePaire } from '../natif/Jeu.jsx';
 import '../natif/ecrans/messages-visuel.css';   // (24 nov., visuel-argent) la paire en tuile, l'avatar du compte sur son coin
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
@@ -37,7 +36,15 @@ import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) l
 import { montant } from '../format.js';
 import { useOrdinateur } from '../natif/Coque.jsx';   // (19 nov. soir) la barre d'outils des listes, à l'ordinateur
 const montantCourt = (v) => montant(v);
-import { BarreOutils, LigneAFaire } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
+import { BarreOutils, LigneAFaire } from '../ui/index.js';
+// (28 nov., messages-parfaits) La photo de profil de la personne ; le filtre Site + Compte des autres onglets ; le statut de
+// l'extension, vrai et daté (src/messages/).
+import { AvatarPersonne } from '../messages/AvatarPersonne.jsx';
+import { FiltrePlateformes, useFiltrePlateforme, useFiltreCompte } from '../natif/FiltrePlateformes.jsx';
+import { FiltreSeul } from '../natif/TableauTravail.jsx';
+import { optionsPlateformes, choixEffectif as choixSiteEffectif } from '../filtrePlateforme.js';
+import { StatutExtensionMessages, useStatutExtension } from '../messages/StatutExtension.jsx';
+import '../messages/messages-parfaits.css';   // (14 nov., refonte) les briques communes des écrans de liste
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
 const lireRelies = () => { try { const v = load(CLE_FILS_RELIES, {}); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; } };
@@ -241,7 +248,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
   // La signature des conversations Vinted (la liste peut être complétée SUR PLACE — sa paire arrive après) :
   // le regroupement se refait dès qu'une conversation, son aperçu ou sa paire change.
-  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p, x.dernier ? `${x.dernier.deMoi}|${x.dernier.texte}` : ''].join("§"); }).join('¶') : String(vinted);
+  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, u.photo && u.photo.url, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p, x.dernier ? `${x.dernier.deMoi}|${x.dernier.texte}` : ''].join("§"); }).join('¶') : String(vinted);
   const { parCle, fils, propositions } = React.useMemo(() => {
     const parCle = new Map();
     const entrees = [];
@@ -257,10 +264,19 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : « Choisir une action ▾ » et le filtre Site (sur les fils DÉJÀ lus : un fil
   // est d'un site s'il porte une conversation de ce site) ; l'avatar de la personne et la vignette de l'article sur chaque fil.
   const ordinateur = useOrdinateur();
-  const [siteF, setSiteF] = React.useState('tous');
+  // (28 nov., messages-parfaits — Julien : « la sélection de la plateforme et du compte comme sur les autres écrans ») Le
+  // MÊME filtre que Ventes, Annonces, Achats : la rangée de puces « Toutes · Vinted · Leboncoin… » (src/natif/FiltrePlateformes.jsx,
+  // règle src/filtrePlateforme.js, choix retenu sur cet appareil) et le bouton « Compte » (`FiltreSeul`, retenu PAR VENDEUR).
+  // Un fil est d'un site s'il porte une conversation de ce site ; un fil est du compte de son DERNIER message (la règle des groupes).
+  const [choixSite, choisirSite] = useFiltrePlateforme('messages');
+  const nombresSites = React.useMemo(() => { const n = { toutes: fils.length }; for (const f of fils) for (const p of f.plateformes) n[p] = (n[p] || 0) + 1; return n; }, [fils]);
+  const optionsSites = React.useMemo(() => optionsPlateformes(nombresSites), [nombresSites]);
+  const siteF = (() => { const c = choixSiteEffectif(choixSite, optionsSites); return c === 'toutes' ? 'tous' : c; })();
+  const [choixCompte, choisirCompte] = useFiltreCompte('messages', (AUTH.user && AUTH.user.id) || '');
   const offreDe = (f) => { const o = f.convs.filter((c) => c.offre).map((c) => c.offre); return o.length ? o[o.length - 1] : null; };
-  const nOffres = fils.filter((f) => offreDe(f)).length;
-  const nNonLues = fils.filter((f) => f.nonLu === true).length;
+  // (28 nov.) Les nombres des vues suivent le filtre Site + Compte (un total partiel ne se présente pas comme complet, §5).
+  const nOffresDe = (l) => l.filter((f) => offreDe(f)).length;
+  const nNonLuesDe = (l) => l.filter((f) => f.nonLu === true).length;
   const motCherche = cherche.trim().toLowerCase().replace(/^n°\s*/, '');
   const filsVus = motCherche ? fils.filter((f) => {
     const d = f.dernier || f.convs[f.convs.length - 1];
@@ -269,7 +285,20 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   }) : fils;
   const filsSite = siteF === 'tous' ? filsVus : filsVus.filter((f) => f.plateformes.includes(siteF));
   const sitesFils = [...new Set(fils.flatMap((f) => f.plateformes))];
-  const filsMontres = vue === 'offres' ? filsSite.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsSite.filter((f) => f.nonLu === true) : filsSite;
+  // Le compte d'un fil = celui de son DERNIER message (la clé des groupes plus bas : `plateforme:compte`), par IDENTITÉ.
+  const cleCompteFil = (f) => { const d = f.dernier || f.convs[f.convs.length - 1] || {}; return `${d.plateforme || ''}:${d.compte == null ? '' : d.compte}`; };
+  const comptesFils = (() => {
+    const m = new Map();
+    for (const f of filsSite) { const k = cleCompteFil(f); const d = f.dernier || f.convs[f.convs.length - 1] || {};
+      const x = m.get(k) || { cle: k, site: d.plateforme || '', nom: '', n: 0 }; x.n++; if (!x.nom && d.compteNom) x.nom = d.compteNom; m.set(k, x); }
+    const L = [...m.values()].map((x) => ({ ...x, libelle: (x.nom || NOM_SITE[x.site] || tr('avenir.compteSans')) + (x.site && x.site !== 'vinted' ? ' · ' + (NOM_SITE[x.site] || x.site) : '') }));
+    return L.sort((a, b) => a.libelle.localeCompare(b.libelle, 'fr') || a.cle.localeCompare(b.cle));
+  })();
+  const compteF = comptesFils.length > 1 && comptesFils.some((x) => x.cle === choixCompte) ? choixCompte : '';
+  const filtreCompte = comptesFils.length > 1 ? { cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: compteF || 'tous', onChange: (v) => choisirCompte(v === 'tous' ? '' : v),
+    options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...comptesFils.map((x) => ({ cle: x.cle, libelle: x.libelle, n: x.n }))] } : null;
+  const filsCompte = compteF ? filsSite.filter((f) => cleCompteFil(f) === compteF) : filsSite;
+  const filsMontres = vue === 'offres' ? filsCompte.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsCompte.filter((f) => f.nonLu === true) : filsCompte;
   // Le prix mini d'un fil : celui posé à côté de SON N° (la fiche de ce N°, une seule — sinon rien), jamais deviné.
   const miniDuNum = (num) => { if (!num) return null; try { const F = load('vinted_annonce_numeros', {}) || {}; const k = cleNum(num);
     const l = Object.values(F).filter((x) => x && x.numero != null && cleNum(x.numero) === k); if (l.length !== 1) return null;
@@ -278,6 +307,9 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // chaque autre compte (le plus récent d'abord) ; DANS chaque compte, du plus récent au plus ancien. Le compte d'un
   // fil est celui de son DERNIER message (un fil relié de deux sites se range une fois). Rien n'est mélangé.
   const vcOuvert = useCompteVcOuvert();
+  // (28 nov., messages-parfaits) « Compte de l'onglet » : LA règle du statut de l'extension (datée, revérifiée), plus le cookie
+  // d'un battement d'il y a longtemps (`compteOnglet`, gardé pour l'appelant) — une seule source, aucune contradiction.
+  const statutExt = useStatutExtension();
   const groupesFils = (() => {
     const m = new Map();
     for (const f of filsMontres) {
@@ -292,7 +324,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     // Vestiaire ne donne pas de nom de compte : « Autre compte Vestiaire », « compte pas encore su ».
     const nomVc = (g) => (!g.compte ? `${NOM_SITE.vestiaire} · ${tr('vcMsg.sansCompte')}` : vcOuvert && g.compte === String(vcOuvert) ? NOM_SITE.vestiaire : tr('vcMsg.autreCompte'));
     const L = [...m.values()].map((g) => ({ ...g, ...(g.plateforme === 'vestiaire' ? { nom: nomVc(g) } : {}),
-      onglet: (g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet)) || (g.plateforme === 'vestiaire' && !!vcOuvert && g.compte === String(vcOuvert)),
+      onglet: (g.plateforme === 'vinted' && statutExt.etat === 'ok' && !!statutExt.compte && g.compte === String(statutExt.compte)) || (g.plateforme === 'vestiaire' && !!vcOuvert && g.compte === String(vcOuvert)),
       // (27 nov., Julien) Les questions eBay sans réponse d'abord, la plus ancienne en tête (src/filUnique.js `ordreARepondre`) ;
       // le reste, du plus récent au plus ancien (règle du 12 nov.).
       fils: ordreARepondre(g.fils.slice().sort((a, b) => t(b) - t(a))) }));
@@ -358,19 +390,17 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {/* (14 nov., refonte — AJOUT 3) Les questions « Peut-être la même paire ? » passent dans UNE ligne
               « À faire · N › » : la feuille montre la question du moment avec SES deux gestes (Oui / Non),
               la suivante vient après. Rien n'est relié sans son clic. */}
-          {ordinateur && fils.length ? <div className="n-msg-outils" data-msg-outils-tableau="">
-            <select className="n-au-choix" aria-label={tr('tableau.choisirAction')} value="" data-msg-action="" onChange={(e) => { const v = e.target.value; e.target.value = '';
-                if (v === 'ebay') relireEbay(); else if (v) setVue(v); }}>
-              <option value="">{tr('tableau.choisirAction')}</option>
-              <option value="nonlues">{tr('tableau.msg.nonLues')}</option>
-              <option value="offres">{tr('tableau.msg.offres')}</option>
-              <option value="toutes">{tr('tableau.msg.toutes')}</option>
-              {sitesFils.includes('ebay') ? <option value="ebay">{tr('tableau.msg.relireEbay')}</option> : null}
-            </select>
-            {sitesFils.length > 1 ? <select className="n-au-choix" aria-label={tr('egalite.site.titre')} value={siteF} data-msg-site="" onChange={(e) => setSiteF(e.target.value)}>
-              <option value="tous">{tr('egalite.site.tous')}</option>
-              {sitesFils.map((x) => <option key={x} value={x}>{NOM_SITE[x] || x}</option>)}
-            </select> : null}
+          {/* (28 nov., messages-parfaits) Plus de « Choisir une action ▾ » ni de liste « Vinted ▾ » : le statut VRAI de
+              l'extension (daté, revérifié ici et avant chaque geste), puis le filtre des autres onglets — la rangée de puces
+              Site et le bouton « Compte » —, et « Relire eBay » en geste natif. Les vues (Toutes · Offres · Non lues) restent
+              le segmenté sous la recherche. */}
+          <StatutExtensionMessages/>
+          {fils.length ? <div className="n-msg-filtres" data-msg-filtres="" data-msg-site={siteF} data-msg-compte={compteF || 'tous'}>
+            <FiltrePlateformes ecran="messages" options={optionsSites} valeur={siteF === 'tous' ? 'toutes' : siteF} onChange={choisirSite} className="n-fp-nu"/>
+            {filtreCompte || sitesFils.includes('ebay') ? <div className="n-msg-filtres-l">
+              {filtreCompte ? <FiltreSeul filtre={filtreCompte} attrs={{ 'data-msg-filtre-compte': compteF || 'tous' }}/> : null}
+              {sitesFils.includes('ebay') ? <BoutonNatif variante="texte" icone={<Icon name="sync" size={16}/>} onClick={() => relireEbay()} attrs={{ 'data-msg-relire-ebay': '' }}>{tr('tableau.msg.relireEbay')}</BoutonNatif> : null}
+            </div> : null}
           </div> : null}
           {fils.length || chargement ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
             data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
@@ -412,7 +442,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                   aria-pressed reste posé à côté d'aria-checked (les bancs d'hier désignent la vue choisie par lui). */}
               <div className="vg-ms-vues" data-msg-vues={vue}>
                 <Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
-                  options={[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => ({ cle: k, libelle: l, n: n || null, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/>
+                  options={[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffresDe(filsCompte)], ['nonlues', tr('verre2.msg.nonLues'), nNonLuesDe(filsCompte)]].map(([k, l, n]) => ({ cle: k, libelle: l, n: n || null, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/>
               </div>
               {!filsMontres.length ? <div data-fils-filtre-vide={vue} className="vrm-ms-rien">{tr(vue === 'offres' ? 'verre2.msg.aucuneOffre' : 'verre2.msg.aucuneNonLue')}</div> : null}
               {(() => { let reste = 80; return groupesFils.map((g) => {
@@ -432,6 +462,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                         const d = f.dernier || f.convs[f.convs.length - 1];
                         const offre = offreDe(f);
                         const photo = (f.convs.find((c) => c.photo) || {}).photo || null;
+                        const avatar = (f.convs.find((c) => c.avatar) || {}).avatar || null;
                         const nomF = nomDe(f);
                         const sensible = f.convs.some((c) => c.plateforme === 'vinted');
                         const motif = d ? motifDeLApercu(d.apercu, d.deMoi) : null;
@@ -444,9 +475,13 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             {/* (24 nov., visuel-argent) La PAIRE en tuile (sa photo vient de la fiche reliée PAR IDENTITÉ, `convVinted` ⇒
                                 `paire.photo` ; jamais l'avatar de l'acheteur ; sans photo, un médaillon) et l'AVATAR DU COMPTE (l'initiale du
                                 groupe) sur son coin — au téléphone comme à l'ordinateur (la vignette de droite est devenue cette tuile). */}
-                            <span className="vg-fil-tuile" aria-hidden="true" data-fil-tuile={photo ? 'photo' : 'medaillon'}>
-                              <TuilePaire photo={photo || ''} Photo={PhotoVinted} Icon={Icon} icone={offre ? 'tag' : photo ? '' : 'chat'} genre={offre ? 'offre' : 'message'} taille="m"/>
-                              {(g.nom || NOM_SITE[g.plateforme]) ? <span className={'vg-fil-compte-av' + (g.plateforme === 'vinted' ? ' vrm-sensible' : '')} data-fil-compte-av="" data-stream-type="compte">{initialeCompte(g.nom || NOM_SITE[g.plateforme])}</span> : null}
+                            {/* (28 nov., messages-parfaits — Julien) LA PHOTO DE PROFIL de la personne (la boîte Vinted la donne,
+                                `opposite_user.photo` ⇒ `avatar`), sinon son INITIALE — plus la bulle générique. La PAIRE, quand sa
+                                photo est connue PAR IDENTITÉ, passe sur le coin (sinon l'initiale du compte, comme avant). Tailles fixes. */}
+                            <span className="vg-fil-tuile vg-fil-avatar" aria-hidden="true" data-fil-tuile={avatar ? 'avatar' : 'initiale'}>
+                              <AvatarPersonne photo={avatar} nom={nomF} taille={52} Photo={PhotoVinted} sensible={sensible}/>
+                              {photo ? <span className="vg-fil-paire-coin" data-fil-paire-coin=""><PhotoVinted src={photo} alt="" loading="lazy" width={24} height={24} style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 6, display: 'block' }}/></span>
+                                : (g.nom || NOM_SITE[g.plateforme]) ? <span className={'vg-fil-compte-av' + (g.plateforme === 'vinted' ? ' vrm-sensible' : '')} data-fil-compte-av="" data-stream-type="compte">{initialeCompte(g.nom || NOM_SITE[g.plateforme])}</span> : null}
                             </span>
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">

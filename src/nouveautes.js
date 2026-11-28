@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., messages-parfaits) src/ecrans/FilsTous.jsx, src/messages/ : photo de profil, filtre Site + Compte, statut daté.
+  { id: 'messages-parfaits', date: '2026-11-28', titre: 'Messages : photos de profil, statut vrai', phrase: 'Filtre Site et Compte, fil tout de suite, contre-offre à ton prix.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (28 nov., sneakers-cote) src/sneakers/ : référence fabricant, pointure, cote VRM (SES ventes), étiquettes, en masse.
   { id: 'sneakers-cote', date: '2026-11-28', titre: 'Référence, pointure et cote de tes ventes', phrase: 'Valeur du stock, étiquettes et modification en masse, sans aucune clé.', tab: 'annonces', pour: 'sneakers', mode: 'tous' },
   // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.

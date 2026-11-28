@@ -24,7 +24,7 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
-import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
+import { poserFaitsAgir, poserEnvoiAgir, poserReverifAgir } from './agir/porte.js';
 import { poserSourcesSneakers } from './sneakers/stockage.js';   // (28 nov., lot sneakers-cote) les lectures de la feuille Sneakers, à la demande
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 // (25 nov.) `requeteConnexions` chargé À LA DEMANDE (src/connexions/connexions.js n'est plus dans le premier JS de chaque écran).
@@ -340,6 +340,7 @@ import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
 import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE, chargerFeuillesCopie } from './copieEcran.js';
 import { VueCopie } from './CopieEcran.jsx';
+import { AvatarPersonne } from './messages/AvatarPersonne.jsx';   // (28 nov., messages-parfaits) la photo de profil dans l'en-tête du fil
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -5506,6 +5507,7 @@ const lireComptaPourEcrire = () => {
   return p;
 };
 export { lireComptaPourEcrire };
+export { reverifierExtension, extensionVerifiee };   // (28 nov., messages-parfaits) le statut vrai de l'extension, dans Messages
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -11086,6 +11088,10 @@ function vmrExecUn({ uid, method, endpoint, body, confirme }, timeoutMs = 15000)
 //    deux — `undefined` on vérifie · `null` elle ne répond pas · objet mesuré.
 //    L'état ne coûte AUCUNE requête Vinted (cookie + stockage de l'extension).
 let __vmrEtat = undefined, __vmrRates = 0;
+// (28 nov., messages-parfaits — Julien : le statut de l'extension « parfois faux ») L'HEURE de la dernière réponse du pont
+// (`battementExt`). Avant, l'état gardé n'avait pas de date : onglet caché, battement sauté, extension rechargée… l'app
+// redisait « compte de l'onglet » sur un état de plusieurs minutes. Daté, il se dit vieux (src/messages/statutExtension.js).
+let __vmrEtatAt = 0, __vmrVerifAt = 0;
 // ══ LE CODE QUI TOURNE N'EST PAS CELUI DU MANIFESTE (11 octobre) ═══════════
 // ⚠️⚠️ MESURÉ dans ses journaux, reproduit dans un vrai Chromium : sur 5 des 6
 //    Chrome qui travaillent pour lui, le dossier avait été remplacé par la
@@ -11425,6 +11431,20 @@ function LigneRelais({ quoi }) {
   );
 }
 let __vmrBattementEnVol = false, __vmrRelance = null;
+// (28 nov., messages-parfaits) REVÉRIFIER MAINTENANT : à l'ouverture de Messages et avant chaque geste (src/agir/porte.js),
+// on redemande l'état au pont au lieu de croire le dernier battement. Rend quand la réponse (ou le raté) est rangée ; au
+// plus `ms`. `extensionVerifiee()` : { at: la dernière réponse, essai: le dernier essai } (0 = jamais).
+function extensionVerifiee() { return { at: __vmrEtatAt, essai: __vmrVerifAt }; }
+async function reverifierExtension(ms = 2500) {
+  if (typeof window === 'undefined') return extensionVerifiee();
+  try { sonderPonts(); } catch (_) {}
+  if (!__vmrExtReady) { __vmrVerifAt = Date.now(); __vmrNotifier(); return extensionVerifiee(); }
+  let fini = false;
+  const tour = (async () => { try { if (__vmrBattementEnVol) { const t0 = Date.now(); while (__vmrBattementEnVol && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 80)); } else { __vmrRates = Math.min(__vmrRates, 1); await battementExt(); } } catch (_) {} fini = true; })();
+  await Promise.race([tour, new Promise((r) => setTimeout(r, ms))]);
+  if (!fini) { __vmrVerifAt = Date.now(); __vmrNotifier(); }
+  return extensionVerifiee();
+}
 // ⚠️ Un pont plus ancien que la 5.129 ne sait pas répondre à « état » : le
 //    questionner le faisait passer pour MUET au bout de 15 s, et l'app disait
 //    « recharge la page » à quelqu'un qui devait METTRE À JOUR — recharger ne
@@ -11450,7 +11470,8 @@ async function battementExt() {
     }
     if(!r)r=await vmrEtat(); // read-only fallback, never an action replay
   } finally { __vmrBattementEnVol = false; }
-  if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
+  __vmrVerifAt = Date.now();
+  if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; __vmrEtatAt = Date.now(); if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
   else {
     __vmrRates++;
     // ⚠️ UN raté ne vaut pas « muette » : un service worker qui se réveille, un
@@ -16494,7 +16515,8 @@ function TeteFil({ onFermer, photo, nom, sensible = false, titre, compte, title,
       <button type="button" className="vrm-chat-back" aria-label={libelleFermer} onClick={onFermer} style={{color:C.accentTexte}}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      {photo?<PhotoVinted src={photo} alt="" style={{width:36,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
+      {/* (28 nov., messages-parfaits) La photo de profil de la personne (ronde, 36 px fixes), sinon son initiale — plus la bulle. */}
+      <AvatarPersonne photo={photo} nom={typeof nom === 'string' ? nom : ''} taille={36} Photo={PhotoVinted} sensible={sensible} className="vrm-chat-head-av" attrs={{ 'data-fil-avatar': photo ? 'photo' : 'initiale' }}/>
       <div className="vrm-chat-head-t">
         <div className="vrm-chat-head-n" style={{color:C.text}}>{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</div>
         {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
@@ -21840,6 +21862,8 @@ function useComptesEbay() {
 // ═══════════════════════════════════════════════════════════════════════════
 const depAgir = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: (l) => withOwner(l), conflit: SB_CONFLICT });
 const aleaAgir = () => { try { const b = new Uint8Array(6); crypto.getRandomValues(b); return Array.from(b, (x) => x.toString(36).padStart(2, '0')).join('').slice(0, 8); } catch (_) { return Math.random().toString(36).slice(2, 10); } };
+// (28 nov., messages-parfaits) Avant chaque geste : l'état du pont revérifié s'il a plus de 10 s (src/agir/porte.js).
+poserReverifAgir(async () => { if (Date.now() - __vmrEtatAt < 10000) return; await reverifierExtension(2500); await new Promise((r) => setTimeout(r, 60)); });
 poserEnvoiAgir({ deposer: async ({ geste, site, compte, args, confirme, num, avant }) => {
   const owner = AUTH.user && AUTH.user.id;
   const c = commandeDistanceAgir({ geste, site, compte, args, owner, confirme, num, avant, alea: aleaAgir() });

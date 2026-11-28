@@ -3,6 +3,7 @@
 import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+import { avatarPersonne } from '../filUnique.js';   // (28 nov., messages-parfaits) la photo de profil de l'en-tête du fil (jamais la photo de l'article)
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
 import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -25,7 +26,7 @@ async function republierAgir(annonces, panneau) {
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
 import { fusionPlan, aReprendre, alerteCouverte } from '../aRetirerAilleurs.js';
-import { MASQUER_CLE, listeMasquerAilleurs } from '../reglesAuto.js';
+import { MASQUER_CLE, listeMasquerAilleurs, plancherBaisse } from '../reglesAuto.js';
 import { publierSiNeuf as publierSiNeufPur } from '../publierSiNeuf.js';
 import { montantSeuil } from '../offresSures.js';
 import { jugerBrouillon } from '../brouillonsProposables.js';
@@ -15616,10 +15617,28 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const request=++conversationRequest.current,lecture=++lectureConversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
     setReplyText(brouillon);setReplyErr(null);setEnvoiReponse(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
-    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,extraitBoite:String(conv.description||'').trim(),loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
-    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
+    const offreConnue=(()=>{ try{ const o=offresConv instanceof Map?offresConv.get(`${String(conv._acc.vinted_user_id)}_${conv.id}`):null; const p=o&&Number(o.prix); return Number.isFinite(p)&&p>0?p:null; }catch(_){ return null; } })();
+    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,extraitBoite:String(conv.description||'').trim(),offreConnue,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:avatarPersonne(conv.opposite_user?.photo)}});
+    // (28 nov., messages-parfaits — Julien : « Ouverture de la conversation… » qui traîne) DEUX TEMPS. Avant, l'ouverture
+    // attendait la relecture PAR L'EXTENSION (`force`, un aller-retour à vinted.fr, plusieurs secondes) avant de montrer quoi
+    // que ce soit. Maintenant : (1) la copie CAPTÉE en base (une ligne, la même lecture qu'avant) s'affiche dès qu'elle arrive
+    // — et, avant même elle, le dernier message connu de la boîte et l'offre de la liste (`apercuFil`) ; (2) l'extension
+    // relit ensuite en arrière-plan (« Actualisation… », les gestes gardent leurs gardes) et remplace le fil s'il a changé.
+    // Rien n'est inventé : une lecture ratée garde ce qui est montré et le dit (`refreshError`), comme « Actualiser ».
+    const ext=extSait('messagerie')==='ok';
+    const t0=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+    const marquer=(quoi)=>{ try{ const t=((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now())-t0; window.__vrmMesuresFil=Object.assign(window.__vrmMesuresFil||{},{[quoi]:Math.round(t)}); }catch(_){} };
+    const poser=(res,suite)=>setOpenConv(o=>o?.request===request?({...o,loading:false,refreshing:!!suite,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
+    const res0=await fetchVintedConversationDetail(conv._acc,conv.id,{force:false});
     if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
-    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
+    const enBase=res0.ok&&res0.source==='harvest';
+    if(res0.ok){ poser(res0,ext&&enBase); marquer('fil'); }
+    if(!ext||!enBase){ if(!res0.ok) poser(res0,false); return; }
+    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:true});
+    if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
+    marquer('actualise');
+    if(res.ok) poser(res,false);
+    else setOpenConv(o=>o?.request===request?({...o,refreshing:false}):o);
   };
   const actualiserConversation=async()=>{
     const oc=openConv;if(!oc||oc.loading||!oc.owner||oc.owner!==(AUTH.user?.id||''))return;
@@ -21859,7 +21878,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       <div className="vrm-chat-offre-traiter vrm-mp-offre-fil" data-cible="offre" data-offre="attente" data-offre-au-dessus-mini={auDessusMini?String(Math.round(mini)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contreMini!=null?String(contreMini):undefined}>
         <CarteOffre qui={openConv.header?.login||''} offre={off.prix} affiche={afficheCompare} mini={mini} fmt={fmtE} quand={evt&&evt.ts||null}
           plancher={<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} puce offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>}
-          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit}/></div>}/>
+          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit} plancher={itemF!=null&&(pc?.devise||'EUR')==='EUR'?plancherBaisse(numeros[String(itemF)]||null,null):null} affiche={afficheCompare!=null?afficheCompare:(pc&&pc.prix!=null&&(pc.devise||'EUR')==='EUR'?pc.prix:null)}/></div>}/>
         {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
       </div>) };
   };
@@ -21927,7 +21946,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {/* (11 nov., anti-arnaque) Les messages PROUVÉS de l'autre personne (`autre`) seulement : jamais les siens, jamais l'équipe Vinted. Aucune action. */}
             {!openConv.loading && !openConv.error && <AlerteArnaque site="vinted" style={{margin:'8px 16px 0'}} lien={openConv.convId?`https://www.vinted.fr/inbox/${openConv.convId}`:''} messages={messagesPourArnaque(openConv.messages)}/>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-              {openConv.loading && <div role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Ouverture de la conversation…</div>}
+              {/* (28 nov., messages-parfaits) Pendant la lecture : CE QUI EST DÉJÀ CONNU tout de suite — le dernier message de la
+                  boîte (son auteur n'y est pas dit : bulle neutre) et l'offre de la liste —, puis la forme des bulles à venir.
+                  Plus jamais « Ouverture de la conversation… » seul au milieu d'un volet vide. */}
+              {openConv.loading && <div className="vrm-fil-apercu" role="status" aria-busy="true" aria-label={tr('mparf.fil.lecture')} data-fil-apercu={openConv.extraitBoite?'dernier':'vide'}>
+                <Skeleton variant="row" count={2}/>
+                {openConv.offreConnue!=null && <div className="vrm-fil-apercu-offre" data-fil-apercu-offre={String(openConv.offreConnue)}><Icon name="tag" size={14}/><span>{tr('verre2.msg.offreDe',{m:fmtE(openConv.offreConnue)})}</span></div>}
+                {openConv.extraitBoite && <div className="vrm-fil-apercu-dernier" data-fil-apercu-dernier=""><span className="vrm-fil-apercu-texte">{openConv.extraitBoite}</span><small>{tr('mparf.fil.dernierConnu')}</small></div>}
+              </div>}
               {/* (5 nov., chantier G) Plus jamais « Erreur : <code> » : la panne dite, son geste (relire ce fil). */}
               {openConv.error && <EtatPanne compact quoi="Ce fil" raison="La conversation n’a pas pu être lue. Rien n’est perdu." onReessayer={actualiserConversation} data-fil-panne=""/>}
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}

@@ -123,7 +123,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Messages, comptes** | 12 nov. (Julien) : comptes SÉPARÉS — compte de l'onglet d'abord, puis chaque autre compte ; du plus récent au plus ancien DANS chaque groupe. Ne pas mélanger. |
 | **403 de Vinted** | 12 nov. : l'extension garde la pause sur TOUT 403. |
 | **Discrétion** | 12 nov. VALIDÉ : temps d'écriture et messages variés, plafond par jour en plus des 50/h, rythme irrégulier, attente après l'ouverture de Vinted, jamais deux comptes à la fois sur un ordinateur ni la même action partout au même moment, compte neuf en douceur, offres selon l’heure, republication par petits groupes, baisses irrégulières, arrêt + alerte au 1er captcha, santé du compte. REFUSÉ : blocage auto la nuit, étalement des messages aux favoris sur la journée. « X € conseillé » gardé mais mesuré. Mode prudence : la relecture des ventes à chaque visite RESTE ; historique complet ⇒ seulement le nouveau. |
-| **Agir depuis l'app** | ⚠️ 24 nov. : « tout faire si l’extension est connectée, sinon on voit sans agir ». Porte `peutAgir` (`src/agir/`) : extension connectée à CE compte VRM, CE compte vendeur dans un onglet (ici ou son ordinateur allumé), à jour, ni dépassée ni arrêtée ; « pas su » ⇒ lecture seule. Bouton éteint visible + raison, rien n'envoyé. |
+| **Agir depuis l'app** | ⚠️ 24 nov. : « tout faire si l’extension est connectée, sinon on voit sans agir ». Porte `peutAgir` (`src/agir/`) : extension connectée à CE compte VRM, CE compte vendeur dans un onglet (ici ou son ordinateur allumé), à jour, ni dépassée ni arrêtée ; « pas su » ⇒ lecture seule. Bouton éteint visible + raison, rien n'envoyé. 28 nov. : accepter (confirmé), contre-offre (plancher sauf SA case + confirmation), envoyer — `src/agir/Agir.jsx` ; sinon le panneau sur CETTE conversation (`audit-actions-app` §M). |
 | **Organisation** | Retirée du menu le 29 oct. (inutilisée) ; l'écran reste joignable par Réglages → Stock et rangement → Organisation. |
 
 **Refusé par Julien le 11 octobre (son choix) — ne pas reproposer** : « imprimer la
@@ -485,8 +485,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **28 nov. · Messages parfaits** : photo de profil (sinon l'initiale), filtre Site + Compte natif, fil en deux temps, statut de l'extension daté (3 états, revérifié avant chaque geste), « Autre prix » jamais sous le plancher sans forcer. `2026-11-28-messages-parfaits.md`. Geste : aucun.
 - **28 nov. · Automatismes eBay (ebay-automatismes)** : baisse par règle, offre aux observateurs, contre-offre par paliers, remise en vente, prix eBay +x %, modification en masse, « Vendre un similaire » — API officielle, cron GitHub horaire (`?moment=ebayauto`), plancher publié par l'app (`vrm_planchers_ebay`), éteints par défaut. `2026-11-28-ebay-automatismes.md`. Geste : aucun.
-- **28 nov. · Sneakers : référence, pointure, cote VRM, étiquettes, en masse (sneakers-cote)** : référence fabricant + pointure sur la fiche (proposées, SON toucher pose ; jamais une identité) ; cote = SES ventes de la même référence à l'ACHAT (calculette) et dans la valeur du stock, jamais à la mise en ligne ; StockX : pas sans clé, écarté sur décision du 28 nov. ; masse par la file `prix` / l'API eBay, plancher mini / achat + 10 %. `2026-11-28-sneakers-cote.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

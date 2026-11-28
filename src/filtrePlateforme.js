@@ -20,7 +20,7 @@ import { lireLocal, ecrireLocal, lireJSON } from './stockageSur.js';
 
 export const TOUTES = 'toutes';
 export const CLE_FILTRE_PLATEFORMES = 'vrm_filtre_plateformes';
-export const ECRANS_FILTRE = Object.freeze(['annonces', 'ventes', 'achats']);
+export const ECRANS_FILTRE = Object.freeze(['annonces', 'ventes', 'achats', 'messages']);   // (28 nov.) Messages aussi (messages-parfaits)
 
 const connu = (s) => IDS_PLATEFORMES.includes(s);
 
