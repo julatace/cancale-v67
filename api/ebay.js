@@ -751,7 +751,7 @@ function itemXml(it) {
     `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` + X.apresEtat +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
-    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
+    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` + (X.colis || '') +
     // ⚠️ LIVRAISON GÉRÉE PAR eBay. MESURÉ 3 fois à blanc sur son compte (27 sept.) :
     // eBay REFUSE tout <ShippingDetails> que VRM envoie — transporteur + coût ET
     // transporteur seul sortent « Item.ShippingDetails non valides ». Seul un item

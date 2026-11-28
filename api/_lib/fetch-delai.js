@@ -17,6 +17,8 @@
 // nu dans api/ hors de ce fichier, et le délai coupe vraiment (exécuté).
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { estAchatEtiquette } from './ebay-livraison.js';
+
 // Délais par service, en millisecondes. Un service lent ne mange pas le temps
 // de la fonction ; un PDF ou une image a un peu plus.
 export const DELAIS_SORTANTS = [
@@ -50,7 +52,11 @@ function plafond(ms) {
 // seulement un filet extérieur.
 export const DELAI_FILET_MS = 60000;
 
+// (28 nov., ebay-livraison — §2.8) AUCUN ACHAT D'ÉTIQUETTE : l'API Logistics d'eBay (devis, achat, téléchargement
+// d'une étiquette achetée) n'est JAMAIS appelée — l'acheteur a payé le port à eBay, l'étiquette se prend dans eBay.
+// Refusé ICI, au seul `fetch` du serveur : aucune route, même écrite plus tard, ne peut passer (audit-ebay-livraison).
 export function fetchAvecDelai(url, options = {}, ms) {
+  if (estAchatEtiquette(url)) { const e = new Error('achat d’étiquette interdit (§2.8) : rien n’a été envoyé'); e.name = 'AchatEtiquetteInterdit'; return Promise.reject(e); }
   const opts = options && typeof options === 'object' ? options : {};
   const duree = plafond(Number(ms) > 0 ? Number(ms) : opts.signal ? DELAI_FILET_MS : delaiPour(url));
   // AbortController + minuterie `unref` : le délai couvre AUSSI la lecture du

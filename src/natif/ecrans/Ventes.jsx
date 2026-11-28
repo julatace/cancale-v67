@@ -149,6 +149,8 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           {!route ? <Fait libelle={tr('vv.col.ou')} valeur={textePlace(r.place) || null}/> : null}
           <Fait libelle={tr('vv.col.transport')} valeur={r.transporteur || null} detail={route ? (r.envoi ? '' : r.suivi) : texteBordereau(r.bordereau)}/>   {/* (24 nov.) la piste dit le n° (un nombre une fois, §7) */}
           <Fait libelle={tr('vn.f.acheteur')} valeur={r.acheteur || null}/>
+          {/* (28 nov., ebay-livraison) Le port PAYÉ PAR L'ACHETEUR à eBay, pour info : ni recette ni charge (§2.8). */}
+          {d.portAcheteur ? <Fait libelle={tr('ebayLiv.port')} valeur={d.portAcheteur} detail={tr('ebayLiv.portInfo')}/> : null}
         </Faits>
       </Groupe>
       {(r.notes || []).length ? <Groupe>{r.notes.map((n) => <Rangee key={n.cle} titre={n.texte} lignes={2} ton="ambre" attrs={{ 'data-vn-note': n.cle }}/>)}</Groupe> : null}
@@ -167,6 +169,7 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           fin={<GestesAchat a={{ ...r.achat, ouvrir: null, titre: r.achat.titre || r.titre }} Icon={Icon} court/>} attrs={{ 'data-vn-geste': 'prix-achat' }}/> : null}
         {G.imprimer ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr(G.facture ? 'vn.g.imprimerFacture' : 'vn.g.imprimer')} onClick={(ev) => G.imprimer(ev)} attrs={{ 'data-vn-geste': 'imprimer' }}/> : null}
         {G.lien ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vn.g.lien.' + G.lien.sorte)} href={G.lien.url} fin="chevron" attrs={{ 'data-vn-geste': 'lien' }}/> : null}
+        {G.commandeEbay ? <Rangee icone={<Icon name="doc" size={22}/>} titre={tr('ebayLiv.commande')} href={G.commandeEbay} fin="chevron" attrs={{ 'data-vn-geste': 'commande-ebay' }}/> : null}
         {G.depose ? <Rangee icone={<Icon name="check" size={22}/>} titre={tr(r.depose ? 'vv.volet.pasDepose' : 'vn.g.depose')} onClick={G.depose} attrs={{ 'data-vn-geste': 'depose' }}/> : null}
         {G.pasDepose ? <Rangee icone={<Icon name="undo" size={22}/>} titre={tr('vv.volet.pasDepose')} onClick={G.pasDepose} attrs={{ 'data-vn-geste': 'pas-depose' }}/> : null}
         {r.lienSuivi || G.suivre ? <Rangee icone={<Icon name="truck" size={22}/>} titre={tr('vv.volet.suivre')} href={r.lienSuivi || G.suivre} fin="chevron" attrs={{ 'data-vn-geste': 'suivre' }}/> : null}
