@@ -60,3 +60,17 @@ plateforme − boosts ; chaque terme compté seulement s'il est connu, le manque
 
 ## Geste de Julien
 Aucun.
+
+## Correctif du 28 nov. : V6 rouge en CI (PR #1458, part 3/3, 3 rouges)
+- **Cause** : la fiche d'une vente NUMÉROTÉE range le détail du bénéfice sous « Tout voir » de l'histoire
+  (src/FichePaire.jsx) ; tant que les autres sites se lisent, la fiche se reconstruit et « Tout voir » se replie.
+  Selon que le N° de la ligne est déjà lu au toucher, on obtient la fiche de la vente (détail tout de suite) ou celle
+  de la paire (détail replié). L'ancien banc attendait 8 s puis lisait « rien ».
+- **Banc** : V6 suit l'ÉTAT de la fiche (pas de fiche / repliée / ouverte / détail lu), touche « Tout voir » quand
+  elle est repliée, lit tout d'un coup dans la page ; plus aucun délai fixe dans V6, les vues et « Déclarer ».
+- **App** : la fiche numérotée dit aussi « port de l'achat compris (reçu) » (le prix d'achat y est dans les faits) ;
+  un prix saisi sur la VENTE remplace aussi la source du prix de la fiche (`fusionEntreeVente`).
+- **Preuves sous charge** (4 cœurs, copies du banc en parallèle) : l'ancien banc 4 fois rouge sur 4 (3 ou 4 rouges,
+  V6 · 91002 sans détail, comme en CI) ; le nouveau 14 fois vert sur 14 (4, puis 6, puis 4 copies à la fois, 80/80).
+  Audits argent-plus, cout-vente, vrai-benefice, benefice(-unique), gains-reels, rentabilite, achats-export,
+  traduction, fiche-modif, fiche-sites, dormantes, inventaire-annuel : verts.
