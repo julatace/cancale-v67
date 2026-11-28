@@ -19,6 +19,7 @@
 const path = require('path'), fs = require('fs'), http = require('http');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
 const sc = require('./_scenario-colis.cjs');
 const DIST = path.join(__dirname, '..', '..', 'dist'), SC = __dirname;
 const J = 86400e3, U = sc.UID[0];
@@ -61,7 +62,10 @@ async function passe(b, nom, ctxOpts, sombre, { rgpdKO = false } = {}) {
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request(), u = metaVersData(req.url());
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (req.method() !== 'GET') { ecrits.push(u); return j([]); }
+    // (28 nov.) Une écriture reçoit la VRAIE réponse de PostgREST (`return=representation` : la ligne écrite).
+    // Répondre `[]` disait « refusé » au comparer-et-échanger de l'app (src/ligneCas.js) : elle REJOUAIT ses
+    // écritures de démarrage en fond, à n'importe quel moment — une fois sur ~20, pendant l'export (vu sous charge).
+    if (req.method() !== 'GET') { ecrits.push(req.method() + ' ' + u); return route.fulfill({ status: req.method() === 'PATCH' ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(req) }); }
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(sc.comptes());
     if (/id=eq\.main/.test(u)) return j(main(sombre));
@@ -78,7 +82,14 @@ async function passe(b, nom, ctxOpts, sombre, { rgpdKO = false } = {}) {
       if (rgpdKO && /suite=p2/.test(u)) return r.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PAGES_RGPD[/suite=p2/.test(u) ? 1 : 0]) });
     }
-    ecrits.push(u); return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' });
+    // (28 nov.) Une ÉCRITURE ou un ENVOI se reconnaît à sa méthode (POST, PATCH, PUT, DELETE), jamais au moment
+    // où il part. Les LECTURES de fond que l'app fait de toute façon (ex. GET /api/email-rattacher?mode=preuves,
+    // relue par `ActionsReglages` à chaque `vrm:save` / `focus` — l'échec dit par « Réessayer » en pose un) ne sont
+    // pas des écritures de l'export : elles ne comptent pas.
+    // Les mesures de vitesse (`ROUTE_MESURES`, src/mesuresCollecte.js) partent par lot quand la page le décide :
+    // de la télémétrie de l'app, pas une donnée du vendeur ni un geste de l'export — nommées, donc écartées.
+    if (r.request().method() !== 'GET' && !/\/api\/compte\?mode=mesures(&|$)/.test(u)) ecrits.push(r.request().method() + ' ' + u);
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' });
   });
   await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
   const g = pg.locator('[data-exporter-donnees]').first();
