@@ -22,6 +22,7 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { voixDisponible, VOIX, ecouter, ecouteEnCours, annulerVoix, effacerErreurVoix, PHRASES_VOIX } from '../dicteeNavigateur.js';
 import { useEtatVoix } from './voix.jsx';
 import { tr } from '../i18n/index.js';
+import { useSaisieDifferee } from './saisieDifferee.jsx';
 
 // (11 nov., parler à la loupe) Le moteur est commun (src/dicteeNavigateur.js) : la
 // transcription s'affiche EN DIRECT dans le champ, puis le texte final passe par
@@ -29,8 +30,11 @@ import { tr } from '../i18n/index.js';
 // sous le champ, le micro disparaît — jamais un bouton mort).
 let N_CANAL = 0;
 
-export function ChampRecherche({ valeur = '', onChange, placeholder = 'Rechercher', label, micro = false, voix = 'requete',
+export function ChampRecherche({ valeur: valeurEcran = '', onChange, placeholder = 'Rechercher', label, micro = false, voix = 'requete',
   onValider, autoFocus = false, inputRef, className = '', fin = null, ...rest }) {
+  // (28 nov., vitesse-fluide) La lettre tapée s'affiche tout de suite ; l'écran la reçoit dans une transition
+  // (src/composants/saisieDifferee.jsx). Hors transition, le champ montre la valeur de l'écran (champ contrôlé).
+  const [valeur, envoyerSaisie] = useSaisieDifferee(valeurEcran, onChange);
   const refLocal = React.useRef(null);
   const ref = inputRef || refLocal;
   const canalRef = React.useRef(null);
@@ -47,13 +51,13 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
 
   const dicter = () => {
     ecouter({ canal,
-      onDirect: (t, fini) => { if (!fini && onChange) onChange(t); },
-      onFinal: (t) => { const texte = voix === 'brut' ? String(t).trim() : requeteDeLaVoix(t).requete; if (onChange) onChange(texte); },
+      onDirect: (t, fini) => { if (!fini) envoyerSaisie(t); },
+      onFinal: (t) => { const texte = voix === 'brut' ? String(t).trim() : requeteDeLaVoix(t).requete; envoyerSaisie(texte); },
     });
   };
   const effacer = () => {
     interrompre();
-    if (onChange) onChange('');
+    envoyerSaisie('');
     try { ref.current && ref.current.focus(); } catch (_) {}
   };
   const nom = label || placeholder;
@@ -61,7 +65,7 @@ export function ChampRecherche({ valeur = '', onChange, placeholder = 'Recherche
     <div className={`vrm-champ-recherche${className ? ' ' + className : ''}`} data-champ-recherche="" data-champ-recherche-plein={valeur ? '1' : '0'} data-voix-ecoute={ecoute ? '1' : '0'} {...rest}>
       <span className="vrm-champ-recherche-loupe"><IconeComposant nom="search" taille={17}/></span>
       <input ref={ref} type="search" className="vrm-champ-recherche-saisie" value={valeur}
-        onChange={(e) => { interrompre();effacerErreurVoix(canal);onChange && onChange(e.target.value); }}
+        onChange={(e) => { interrompre();effacerErreurVoix(canal);envoyerSaisie(e.target.value); }}
         onCompositionStart={()=>{composition.current=true;interrompre();}} onCompositionEnd={()=>{composition.current=false;}}
         onKeyDown={(e) => { if(composition.current||e.nativeEvent.isComposing||e.keyCode===229){if(e.key==='Enter'||e.key==='Escape')e.stopPropagation();return;} if (e.key === 'Enter' && onValider) { e.preventDefault(); onValider(valeur); } if (e.key === 'Escape' && (valeur||ecouteEnCours(canal))) { e.preventDefault(); e.stopPropagation(); effacer(); } }}
         placeholder={placeholder} aria-label={nom} autoFocus={autoFocus}
