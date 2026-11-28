@@ -168,7 +168,7 @@ async function sectionD() {
   const coupables = [];
   for (const f of fichiersApi(path.join(RACINE, 'api'))) {
     const rel = path.relative(RACINE, f);
-    if (rel === path.join('api', '_lib', 'ebay-livraison.js')) continue;   // la liste des motifs interdits elle-même
+    if (rel === path.join('api', '_lib', 'fetch-delai.js')) continue;   // la liste des motifs interdits elle-même (et la garde)
     const t = sansCommentaires(fs.readFileSync(f, 'utf8'));
     for (const re of MOTIFS_ACHAT) if (re.test(t)) coupables.push(rel + ' ' + re);
   }

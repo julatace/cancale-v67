@@ -28,19 +28,9 @@ import { limiteDepuisInstant } from './limite-envoi.js';
 import { limiteEnvoiEbay } from './ebay-a-expedier.js';
 
 // ── 1. AUCUN ACHAT D'ÉTIQUETTE ─────────────────────────────────────────────
-// Les adresses qui achètent (ou ne servent qu'après un achat) une étiquette.
-export const ACHAT_ETIQUETTE_INTERDIT = Object.freeze([
-  /\/sell\/logistics\//i,
-  /shipping_quote/i,
-  /create_from_shipping_quote/i,
-  /download_label_file/i,
-  /createShippingLabel/i,
-  /\/ship\/label\/purchase/i,
-]);
-export function estAchatEtiquette(url) {
-  const s = String(url == null ? '' : (url && url.url) || url);
-  return ACHAT_ETIQUETTE_INTERDIT.some((re) => re.test(s));
-}
+// La liste et la garde vivent dans `fetch-delai.js` (le seul `fetch` du serveur, sans autre import : les audits qui
+// copient une partie d'api/_lib/ le chargent seul) ; elles sont redonnées ici.
+export { ACHAT_ETIQUETTE_INTERDIT, estAchatEtiquette } from './fetch-delai.js';
 
 // ── 2. LA DATE LIMITE D'ENVOI LUE (handling time ⇒ `shipByDate`) ───────────
 // La plus proche des lignes de la commande (`limiteEnvoiEbay`), en jour et heure

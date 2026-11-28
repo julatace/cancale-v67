@@ -17,7 +17,20 @@
 // nu dans api/ hors de ce fichier, et le délai coupe vraiment (exécuté).
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { estAchatEtiquette } from './ebay-livraison.js';
+// (28 nov., ebay-livraison — §2.8) Les adresses qui ACHÈTENT une étiquette (ou ne servent qu'après un achat) : l'API
+// Logistics d'eBay (devis, `create_from_shipping_quote`, `download_label_file`). Ici, sans import (ce module se charge seul).
+export const ACHAT_ETIQUETTE_INTERDIT = Object.freeze([
+  /\/sell\/logistics\//i,
+  /shipping_quote/i,
+  /create_from_shipping_quote/i,
+  /download_label_file/i,
+  /createShippingLabel/i,
+  /\/ship\/label\/purchase/i,
+]);
+export function estAchatEtiquette(url) {
+  const s = String(url == null ? '' : (url && url.url) || url);
+  return ACHAT_ETIQUETTE_INTERDIT.some((re) => re.test(s));
+}
 
 // Délais par service, en millisecondes. Un service lent ne mange pas le temps
 // de la fonction ; un PDF ou une image a un peu plus.

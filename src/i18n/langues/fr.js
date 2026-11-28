@@ -1572,7 +1572,7 @@ export default {
   "ebay.param.livraison.aide": "Tu ne paies jamais le port : l'acheteur le paie à eBay.",
   "ebay.param.livraison.geree": "Gérée par eBay",
   "ebay.param.colis": "Poids et taille du colis",
-  "ebay.param.colis.aide": "Une boîte à chaussures par défaut : eBay en calcule le port, payé par l’acheteur.",
+  "ebay.param.colis.aide": "Un colis moyen par défaut (1,2 kg) : eBay en calcule le port, payé par l’acheteur.",
   "ebay.param.colis.mesures": "Poids (g) · longueur · largeur · hauteur (cm)",
   "ebay.param.colis.poids": "Poids en grammes",
   "ebay.param.colis.longueur": "Longueur en centimètres",

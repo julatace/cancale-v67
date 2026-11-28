@@ -1567,7 +1567,7 @@ export default {
   "ebay.param.livraison.aide": "Non paghi mai la spedizione: la paga l'acquirente a eBay.",
   "ebay.param.livraison.geree": "Gestita da eBay",
   "ebay.param.colis": "Peso e dimensioni del pacco",
-  "ebay.param.colis.aide": "Una scatola da scarpe per impostazione: eBay calcola la spedizione, pagata dall’acquirente.",
+  "ebay.param.colis.aide": "Un pacco medio per impostazione (1,2 kg): eBay calcola la spedizione, pagata dall’acquirente.",
   "ebay.param.colis.mesures": "Peso (g) · lunghezza · larghezza · altezza (cm)",
   "ebay.param.colis.poids": "Peso in grammi",
   "ebay.param.colis.longueur": "Lunghezza in centimetri",

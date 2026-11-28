@@ -1567,7 +1567,7 @@ export default {
   "ebay.param.livraison.aide": "You never pay postage: the buyer pays it to eBay.",
   "ebay.param.livraison.geree": "Managed by eBay",
   "ebay.param.colis": "Parcel weight and size",
-  "ebay.param.colis.aide": "A shoebox by default: eBay works out the postage, paid by the buyer.",
+  "ebay.param.colis.aide": "A medium parcel by default (1.2 kg): eBay works out the postage, paid by the buyer.",
   "ebay.param.colis.mesures": "Weight (g) · length · width · height (cm)",
   "ebay.param.colis.poids": "Weight in grams",
   "ebay.param.colis.longueur": "Length in centimetres",

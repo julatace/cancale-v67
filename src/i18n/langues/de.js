@@ -1567,7 +1567,7 @@ export default {
   "ebay.param.livraison.aide": "Du zahlst nie Porto: Der Käufer zahlt es an eBay.",
   "ebay.param.livraison.geree": "Über eBay",
   "ebay.param.colis": "Gewicht und Größe des Pakets",
-  "ebay.param.colis.aide": "Standardmäßig ein Schuhkarton: eBay berechnet das Porto, das der Käufer zahlt.",
+  "ebay.param.colis.aide": "Standardmäßig ein mittleres Paket (1,2 kg): eBay berechnet das Porto, das der Käufer zahlt.",
   "ebay.param.colis.mesures": "Gewicht (g) · Länge · Breite · Höhe (cm)",
   "ebay.param.colis.poids": "Gewicht in Gramm",
   "ebay.param.colis.longueur": "Länge in Zentimetern",
