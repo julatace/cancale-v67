@@ -6,11 +6,14 @@
 // l'annonce de la conversation). L'app n'envoie rien (décision du 20 nov. : tout geste de plateforme se fait dans le
 // panneau) : elle MONTRE la réponse ; « Envoyer depuis le panneau » ouvre la conversation dans le panneau, où la même
 // réponse attend son toucher « Envoyer ».
-import React, { useMemo } from 'react';
+import React, { useMemo, Suspense } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
 import { rrPropositions } from './reponsesRapides.js';
 import { risquesMessage } from './messageSur.js';
-import ReponseNavigateur from './ReponseNavigateur.jsx';   // (28 nov., ia-sans-cle) « ✦ Proposer » : l'IA du navigateur, sans clé
+// (28 nov., ia-sans-cle) « ✦ Proposer » : l'IA du navigateur, sans clé. Chargée À LA DEMANDE, et seulement si le
+// navigateur a l'API (Safari, Firefox n'en téléchargent rien ; le démarrage ne porte pas son code).
+const ReponseNavigateur = React.lazy(() => import('./ReponseNavigateur.jsx'));
+const apiIaPresente = () => { try { return typeof window !== 'undefined' && !!(window.LanguageModel || (window.ai && window.ai.languageModel)); } catch (_) { return false; } };
 
 // (24 nov., lot agir-si-connecte) `onChoisir(texte)` : une réponse touchée REMPLIT le champ « Répondre » de VRM (rien ne part).
 export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null, onChoisir = null, puces = false }) {
@@ -19,7 +22,7 @@ export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = 
   const l = r.propositions || [];
   // (28 nov., ia-sans-cle) La puce de l'IA du navigateur (seulement si le modèle est prêt sur l'appareil) — même sans
   // réponse rapide reconnue.
-  const iaNav = puces && onChoisir ? <ReponseNavigateur messages={messages} vars={vars} sur={(t) => !risquesMessage(String(t || ''), site).length} onChoisir={onChoisir}/> : null;
+  const iaNav = puces && onChoisir && apiIaPresente() ? <Suspense fallback={null}><ReponseNavigateur messages={messages} vars={vars} sur={(t) => !risquesMessage(String(t || ''), site).length} onChoisir={onChoisir}/></Suspense> : null;
   if (!l.length) return iaNav ? <div className="vrm-mp-puces" data-rr-app={0} data-rr-puces="" role="group" aria-label={tr('rr.app.titre')}>{iaNav}</div> : null;
   // (24 nov., lot messages-pro) `puces` : une rangée de puces qui défile au doigt, au-dessus du champ — la puce porte le
   // NOM de la réponse (« Taille »), le texte entier va dans le champ au toucher (rien ne part). Une réponse qu'il manque
