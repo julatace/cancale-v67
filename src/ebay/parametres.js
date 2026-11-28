@@ -58,7 +58,18 @@ export const DEFAUTS_USINE = Object.freeze({
   sousTitre: '',
   categorie2: '',
   privee: false,
+  // (28 nov., ebay-livraison) LE COLIS PAR DÉFAUT d'une boîte à chaussures (réglé UNE fois dans Paramètres › eBay) : eBay en
+  // déduit le tarif de SA livraison gérée — payé par l'acheteur (§2.8). Jamais un port, jamais « gratuite ».
+  colis: Object.freeze({ actif: true, poids: 1200, longueur: 35, largeur: 24, hauteur: 13 }),
 });
+// Les bornes du colis (grammes, centimètres) — les mêmes que le serveur (api/_lib/ebay-parametres.js `COLIS_BORNES`).
+export const COLIS_BORNES = Object.freeze({ poids: [50, 30000], longueur: [1, 150], largeur: [1, 150], hauteur: [1, 150] });
+export function colisLu(c) {
+  const u = DEFAUTS_USINE.colis;
+  const x = c && typeof c === 'object' ? c : {};
+  const n = (k) => { const v = Number(String(x[k] == null ? '' : x[k]).replace(',', '.')); const [a, b] = COLIS_BORNES[k]; return Number.isInteger(v) && v >= a && v <= b ? v : u[k]; };
+  return { actif: x.actif === false ? false : true, poids: n('poids'), longueur: n('longueur'), largeur: n('largeur'), hauteur: n('hauteur') };
+}
 
 // LE CATALOGUE : chaque paramètre qu'eBay propose à la publication, son groupe
 // et ce qu'il coûte. `cle` = la clé de traduction `ebay.param.<cle>` (libellé)
@@ -129,6 +140,7 @@ export function defautsDepuis(stocke) {
     tva: s.tva == null ? '' : String(s.tva).trim(),
     sousTitre: '', categorie2: '',        // propres à une annonce
     privee: s.privee === true,
+    colis: colisLu(s.colis),
   };
   return r;
 }
@@ -146,6 +158,7 @@ export function fusionner(defauts, annonce) {
     ...d, ...a,
     retours: { ...d.retours, ...(a.retours || {}) },
     politiques: { ...d.politiques, ...(a.politiques || {}) },
+    colis: colisLu({ ...d.colis, ...(a.colis || {}) }),
   };
 }
 
@@ -183,6 +196,8 @@ export function parametresServeur(r0, compte = {}) {
   const c2 = String((r0 && r0.categorie2) || '').trim();
   if (/^\d{1,9}$/.test(c2)) p.categorie2 = c2;
   if (r.privee === true) p.privee = true;
+  // (28 nov., ebay-livraison) Le poids et la taille du colis (livraison GÉRÉE par eBay : eBay calcule le port, l'acheteur le paie).
+  if (r.colis && r.colis.actif !== false) p.colis = { poids: r.colis.poids, longueur: r.colis.longueur, largeur: r.colis.largeur, hauteur: r.colis.hauteur };
   if (Array.isArray(r0 && r0.descripteurs) && r0.descripteurs.length) p.descripteurs = r0.descripteurs.map((d) => ({ nom: String(d.nom), valeur: String(d.valeur) }));
   return Object.keys(p).length ? p : null;
 }

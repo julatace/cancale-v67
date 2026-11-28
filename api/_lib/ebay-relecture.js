@@ -18,9 +18,10 @@
 // dernière capture reste — jamais une liste vide à sa place.
 // ────────────────────────────────────────────────────────────────────────────
 import crypto from 'crypto';
-import { accessToken, modifierDonnee, lireComptes, comptesActifs, keysReady } from './ebay.js';
+import { accessToken, modifierDonnee, lireDonnee, lireComptes, comptesActifs, keysReady } from './ebay.js';
 import { fusionCommandesEbay } from './ebay-synchronisation.js';
-import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { fetchAvecDelai } from './fetch-delai.js';
+import { commandesASuivre, suivisDeFulfillments, fusionSuivis } from './ebay-livraison.js';   // (11 nov.) chaque appel sortant a un délai
 
 const EBAY_API = 'https://api.ebay.com';
 export const URL_COMMANDES = `${EBAY_API}/sell/fulfillment/v1/order?limit=50`;
@@ -59,7 +60,34 @@ export async function relireCommandesCompte({ owner, compte, token }) {
     const f = fusionCommandesEbay(d, orders.data, at2, gen);
     return f ? { ...f, status: orders.status } : undefined;
   });
-  return { ok: r === true, range: r === true, reason: r === true ? undefined : (r === null ? 'base' : 'ecriture'), status: r === true ? 200 : 503, lues: orders.data.orders.length, capturedAt: at2 };
+  // (28 nov., ebay-livraison) LES N° DE SUIVI des commandes parties, sans geste : après les commandes rangées.
+  // Un échec ici ne change rien à la relecture (les commandes sont rangées) : il est seulement dit (`suivis`).
+  let suivis = null;
+  if (r === true) { try { suivis = await relireSuivisCompte({ owner, suffixe, token: jeton, orders: orders.data.orders }); } catch (_) { suivis = { ok: false, reason: 'erreur' }; } }
+  return { ok: r === true, range: r === true, reason: r === true ? undefined : (r === null ? 'base' : 'ecriture'), status: r === true ? 200 : 503, lues: orders.data.orders.length, capturedAt: at2, ...(suivis ? { suivis } : {}) };
+}
+
+// ── (28 nov., ebay-livraison) LE SUIVI AUTOMATIQUE ─────────────────────────────
+// Julien : « n° de suivi lu chez eBay ⇒ En route puis Livrée, sans geste ». Pour les commandes PARTIES (au plus 6
+// par relecture, les plus récentes, jamais relues une fois leur n° rangé — `commandesASuivre`), `getShippingFulfillments`
+// (`GET /sell/fulfillment/v1/order/{id}/shipping_fulfillment`, LECTURE seule) ; les n° (scalaires, aucune adresse)
+// sont rangés dans `ebay_suivis{suffixe}` en comparer-et-échanger. Une lecture ratée (eBay muet, forme inconnue)
+// ne remplace rien ; la ligne illisible ⇒ rien n'est lu ni écrit (« pas su »).
+export async function relireSuivisCompte({ owner, suffixe = '', token, orders, maintenant = Date.now() }) {
+  const id = 'ebay_suivis' + suffixe;
+  const d = await lireDonnee(id, owner);
+  if (d === undefined) return { ok: false, reason: 'base', lus: 0 };
+  const aLire = commandesASuivre(orders, (d && d.parCommande) || {}, maintenant);
+  if (!aLire.length) return { ok: true, lus: 0 };
+  const lus = [];
+  for (const o of aLire) {
+    const f = await ebayJson(`${EBAY_API}/sell/fulfillment/v1/order/${encodeURIComponent(o.orderId)}/shipping_fulfillment`, token);
+    const s = f.ok ? suivisDeFulfillments(f.data) : null;
+    if (s) lus.push({ orderId: String(o.orderId), suivis: s, n: Array.isArray(o.fulfillmentHrefs) ? o.fulfillmentHrefs.length : 0 });
+  }
+  if (!lus.length) return { ok: false, reason: 'ebay', lus: 0 };
+  const w = await modifierDonnee(id, owner, (dd) => fusionSuivis(dd, lus, maintenant));
+  return { ok: w === true, lus: lus.length, reason: w === true ? undefined : (w === null ? 'base' : 'ecriture') };
 }
 
 // Toutes les commandes eBay d'UN vendeur (ses comptes ACTIFS, chacun avec SON
