@@ -41,6 +41,9 @@ import { pointsEcran, gestePoint } from './toutVaBienPoints.js';   // (20 nov.) 
 import { etatNavigateur } from './extension/peutFaire.js';
 import { CONTROLES } from './controleNuit.js';
 import { installerExtensionIci } from './navigateurExtension.js';
+// (27 nov., lot tout-va-bien) Ce qui tourne, morceau par morceau : extension, sites, e-mails, capture, favoris, serveur.
+import { SondesToutVaBien, useLecturesSondes, calculerSondes, gesteSonde } from './SondesToutVaBien.jsx';
+import { bilanSondes } from './toutVaBienSondes.js';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
 // ne publient pas leur appareil) : `panel_diag_capture`. Trois états.
@@ -192,6 +195,7 @@ export function ToutVaBien({ onComptes }) {
   const fiab = usePointsToutVaBien();
   const sante = useSanteDonnees({ capture: etat });
   const [details, setDetails] = React.useState(false);
+  const lectures = useLecturesSondes(etat && etat.comptesPrets ? etat : null);
   if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><Groupe><Rangee titre={tr('tvb.verif')} attrs={{ 'data-tvb-resume': '' }}/></Groupe></div>;
   const { appareils, pannes, lignes, passu, maintenant } = etat;
   const av = aVoirCapture(etat, { etatVersion, attendue: EXT_ATTENDUE });
@@ -212,17 +216,26 @@ export function ToutVaBien({ onComptes }) {
     if (g.code === 'relire') { relire(); return; }
     if (g.lien) { try { if (g.telecharger) { const a = document.createElement('a'); a.href = g.lien; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); } else window.open(g.lien, '_blank', 'noopener'); } catch (_) {} }
   };
-  const ton = r.etat === 'points' ? 'geste' : r.etat === 'passu' ? 'passu' : 'ok';
-  const resume = r.n ? tr('tvb.resume.points', { n: r.n }) : r.etat === 'passu' ? tr('tvb.resume.passu') : !lignes.length ? tr('tvb.resume.aucun') : tr('tvb.resume.ok');
+  // (27 nov.) Ce qui tourne : une rangée par morceau (src/toutVaBienSondes.js). L'extension d'ici et les comptes y portent
+  // LEUR geste : « À régler » ne les répète pas ; les e-mails, la capture, les favoris et le serveur s'ajoutent au compte.
+  const passuSites = ['vinted', 'leboncoin', 'vestiaire', 'ebay'].filter((p) => (passu || []).includes(p === 'vinted' ? 'Vinted' : nomPlateforme(p)));
+  const sondes = calculerSondes({ etat, nav, lectures, attendue: EXT_ATTENDUE, quand: (t) => quandRelu(t, maintenant), passuSites });
+  const bs = bilanSondes(sondes.filter((s) => ['emails', 'capture', 'favoris', 'serveur'].includes(s.cle)));
+  const nTout = r.n + bs.gestes;
+  const DANS_SONDES = new Set(['extension', 'panne', 'compte']);
+  const pointsVus = r.points.filter((pt) => !DANS_SONDES.has(pt.type));
+  const ton = nTout ? 'geste' : r.etat === 'passu' || bs.passu.length ? 'passu' : bs.lecture ? 'lecture-sondes' : 'ok';
+  const resume = nTout ? tr('tvb.resume.points', { n: nTout }) : r.etat === 'passu' || bs.passu.length ? tr('tvb.resume.passu') : bs.lecture ? tr('tvb.verif') : !lignes.length ? tr('tvb.resume.aucun') : tr('tvb.resume.ok');
   return (
-    <div className="vrm-tvb" data-tout-va-bien={ton} data-tvb-a-faire={r.n}>
+    <div className="vrm-tvb" data-tout-va-bien={ton} data-tvb-a-faire={nTout}>
       <Groupe>
         <Rangee titre={resume} sousTitre={tr('tvb.verifie', { quand: quandRelu(maintenant) })} valeur={tr('tvb.g.relire')} onClick={relire} className="vrm-tvb-point"
           attrs={{ 'data-tvb-resume': '', 'data-tvb-relire': '' }}/>
       </Groupe>
-      {r.points.length ? (
-        <Groupe titre={tr(r.n ? 'tvb.groupe.regler' : 'tvb.groupe.savoir')} attrs={{ 'data-tvb-points': r.points.length }}>
-          {r.points.map((pt, i) => {
+      <SondesToutVaBien sondes={sondes} faire={faire} gesteDe={(x) => gesteSonde(x, { gestePoint, inst, liensSite: LIENS_SITE_TVB })}/>
+      {pointsVus.length ? (
+        <Groupe titre={tr(pointsVus.some((pt) => pt.type !== 'forme' && pt.type !== 'passu') ? 'tvb.groupe.regler' : 'tvb.groupe.savoir')} attrs={{ 'data-tvb-points': pointsVus.length }}>
+          {pointsVus.map((pt, i) => {
             const t = textesPoint(pt);
             const g = gestePoint(pt, { inst, liensSite: LIENS_SITE_TVB, lienPaquet: (x) => gestesMiseAJour({ paquet: x.paquet }, EXT_ATTENDUE).lien || '', allerControle: allerControleTvb });
             return <Rangee key={pt.cle} titre={t.titre} sousTitre={t.sous} sousLignes={2} valeur={g ? t.geste : ''} ton={pt.ton === 'geste' ? 'ambre' : 'neutre'}
