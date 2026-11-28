@@ -2452,3 +2452,8 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., paires-qui-dorment, pour rester sous 60 Ko)
 - **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 28 nov. (place pour la 5.456.0, sous 60 Ko)
+
+- **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
+- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
