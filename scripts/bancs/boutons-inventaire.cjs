@@ -18,7 +18,8 @@
 //      désalignée (> 2 px du centre du texte) ; D7 gris d'une règle GLOBALE (fond = `--fu-remplir` sur un bouton d'avant
 //      qui n'en pose aucun) ; D8 aucun focus visible au clavier ; D9 indisponible MUET (sans raison) ; D10 lien souligné
 //      qui sert de bouton ; D11 deux pleins sur un écran (par écran) ; D12 taille de texte hors 13·15·17 ;
-//      D13 style en ligne sur le bouton.
+//      D13 style en ligne sur le bouton ; D14 doublon (même libellé deux fois dans l'écran ou la feuille, hors rangées
+//      répétées) ; D15 sans nom accessible (28 nov., boutons-donnees).
 //  Sorties (`SORTIE=dossier`, défaut /tmp/banc-boutons-inventaire) : `inventaire.json`, `inventaire.md` (un tableau par
 //  écran), `planche-pires.png` (les pires cas, découpés), `ecrans/<écran>-<W>-<thème>.png` (pour la planche avant/après).
 //  `BANC_DIST=…` juge un autre build (avant : le build d'origin/main). `ECRANS=a,b` `LARGEURS=390` `THEMES=clair`.
@@ -72,7 +73,8 @@ function mesurer({ tel, mut }) {
   const COQUE = '.n-onglets, .n-laterale, .n-barre-titre, .vrm-mobile-nav, .vrm-atelier-rail, .vrm-toasts, .n-toast';
   const dialogues = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], .n-feuille, .n-poussee, .vrm-sheet, dialog[open]')]
     .filter((d) => d.getClientRects().length && getComputedStyle(d).visibility !== 'hidden');
-  const racines = dialogues.length ? dialogues : [document.querySelector('#vrm-contenu, .vrm-main') || document.body];
+  const contenu0 = document.querySelector('#vrm-contenu, .vrm-main') || document.body;
+  const racines = dialogues.length ? dialogues : [contenu0];
   const SEL = 'button, [role="button"], a:not([href]), a[href="#"], a[href^="javascript"], summary';
   const vus = new Set(); const els = [];
   for (const r of racines) for (const e of r.querySelectorAll(SEL)) {
@@ -203,6 +205,21 @@ function mesurer({ tel, mut }) {
     if (!visible || focal === repos) { const it = out.find((x) => x.idx === i); if (it) it.d.push('D8'); }
   });
   try { actif && actif.focus && actif.focus({ preventScroll: true }); } catch (_) {}
+  // (28 nov., boutons-donnees) D14 doublon : deux touchables du MÊME libellé dans la même racine (l'écran ou une feuille),
+  // hors des rangées répétées d'une liste (« Modifier » sur chaque ligne n'est pas un doublon). D15 sans nom : un touchable
+  // qu'un lecteur d'écran ne sait pas nommer (ni texte, ni aria-label, ni aria-labelledby, ni title).
+  const REPETE = 'li, tr, .n-rangee, [data-n-rangee], [role="row"], [role="listitem"], article, .n-tt-ligne';
+  const parRacine = new Map();
+  for (const b of out) {
+    const e = els[b.idx]; const racine = e.closest('[role="dialog"], [aria-modal="true"], .n-feuille, .n-poussee, .vrm-sheet, dialog') || contenu0;
+    const nomAcc = (e.getAttribute('aria-label') || (e.getAttribute('aria-labelledby') ? (document.getElementById(e.getAttribute('aria-labelledby')) || {}).textContent : '') || e.innerText || e.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+    if (!nomAcc) b.d.push('D15');
+    if (b.rangee || e.closest(REPETE) || nomAcc.length < 2 || e.tagName === 'SUMMARY') continue;
+    const k = nomAcc.toLowerCase();
+    const m = parRacine.get(racine) || new Map(); parRacine.set(racine, m);
+    (m.get(k) || m.set(k, []).get(k)).push(b);
+  }
+  for (const m of parRacine.values()) for (const [, bs] of m) if (bs.length > 1) for (const b of bs.slice(1)) b.d.push('D14');
   const pleins = out.filter((x) => x.plein).length;
   return { boutons: out, pleins, dialogues: dialogues.length };
 }
@@ -242,7 +259,7 @@ function resumer(r) {
   const parOrigine = {}; const parDefaut = {};
   // Une RANGÉE n'est pas jugée comme un bouton dessiné : seuls comptent pour elle la cible (D1), le contraste (D4), le focus
   // (D8) et l'indisponible muet (D9) — son icône posée sur la 1re ligne, sa taille de titre, son style sont ceux d'une liste.
-  const POUR_RANGEE = new Set(['D1', 'D4', 'D8', 'D9']);
+  const POUR_RANGEE = new Set(['D1', 'D4', 'D8', 'D9', 'D15']);
   for (const b of r.boutons) { parOrigine[b.o] = (parOrigine[b.o] || 0) + 1; for (const d of b.d) if (!b.rangee || POUR_RANGEE.has(d)) parDefaut[d] = (parDefaut[d] || 0) + 1; }
   if (r.pleins > 1) parDefaut.D11 = r.pleins;
   // Une RANGÉE d'avant (toute la largeur de sa liste : une conversation, un réglage, un achat) est comptée à part : ce n'est
@@ -253,7 +270,7 @@ function resumer(r) {
   return { ecran: r.ecran, W: r.W, theme: r.theme, total: r.boutons.length, natifs: r.boutons.length - anciensTous.length, anciens, rangees, parOrigine, parDefaut, pleins: r.pleins, erreurs: r.erreurs.length, manque: r.manque };
 }
 
-const NOMS_D = { D1: 'cible petite', D2: 'rayon', D3: 'graisse', D4: 'contraste', D5: 'texte coupé', D6: 'icône désalignée', D7: 'gris global', D8: 'focus invisible', D9: 'indisponible muet', D10: 'lien souligné', D11: 'deux pleins', D12: 'taille de texte', D13: 'style en ligne' };
+const NOMS_D = { D1: 'cible petite', D2: 'rayon', D3: 'graisse', D4: 'contraste', D5: 'texte coupé', D6: 'icône désalignée', D7: 'gris global', D8: 'focus invisible', D9: 'indisponible muet', D10: 'lien souligné', D11: 'deux pleins', D12: 'taille de texte', D13: 'style en ligne', D14: 'doublon', D15: 'sans nom' };
 function tableau(resumes) {
   const lignes = ['| écran | W | thème | touchables | natifs | boutons d\'avant | rangées d\'avant | origines | défauts |', '|---|---|---|---|---|---|---|---|---|'];
   for (const s of resumes) lignes.push(`| ${s.ecran} | ${s.W} | ${s.theme} | ${s.total} | ${s.natifs} | ${s.anciens} | ${s.rangees} | ${Object.entries(s.parOrigine).map(([k, v]) => k + ' ' + v).join(', ')} | ${Object.entries(s.parDefaut).map(([k, v]) => `${k} ${NOMS_D[k]} ${v}`).join(', ') || '—'}${s.manque ? ' · ⚠️ ' + s.manque : ''} |`);
