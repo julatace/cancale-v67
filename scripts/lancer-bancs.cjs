@@ -48,6 +48,7 @@ const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
   'compta-export',   // (27 nov.) export comptable et URSSAF = l'écran, comptes exclus absents, « à dater » jamais comptée
+  'paires-dorment',   // (27 nov.) « Paires qui dorment » : le plan, l'argent qui dort, les gestes par la porte, lecture seule dite
   'ecran-pret-une-fois',   // (26 nov.) l'écran arrive UNE fois, jamais sous 95 % d'opacité (fondu d'entrée sous AA)
   'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
   'design-v2-chargement',
@@ -72,6 +73,7 @@ const DUREES_CI = {
   'barre-depuis-journee': 15,
   'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
   'compta-export': 240,   // (27 nov.) mesuré ici, seul : ~4 min (4 tailles × thèmes)
+  'paires-dorment': 100,   // (27 nov.) mesuré ici, seul : ~1 min 30 (2 tailles × 2 thèmes × 3 scènes)
 };
 // Les bancs ROUGES CONNUS (scripts/audits-exceptions.json, clé `bancs`) : chacun dit
 // SES lignes rouges connues (`rouges`, une expression régulière sur la ligne). Le banc
