@@ -3,7 +3,7 @@
 //  BANC « MESSAGES PARFAITS » (28 nov.) — la vraie app (dist/), un faux Supabase à état (_e2e-monde.cjs), une FAUSSE
 //  extension qui répond au pont (postMessage `__vmr`), une base INVENTÉE : deux comptes Vinted (boutique_a dans l'onglet,
 //  atelier_b), des conversations avec et sans photo de profil (et l'image « pas de photo » de Vinted), une offre de 70 € sur
-//  une paire affichée 85 € (prix mini 50 €), un fil Leboncoin. Trois extensions :
+//  une paire affichée 85 € (prix mini 80 €), un fil Leboncoin. Trois extensions :
 //    · « a-jour »   5.455.7, boutique_a dans l'onglet      ⇒ statut « ok » ; gestes ALLUMÉS (Accepter confirmé, Autre prix
 //                   sous le plancher seulement forcé + confirmé, Envoyer) ⇒ des commandes `cmd_dist_*` au nom de boutique_a ;
 //    · « ancienne » 5.430.0 (sait le panneau, pas la file)  ⇒ statut « différente » ; les gestes mènent au PANNEAU de
@@ -36,7 +36,7 @@ const U = { id: 'aaaaaaaa-0000-4000-8000-000000000001', email: 'vendeur@exemple.
 const A = '41000001', B = '41000002';
 const C1 = '7300001', C2 = '7300002', C3 = '7300003', CB = '7300101', TX1 = '8800001', OID1 = '9900001', ITEM1 = 91010001;
 const AV = (n) => `https://images1.vinted.net/t/av-${n}/f800/profil.jpeg?s=banc`;
-const NUMEROS = { [String(ITEM1)]: { numero: '124', min: '50', buyPrice: '40' } };
+const NUMEROS = { [String(ITEM1)]: { numero: '124', min: '80', buyPrice: '40' } };
 let M;
 
 function semer() {
@@ -233,12 +233,12 @@ async function ouvrirFil(pg, conv) {
           // Autre prix sous le plancher (mini 50 €) : bloqué, puis forcé + confirmé.
           await pg.click('[data-agir-autre-prix]').catch(() => {});
           await attendre(400);
-          await pg.fill('[data-agir-contre-saisi]', '45').catch(() => {});
+          await pg.fill('[data-agir-contre-saisi]', '75').catch(() => {});
           await attendre(400);
           const c0 = await pg.evaluate(() => { const b = document.querySelector('[data-agir-contre-envoyer]'); const z = document.querySelector('[data-agir-contre-autre]'); return { code: z && z.getAttribute('data-agir-contre-autre'), bloque: b && b.getAttribute('aria-disabled'), forcer: !!document.querySelector('[data-agir-contre-forcer]') }; });
           await pg.click('[data-agir-contre-envoyer]').catch(() => {});
           await attendre(800);
-          dit(c0.code === 'sousPlancher' && c0.bloque === 'true' && c0.forcer && !commandes().some((c) => c.geste === 'contreOffre') && !(await pg.$('[data-agir-contre-confirmer]')), `${nom} : 45 € sous le plancher (50 €) ⇒ bouton éteint, rien ne part sans la case`, JSON.stringify(c0));
+          dit(c0.code === 'sousPlancher' && c0.bloque === 'true' && c0.forcer && !commandes().some((c) => c.geste === 'contreOffre') && !(await pg.$('[data-agir-contre-confirmer]')), `${nom} : 75 € sous le plancher (80 €, au-dessus de l'offre de 70 €) ⇒ bouton éteint, rien ne part sans la case`, JSON.stringify(c0));
           await photo(pg, `autre-prix-sous-plancher-${nom}`);
           await pg.check('[data-agir-contre-forcer]').catch(() => {});
           await pg.click('[data-agir-contre-envoyer]').catch(() => {});
@@ -247,7 +247,7 @@ async function ouvrirFil(pg, conv) {
           await pg.click('[data-agir-contre-confirmer]').catch(() => {});
           await attendre(4500);
           const co = commandes().filter((c) => c.geste === 'contreOffre');
-          dit(co.length === 1 && co[0].compte === A && Number(co[0].args.prix) === 45 && String(co[0].args.tx) === TX1, `${nom} : confirmée ⇒ UNE contre-offre de 45 € au nom de boutique_a`, JSON.stringify(co));
+          dit(co.length === 1 && co[0].compte === A && Number(co[0].args.prix) === 75 && String(co[0].args.tx) === TX1, `${nom} : confirmée ⇒ UNE contre-offre de 75 € au nom de boutique_a`, JSON.stringify(co));
           // Envoyer un message.
           await pg.fill('[data-agir-composer="vinted"] textarea', 'Elle taille normalement, prenez votre pointure.').catch(() => {});
           await pg.click('[data-agir-composer="vinted"] [data-agir-envoyer]').catch(() => {});
