@@ -486,7 +486,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **28 nov. · Leboncoin, Vestiaire, eBay soignés « comme la connexion eBay » (sites-soignes)** : `src/sites/SiteSoigne.jsx` (`TeteSite`, `EtatSite`) ; Comptes eBay reliés en liste native ; états vides des trois sites. `2026-11-28-sites-soignes.md`. Geste : aucun.
+- **28 nov. · eBay, Leboncoin, Vestiaire soignés (sites-soignes)** : `src/sites/SiteSoigne.jsx` (tête et états « comme la connexion eBay ») ; Comptes eBay en liste native. `2026-11-28-sites-soignes.md`. Geste : aucun.
 - **28 nov. · Vitesse (vitesse-fluide)** : lettre tapée peinte d'abord (`src/composants/saisieDifferee.jsx`), molette sans relecture du style, Annonces garde ses nombres, formateurs Intl gardés ; banc `iphone-rapide` `LARGEUR=1512`, `ETAPES=gestes`. `2026-11-28-vitesse-fluide.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
