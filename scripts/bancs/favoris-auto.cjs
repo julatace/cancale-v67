@@ -294,6 +294,16 @@ const lireFenetre = (pg) => pg.evaluate(() => {
       const m = await lireFenetre(pg);
       dit(m && m.etape === 'attente' && /Ensuite dans/.test(m.etapeTxt) && m.envoyes === '2', 'F2 entre deux favoris : « Ensuite dans 1 min … », 2 envoyés', JSON.stringify(m && [m.etape, m.etapeTxt, m.envoyes]));
     });
+    // 5.455.4 (Julien, 27 nov. 18:42 : « le chronomètre ne marche pas ») : le compte à rebours AVANCE, et continue après une
+    //    mise à jour SUR PLACE de la fenêtre (nouvel état posé par le fond, même vue).
+    await fenetre(b, 'F2b-chrono', 1512, false, ETAT({ enCours: false, etapeFav: '', prochain: Date.now() + 45000, lignes: LIGNES.map((x) => (x.etat === 'cours' ? Object.assign({}, x, { etat: 'envoye' }) : x)) }), async (pg) => {
+      const sec = (t) => { const m = /(\d+)\s*s\b/.exec(String(t || '')); return m ? Number(m[1]) : NaN; };
+      const a = sec((await lireFenetre(pg)).etapeTxt); await pg.waitForTimeout(2600);
+      const b2 = sec((await lireFenetre(pg)).etapeTxt);
+      await pg.evaluate(() => { const x = Object.assign({}, window.__store.vrmActionEnCours, { prochain: Date.now() + 30000, fait: 2, maj: Date.now() }); window.__poser(x); });
+      await pg.waitForTimeout(800); const c = sec((await lireFenetre(pg)).etapeTxt); await pg.waitForTimeout(2600); const d = sec((await lireFenetre(pg)).etapeTxt);
+      dit(a > 0 && b2 > 0 && b2 <= a - 2 && c > 0 && d <= c - 2, `F2b le compte à rebours avance (${a} → ${b2} s) et continue après une mise à jour sur place (${c} → ${d} s)`, JSON.stringify([a, b2, c, d]));
+    });
     await fenetre(b, 'F3-saute-pas', 1512, false, ETAT({ etapeFav: 'envoi', lignes: [Object.assign({}, LIGNES[0]), Object.assign({}, LIGNES[1], { etat: 'saute', r: 'favori_trop_ancien' }), Object.assign({}, LIGNES[2], { etat: 'pas', r: 'element_introuvable' }), Object.assign({}, LIGNES[3], { etat: 'cours' }), LIGNES[4]] }), async (pg) => {
       const m = await lireFenetre(pg);
       dit(m && m.lignes[1].r === 'Pas trouvé dans tes notifications (liste lue jusqu’au bout)' && /Page Vinted pas reconnue/.test(m.lignes[2].r) && m.lignes[2].chip === 'Pas envoyé' && /Envoi du message/.test(m.etapeTxt), 'F3 sauté « Pas trouvé dans tes notifications (liste lue jusqu’au bout) » (5.440.2 : plus jamais « trop ancien »), pas envoyé « Page Vinted pas reconnue — rien n’est parti », étape « Envoi du message… »', JSON.stringify(m && m.lignes));

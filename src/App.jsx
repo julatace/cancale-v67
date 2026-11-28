@@ -1809,7 +1809,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.455.3';
+const EXT_ATTENDUE = '5.455.5';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -31045,7 +31045,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ cle: 'vinted:' + tx, site: 'vinted', id: tx, titre: o.title || '(sans titre)', t: ts(o.date),
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
-          compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || photoVentePubliee(tx) || null,   // (25 nov.) sinon la photo de SES sources, publiée par Ventes
+          compte: labels[uid] || (o._acc && o._acc.login) || '', compteCle: uid ? 'vinted:' + uid : '', num: '', photo: photosVenteVintedCandidates(o)[0] || photoVentePubliee(tx) || null,   // (25 nov.) sinon la photo de SES sources, publiée par Ventes
           // (21 nov.) « Marque · T42 » sur la rangée (affichage seulement : jamais une identité).
           marque: (o.brand_title || o.brand || extractBrand(String(o.title || '')) || ''), taille: typeof o.size_title === 'string' ? o.size_title : '',
           tr: bordTParTx[tx] ? transporteurDeVente({ bord: bordTParTx[tx] }) : null });
@@ -31061,7 +31061,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         if (!id) continue;
         out.push({ hp: horsPlanAutre('leboncoin', v) ? compteDeVente('leboncoin', v) : null, cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
-          etat: lbcAnnulee(v) ? 'Annulée' : lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null,
+          etat: lbcAnnulee(v) ? 'Annulée' : lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', compteCle: identiteCompteVente('leboncoin', v) ? 'leboncoin:' + identiteCompteVente('leboncoin', v) : '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null,
           annonce: v.itemId != null ? String(v.itemId) : null, marque: extractBrand(String(v.title || '')) || '',
           tr: transporteurDuColis({ declare: v.deliveryMethod || v.deliveryLabel || '' }) });
       }
@@ -31073,7 +31073,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
         out.push({ hp: horsPlanAutre('ebay', c) ? compteDeVente('ebay', c) : null, cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
-          etat: commandeEbayEngagee(c) ? 'Payée' : (etatCommandeEbay(c).label || 'Annulée ou remboursée'), compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null,
+          etat: commandeEbayEngagee(c) ? 'Payée' : (etatCommandeEbay(c).label || 'Annulée ou remboursée'), compte: compteVenteEbay(c, null) || '', compteCle: identiteCompteVente('ebay', c) ? 'ebay:' + identiteCompteVente('ebay', c) : '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null,
           // (21 nov.) L'achat d'une vente eBay (sa commande, l'annonce de sa ligne) : « Relier » et « Prix d'achat » sur la rangée.
           ordre: c, annonce: li.legacyItemId != null ? String(li.legacyItemId) : null, marque: extractBrand(String(li.title || '')) || '' });
       }
@@ -31129,7 +31129,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   const effC = ordiT || comptesC.length < 2 ? '' : choixCompteEffectif(choixC, comptesC);
   const lignes = React.useMemo(() => filtrerCompte(lignesP, effC), [lignesP, effC]);
   const filtreCompteTel = !ordiT && comptesC.length > 1 ? { cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: effC || 'tous', onChange: (v) => choisirC(v === 'tous' ? '' : v),
-    options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...comptesC.map((x) => ({ cle: x, libelle: x, n: lignesP.filter((l) => l.compte === x).length }))] } : null;
+    options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...comptesC.map((x) => ({ cle: x.cle, libelle: x.libelle, n: filtrerCompte(lignesP, x.cle).length }))] } : null;
   // Au téléphone : la liste d'abord (sans les annulées), puis le groupe « Annulées » (les annulations, pas les retours :
   // un retour a déjà son groupe « Retours et litiges »).
   const lignesTel = React.useMemo(() => lignes.filter((l) => !(l.annul && l.annul.sorte === 'annulee')), [lignes]);
@@ -31234,7 +31234,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const filtresT = [
       ...(filtreSiteT ? [filtreSiteT] : []),
       ...(cptsT.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
-        options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cptsT.map((x) => ({ cle: x, libelle: x }))] }] : []),
+        options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cptsT.map((x) => ({ cle: x.cle, libelle: x.libelle }))] }] : []),
       { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreT.periode, onChange: (v) => setFiltreT((f) => ({ ...f, periode: v })),
         options: [{ cle: 'tout', libelle: tr('tableau.filtre.toutePeriode') }, { cle: 'j7', libelle: tr('tableau.filtre.jours', { n: 7 }) }, { cle: 'j30', libelle: tr('tableau.filtre.jours', { n: 30 }) }] },
     ];
@@ -31243,7 +31243,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
         {repliJamais ? <div style={{ padding: '0 16px' }}>{repliJamais}</div> : null}
         <VentesTableau achatDe={achatToutes} netDe={(l) => (NET_VENTES.de ? NET_VENTES.de(l) : null)} euros={(c) => montant(c / 100)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
-          compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
+          compte={filtreT.compte ? ((cptsT.find((x) => x.cle === filtreT.compte) || {}).libelle || '') : ''} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
           imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}
           onImprimer={(ls) => { try { window.dispatchEvent(new CustomEvent('vrm:imprimer-choix', { detail: { tx: ls.filter((l) => l.site === 'vinted').map((l) => String(l.id)) } })); } catch (_) {} }}
