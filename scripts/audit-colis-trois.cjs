@@ -114,7 +114,9 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // jamais dans le PDF — la règle vit dans src/lotSelection.js (audit-selection-bordereaux).
   const selSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'lotSelection.js'), 'utf8');
   const blocEb = selSrc.slice(selSrc.indexOf("x.__autre === 'eb'"), selSrc.indexOf("x.__autre === 'eb'") + 600);
-  dit(/__autre === 'vc'/.test(lotBloc + selSrc) && /__autre === 'lbc'/.test(lotBloc + selSrc) && /cochable: false/.test(blocEb), '2e App : Vinted, Vestiaire, Leboncoin dans le lot ; eBay jamais (étiquette dans eBay, §2.8)');
+  // (28 nov., ebay-livraison) eBay n'entre dans le lot qu'avec l'étiquette PRÉPAYÉE PAR L'ACHETEUR reçue par e-mail
+  // (`x.etiquette`) ; sans elle, jamais (elle se prend dans eBay, §2.8). Exécuté par audit-ebay-livraison B10.
+  dit(/__autre === 'vc'/.test(lotBloc + selSrc) && /__autre === 'lbc'/.test(lotBloc + selSrc) && /const pdf = !!x\.etiquette/.test(blocEb) && /cochable: pdf/.test(blocEb), '2e App : Vinted, Vestiaire, Leboncoin dans le lot ; eBay seulement avec l\'étiquette reçue (§2.8)');
   // (14 nov., impression-simple) la fusion vit dans `composerBordereaux` (préparée d'avance) ; la garde, dans l'appelant.
   const merge = app.slice(app.indexOf('const composerBordereaux = async'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/confirmerNumerosAVerifier\(/.test(merge) && /poserBordereau\(PL, out, src/.test(merge), '2f App : la fusion demande les N° « à vérifier » et tamponne chaque page (`poserBordereau` → `tamponnerBordereau`)');

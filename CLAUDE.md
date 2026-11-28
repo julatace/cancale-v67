@@ -486,7 +486,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **28 nov. · Automatismes eBay (ebay-automatismes)** : baisse par règle, offre aux observateurs, contre-offre par paliers, remise en vente, prix eBay +x %, modification en masse, « Vendre un similaire » — API officielle, cron GitHub horaire (`?moment=ebayauto`), plancher publié par l'app (`vrm_planchers_ebay`), éteints par défaut. `2026-11-28-ebay-automatismes.md`. Geste : aucun.
-- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
+- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

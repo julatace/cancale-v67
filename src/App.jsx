@@ -9890,7 +9890,18 @@ const montantRecuEbay = (o) => {
   if (d.currency !== 'EUR') return { eur: null, raison: 'devise ' + (d.currency || 'inconnue') };
   if (!f) return { eur: null, raison: 'frais eBay inconnus' };
   if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
-  return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
+  // (28 nov., ebay-livraison — §2.8) LE PORT N'ENTRE NULLE PART. En livraison gérée par eBay, si le dû au vendeur PORTE le port
+  // payé par l'acheteur (il est plus proche de « articles + port » que des articles seuls — `pricingSummary.priceSubtotal`,
+  // `deliveryCost` − `deliveryDiscount`, en euros), ce port est retiré : il paie l'étiquette, il n'est pas une recette. Les
+  // montants de la MÊME commande sont comparés, rien n'est deviné ; illisible ⇒ rien n'est retiré (le dû tel qu'avant).
+  const ps = o && o.pricingSummary, sous = lu(ps && ps.priceSubtotal), port = lu(ps && ps.deliveryCost), remise = lu(ps && ps.deliveryDiscount);
+  const dC = Math.round(Number(d.value) * 100);
+  let portC = 0;
+  if (sous && port && sous.currency === 'EUR' && port.currency === 'EUR') {
+    const pC = Math.max(0, Math.round(Number(port.value) * 100) - (remise && remise.currency === 'EUR' ? Math.abs(Math.round(Number(remise.value) * 100)) : 0)), sC = Math.round(Number(sous.value) * 100);
+    if (pC > 0 && Math.abs(dC - (sC + pC)) < Math.abs(dC - sC)) portC = pC;
+  }
+  return { eur: (dC - portC - Math.round(Number(f.value) * 100)) / 100, raison: '', ...(portC ? { portRetire: portC / 100 } : {}) };
 };
 // ⟦→ ecrans/Comptabilite.jsx #159⟧
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
