@@ -32,6 +32,9 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (27 nov., tout-va-bien) src/SondesToutVaBien.jsx, src/toutVaBienSondes.js : une rangée par morceau.
   { id: 'tout-va-bien-morceaux', date: '2026-11-27', titre: 'Tout va bien ? : chaque morceau vérifié', phrase: 'Extension, sites, e-mails, capture, favoris, serveur : vert ou le geste.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (27 nov., paires-qui-dorment — choix de Julien) src/pairesDorment.js, src/natif/ecrans/PairesDorment.jsx
+  { id: 'paires-qui-dorment', date: '2026-11-27', titre: 'Paires qui dorment : l’argent immobilisé', phrase: 'Plus de 21 jours en ligne, par prix d’achat, un geste chacune.', tab: 'annonces', pour: 'tous', mode: 'tous',
+    titreArt: 'Articles qui dorment : l’argent immobilisé' },
   // (27 nov., ameliorations-27nov — Julien : « Vas-y fais tout ») src/ecrans/Comptabilite.jsx fusionLignesMemeSuivi,
   // src/aujourdhui/modele.js prixManquants, src/aujourdhui/LigneLectureAncienne.jsx, src/aDistance/LigneOrdinateur.jsx
   { id: 'retrait-contenu-code', date: '2026-11-27', titre: 'À retirer : la photo de l’achat', phrase: 'Relié par le code de retrait de sa commande.', tab: 'achats', pour: 'tous', mode: 'tous' },

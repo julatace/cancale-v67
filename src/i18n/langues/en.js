@@ -21,6 +21,7 @@ import ecran_journee_stats from './en/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_gains from './en/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './en/exportCompta.js';   // (27 nov.) export comptable et URSSAF
+import ecran_paires_dorment from './en/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './en/aDistance.js';
@@ -2479,4 +2480,5 @@ export default {
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
   ...ecran_export_compta,
+  ...ecran_paires_dorment,
 };
