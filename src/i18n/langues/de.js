@@ -25,6 +25,7 @@ import ecran_paires_dorment from './de/pairesDorment.js';   // (27 nov.) « Pair
 import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './de/aDistance.js';
+import ecran_serveur from './de/serveur.js';   // (28 nov., ext. 5.457) « Ordinateur serveur »
 import ecran_agir from './de/agir.js';   // (24 nov.) agir seulement si l'extension est connectée
 import ecran_messagesPro from './de/messagesPro.js';   // (24 nov.) la conversation refaite
 import ecran_connexions_ext from './de/connexions.js';   // (24 nov.) « Connexions de l'extension »   // (22 nov., ext. 5.436) « Mes comptes » à distance
@@ -2440,6 +2441,7 @@ export default {
   ...ecran_argentVisuel,
   ...ecran_observation,
   ...ecran_a_distance,
+  ...ecran_serveur,
   ...ecran_connexions_ext,
   ...ecran_agir,
   ...ecran_messagesPro,

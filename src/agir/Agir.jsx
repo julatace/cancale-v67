@@ -59,6 +59,8 @@ export function BandeauLectureSeule({ site, compte, conv, lien = '', gestes = ['
 
 export function BadgeLectureSeule({ site, compte }) {
   const e = useCompteAgir(site, compte);
+  // 5.457 : un compte servi par l'ordinateur allumé, prêt ⇒ « ordinateur allumé · compte X prêt » (neutre, aucune couleur).
+  if (e && !e.lecture && e.serveur) return <span className="vrm-agir-badge" data-agir-badge="serveur" data-agir-site={site} data-agir-compte={String(compte == null ? '' : compte)}>{tr(e.cle, e.vars)}</span>;
   if (!e || !e.lecture) return null;
   const raison = texteRaison(e.raison);
   return <span className="vrm-agir-badge" data-agir-badge="lecture" data-agir-site={site} data-agir-compte={String(compte == null ? '' : compte)} title={raison} aria-label={tr('agir.badge') + ' · ' + raison}>

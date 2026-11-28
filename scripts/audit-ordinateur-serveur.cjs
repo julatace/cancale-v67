@@ -326,6 +326,20 @@ const H = 3600000;
   { const f = profil({ uid: A, lignes: {} }); const r1 = await f.ctx.pousserCapte('vinted', A, 'messages', ['7001@2026-11-28T10:00:00.000Z']);
     dit(r1 && r1.etat === 'serveur', 'S14 veille allumée ⇒ le message n’est pas annoncé une seconde fois par « capte »', JSON.stringify(r1)); }
 
+  console.log('\nS15. La porte de l’app (`peutAgir`) : « ordinateur allumé · compte X prêt »');
+  { const PA = await import('file://' + path.join(RACINE, 'src', 'agir', 'peutAgir.js'));
+    const t = Date.now();
+    const ligne = (serveur) => AD.adistPresence({ id: 'presence_aaaaaaaaaaaaaaaa', atMs: t - 1000, ver: '5.457.0', appareil: { nav: 'chrome', systeme: 'mac' }, comptes: [{ site: 'vinted', id: A, nom: 'shop_a' }, { site: 'vinted', id: B, nom: 'shop_b' }], serveur }, t);
+    const faits = (serveur) => ({ maintenant: t, capacites: { messagerie: '5.135.0', adistance: '5.436.0' }, presences: [ligne(serveur)], ext: {}, noms: { vinted: { [A]: 'shop_a', [B]: 'shop_b' } } });
+    const r1 = PA.peutAgir(faits({ on: true, uid: A, code: 'pret' }), { site: 'vinted', compte: A, geste: 'repondre' });
+    dit(r1.ok && r1.serveur === true && r1.cle === 'agir.serveur.pret' && r1.vars && r1.vars.nom === 'shop_a', 'S15a profil prêt pour CE compte ⇒ « ordinateur allumé · compte shop_a prêt »', JSON.stringify(r1));
+    const r2 = PA.peutAgir(faits({ on: true, uid: A, code: 'pret' }), { site: 'vinted', compte: B, geste: 'repondre' });
+    dit(!r2.serveur, 'S15b un AUTRE compte (pas celui de la veille) ⇒ jamais dit « prêt »', JSON.stringify(r2));
+    const r3 = PA.peutAgir(faits({ on: true, uid: A, code: 'captcha' }), { site: 'vinted', compte: A, geste: 'repondre' });
+    dit(!r3.serveur, 'S15c en vérification ⇒ pas « prêt »', JSON.stringify(r3));
+    const e = PA.etatCompteAgir(faits({ on: true, uid: A, code: 'pret' }), 'vinted', A);
+    dit(e && e.lecture === false && e.serveur === true && e.cle === 'agir.serveur.pret', 'S15d le badge par compte le porte (`etatCompteAgir`)', JSON.stringify(e)); }
+
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.log('❌ exception : ' + (e && e.stack || e)); process.exit(1); });

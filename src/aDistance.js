@@ -198,7 +198,10 @@ function adistPresence(row, maintenant) {
   const retenues = (Array.isArray(row.retenues) ? row.retenues : []).filter((x) => x && ADIST_RE_ID.test(String(x.id || ''))).slice(0, 20).map((x) => ({ id: String(x.id), code: String(x.code || '').slice(0, 30) }));
   return { id: String(row.id).slice(9), atMs, allume: atMs > 0 && maintenant - atMs < ADIST_ALLUME_MS && atMs <= maintenant + 120000, ver: String(row.ver || ''),
     nav: String(app.nav || ''), sys: String(app.systeme || ''), comptes, retenues, enCours: ADIST_RE_ID.test(String(row.enCours || '')) ? String(row.enCours) : '',
-    rt: String(row.rt || '') };
+    rt: String(row.rt || ''),
+    // 5.457 (« Mode ordinateur allumé ») : la veille de CE profil — allumée, sur quel compte, prête ou arrêtée (et pourquoi).
+    serveur: row.serveur && typeof row.serveur === 'object' && row.serveur.on === true
+      ? { on: true, uid: /^\d{1,20}$/.test(String(row.serveur.uid || '')) ? String(row.serveur.uid) : '', code: String(row.serveur.code || '').slice(0, 20), deconnecte: row.serveur.deconnecte === true } : null };
 }
 // </a-distance-regle>
 
@@ -240,7 +243,7 @@ export function vueCommandeDistance(l, maintenant = Date.now()) {
 }
 export const SELECT_DISTANCE = 'id,etat:meta->>etat,geste:meta->>geste,site:meta->>site,compte:meta->>compte,num:meta->>num,avant:meta->>avant,apres:meta->>apres,'
   + 'demandeLe:meta->>demandeLe,expire:meta->>expire,prisLe:meta->>prisLe,finiLe:meta->>finiLe,code:meta->>code,raison:meta->>raison,appareil:meta->>appareil,attend:meta->>attend,pdf:meta->>pdf,cle:meta->>cle';
-export const SELECT_PRESENCE = 'id,atMs:meta->>atMs,ver:meta->>ver,enCours:meta->>enCours,rt:meta->>rt,appareil:data->appareil,comptes:data->comptes,retenues:data->retenues';
+export const SELECT_PRESENCE = 'id,atMs:meta->>atMs,ver:meta->>ver,enCours:meta->>enCours,rt:meta->>rt,appareil:data->appareil,comptes:data->comptes,retenues:data->retenues,serveur:data->serveur';
 
 // Les quatre groupes de la file (« En attente / En cours / Fait / Refusé »), du plus récent au plus ancien.
 export function groupesFile(vues, maintenant = Date.now()) {
