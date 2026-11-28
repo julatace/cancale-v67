@@ -17,9 +17,10 @@
     width: 40px; height: 40px; border-radius: 11px; background: var(--ss-teinte, var(--n-carte-2)); }
   .ss-tuile[data-ss-taille="44"] { width: 48px; height: 48px; border-radius: 13px; }
   .ss-tuile .n-logo-site { vertical-align: 0; }
-  .ss-tuile .n-logo-site[data-site="ebay"] { width: 30px; height: 18px; }
-  .ss-tuile[data-ss-taille="44"] .n-logo-site[data-site="ebay"] { width: 34px; height: 20px; }
-  .ss-tuile .n-logo-site[data-site="vestiaire"] { width: 24px; height: 18px; }
+  .ss-tuile .n-logo-site[data-site="ebay"] { width: 34px; height: 34px; }
+  .ss-tuile[data-ss-taille="44"] .n-logo-site[data-site="ebay"] { width: 40px; height: 40px; }
+  .ss-tuile .n-logo-site:not([data-site="ebay"]) { width: 22px; height: 22px; }
+  .ss-tuile[data-ss-taille="44"] .n-logo-site:not([data-site="ebay"]) { width: 26px; height: 26px; }
 
   /* ── La tête d'une page de site ── */
   .ss-tete { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 0 4px; padding: 4px 0;
@@ -49,9 +50,10 @@
   @media (max-width: 599px) { .ss-etat { padding: 16px; } .ss-etat .n-bouton-bloc { width: 100%; } }
 
   /* ── eBay : la connexion reliée, en liste groupée (Réglages) ── */
+  .ss-ebay-cx { display: grid; gap: 16px; padding-top: 8px; }
   .ss-ebay-relie { display: grid; gap: 20px; }
   .ss-ebay-relie .n-groupe { margin: 0; }
-  .ss-jeton { display: inline-flex; align-items: center; gap: 6px; }
+  .ss-jeton { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
   .ss-compte-fin { display: inline-flex; align-items: center; gap: 4px; }
   .ss-etiquette { display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 999px;
     font: var(--n-t-legende-fort); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }

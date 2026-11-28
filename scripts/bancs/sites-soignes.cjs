@@ -52,16 +52,16 @@ const PAGES = [
   { cle: 'ebay.annonces', site: 'ebay', tache: 'annonces', url: '?tab=plat_ebay&section=annonces' },
   { cle: 'ebay.trafic', site: 'ebay', tache: 'trafic', url: '?tab=plat_ebay&section=trafic' , tete: true },
   { cle: 'ebay.promo', site: 'ebay', tache: 'promo', url: '?tab=plat_ebay&section=promo' , tete: true },
-  { cle: 'ebay.messages', site: 'ebay', tache: 'messages', url: '?tab=plat_ebay&section=messages' , tete: true },
+  { cle: 'ebay.messages', site: 'ebay', tache: 'messages', url: '?tab=messages&site=ebay' },
   { cle: 'ebay.recherches', site: 'ebay', tache: 'recherches', url: '?tab=journee', evt: 'vrm:ebay-recherches' },
-  { cle: 'lbc.annonces', site: 'leboncoin', tache: 'annonces', url: '?tab=plat_leboncoin&section=annonces' },
-  { cle: 'lbc.ventes', site: 'leboncoin', tache: 'ventes', url: '?tab=plat_leboncoin&section=ventes' },
-  { cle: 'lbc.messages', site: 'leboncoin', tache: 'messages', url: '?tab=plat_leboncoin&section=messages' , tete: true },
-  { cle: 'lbc.achats', site: 'leboncoin', tache: 'achats', url: '?tab=plat_leboncoin&section=achats' },
-  { cle: 'vc.annonces', site: 'vestiaire', tache: 'annonces', url: '?tab=plat_vestiaire&section=annonces' },
-  { cle: 'vc.ventes', site: 'vestiaire', tache: 'ventes', url: '?tab=plat_vestiaire&section=ventes' },
-  { cle: 'vc.messages', site: 'vestiaire', tache: 'messages', url: '?tab=plat_vestiaire&section=messages' , tete: true },
-  { cle: 'vc.achats', site: 'vestiaire', tache: 'achats', url: '?tab=plat_vestiaire&section=achats' },
+  { cle: 'lbc.annonces', site: 'leboncoin', tache: 'annonces', url: '?tab=annonces&site=leboncoin' },
+  { cle: 'lbc.ventes', site: 'leboncoin', tache: 'ventes', url: '?tab=ventes&site=leboncoin' },
+  { cle: 'lbc.messages', site: 'leboncoin', tache: 'messages', url: '?tab=messages&site=leboncoin' },
+  { cle: 'lbc.achats', site: 'leboncoin', tache: 'achats', url: '?tab=achats&site=leboncoin' },
+  { cle: 'vc.annonces', site: 'vestiaire', tache: 'annonces', url: '?tab=annonces&site=vestiaire' },
+  { cle: 'vc.ventes', site: 'vestiaire', tache: 'ventes', url: '?tab=ventes&site=vestiaire' },
+  { cle: 'vc.messages', site: 'vestiaire', tache: 'messages', url: '?tab=messages&site=vestiaire' },
+  { cle: 'vc.achats', site: 'vestiaire', tache: 'achats', url: '?tab=achats&site=vestiaire' },
 ];
 const VOULUES = liste('PAGES', PAGES.map((p) => p.cle).join(','));
 const CHOISIES = PAGES.filter((p) => VOULUES.includes(p.cle));
@@ -194,7 +194,9 @@ if (require.main === module) (async () => {
   const rate = (p, fen, th, base, e) => { console.log(`❌ ${p.cle} ${fen} ${th} ${base} : ${String(e.message || e).slice(0, 200)}`); res.push({ page: p.cle, site: p.site, tache: p.tache, fen, theme: th, base, erreurs: [String(e.message || e).slice(0, 200)], pleins: 0, cibles: [], contraste: [], coupes: [], f: { tete: [], groupes: 0, rangees: 0, casses: [] } }); };
   try {
     for (const base of BASES) for (const fen of FENETRES) for (const th of THEMES) {
-      const communes = CHOISIES.filter((p) => !p.ebay), propres = CHOISIES.filter((p) => p.ebay);
+      // Chaque page dans SON contexte (par défaut) : Messages et Ventes retiennent le site choisi, un lien de l'app ne le change
+      // pas toujours — une page ouverte après une autre aurait pu montrer l'autre site. `RAPIDE=1` : un contexte, des liens.
+      const communes = process.env.RAPIDE ? CHOISIES.filter((p) => !p.ebay) : [], propres = process.env.RAPIDE ? CHOISIES.filter((p) => p.ebay) : CHOISIES;
       let o = null;
       try {
         for (let i = 0; i < communes.length; i++) {
@@ -208,7 +210,7 @@ if (require.main === module) (async () => {
       } finally { if (o) await o.ctx.close().catch(() => {}); }
       for (const p of propres) {
         let x = null;
-        try { x = await ouvrirApp(nav, fen, th === 'sombre', base, p.ebay, p.url); await allerPage(x, p, true); await mesurerIci(x, p, fen, th, base); }
+        try { x = await ouvrirApp(nav, fen, th === 'sombre', base, base === 'vide' ? { nonRelie: true } : (p.ebay || {}), p.url); await allerPage(x, p, true); await mesurerIci(x, p, fen, th, base); }
         catch (e) { rate(p, fen, th, base, e); }
         if (x) await x.ctx.close().catch(() => {});
       }

@@ -1928,9 +1928,8 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 {liste.map((c) => {
                   const ref = c.principal ? 'principal' : c.cle; const etat = deconnexion[ref];
                   return <Natif.Rangee key={ref} titre={nomCompteEbay(c)} attrs={{ 'data-ebay-compte-ligne': ref }}
-                    sousTitre={<span className="ss-jeton">{etiquettes(c)}</span>}
+                    sousTitre={<span className="ss-jeton">{etiquettes(c)}<EtatJetonEbay C={C} compte={c} busy={busy} onReconnecter={() => connecter(!c.principal)}/></span>} sousLignes={2}
                     note={etat && etat !== '…' ? etat : ''}
-                    pied={<EtatJetonEbay C={C} compte={c} busy={busy} onReconnecter={() => connecter(!c.principal)}/>}
                     fin={plusieurs ? <BoutonNatif variante="texte" taille="compact" indisponible={etat === '…'} onClick={() => deconnecter(c)} attrs={{ 'data-ebay-deconnecter': ref }}>{etat === '…' ? 'Déconnexion…' : 'Déconnecter'}</BoutonNatif> : null}/>;
                 })}
                 <Natif.Rangee titre={busy ? 'Ouverture d\'eBay…' : tr('ss.cx.autre')} sousTitre={tr('ss.cx.autre.sous')} sousLignes={2} fin="chevron"
