@@ -3755,10 +3755,6 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
-  // (28 nov., lot ebay-automatismes) Les automatismes eBay : LE PLANCHER de chaque N° (prix mini, achat) et les paires en
-  // vente, PUBLIÉS par l'app pour le serveur (src/ebay/automatismes.js `planchersAPublier`, §11) ; la majoration eBay par
-  // compte (« +x % sur eBay », SON choix) ; et « un automatisme est allumé » (alors seulement l'app publie le plancher).
-  'vrm_planchers_ebay','vrm_ebay_majoration','vrm_ebay_auto_actif',
   // (28 nov., lot sneakers-cote) La référence fabricant, la pointure, la marque et les étiquettes de SES N° (src/sneakers/stockage.js) — SON geste seulement.
   'vrm_sneakers',
   // (22 nov., choix n° 35) « Ce n'est pas un doublon » (Annonces · Photo en double) : { [ids du groupe]: at } — SON toucher, sur tous ses appareils (src/photoEnDouble.js).
@@ -4138,6 +4134,11 @@ const SYNC_KEYS = [
   // OWNED par l'app, synchronisé (il range sur l'ordi, cherche sur le téléphone),
   // jamais écrit par l'extension. Le NUMÉRO reste l'identité (§5), jamais le titre.
   'vrm_meubles','vrm_slots',
+  // (28 nov., main-vert) Les clés neuves se rangent EN FIN de liste (l'ordre ne compte pas).
+  // (28 nov., lot ebay-automatismes) Les automatismes eBay : LE PLANCHER de chaque N° (prix mini, achat) et les paires en
+  // vente, PUBLIÉS par l'app pour le serveur (src/ebay/automatismes.js `planchersAPublier`, §11) ; la majoration eBay par
+  // compte (« +x % sur eBay », SON choix) ; et « un automatisme est allumé » (alors seulement l'app publie le plancher).
+  'vrm_planchers_ebay','vrm_ebay_majoration','vrm_ebay_auto_actif',
 ];
 // Réponses rapides par défaut aux messages Vinted (copiables en 1 clic, éditables).
 const DEFAULT_QUICK_REPLIES = [
