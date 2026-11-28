@@ -137,9 +137,6 @@ async function scenarioA(b, port, { tel, sombre, nom }) {
   const grp = await pg.evaluate(() => [...document.querySelectorAll('[data-sm-piece-titre]')].map((e) => e.textContent));
   dit(grp.length === 2 && grp.includes('Cave'), `${t} : le Stock se range par pièce`, grp.join(' | '));
   await shot(pg, nom + '-A-stock');
-  if (process.env.SONDE) console.log(JSON.stringify(await pg.evaluate(() => { const e = document.querySelector('.sm-assistant'); if (!e) return 'absent'; const out = [];
-    for (const sh of document.styleSheets) { let rs; try { rs = sh.cssRules; } catch (_) { continue; } const tour = (l) => { for (const r of l) { if (r.cssRules && !r.selectorText) tour(r.cssRules); else if (r.selectorText) { try { if (e.matches(r.selectorText) && /display/.test(r.style.cssText)) out.push(r.selectorText.slice(0, 90) + ' {' + r.style.getPropertyValue('display') + '|' + r.style.getPropertyPriority('display') + '|' + (r.parentRule && r.parentRule.constructor.name)); } catch (_) {} } } }; tour(rs); }
-    const c = getComputedStyle(e); return [out, c.display, c.flexDirection, c.flexWrap, c.textAlign, c.justifyContent, c.alignItems, c.borderRadius]; }), null, 1));
   dit(!r.errs.length, `${t} : Q — aucune erreur de page`, r.errs.slice(0, 2).join(' | '));
   await r.ctx.close();
 }
