@@ -141,7 +141,12 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                     data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-couvert={x.couvert === false ? '0' : '1'} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
                     <span className="n-arg-m6-nom">{x.long.replace(/\s+\d{4}$/, '')}</span>
                     <span className="n-arg-m6-piste" aria-hidden="true"><span className={'n-arg-m6-plein' + (neuf6 ? ' n-agv-pousse' : '')} style={{ width: h + '%', ...(neuf6 ? { animationDelay: retard(i) + 'ms' } : {}) }}/></span>
-                    <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
+                    {/* (28 nov., compta-finitions, point 2 — §7 « le même nombre ne s'écrit jamais deux fois sur un écran ») Le mois en
+                        cours EST l'affiche juste au-dessus (la même valeur) : sa barre ne redit pas le montant à l'œil (le lecteur
+                        d'écran l'entend toujours) ; les mois d'avant gardent le leur. */}
+                    <span className="n-arg-m6-v" data-arg-montant="" data-arg-m6-affiche={x.courant && x.v != null && valeur != null ? '1' : undefined}>{x.courant && x.v != null && valeur != null
+                      ? <span className="n-lu-seul">{(x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}</span>
+                      : <>{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}</>}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
                   </li>
                 );
               })}

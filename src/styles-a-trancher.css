@@ -14,14 +14,14 @@
   --at-encre: var(--w-encre, #1D1D1F);
   --at-gris: var(--w-gris, #6E6E73);
   --at-ombre: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
-  --at-ambre-fond: rgba(255,149,0,.14);
-  --at-ambre: #A35200;
+  --at-ambre-fond: var(--n-ambre-fond);
+  --at-ambre: var(--n-ambre);
   --at-double-fond: color-mix(in srgb, var(--vrm-doublon) 12%, transparent);
   --at-double: var(--vrm-doublon);
 }
 :root[data-theme="dark"] {
-  --at-ambre-fond: rgba(255,159,10,.20);
-  --at-ambre: #FFB340;
+  --at-ambre-fond: var(--n-ambre-fond);
+  --at-ambre: var(--n-ambre);
   --at-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent);
 }
 

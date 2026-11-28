@@ -10,17 +10,17 @@
   --sr-encre: var(--w-encre, #1D1D1F);
   --sr-gris: var(--w-gris, #6E6E73);
   --sr-trait: rgba(60,60,67,.18);
-  --sr-faux: #A35200;
+  --sr-faux: var(--n-ambre);
 }
 :root[data-theme="dark"] {
   --sr-tuile: rgba(118,118,128,.24);
   --sr-encre: #F5F5F7;
   --sr-gris: #98989D;
   --sr-trait: rgba(235,235,245,.18);
-  --sr-faux: #FFB340;
+  --sr-faux: var(--n-ambre);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --sr-tuile: rgba(118,118,128,.24); --sr-encre: #F5F5F7; --sr-gris: #98989D; --sr-trait: rgba(235,235,245,.18); --sr-faux: #FFB340; }
+  :root:not([data-theme="light"]) { --sr-tuile: rgba(118,118,128,.24); --sr-encre: #F5F5F7; --sr-gris: #98989D; --sr-trait: rgba(235,235,245,.18); --sr-faux: var(--n-ambre); }
 }
 
 .vrm-sr-bloc { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 4px; min-width: 0; }

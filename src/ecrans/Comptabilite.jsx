@@ -27434,7 +27434,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button key={t.k} type="button" className="vrm-annbar-outil" data-outil-annonces={t.k} data-outil-n={t.n ? String(t.n) : undefined} onClick={t.on} title={t.desc}>
                       <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
                       <span className="vrm-annbar-outil-mot">{t.lab}</span>
-                      {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',color:'var(--vrm-warn, #B25000)',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
+                      {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',color:'var(--vrm-warn, var(--n-ambre))',fontWeight:600,fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
                     </button>
                   ))}
                 </div>
@@ -27704,7 +27704,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           {/* (15 nov., refonte-journee — « la liste d'abord ») Les N° à vérifier rejoignent « À faire » (la feuille, au téléphone) :
               ils poussaient la 1re annonce sous le premier écran. Le même bloc, les mêmes gestes. */}
           {aVerifierCarton.length > 0 && <VersAFaire>{(
-          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || '#B25000'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
+          <details data-numeros-a-verifier={aVerifierCarton.length} className="vrm-repli" open style={{ background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.warn || 'var(--n-ambre)'}`, borderRadius: 12, padding: '4px 12px 10px', marginBottom: 12 }}>
             <summary style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('annonces.numerosVerifier', { n: aVerifierCarton.length })}</summary>
             {/* (6 nov., v36-visuel) Une ligne ; le récit de la panne derrière le « ⓘ ». */}
             <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, margin: '2px 0 6px' }}>

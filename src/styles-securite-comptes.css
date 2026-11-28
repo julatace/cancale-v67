@@ -14,7 +14,7 @@
 .vrm-secu-rangee > .vrm-ios-rangee-zone { width: 100%; min-height: 44px; }
 .vrm-secu-initiale { font-size: 14px; font-weight: 600; }
 .vrm-secu .vrm-ios-detail { white-space: normal; overflow-wrap: anywhere; }
-:root:root body .vrm-app-shell .vrm-main .vrm-secu .vrm-ios-detail[data-ton="geste"] { color: var(--vrm-warn, #B25000) !important; }
+:root:root body .vrm-app-shell .vrm-main .vrm-secu .vrm-ios-detail[data-ton="geste"] { color: var(--vrm-warn, var(--n-ambre)) !important; }
 .vrm-secu-reglages { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 14px; }
 .vrm-secu-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; flex-wrap: wrap; }
 .vrm-secu-sous { justify-content: flex-start; min-height: 0; color: var(--vrm-ink, #1D1D1F); font-size: 15px; }
@@ -27,8 +27,8 @@
 .vrm-secu-jours { display: flex; flex-wrap: wrap; gap: 6px; }
 .vrm-secu-jour { min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: transparent; color: var(--vrm-ink, #1D1D1F); font: inherit; font-size: 14px; cursor: pointer; }
 .vrm-secu-jour[aria-pressed="true"] { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff); border-color: transparent; }
-.vrm-secu-conseil { color: var(--vrm-warn, #B25000); }
-.vrm-secu-conseil .vrm-secu-aide { color: var(--vrm-warn, #B25000); flex: 1 1 180px; }
+.vrm-secu-conseil { color: var(--vrm-warn, var(--n-ambre)); }
+.vrm-secu-conseil .vrm-secu-aide { color: var(--vrm-warn, var(--n-ambre)); flex: 1 1 180px; }
 .vrm-secu-table-cadre { overflow-x: auto; padding: 4px 8px 8px; }
 .vrm-secu-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .vrm-secu-table th, .vrm-secu-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--vrm-line, rgba(0,0,0,.08)); color: var(--vrm-ink, #1D1D1F); }

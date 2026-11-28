@@ -14,7 +14,7 @@
 .vrm-ac-couv { margin: 0; font-size: 13px; line-height: 1.35; color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-ac-carte { background: var(--d-surface-atelier, var(--d-carte, #fff)); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-douce, var(--d-ombre-carte, none)); padding: var(--d-e-4, 16px); margin: 0; min-width: 0; overflow: hidden; box-sizing: border-box; }
 .vrm-ac-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6E6E73); }
-.vrm-ac-note.is-ambre, .vrm-ac-hors .is-ambre, .vrm-ac-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, #B25000); }
+.vrm-ac-note.is-ambre, .vrm-ac-hors .is-ambre, .vrm-ac-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, var(--n-ambre)); }
 .vrm-ac-affiche { display: block; color: var(--d-encre, inherit); font-size: var(--d-t-affiche, clamp(44px, 12vw, 56px)); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-ac-aumoins { font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--d-gris, #6E6E73); }
 .vrm-ac-chiffre { display: block; font-size: clamp(20px, 6vw, 28px); font-weight: 700; letter-spacing: -.02em; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--d-encre, inherit); white-space: nowrap; }
@@ -36,7 +36,7 @@
 .vrm-ac-lignes { list-style: none; margin: 0; padding: 0; background: var(--d-carte, #fff); border-radius: var(--d-r-case, 12px); overflow: hidden; }
 .vrm-ac-ligne { display: flex; align-items: center; gap: 12px; padding: 8px 12px; min-height: 56px; contain-intrinsic-size: auto 56px; box-sizing: border-box; }
 .vrm-ac-ligne + .vrm-ac-ligne { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--d-filet, rgba(60,60,67,.18))); }
-.vrm-ac-ligne.is-refuse .vrm-ac-sous { color: var(--d-ambre, #B25000); }
+.vrm-ac-ligne.is-refuse .vrm-ac-sous { color: var(--d-ambre, var(--n-ambre)); }
 .vrm-ac-ligne:not(.is-ecrit) .vrm-ac-prix { color: var(--d-gris, #6E6E73); text-decoration: none; }
 .vrm-ac-num { flex: 0 0 auto; min-width: 52px; font-size: 13px; font-weight: 700; color: var(--d-encre, inherit); background: var(--d-remplir, rgba(118,118,128,.12)); border-radius: var(--d-r-num, 6px); padding: 3px 6px; text-align: center; font-variant-numeric: tabular-nums; }
 .vrm-ac-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

@@ -38,7 +38,7 @@
 .vrm-ar-rangs li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; box-sizing: border-box; }
 .vrm-ar-rangs li + li { box-shadow: inset 36px .5px 0 0 var(--d-carte, #fff), inset 0 .5px 0 0 var(--d-filet, rgba(60,60,67,.18)); }
 .vrm-ar-pastille { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--d-filet-fort, rgba(60,60,67,.29)); }
-.vrm-ar-pastille.is-geste { background: var(--d-ambre, #B25000); }
+.vrm-ar-pastille.is-geste { background: var(--d-ambre, var(--n-ambre)); }
 .vrm-ar-rang-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-ar-rang-texte b { font-size: var(--d-t-17, 17px); line-height: 22px; font-weight: 400; }
 .vrm-ar-rang-texte small { font-size: var(--d-t-13, 13px); line-height: 18px; color: var(--d-gris, #6e6e73); }

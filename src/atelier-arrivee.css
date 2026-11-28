@@ -31,7 +31,7 @@
   .vrm-arr-h { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
   .vrm-arr-corps { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .vrm-arr-doux { margin: 0; font-size: 13px; line-height: 1.4; color: var(--aa-gris); overflow-wrap: anywhere; }
-  .vrm-arr-refus { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #764300); overflow-wrap: anywhere; }
+  .vrm-arr-refus { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, var(--n-ambre)); overflow-wrap: anywhere; }
 
   /* 1 · le N° : la plaque en grand (la plaque gravée du système, .sb-plaque). */
   .vrm-arr-nums { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
@@ -41,7 +41,7 @@
   .vrm-arr-plaque-petite { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 9px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
   .vrm-arr-num-tape { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; }
   .vrm-arr-num-tape input { width: 120px; height: 52px; font: inherit; font-size: 26px; border-radius: 14px; border: 1px solid var(--aa-filet); padding: 0 12px; background: var(--vrm-surface, #fff); color: inherit; }
-  .vrm-arr-num-tape input[aria-invalid="true"] { border-color: var(--vrm-warn, #764300); }
+  .vrm-arr-num-tape input[aria-invalid="true"] { border-color: var(--vrm-warn, var(--n-ambre)); }
   .vrm-arr-lot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 600; flex-wrap: wrap; }
   .vrm-arr-pas { display: inline-flex; align-items: center; gap: 4px; }
   .vrm-arr-pas button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--aa-filet); background: var(--vrm-surface, #fff); color: inherit; font: inherit; font-size: 20px; cursor: pointer; }
@@ -92,7 +92,7 @@
   .vrm-arr-bilan li span { margin-left: auto; font-size: 13px; color: var(--aa-gris); }
   .vrm-arr-bilan i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--aa-filet); }
   .vrm-arr-bilan i.is-fait { background: var(--aa-encre); }
-  .vrm-arr-bilan i.is-afaire { background: var(--vrm-warn, #764300); }
+  .vrm-arr-bilan i.is-afaire { background: var(--vrm-warn, var(--n-ambre)); }
 
   .vrm-arr-pied { display: flex; flex-direction: column; gap: 8px; }
   .vrm-arr-pied-second { display: flex; gap: 8px; }

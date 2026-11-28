@@ -22,7 +22,7 @@
 .vrm-lvc-relier:focus-visible, .vrm-lvc-cherche:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 2px; }
 /* Les N° à barrer : une ligne par article, « N°a → N°b », jusqu'à « C'est écrit ». */
 .vrm-lvc-barrer { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 6px 12px; margin-bottom: 12px; }
-.vrm-lvc-barrer h3 { margin: 6px 0 4px; font-size: 15px; font-weight: 700; color: var(--fu-ambre-txt, #b25000); }
+.vrm-lvc-barrer h3 { margin: 6px 0 4px; font-size: 15px; font-weight: 700; color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-lvc-barrer-ligne { display: flex; align-items: center; gap: 10px; min-height: 52px; }
 .vrm-lvc-barrer-ligne + .vrm-lvc-barrer-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-lvc-barrer-ligne span { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

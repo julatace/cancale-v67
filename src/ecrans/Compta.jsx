@@ -3169,7 +3169,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.microEntreprise')}</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || 'var(--n-ambre)') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -3197,7 +3197,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
-  const ambre = C.warn || C.amber || '#B25000';
+  const ambre = C.warn || C.amber || 'var(--n-ambre)';
   // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
   const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('compta.suiviDeclarationsUrssaf')}</div>;
   if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.lectureDeclarations')}</div></div></Card>;
