@@ -95,10 +95,12 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     f2.ctx.attenteAvantFavori = async () => null;   // les gardes de discrétion ont leurs audits ; ici le tour lui-même
     const r2 = await f2.ctx.piloteFavorisTick(Date.now());
     dit(r2 && r2.etat === 'envoye' && actions(f2).join(',') === 'auto,suivant,terminer' && exec2.length === 1 && exec2[0].uid === UID && exec2[0].endpoint === '/vrm/favoris' && exec2[0].body.jeton === 'jeton-1', 'pilote : allumé ⇒ auto → suivant → envoi (compte de l’onglet) → terminer', JSON.stringify({ r2, a: actions(f2), exec2 }));
-    const r2b = await f2.ctx.piloteFavorisTick(Date.now() + 30000);
-    dit(r2b && r2b.etat === 'attente', 'pilote : le tour suivant attend 2 à 5 min (tiré au hasard)', JSON.stringify(r2b));
+    // 5.455.8 (Julien, 28 nov. : « un vrai agent autonome ») : après un envoi, l'agent redemande au serveur QUELQUES secondes
+    //    après (c'est le SERVEUR qui tire la pause de 20–60 s, `AUTO_ECART_MS`) ; sans rien à envoyer, il repasse dans 2 à 5 min.
     const st = f2.store.vrmPiloteFavoris; const ec = st && Number(st.prochain) - Number(st.dernier && st.dernier.at);
-    dit(ec >= 2 * MIN && ec <= 5 * MIN, 'pilote : l’écart est entre 2 et 5 min', ec);
+    const r2b = await f2.ctx.piloteFavorisTick(Number(st.dernier.at) + 1000);
+    dit(r2b && r2b.etat === 'attente', 'pilote : juste après un envoi, le tour suivant attend son heure', JSON.stringify(r2b));
+    dit(ec >= 1000 && ec <= 10000, 'pilote : après un envoi, le serveur est redemandé sous 10 s (il rend l’espacement 20–60 s)', ec);
     const e3 = { auto: AUTO_ON };
     const f3 = faireFond({ src: SRC, connecte: UID, lignes: { main: {} }, vrm: serveurFavoris(e3), store: { vrmCaptcha: { [UID]: { depuis: Date.now() - MIN, quoi: 'captcha' } } } });
     const exec3 = []; f3.ctx.executerPourAppCoeur = async (m) => { exec3.push(m); return { ok: true }; };
