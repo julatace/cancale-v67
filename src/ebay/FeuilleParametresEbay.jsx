@@ -13,7 +13,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { BoutonBase } from '../composants/Bouton.jsx';
-import { DUREES_ENCHERE, DELAIS_ENVOI, JOURS_RETOUR, SOUS_TITRE_MAX, DEFAUTS_USINE, coutsOptions, tauxSponsorLu } from './parametres.js';
+import { DUREES_ENCHERE, DELAIS_ENVOI, JOURS_RETOUR, SOUS_TITRE_MAX, DEFAUTS_USINE, COLIS_BORNES, coutsOptions, tauxSponsorLu } from './parametres.js';
 
 function Groupe({ id, C, children }) {
   return (
@@ -54,6 +54,16 @@ function Choix({ valeur, options, onChange, C, label, attr = {} }) {
       ))}
     </div>
   );
+}
+
+// (28 nov., ebay-livraison) Un champ du colis : la frappe reste locale, la valeur part au départ du champ si elle est dans
+// les bornes (`COLIS_BORNES`) — sinon le champ revient à la valeur gardée (jamais une valeur inventée).
+function ChampColis({ cle, valeur, onValider, style }) {
+  const [t, setT] = React.useState(String(valeur));
+  React.useEffect(() => { setT(String(valeur)); }, [valeur]);
+  const valider = () => { const n = Number(t); const [a, b] = COLIS_BORNES[cle]; if (Number.isInteger(n) && n >= a && n <= b) { if (n !== valeur) onValider(n); } else setT(String(valeur)); };
+  return <input aria-label={tr('ebay.param.colis.' + cle)} data-ebay-colis-champ={cle} inputMode="numeric" value={t}
+    onChange={(e) => setT(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} onBlur={valider} onKeyDown={(e) => { if (e.key === 'Enter') valider(); }} style={style}/>;
 }
 
 // `valeurs` : les réglages fusionnés (défauts + annonce). `compte` : la partie
@@ -107,6 +117,23 @@ export default function FeuilleParametresEbay({ Feuille, C, mode = 'annonce', va
         <Ligne cle="livraison" C={C} attr={{ 'data-ebay-livraison': 'geree' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{tr('ebay.param.livraison.geree')}</span>
         </Ligne>
+        {/* (28 nov., ebay-livraison) Le colis d'une boîte à chaussures, réglé une fois : eBay en tire le port de SA livraison
+            gérée, que l'acheteur paie (§2.8). Aucun port, aucun transporteur ici. */}
+        <Ligne cle="colis" C={C} attr={{ 'data-ebay-colis': v.colis && v.colis.actif === false ? 'non' : 'oui' }}>
+          <Interrupteur C={C} on={!(v.colis && v.colis.actif === false)} onChange={(x) => set({ colis: { ...(v.colis || DEFAUTS_USINE.colis), actif: x } })} label={tr('ebay.param.colis')}/>
+        </Ligne>
+        {!(v.colis && v.colis.actif === false) && (
+          <Ligne cle="colis.mesures" C={C} aide={false}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[['poids', 'g', 86], ['longueur', 'cm', 70], ['largeur', 'cm', 70], ['hauteur', 'cm', 70]].map(([k, u, w]) => (
+                <label key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: C.muted }}>
+                  <ChampColis cle={k} valeur={(v.colis || DEFAUTS_USINE.colis)[k]} style={{ ...inp, width: w }}
+                    onValider={(n) => set({ colis: { ...(v.colis || DEFAUTS_USINE.colis), [k]: n } })}/>{u}
+                </label>
+              ))}
+            </div>
+          </Ligne>
+        )}
         <Ligne cle="delaiEnvoi" C={C}>
           <select aria-label={tr('ebay.param.delaiEnvoi')} data-ebay-delai value={v.delaiEnvoi} onChange={(e) => set({ delaiEnvoi: Number(e.target.value) })} style={inp}>
             {DELAIS_ENVOI.map((d) => <option key={d} value={d}>{d === 0 ? tr('ebay.param.delai.jour') : tr('ebay.param.jours', { n: d })}</option>)}

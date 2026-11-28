@@ -126,6 +126,19 @@ export function limiteExpedition(o, b, maintenant = Date.now()) {
   return { daysLeft: e.jours, shipBy, limite, jour: lim.jour, heure: lim.heure, at: lim.at, depasse: e.depasse, retard: e.retard };
 }
 
+// (28 nov., ebay-livraison) LA LIMITE LUE D'UN INSTANT EXACT — eBay donne `shipByDate` (ISO, avec l'heure) :
+// le jour et l'heure de PARIS de cet instant, `limite: 'ebay'` (une limite LUE, jamais « estimée » : dépassée,
+// c'est un retard). 23 h 59 se dit « jour seul » (l'heure de fin de journée d'eBay n'apprend rien). Illisible ⇒ null.
+export function limiteDepuisInstant(iso, maintenant = Date.now()) {
+  const at = typeof iso === 'number' ? iso : Date.parse(String(iso || ''));
+  if (!Number.isFinite(at) || at <= 0) return null;
+  const p = partsParis(at);
+  const heure = /^23:5\d$/.test(p.heure) ? null : p.heure;
+  const lim = { jour: p.date, heure, at, limite: 'ebay' };
+  const e = echeanceLimite(lim, maintenant);
+  return { ...lim, daysLeft: e.jours, depasse: e.depasse, retard: e.retard };
+}
+
 // Où en est une limite à `maintenant` : jours de calendrier, dépassée ou non,
 // et la classe que comptent les rappels (retard · estimeeDepassee · aujourdhui
 // · demain · plus). `retard` : dépassée ET lue dans l'email — une limite
