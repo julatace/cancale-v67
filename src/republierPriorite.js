@@ -151,11 +151,11 @@ export function republierEnPriorite(articles, opts = {}) {
       if (raisonE) { exclues[raisonE] += 1; continue; }
       const x = es.x, compte = str(x.compte);
       const jours = x.depuis != null ? Math.floor((maintenant - x.depuis) / JOUR_MS) : null;
-      const vues = entier(x.vues), favoris = entier(x.favoris);
+      const favoris = entier(x.favoris), vues = entier(x.vues);   // LUS (null = pas lu, jamais 0)
       if (vues == null || favoris == null) sansCompteur += 1;
       ess.n += 1;
-      proposables.push({ cle: a.cle, article: a, annonce: { id: str(x.id), compte, pseudo: str(x.pseudo) }, numero: str(a.numero),
-        jours, vues, favoris, baisse: null, score: scorePriorite({ jours: jours || 0, vues, favoris }), essouffle: { jours: es.e.jours }, gain: gainDe(compte) });
+      proposables.push({ essouffle: { jours: es.e.jours }, cle: a.cle, article: a, annonce: { id: str(x.id), compte, pseudo: str(x.pseudo) }, numero: str(a.numero),
+        jours, vues, favoris, baisse: null, score: scorePriorite({ jours: jours || 0, vues, favoris }), gain: gainDe(compte) });
       continue;
     }
     // Une annonce Vinted assez ancienne mais MASQUÉE par Vinted, ou d'un compte BLOQUÉ mis en pause (sa dernière trace) : elle

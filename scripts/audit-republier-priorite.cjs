@@ -34,10 +34,10 @@ const BR = fs.readFileSync(F('aujourdhui/Branche.jsx'), 'utf8');
 const MUTATIONS = {
   'age-recopie': ['src', "if (!filtrerArticles([a], { site: 'vinted', etat: 'dorment', seuil: reglage.jours, maintenant, cle }).length) {", "if (!a.annonces.some((y) => y.site === 'vinted' && y.etat === 'enligne')) {"],
   'tous-sites': ['src', "etat: 'dorment', seuil: reglage.jours, maintenant, cle }).length) {", "etat: 'dorment', site: 'tous', seuil: reglage.jours, maintenant, cle }).length) {"],
-  'vendue-oubliee': ['src', "if (a.annonces.some((y) => y.etat === 'vendue')) raison = 'vendue';", "if (false) raison = 'vendue';"],
-  'litige-oublie': ['src', "else if (litige && (litige.ids.has(str(x.id)) || (cle(a.numero) && litige.nums.has(cle(a.numero))))) raison = 'litige';", ''],
-  'bloque-oublie': ['src', "else if (bloques.has(compte) || a.annonces.some((y) => y.etat === 'bloque')) raison = 'bloque';", ''],
-  'perso-oublie': ['src', "else if (perso.has(compte) || horsVente.has(compte)) raison = 'perso';", ''],
+  'vendue-oubliee': ['src', "if (a.annonces.some((y) => y.etat === 'vendue')) return 'vendue';", "if (false) return 'vendue';"],
+  'litige-oublie': ['src', "if (litige && (litige.ids.has(str(x.id)) || (cle(a.numero) && litige.nums.has(cle(a.numero))))) return 'litige';", ''],
+  'bloque-oublie': ['src', "if (bloques.has(compte) || a.annonces.some((y) => y.etat === 'bloque')) return 'bloque';", ''],
+  'perso-oublie': ['src', "if (perso.has(compte) || horsVente.has(compte)) return 'perso';", ''],
   'pas-lu-zero': ['src', "const vues = entier(x.vues), favoris = entier(x.favoris);", "const vues = entier(x.vues) ?? 0, favoris = entier(x.favoris) ?? 0;"],
   'baisse-sur-doute': ['src', '  if (pts.length < 3) return null;', '  if (pts.length < 2) return true;'],
   'identite-titre': ['src', "proposables.push({ cle: a.cle, article: a,", "proposables.push({ cle: a.titre, article: a,"],
@@ -45,14 +45,14 @@ const MUTATIONS = {
   'tri-favoris-ignores': ['src', "  if (f === 0) s += POIDS.zeroFavori;\n  else if (f != null) s -= POIDS.parFavori * Math.min(f, POIDS.favorisMax);", ''],
   'deux-comptes': ['src', "  if (comptes.length > 1) return { ok: false, raison: 'comptes', comptes };", ''],
   'lancement-seul': ['vue', "  const [reglages, setReglages] = React.useState(false);", "  const [reglages, setReglages] = React.useState(false);\n  React.useEffect(() => { if (lignes && lignes.length && onRepublierAuto) onRepublierAuto(); });"],
-  'panneau-effet': ['eg', "  const republierPrio = ({ ids }) =>", "  React.useEffect(() => { if (prio && prio.liste.length) ouvrirPanneau({ site: 'vinted', page: 'republier', ids: prio.liste.map((l) => l.annonce.id), action: 'republier' }); }, [prio]);\n  const republierPrio = ({ ids }) =>"],
+  'panneau-effet': ['eg', "  const republierPrio = ({ ids, compte }) =>", "  React.useEffect(() => { if (prio && prio.liste.length) ouvrirPanneau({ site: 'vinted', page: 'republier', ids: prio.liste.map((l) => l.annonce.id), action: 'republier' }); }, [prio]);\n  const republierPrio = ({ ids, compte }) =>"],
   'journee-vide': ['src', "export const rangeeAujourdhui = (p) => (p && p.montres > 0 ?", "export const rangeeAujourdhui = (p) => (p ?"],
 };
 const PROUVE = process.argv.includes('--prouve');
 
 async function charger(src) {
   const abs = (m) => pathToFileURL(F(m)).href;
-  const code = src.replace("from './articles/modele.js'", `from '${abs('articles/modele.js')}'`).replace("from './quiDorment.js'", `from '${abs('quiDorment.js')}'`);
+  const code = src.replace("from './articles/modele.js'", `from '${abs('articles/modele.js')}'`).replace("from './quiDorment.js'", `from '${abs('quiDorment.js')}'`).replace("from './essoufflement.js'", `from '${abs('essoufflement.js')}'`);
   const f = path.join(os.tmpdir(), `republierPriorite-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
   fs.writeFileSync(f, code);
   try { return await import(pathToFileURL(f).href); } finally { try { fs.unlinkSync(f); } catch (_) {} }
@@ -113,7 +113,7 @@ async function audit(sources, bavard) {
   dit(r60 && r60.liste.map((l) => l.annonce.id).join(',') === '2', 'R1 âge mini 60 j ⇒ p2 seule (90 j)', r60 && r60.liste.map((l) => l.annonce.id));
   dit(/CLE_SEUIL_DORMENT = 'vrm_qd_seuil'/.test(sources.src) && /localStorage\.getItem\(CLE_SEUIL_DORMENT\)/.test(EG) && /const seuil = regPrio\.jours;/.test(EG), 'R1 l\'âge mini EST le seuil de « Dorment » (`vrm_qd_seuil`), un seul réglage pour les deux');
   // R2
-  dit(r && JSON.stringify(r.exclues) === JSON.stringify({ vendue: 1, masquee: 1, litige: 1, bloque: 1, perso: 1 }), 'R2 écartées, chacune comptée : vendue 1 · masquée 1 · litige 1 · bloqué 1 · personnel 1', r && r.exclues);
+  dit(r && JSON.stringify(r.exclues) === JSON.stringify({ vendue: 1, masquee: 1, reservee: 0, litige: 1, bloque: 1, perso: 1 }), 'R2 écartées, chacune comptée : vendue 1 · masquée 1 · litige 1 · bloqué 1 · personnel 1', r && r.exclues);
   dit(r && !['5', '6', '7', '8', '9'].some((x) => ids.includes(x)), 'R2 aucune écartée dans la liste', ids.filter((x) => ['5', '6', '7', '8', '9'].includes(x)));
   const rId = M.republierEnPriorite(articles, { ...opts, enLitige: { nums: new Set(), ids: new Set(['2']) } });
   dit(rId && !rId.liste.some((l) => l.annonce.id === '2') && rId.exclues.litige === 1, 'R2 un litige par l\'IDENTIFIANT de l\'annonce l\'écarte aussi', rId && rId.exclues);
