@@ -238,9 +238,8 @@ async function scenarioD(b, port, { tel, sombre, nom }) {
   await shot(pg, nom + '-D-propose');
   await verifQ(pg, t, 'la proposition de téléchargement');
   await toucher(pg, tel, '[data-rgt-telecharger-b]');
-  await pg.waitForSelector('[data-rgt-telecharger="en-cours"] progress', { timeout: 3000 }).catch(() => {});
-  await pg.waitForTimeout(500);
-  const pr = await pg.evaluate(() => { const p = document.querySelector('.rgt-progres'); return p ? Number(p.value) : null; });
+  // un geste « pendant » se juge sur l'état tenu, jamais sur un délai fixe (§6.5) : la barre a avancé, le modèle pas fini
+  const pr = await pg.waitForFunction(() => { const p = document.querySelector('[data-rgt-telecharger="en-cours"] .rgt-progres'); return p && Number(p.value) > 0 ? Number(p.value) : null; }, null, { timeout: 4000, polling: 50 }).then((h) => h.jsonValue()).catch(() => null);
   dit(pr != null && pr > 0 && pr <= 1, `${t} : la progression du téléchargement est affichée`, String(pr));
   await shot(pg, nom + '-D-progres');
   await pg.waitForSelector('[data-rgt="ia"] [data-rgt-question="ia"]', { timeout: 8000 }).catch(() => {});
