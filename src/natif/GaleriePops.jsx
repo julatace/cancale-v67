@@ -13,8 +13,10 @@ import './galerie-pops.css';
 const PAS = 3500;
 const TOASTS = [{ ton: 'ok', cle: 'gal.toast.ok' }, { ton: 'err', cle: 'gal.toast.err' }, { ton: 'info', cle: 'gal.toast.info' }];
 
-export function GaleriePops({ autorise = false, Icon }) {
-  const [ouverte, setOuverte] = React.useState(false);
+// `ouverteDes` (27 nov., budget-vitesse) : montée par la coque au premier « vrm:galerie-pops » (src/App.jsx,
+// GaleriePopsCoque) — elle s'ouvre comme si elle l'avait entendu.
+export function GaleriePops({ autorise = false, Icon, ouverteDes = false }) {
+  const [ouverte, setOuverte] = React.useState(() => !!(autorise && ouverteDes));
   const [i, setI] = React.useState(0);
   const [lecture, setLecture] = React.useState(true);
   const liste = React.useMemo(() => (ouverte ? [...exemplesPops().map((x) => ({ sorte: 'pop', ...x })), ...TOASTS.map((t) => ({ sorte: 'toast', cle: 'toast-' + t.ton, famille: 'toast', ...t }))] : []), [ouverte]);

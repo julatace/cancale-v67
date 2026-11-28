@@ -43,8 +43,7 @@ import { planRetirerAilleurs, texteConfirmation, executerRetraits, avecRelecture
 // (15 nov., retrait-ailleurs) « À retirer ailleurs » : un endroit, un geste par site (src/aRetirerAilleurs.js).
 import ARetirerAilleurs from './ARetirerAilleurs.jsx';
 import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
-// (19 nov., décisions « 1 oui, 3 oui », ext. 5.409) La baisse par règle (éteinte par défaut) et « vendue ailleurs ⇒ masquée ».
-import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
+// ⟦→ ecrans/Feuilles.jsx #1⟧
 import { automatisationsActives, AUTOMATISATIONS_COMPTEES } from './automatisationsEtat.js';   // (21 nov., lot journee-stats) « N sur 3 » dans Statistiques ; (onglets-menu) « N actives » sur la tuile du Menu
 import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage, bleamDe } from './reglagesAutoLigne.js';
 import { PM_CLE, pmAbsorber } from './prixMiniPose.js';
@@ -79,8 +78,7 @@ import { bandeauStatut, CLE_VUS as CLE_STATUT_VUS } from './statutBandeau.js';
 const eurCourt = (v) => (Number.isInteger(Number(v)) ? `${Number(v)}\u00a0€` : `${Number(v).toFixed(2).replace('.', ',')}\u00a0€`);
 import {CONVERSATIONS_RETIREES,cleConversation,conversationRetiree,retirerConversation,remettreConversations,majAuGeste,phraseRetour} from './conversationsRetirees.js';
 import {conversationNonLue,conversationNonLueAncienne,messageRecent} from './messagesNonLus.js';
-// ⟦→ ecrans/Comptabilite.jsx #11⟧
-import FiabiliteVentes from './FiabiliteVentes.jsx';
+// ⟦→ ecrans/Plateformes.jsx #1⟧
 // ⟦→ ecrans/Reglages.jsx #1⟧
 import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.js';
 // ⟦→ ecrans/Reglages.jsx #2⟧
@@ -307,12 +305,12 @@ import { bilanEnLigneLbc, etatEnLigneLbc, quandLectureLbc, LIEN_MES_ANNONCES_LBC
 import './ebay-annonces.css';
 import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissementLeboncoin.js';
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
-// ⟦→ ecrans/Comptabilite.jsx #13⟧ // (11 nov., agent2-regroupe-comptes) lignes floutées regroupées par compte
-import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
+// ⟦→ ecrans/Plateformes.jsx #2⟧
+import './styles-groupes-comptes.css'; // (8 nov.) style de ./GroupesComptes.jsx, gardé à sa place (son écran est chargé à la demande)
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : DiagnosticLeboncoin (était importé en statique)
 const DiagnosticLeboncoin = aLaDemandeDiscret(() => import('./DiagnosticLeboncoin.jsx'));
-const AchatsSiteLazy = aLaDemande(() => import('./achats/AchatsSite.jsx'));   // (20 nov.) les achats Leboncoin / Vestiaire, disposition Vinted
-import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
+const AchatsSiteLazy = aLaDemande(() => import('./achats/AchatsSite.jsx'));
+// ⟦→ ecrans/Plateformes.jsx #3⟧   // (14 nov., refonte des sites) la bande de chiffres des listes
 import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import './design/studio-reste.css';   // (14 nov., Studio bleu clair) Argent, Messages, Paramètres, Communauté, E-mails, connexion, feuilles
 // (21 nov., fluidité — banc couches-chargement, Annonces à l'ouverture : CLS 0,28) La feuille de l'écran Annonces voyageait
@@ -394,10 +392,7 @@ import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actio
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER, sansSourcesDites as sansSourcesDitesTrancher, sourcesDitesPar as sourcesDitesParTrancher } from "./aTrancher.js";
 // ⟦→ ecrans/Comptabilite.jsx #24⟧   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
-// (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
-// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : MaSemaine (était importé en statique)
-const MaSemaine = aLaDemande(() => import('./MaSemaine.jsx'));
-import { maSemaine } from "./maSemaine.js";
+// ⟦→ ecrans/MaSemaine.jsx #1⟧
 // ⟦→ ecrans/Comptabilite.jsx #25⟧
 const EntreeLitiges = aLaDemandeDiscret(() => import('./LitigesEnCours.jsx').then((m) => ({ default: m.EntreeLitiges })));
 // ⟦→ ecrans/Comptabilite.jsx #26⟧
@@ -427,8 +422,7 @@ import {semainePassee} from '../api/_lib/bilan-semaine.js';
 // ⟦→ ecrans/Comptabilite.jsx #29⟧
 // ⟦→ ecrans/Reglages.jsx #9⟧
 import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produitDeVinted, vcReliable, suggestionsLienVc } from "./lienVestiaire.js";
-// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : FeuilleLienVc (était importé en statique)
-const FeuilleLienVc = aLaDemandeFeuille(() => import('./LienVestiaire.jsx'));
+// ⟦→ ecrans/Feuilles.jsx #2⟧
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, achatDisponible, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
@@ -561,15 +555,9 @@ const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/Ac
 // paire (108), Achats en plus (111, 125, 131) et le catalogue privé (110). Récit :
 // docs/passation/2026-11-14-messages-achats-plus.md.
 const AideReponse = aLaDemande(() => import('./AideReponse.jsx'));
-// ⟦→ ecrans/Comptabilite.jsx #40⟧
-const InfosPaireVueP = lazySur(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireVue })));
+// ⟦→ ecrans/FichePaire.jsx #1⟧
 const InfosPaireFeuilleP = lazySur(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireFeuille })));
-// ⟦→ ecrans/Vestiaire.jsx #3⟧
-// ⟦→ ecrans/Compta.jsx #3⟧
-const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
-// (11 nov., lot alertes-ebay) « Nouvelles annonces pour tes recherches » (eBay → Achats), à la demande.
-const AlertesEbay = aLaDemande(() => import('./AlertesEbay.jsx'));
-import { mediane } from './alertesEbayMarge.js';
+// ⟦→ ecrans/Plateformes.jsx #4⟧
 // ⟦→ ecrans/Comptabilite.jsx #41⟧
 // (6 nov.) La même, sur la LIGNE de la vente (à côté de la vente) : rien pendant le
 // chargement (pas de squelette sur chaque ligne de la liste).
@@ -582,13 +570,7 @@ const AlerteFormeVinted = lazySur(() => import('./AlerteFormeVinted.jsx'));
 const AlertesVerificationJournee = lazySur(() => import('./Discretion.jsx'));   // (12 nov., ext. 5.370) « Vinted demande une vérification »
 // (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
 const AccueilComptesReliesParesseux = lazySur(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
-// ⟦→ ecrans/Comptabilite.jsx #42⟧
-// (10 nov., lot S) La facture Pro d'une vente Leboncoin / eBay / Vestiaire, dans le détail de la vente.
-const FactureAutreParesseuse = lazySur(() => import('./FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
-const FactureAutreVente = (props) => <Suspense fallback={null}><FactureAutreParesseuse {...props}/></Suspense>;
-// (11 nov., lot lbc-plus) La remise en main propre organisée d'une vente Leboncoin (date, heure, lieu, « Remis »).
-const RemiseMainPropreParesseuse = lazySur(() => import('./RemiseMainPropre.jsx'));
-const RemiseMainPropre = (props) => <Suspense fallback={null}><RemiseMainPropreParesseuse {...props}/></Suspense>;
+// ⟦→ ecrans/Plateformes.jsx #5⟧
 // ⟦→ ecrans/Comptabilite.jsx #43⟧
 // (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat, SON retour (à la demande).
 const ScannerRetrouver = aLaDemande(() => import('./ScannerRetrouver.jsx'), true);
@@ -659,7 +641,7 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
   // (22 nov., chasse P1-2) Plein écran au téléphone : le geste retour de l'iPhone la ferme (CLAUDE.md §7, FermeAuRetour).
   return <><FermeAuRetour fermer={fermer}/><GardeEcran nom="fiche-ligne" feuille resetKey={l.cle + ':' + (num || '')} onFermer={fermer}>{rendre(num, l, fermer, res, (n) => setChoisi(String(n)))}</GardeEcran></>;
 }
-const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
+// ⟦→ ecrans/Feuilles.jsx #3⟧
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
 // (11 nov., lot visuels-reseaux) Les visuels réseaux (carré, story), dessinés dans le navigateur.
 const VisuelsReseaux = aLaDemande(() => import('./composants/VisuelsReseaux.jsx'), true);
@@ -688,14 +670,38 @@ const LigneConnexionsJournee = lazySur(() => import('./connexions/EcranConnexion
 const EcranParrainage = lazySur(() => import('./parrainage/EcranParrainage.jsx'));   // (25 nov.) le parrainage à 20 % : un VRAI écran (Julien : « Tu dois faire un vrai interface »)
 const EcranADistance = lazySur(() => import('./aDistance/EcranADistance.jsx'));
 const EcranServeur = lazySur(() => import('./serveur/EcranServeur.jsx'));   // (28 nov., ext. 5.457 `serveur`) « Ordinateur serveur » : une ligne par compte de l'ordinateur allumé   // (22 nov., ext. 5.436 `adistance`) « Mes comptes » : tes comptes à distance, ton ordinateur exécute   // (19 nov., demande H) LE seul endroit « Extension »   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
-const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
-// (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
-const PublierPartout = aLaDemande(() => import('./PublierPartout.jsx'), true);
+// ⟦→ ecrans/Feuilles2.jsx #1⟧
+// ⟦→ ecrans/Feuilles.jsx #4⟧
 // ⟦→ ecrans/Reglages.jsx #10⟧
 // (8 nov., démarrage léger) Écrans sortis d’App.jsx vers src/ecrans/ (découpe mécanique) : chargés
 // quand ils sont rendus, comme les morceaux ci-dessus. Leur code n’a pas changé ; ce qu’ils empruntent
 // à App.jsx est exporté tout en bas (`export { … }`).
 // ⟦démarrage léger⟧ racines paresseuses
+const BackupModal = aLaDemande(() => import('./ecrans/Feuilles2.jsx').then((m) => ({ default: m.BackupModal })), true);
+const HotePublierAilleurs = aLaDemande(() => import('./ecrans/Feuilles2.jsx').then((m) => ({ default: m.HotePublierAilleurs })), true);
+const AdressesSansCompte = aLaDemandeDiscret(() => import('./ecrans/Adresses.jsx').then((m) => ({ default: m.AdressesSansCompte })));
+const InfosPaireCoque = aLaDemandeDiscret(() => import('./ecrans/FichePaire.jsx').then((m) => ({ default: m.InfosPaireCoque })));
+const OuVendreCoque = aLaDemandeDiscret(() => import('./ecrans/FichePaire.jsx').then((m) => ({ default: m.OuVendreCoque })));
+const AtelierPaireCoque = aLaDemandeDiscret(() => import('./ecrans/FichePaire.jsx').then((m) => ({ default: m.AtelierPaireCoque })));
+const VentesLeboncoin = aLaDemande(() => import('./ecrans/Plateformes.jsx').then((m) => ({ default: m.VentesLeboncoin })));
+const EbayMessagesVolets = aLaDemande(() => import('./ecrans/Plateformes.jsx').then((m) => ({ default: m.EbayMessagesVolets })));
+const EbayAchatsOnglet = aLaDemande(() => import('./ecrans/Plateformes.jsx').then((m) => ({ default: m.EbayAchatsOnglet })));
+const PlatResume = aLaDemandeDiscret(() => import('./ecrans/Plateformes.jsx').then((m) => ({ default: m.PlatResume })));
+const EcranMaSemaine = aLaDemande(() => import('./ecrans/MaSemaine.jsx').then((m) => ({ default: m.EcranMaSemaine })));
+const ColisEquipe = aLaDemande(() => import('./ecrans/Equipe.jsx').then((m) => ({ default: m.ColisEquipe })));
+const JourneeHorsLigne = aLaDemande(() => import('./ecrans/HorsLigne.jsx').then((m) => ({ default: m.JourneeHorsLigne })));
+const TutoIllustration = aLaDemandeDiscret(() => import('./ecrans/Guide.jsx').then((m) => ({ default: m.TutoIllustration })));
+const PremiersPas = aLaDemandeDiscret(() => import('./ecrans/Guide.jsx').then((m) => ({ default: m.PremiersPas })));
+const HotePublierPartout = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.HotePublierPartout })), true);
+const HotePrixPartout = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.HotePrixPartout })), true);
+const ParcoursNouveauApp = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.ParcoursNouveauApp })), true);
+const RangerSheet = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.RangerSheet })), true);
+const FeuilleGestesHL = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.FeuilleGestesHL })), true);
+const PlaceurTamponFeuille = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.PlaceurTamponFeuille })), true);
+const HoteLienVc = aLaDemande(() => import('./ecrans/Feuilles.jsx').then((m) => ({ default: m.HoteLienVc })), true);
+const AuthScreen = aLaDemande(() => import('./ecrans/Connexion.jsx').then((m) => ({ default: m.AuthScreen })));
+const PorteMfa = aLaDemande(() => import('./ecrans/Connexion.jsx').then((m) => ({ default: m.PorteMfa })));
+const PorteNouveauOAuth = aLaDemande(() => import('./ecrans/Connexion.jsx').then((m) => ({ default: m.PorteNouveauOAuth })));
 // (21 nov., lot personnel-compta) `Comptabilite` (Aujourd'hui, Ventes, Achats, Annonces : 2,5 Mo de source) vit dans
 // src/ecrans/Comptabilite.jsx. Aujourd'hui en a besoin au premier écran : son morceau est demandé DÈS l'évaluation d'App
 // (et déjà préchargé en basse priorité par index.html, `data-js-ensuite` — vite.config.js) : le morceau App, 40 % plus
@@ -797,7 +803,7 @@ import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 // ⟦→ ecrans/Comptabilite.jsx #50⟧   // (11 nov., limites-client) longues listes par paquets
 import { PhotoVide } from "./composants/PhotoVide.jsx";
 import { Numero } from "./composants/Numero.jsx";
-import { EtatPanne } from "./composants/EtatPanne.jsx";
+// ⟦→ ecrans/Adresses.jsx #1⟧
 // (6 nov., filet 2) Un garde-fou par écran et par feuille : un écran qui tombe ne tombe que lui.
 import { GardeEcran, Differe } from "./composants/GardeEcran.jsx";
 import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
@@ -865,9 +871,7 @@ import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } f
 // ⟦→ ecrans/Comptabilite.jsx #53⟧
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc,fraisVc} from '../api/_lib/vestiaire-regle.js';
-// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : OuVendre (était importé en statique)   // (15 nov., lot securite-ventes) « Où vendre cet article ? » sur la fiche
-const OuVendre = aLaDemandeDiscret(() => import('./OuVendre.jsx'));
-import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
+// ⟦→ ecrans/FichePaire.jsx #2⟧
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
 import {SELECT_DEPART_META,departsParSuivi,txVintedParties,mrSansCodePostal} from '../api/_lib/depart-colis.js';
@@ -926,8 +930,7 @@ import "./ebay-interface.css";
 const _ecranEbay = (nom) => aLaDemande(() => import("./ebayGestion.jsx").then((m) => ({ default: m[nom] })));
 const EbayCommande = _ecranEbay("EbayCommande"), EbayMessages = _ecranEbay("EbayMessages"), EbayOffres = _ecranEbay("EbayOffres"), EbayAgent = _ecranEbay("EbayAgent");
 const EbayEvaluations = _ecranEbay("EbayEvaluations"), EbayRetours = _ecranEbay("EbayRetours"), EbayPromotion = _ecranEbay("EbayPromotion"), EbayAchats = _ecranEbay("EbayAchats");
-// (6 nov., vitesse 2) RechercheEbay : à la demande ; sa règle pure `repereAdmis` vit dans repereEbay.js.
-import {repereAdmis} from "./repereEbay.js";
+// ⟦→ ecrans/Plateformes.jsx #6⟧
 import { contactEmail, CONTACT_A_VENIR } from "./contact.js";
 import { captchaActif, routeProtegee, jetonCaptcha, etatCaptcha, abonnerCaptcha, consommerCaptcha, corpsAvecCaptcha, monterWidget, MSG_CAPTCHA_ATTENTE, MSG_CAPTCHA_REFUS, MSG_CAPTCHA_ERREUR } from "./captcha.js";
 import { boutiqueIci, boutiqueOrion, installerExtensionIci, estAndroid, pageExtensionsIci, nomNavigateurIci, mobileIci, LIENS_BOUTIQUES, LIEN_FIREFOX_ANDROID, LIEN_ORION_FICHIER, NOTICE_ORION, phraseNavigateur, motsNavigateur, ouExtensionIci } from "./navigateurExtension.js";
@@ -941,10 +944,7 @@ import { boutiqueIci, boutiqueOrion, installerExtensionIci, estAndroid, pageExte
 const NAV = new Proxy({}, { get: (_, k) => motsNavigateur()[k] });
 // (6 nov., vitesse 2) FacturePro : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./facture-pro.css";
-// ⟦→ ecrans/Vestiaire.jsx #4⟧
-// §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
-// décide à qui appartient un email) — jamais une seconde normalisation ici.
-import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
+// ⟦→ ecrans/Adresses.jsx #2⟧
 // ⟦→ ecrans/Comptabilite.jsx #64⟧
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
@@ -1020,11 +1020,11 @@ installerFonduPhotos();
 import "./design/scanner.css";
 import "./styles-photo-carton.css";   // (10 nov., lot AZ) « Photo du carton » (scanner, Préparer, fiche de la vente)
 import { brancherPhotoCarton, venteDuColis, aPhotoCarton, photoCartonDe } from "./photoCarton.js";
-// ⟦→ ecrans/Comptabilite.jsx #73⟧
-import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
+// ⟦→ ecrans/Plateformes.jsx #7⟧
 // ⟦→ ecrans/Comptabilite.jsx #74⟧
-import './styles-frise-vente.css'; // (8 nov.) style de ./FriseVente.jsx, gardé à sa place (son écran est chargé à la demande)   // (10 nov., lot BM) vitesse d'envoi
-import { LigneVitesse } from "./VitesseEnvoi.jsx";
+import './styles-frise-vente.css';
+// ⟦→ ecrans/MaSemaine.jsx #2⟧
+import './styles-vitesse-avis.css'; // (8 nov.) style de ./VitesseEnvoi.jsx, gardé à sa place (son écran est chargé à la demande)
 // ⟦→ ecrans/Comptabilite.jsx #75⟧
 import './styles-mineral.css'; // (8 nov.) style de ./SanteComptes.jsx, gardé à sa place (son écran est chargé à la demande)
 import './styles-reglages.css'; // (8 nov.) style de ./SanteComptes.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -1448,7 +1448,7 @@ import './styles-discretion.css'; // (8 nov.) style de ./fiabilite/Fiabilite.jsx
 import './fiabilite/fiabilite.css'; // (8 nov.) style de ./fiabilite/Fiabilite.jsx, gardé à sa place (son écran est chargé à la demande)
 import "./styles-onglets-b.css";
 import { comptesARelier, boitesQuiArrivent, phraseARelier } from "./relierCompte.js";
-import { adressesSansCompte, comptesSansAdresse, relierAdresse, CLE_ADRESSES_ACHETEUR } from "./adressesSansCompte.js";
+// ⟦→ ecrans/Adresses.jsx #3⟧
 // ⟦→ ecrans/Comptabilite.jsx #76⟧
 import './design/carte-pages.css'; // (8 nov.) style de ./design/CarteMois.jsx, gardé à sa place (son écran est chargé à la demande)
 import './ui/ui.css'; // (8 nov.) style de ./design/CarteMois.jsx, gardé à sa place (son écran est chargé à la demande)
@@ -1588,7 +1588,8 @@ import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
 import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
 import { PopEvenements } from "./natif/PopEvenements.jsx";
-import { GaleriePops } from "./natif/GaleriePops.jsx";   // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
+// (27 nov., budget-vitesse) GaleriePops : chargée au premier « vrm:galerie-pops » (GaleriePopsCoque, plus bas).
+// (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -1616,7 +1617,7 @@ import "./styles-popups.css";
 import { CLE_NOTES_PAIRES, NOTE_MAX, noteDe, opsNote, notesPropres, numerosAmbigus } from './notePaire.js';
 import { CLE_FUSIONS, pairesFusionnees, aliasDuNumero, opsDefaire, defaisable, finDefaire } from './fusionFiches.js';
 import { CLE_SEANCE, selectStudio, etatStudio, lignesSeance, nouvelleSeance, opsNouvelleSeance, opCoche, triNumSeance } from './seancePhoto.js';
-import { cleCertificat } from './certificatPaire.js';
+// ⟦→ ecrans/FichePaire.jsx #3⟧
 import { ajouterDictee, raisonSansDictee } from './noteVocale.js';
 import LigneCouleurLoupe from './LigneCouleurLoupe.jsx';
 import { CLE_INFOS_PAIRES, infosPropres, infosDe, opsInfos, infosNettes } from './infosPaire.js';
@@ -1626,14 +1627,9 @@ import { CLE_RAPPELS, lireRappels, nouveauRappel, reporterRappel, marquerFait, s
 import { lienNotif as lienNotifRappel } from '../api/_lib/lien-notif.js';
 import { FeuilleRappel, CarteRappelsJour, ListeRappels, BandeauRappel, BoutonRappelVue } from './Rappels.jsx';
 import { NotePaireVue } from './NotePaire.jsx';
-// ⟦→ ecrans/Comptabilite.jsx #102⟧   // (6 nov., v36-visuel-2) les dessins des états vides
-import { SITES_PUBLIER, apercuEnvoi, manquesEnvoi, etatsPaire, partoutLeMeme, lienVu, chercherPaires, enLigneSur } from "./publierAilleurs.js";
+// ⟦→ ecrans/Feuilles2.jsx #2⟧
 import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, lignePartout, planPartout, executerPartout, aussiSur, texteAussiSur } from "./publierPartout.js";
-import { suiviPourPartout } from "./publierPartoutSuivi.js";
-import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
-import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
-// ⟦→ ecrans/Comptabilite.jsx #103⟧   // (15 nov., eBay complet 2) le CA eBay daté au versement
-import { chargerSuivi } from "./suiviBranchement.js";
+// ⟦→ ecrans/Feuilles.jsx #5⟧
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 // ⟦→ ecrans/Comptabilite.jsx #104⟧
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
@@ -1747,9 +1743,7 @@ import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { echelleTotale, lireTailleTexte } from "./tailleTexte.js";   // (15 nov.) Paramètres → Taille du texte
 import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./langueCompte.js";
-// (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
-// `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
-import ChoixLangue from "./i18n/ChoixLangue.jsx";
+// ⟦→ ecrans/Connexion.jsx #1⟧
 import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue, poserVarianteArticle } from "./i18n/index.js";
 // ⟦→ ecrans/Comptabilite.jsx #113⟧
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
@@ -1774,7 +1768,7 @@ import { trj, useLangue } from './i18n/react.js';
 // ⟦→ ecrans/Comptabilite.jsx #119⟧
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, reglagePlateformes, ETAPES_NOUVEAU, installationIci, etatExtensionDirect, comptesCaptes } from "./parcoursNouveau/regle.js";
-import { etatNavigateur as etatNavigateurPN } from "./extension/peutFaire.js";   // (20 nov.) l'état de la page Extension, dans « Bien démarrer »
+// ⟦→ ecrans/Feuilles.jsx #6⟧   // (20 nov.) l'état de la page Extension, dans « Bien démarrer »
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
 // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » : ses annonces en pause sur SON choix (src/compteBloque.js).
 import { useComptesBloques, uidsEnPauseConnus, uidsBloquesConnus } from "./compteBloqueEtat.js";
@@ -2434,8 +2428,8 @@ installerGardeHorsLigne(SUPABASE_URL);
 let PARRAIN_DU_LIEN = '';
 try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) { localStorage.setItem(CLE_PARRAIN, c); PARRAIN_DU_LIEN = c; } } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
 let PARTENAIRE_DU_LIEN = '';
-try { PARTENAIRE_DU_LIEN = garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}   // (15 nov.) programme partenaire
-const codeParrainGarde = () => { try { const c = String(localStorage.getItem(CLE_PARRAIN) || ''); return CODE_PARRAIN_RE.test(c) ? c : ''; } catch (_) { return ''; } };
+try { PARTENAIRE_DU_LIEN = garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}
+// ⟦→ ecrans/Connexion.jsx #2⟧
 
 // ════════════════════════════════════════════════════════════════════════════
 //  COMPTES VENDEURS (multi-utilisateurs)
@@ -2479,6 +2473,9 @@ const onAuthChange = (fn) => { _authListeners.push(fn); return () => { _authList
 const _emitAuth = () => { _authListeners.forEach(fn => { try { fn(AUTH); } catch (_) {} }); };
 
 const readSession = () => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } };
+// (27 nov., budget-vitesse) L'écran de connexion vit dans src/ecrans/Connexion.jsx (à la demande) : sans session, il est
+// demandé tout de suite, avec ce morceau — jamais un aller-retour de plus avant le formulaire.
+if (typeof window !== 'undefined') { try { if (!readSession()) AuthScreen.precharger(); } catch (_) {} }
 // (6 nov., v36) La session était-elle là au chargement de la page ? Sinon le « premier écran utile »
 // de l'ouverture compterait la saisie du mot de passe : il n'est pas mesuré (src/mesuresCollecte.js).
 const SESSION_AU_CHARGEMENT = (() => { try { return !!(readSession() || {}).access_token; } catch (_) { return false; } })();
@@ -2930,93 +2927,7 @@ const mfaVerifierCodeParmi = async (ids, code) => {
 };
 
 const authValid = () => !!(AUTH.session && AUTH.session.access_token && AUTH.session.expires_at > Date.now() + 60000);
-
-const authSignIn  = async (email, password) => {
-  const r = await authCall('token?grant_type=password', { email: String(email).trim().toLowerCase(), password });
-  if (!r.ok) {
-    // « Email not confirmed » veut dire que le compte existe bel et bien : il
-    // attend juste que le lien reçu par email soit cliqué. C'est une situation
-    // qui se règle, pas une erreur de saisie — on le dit, et on propose de
-    // renvoyer l'email plutôt que de laisser l'utilisateur devant un mur.
-    if (/not confirmed/i.test(r.error)) return { ok: false, needsConfirm: true, error: "Ton compte existe, mais l'email n'est pas encore confirmé." };
-    if (r.status>=500) return {ok:false,error:'Le service de connexion est momentanément indisponible. Réessaie dans un instant.'};
-    if (r.status===429) return {ok:false,error:'Trop de tentatives de connexion. Patiente un moment avant de réessayer.'};
-    if (/invalid|credential/i.test(r.error)) return { ok: false, error: 'E-mail ou mot de passe incorrect.' };
-    return { ok: false, error: r.error };
-  }
-  // Un HTTP 200 ne suffit pas : ne jamais recharger vers une session vide.
-  const j=r.json;
-  if (!j || typeof j.access_token!=='string' || !j.access_token.trim()
-      || typeof j.user?.id!=='string' || !j.user.id.trim()) {
-    return {ok:false,error:'La connexion n’a pas pu être confirmée. Réessaie : tes identifiants sont conservés.'};
-  }
-  writeSession(sessionFrom(j));
-  return { ok: true };
-};
-// ── CONFIRMER EN COLLANT LE LIEN REÇU ─────────────────────────────────────
-// Le lien du mail passe par Supabase, qui renvoie ensuite vers l'adresse
-// configurée dans le projet (« Site URL »). Si elle est restée sur la valeur
-// d'usine (http://localhost:3000), le navigateur affiche « impossible d'accéder
-// au site » — et selon le moment où ça casse, le compte n'est même pas confirmé.
-//
-// Plutôt que de dépendre de ce réglage, on accepte que le lien soit COLLÉ ici :
-// on en extrait le jeton et on fait nous-mêmes la vérification. Aucune
-// redirection, donc rien à casser.
-const authConfirmFromLink = async (raw, email) => {
-  const txt = String(raw || '').trim();
-  if (!txt) return { ok: false, error: 'Colle le lien reçu par email.' };
-  let q = null, typeFragment='';
-  if (/^\d{6}$/.test(txt)) q = new URLSearchParams({ token: txt, type: 'signup' });  // code à 6 chiffres collé tel quel
-  else {
-    try { const u=new URL(txt);q=u.searchParams;typeFragment=new URLSearchParams(u.hash.slice(1)).get('type')||''; }
-    catch (_) { const i = txt.indexOf('?'); if (i >= 0) q = new URLSearchParams(txt.slice(i + 1)); }
-  }
-  if (!q) return { ok: false, error: "Ce n'est ni un lien, ni un code à 6 chiffres." };
-  const type = q.get('type') || 'signup';
-  if(type==='recovery'||typeFragment==='recovery')return{ok:false,recovery:true,error:'Ce lien sert à changer ton mot de passe : ouvre-le directement depuis l’e-mail, sur cet appareil. Sinon, redemande un e-mail ci-dessous.'};
-  const hash = q.get('token_hash');
-  const token = q.get('token');
-  if (!hash && !token) return { ok: false, error: "Ce lien ne contient pas de jeton de confirmation." };
-  // ⚠️ PIÈGE : dans un lien d'email, le paramètre `token` contient DÉJÀ un jeton
-  // haché — c'est la même chose qu'un `token_hash`. Si on l'envoie comme un code
-  // à 6 chiffres (`{token, email}`), le serveur le hache une deuxième fois et le
-  // rejette systématiquement. On ne prend ce format QUE pour un vrai code court
-  // tapé à la main.
-  const body = (!hash && /^\d{6}$/.test(String(token)))
-    ? { type, token, email: String(email || '').trim().toLowerCase() }
-    : { type, token_hash: hash || token };
-  const r = await authCall('verify', body);
-  if (!r.ok) {
-    if (/expired|invalid/i.test(r.error)) return { ok: false, error: 'Lien expiré ou déjà utilisé. Redemande un e-mail, et colle le PLUS RÉCENT.' };
-    return { ok: false, error: r.error };
-  }
-  const j=r.json;
-  if (typeof j?.access_token==='string' && j.access_token.trim() && typeof j.user?.id==='string' && j.user.id.trim()) { writeSession(sessionFrom(j)); return {ok:true,connected:true}; }
-  const u=j?.user||j;
-  if (!j?.access_token && typeof u?.id==='string' && u.id.trim() && typeof u.email_confirmed_at==='string' && u.email_confirmed_at.trim()) return {ok:true,connected:false};
-  return {ok:false,error:'La confirmation n’a pas pu être vérifiée. Réessaie avec le lien le plus récent.'};
-};
-
-// Renvoyer l'email de confirmation (le premier peut s'être perdu, ou avoir été
-// bloqué par le quota du serveur d'envoi de test de Supabase).
-const authResendConfirm = async (email) => {
-  const r = await authCall(avecRetour('resend'), { type: 'signup', email: String(email).trim().toLowerCase() });
-  if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
-  noterLienDemande(localStorage);
-  return { ok: true };
-};
-
-// LIEN DE CONNEXION PAR EMAIL (« magic link »). Utile quand le mot de passe est
-// bon mais que le compte attend encore sa confirmation : ouvrir ce lien confirme
-// l'adresse ET connecte, d'un coup. Comme le lien renvoie vers l'adresse
-// configurée dans Supabase (souvent restée sur localhost), on le fait plutôt
-// COLLER dans l'app, qui le vérifie elle-même.
-const authMagicLink = async (email) => {
-  const r = await authCall(avecRetour('otp'), { email: String(email).trim().toLowerCase(), create_user: false });
-  if (!r.ok) return { ok: false, error: mapMailError(r.error), attente: delaiDemandeEmail(r.error) };
-  noterLienDemande(localStorage);
-  return { ok: true };
-};
+// ⟦→ ecrans/Connexion.jsx #3⟧
 
 // Le serveur d'envoi intégré de Supabase est limité à quelques messages par
 // heure. « email rate limit exceeded » n'aide personne : on dit ce qui se passe
@@ -3065,39 +2976,7 @@ const useSecondesRestantes = (fin) => {
   }, [fin]);
   return fin > Date.now() ? Math.ceil((fin - Date.now()) / 1000) : 0;
 };
-const authSignUp  = async (email, password) => {
-  // (8 nov.) `data.langue` : la langue des e-mails de compte (modèles Supabase).
-  // (11 nov., sécurité) Le lien de confirmation ne s'ouvrira QUE dans ce navigateur (src/lienEmail.js).
-  noterLienDemande(localStorage);
-  // (13 nov., lot 54) Le code de parrainage suit le COMPTE (`user_metadata.parrain`) : le lien de
-  // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
-  const parrain = codeParrainGarde();
-  const partenaire = codePartenaireGarde(localStorage);   // (15 nov.) le code partenaire suit aussi le compte
-  // (25 nov.) « Montrer mon prénom à mon parrain », coché à l'inscription (décoché par défaut) : suit le compte.
-  let montrerParrain = false; try { montrerParrain = !!parrain && localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) {}
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(montrerParrain ? { parrain_montrer: true } : {}), ...(partenaire ? { partenaire } : {}) } });
-  if (!r.ok) {
-    if(r.captcha)return {ok:false,error:r.error};
-    // On traduit les erreurs techniques de Supabase : « email rate limit
-    // exceeded » ne veut rien dire pour quelqu'un qui essaie juste de créer un
-    // compte, alors que la cause est précise et la solution simple.
-    let msg = r.error;
-    const attente = delaiDemandeEmail(r.error);
-    if (attente) return { ok: false, error: texteDelaiEmail(attente), attente };
-    if (/already registered/i.test(r.error)) msg = 'Un compte existe déjà avec cet email.';
-    else if (/rate limit/i.test(r.error)) msg = MAIL_QUOTA;
-    else if (/invalid/i.test(r.error) && /email/i.test(r.error)) msg = 'Cette adresse e-mail est refusée par le serveur.';
-    else if (/signups? not allowed|disabled/i.test(r.error)) msg = 'Les inscriptions sont fermées pour le moment.';
-    return { ok: false, incertain:r.status===0 || r.status>=500, error: r.status===0 || r.status>=500 ? 'Je ne peux pas confirmer le résultat de la création. Si tu as reçu un e-mail VRM, ton compte peut déjà être créé : confirme-le, puis utilise « Se connecter » ici.' : msg };
-  }
-  const j=r.json,uid=j?.user?.id||j?.id;
-  if(typeof uid!=='string'||!uid.trim()||(j?.access_token&&(typeof j.access_token!=='string'||!j.access_token.trim()||typeof j.user?.id!=='string'||!j.user.id.trim())))return {ok:false,incertain:true,error:'La réponse du serveur est incomplète. Si tu as reçu un e-mail, confirme-le puis connecte-toi ici ; sinon réessaie dans un instant.'};
-  // Si la confirmation par email est activée côté Supabase, il n'y a pas encore
-  // de jeton : le compte n'existe vraiment qu'une fois le lien cliqué.
-  if (r.json && r.json.access_token) { writeSession(sessionFrom(r.json)); return { ok: true }; }
-  return { ok: true, needsConfirm: true };
-};
-const authReset   = (email) => { noterLienDemande(localStorage); return authCall(avecRetour('recover', '/recuperation.html'), { email: String(email).trim().toLowerCase() }); };
+// ⟦→ ecrans/Connexion.jsx #4⟧
 
 // ── CONNEXION AVEC GOOGLE / DISCORD (OAuth, méthode PKCE) ─────────────────
 // Comment ça marche : on n'échange JAMAIS de mot de passe. On envoie le vendeur
@@ -3139,8 +3018,7 @@ const OAUTH_PROVIDERS = [
 let AUTH_SETTINGS = null;
 let AUTH_SETTINGS_ETAT='initial',AUTH_SETTINGS_PROMESSE=null;
 const AUTH_SETTINGS_ABONNES=new Set();
-const etatAuthSettings=()=>({statut:AUTH_SETTINGS_ETAT,reglages:AUTH_SETTINGS});
-const onAuthSettingsChange=fn=>{AUTH_SETTINGS_ABONNES.add(fn);return()=>AUTH_SETTINGS_ABONNES.delete(fn);};
+// ⟦→ ecrans/Connexion.jsx #5⟧
 const notifierAuthSettings=()=>{for(const fn of AUTH_SETTINGS_ABONNES){try{fn();}catch(_){}}};
 const loadAuthSettings = () => {
   if(AUTH_SETTINGS_PROMESSE)return AUTH_SETTINGS_PROMESSE;
@@ -3167,9 +3045,7 @@ const loadAuthSettings = () => {
 };
 // Un fournisseur n'est proposé que s'il est réellement activé côté Supabase.
 const providerEnabled = (id) => AUTH_SETTINGS?.external?.[id]===true;
-// La création de compte attend-elle un email de confirmation ? Si oui, on le
-// dit AVANT que la personne tape son mot de passe.
-const confirmRequired = () => !!(AUTH_SETTINGS && AUTH_SETTINGS.mailer_autoconfirm === false);
+// ⟦→ ecrans/Connexion.jsx #6⟧
 
 const oauthStart = async (provider, intention) => {
   try {
@@ -4528,110 +4404,7 @@ const DEMANDE_REGLAGE_SOUS = { id: null };
 const DEMANDE_SEMAINE = { lundi: null };
 // (11 nov., ebay-complet) Le retour de connexion eBay, gardé pour Comptes eBay (lu une fois à son montage).
 const DEMANDE_RETOUR_EBAY = { v: null };
-
-// ── RANGER UNE VRAIE PAIRE (feuille du garage 3D) ──────────────────────────
-// Julien : « tu peux sélectionner lesquels tu ranges ici, la taille… vraiment
-// tu peux tout faire avec l'application ». Avant, ranger une paire demandait de
-// TAPER son numéro de mémoire : rien ne vérifiait qu'elle existe, ni qu'elle
-// n'est pas déjà rangée ailleurs. On choisit désormais dans la liste de ses
-// paires réellement présentes — photo, N°, titre, pointure.
-// ⚠️ La saisie libre reste possible (une paire hors app, un carton de matériel),
-// mais elle n'est plus le chemin par défaut.
-// ── L'APERÇU DU MEUBLE OÙ L'ON RANGE (17 oct.) ─────────────────────────────
-// Julien : « quand il met par exemple table et l'endroit où l'on peut mettre une
-// paire à ranger, que ça fasse un petit carré sur le côté avec une vue du meuble
-// ou de l'endroit où on range ». Un dessin vu de FACE, tiré des données du
-// meuble (ses cases, ce qu'elles portent) — la case visée en couleur d'accent.
-function ApercuMeuble({ it, cellKey, mode, cap, size = 132 }) {
-  const nr = Math.max(1, it.rows || 1), nc = Math.max(1, it.cols || 1);
-  const ft = FURN_TYPES[it.type] || {};
-  const table = ft.build === 'table', portant = mode === 'cintre';
-  const W = 120, H = table ? 80 : 120, pad = 8;
-  const iw = W - pad * 2, ih = (table ? 30 : H - pad * 2);
-  const cw = iw / nc, ch = table ? ih : ih / nr;
-  const [rk, ck] = String(cellKey).split('_').map(Number);
-  const cases = [];
-  for (let r = 0; r < (table ? 1 : nr); r++) for (let c = 0; c < nc; c++) {
-    const key = r + '_' + c; const a = numsCase((it.slots || {})[key]); const vise = r === rk && c === ck;
-    const x = pad + c * cw, y = table ? pad + 6 : pad + r * ch;
-    const n = Math.min(a.length, Math.max(1, cap || 1));
-    cases.push(
-      <g key={key}>
-        <rect x={x + 1.5} y={y + 1.5} width={cw - 3} height={ch - 3} rx="2.5" fill={vise ? C.accent : 'transparent'} fillOpacity={vise ? 0.18 : 0} stroke={vise ? C.accent : C.border} strokeWidth={vise ? 2 : 1} strokeDasharray={a.length || vise ? '' : '3 2'} />
-        {portant
-          ? (a.length ? <text x={x + cw / 2} y={y + ch / 2 + 3} textAnchor="middle" fontSize="8.5" fontWeight="700" fill={C.text}>{a[0]}</text> : null)
-          : Array.from({ length: n }, (_, i) => { const bh = Math.min(10, (ch - 6) / Math.max(1, cap || 1)); return <rect key={i} x={x + cw * 0.2} y={y + ch - 3 - (i + 1) * (bh + 1)} width={cw * 0.6} height={bh} rx="1.5" fill={C.muted} fillOpacity="0.45" />; })}
-      </g>
-    );
-  }
-  return (
-    <svg data-apercu-meuble={it.id} data-apercu-case={cellKey} role="img" aria-label={`${it.name || ft.label || 'Meuble'} vu de face, la case où ranger en couleur`} viewBox={`0 0 ${W} ${H}`} width={size} height={size * H / W} style={{ flexShrink: 0, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10 }}>
-      {portant && Array.from({ length: nr }, (_, r) => <line key={'b' + r} x1={pad} x2={W - pad} y1={pad + r * ch + 2} y2={pad + r * ch + 2} stroke={C.muted} strokeWidth="2" />)}
-      {table && <><rect x={pad} y={pad + 6 + ch} width={iw} height="5" rx="1.5" fill={C.muted} fillOpacity="0.7" /><rect x={pad + 4} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /><rect x={W - pad - 8} y={pad + 11 + ch} width="4" height={H - pad - 11 - ch - 4} fill={C.muted} fillOpacity="0.55" /></>}
-      {!table && !portant && <rect x={pad} y={pad} width={iw} height={ih} fill="none" stroke={C.muted} strokeOpacity="0.6" strokeWidth="1.5" rx="2" />}
-      {cases}
-    </svg>
-  );
-}
-
-function RangerSheet({ paires, cellNom, onPick, onLibre, onClose, apercu }) {
-  const [q, setQ] = React.useState('');
-  const f = q.trim().toLowerCase();
-  const liste = !f ? paires : paires.filter(p =>
-    String(p.numero).includes(f) || (p.title || '').toLowerCase().includes(f) || String(p.taille || '').toLowerCase().includes(f));
-  return (
-    <SheetShell onClose={onClose}>
-      <div style={{display:'flex',gap:12,alignItems:'flex-start',marginBottom:apercu?6:0}}>
-        {apercu && <ApercuMeuble {...apercu} />}
-        <div style={{flex:1,minWidth:0}}>
-      <div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text,marginBottom:2}}>Ranger un article</div>
-      <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.45}}>
-        {cellNom ? <>Case <b style={{color:C.text}}>{cellNom}</b> · </> : null}
-        {paires.length} article{paires.length>1?'s':''} pas encore rangé{paires.length>1?'s':''}
-        {/* ⚠️ On ne fait pas semblant de savoir : quand l'écran Annonces n'a
-            pas encore publié la liste des paires présentes, cette liste
-            contient tout l'historique. On l'écrit, et on met les plus
-            récentes en tête plutôt que de trier par numéro. */}
-        {paires.length > 0 && !paires[0].sur && (
-          <><br/><span style={{color:C.warn}}>Ouvre Annonces une fois pour ne garder que ton stock.</span></>
-        )}
-      </div>
-        </div>
-      </div>
-      {paires.length > 6 && (
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={`N°, marque, ${motTaille(vendActuel()).toLowerCase()}…`} inputMode="search"
-          style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,background:C.card,color:C.text,outline:'none',fontFamily:'inherit',marginBottom:10}}/>
-      )}
-      {liste.length === 0 && (
-        <div style={{fontSize:13,color:C.muted,padding:'14px 2px',lineHeight:1.5}}>
-          {paires.length === 0
-            ? "Tout ton stock est déjà rangé."
-            : "Rien ne correspond à cette recherche."}
-        </div>
-      )}
-      <div style={{display:'flex',flexDirection:'column',gap:7,maxHeight:'46vh',overflowY:'auto'}}>
-        {liste.slice(0, 200).map(p => (
-          <button type="button" key={p.numero} onClick={()=>onPick(p)}
-            style={{display:'flex',alignItems:'center',gap:11,textAlign:'left',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:'9px 11px',cursor:'pointer',fontFamily:'inherit',boxShadow:C.shadow}}>
-            {p.photo
-              ? <PhotoVinted src={p.photo} alt="" style={{width:44,height:44,borderRadius:12,objectFit:'cover',flexShrink:0,background:C.card2}}/>
-              : <span style={{width:44,height:44,borderRadius:12,background:C.card2,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-            <span style={{flex:'1 1 120px',minWidth:0}}>
-              <span className="vrm-display" style={{display:'block',fontSize:15,fontWeight:700,color:C.accentTexte}}>N°{p.numero}</span>
-              <span style={{display:'block',fontSize:12,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.title || '—'}</span>
-              {p.taille ? <span className="vrm-label" style={{color:C.muted}}>{motTaille(vendActuel())} {p.taille}</span> : null}
-            </span>
-            <span style={{flexShrink:0,color:C.muted}}><Icon name="home" size={17}/></span>
-          </button>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:12}}>
-        <Bouton variante="discret" onClick={onClose} style={{flex:1}}>Annuler</Bouton>
-        <Bouton variante="secondaire" onClick={onLibre} style={{flex:1}}>Autre numéro…</Bouton>
-      </div>
-    </SheetShell>
-  );
-}
+// ⟦→ ecrans/Feuilles.jsx #7⟧
 
 // Feuille de SAISIE (remplace window.prompt).
 // (9 nov., DA4) Fermée par Échap, le glisser, le voile ou « retour », elle GARDE ce
@@ -5346,16 +5119,7 @@ const rejouerGestes = async () => {
   _pushApresGestes = false; cloudPush();
 };
 const fileNonVideHL = () => { const f = lireFile(localStorage, AUTH.user?.id); return !!(f && f.cles && Object.keys(f.cles).length); };
-const trancherGesteHL = async (ids, choix) => {
-  const owner = AUTH.user?.id; if (!owner) return;
-  let mien = false;
-  for (const id of [].concat(ids)) {
-    const g = await trancherRegistre(stockGestes(), owner, id, choix);
-    if (g && choix === 'mien') { poserLocalHL(g.k, g.chemin, g.apres); mien = true; }
-  }
-  await rafraichirGestesHL();
-  if (mien) rejouerGestesBientot(0);
-};
+// ⟦→ ecrans/Feuilles.jsx #8⟧
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => rejouerGestesBientot(1500));
   // La porte « hors ligne à froid » se lève (vérifiée au retour du réseau) : les gestes partent.
@@ -6592,16 +6356,7 @@ function NotePaireCoque({ numero = '', itemId = '', recreeDe = '', variante = 'l
   const tout = dictee ? <>{vue}<DicterNoteLazy num={String(numero || itemId)} dictee={dictee} Icon={Icon}/></> : vue;
   return rangee ? <span className="vrm-note-rangee">{tout}</span> : tout;
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// (14 nov., propositions 102-107) PHOTOS ET FICHES — docs/passation/2026-11-14-photos-fiches.md
-// La partie « Atelier » de la fiche (photos du studio et leur avis floue / sombre, note
-// dictée, certificat d'authenticité, fusion de deux fiches), la séance photo et la
-// recherche par couleur. Les règles : src/qualitePhoto.js, src/seancePhoto.js,
-// src/couleurPhoto.js, src/certificatPaire.js, src/fusionFiches.js, src/noteVocale.js
-// (modules purs, audités). Tout se charge À LA DEMANDE.
-// ══════════════════════════════════════════════════════════════════════════════
-const AtelierPaireLazy = aLaDemande(() => import('./AtelierPaire.jsx'));
+// ⟦→ ecrans/FichePaire.jsx #4⟧
 const FeuilleFusionLazy = aLaDemande(() => import('./AtelierPaire.jsx').then((m) => ({ default: m.FeuilleFusion })), true);
 const SeancePhotoLazy = aLaDemande(() => import('./SeancePhoto.jsx'), true);
 const RechercheCouleurLazy = aLaDemande(() => import('./RechercheCouleur.jsx'), true);
@@ -6651,7 +6406,7 @@ const lireEtatStudio = async () => {
   const rows = await lireTout(`id=like.studio_photos_*${o}&select=${selectStudio()}`);
   return etatStudio(rows, cleNum);
 };
-const BASE_CERTIFICAT = { fetch: (...a) => fetch(...a), url: SUPABASE_URL, auth: (x) => sbAuth(x), withOwner: (r) => withOwner(r), get conflit() { return SB_CONFLICT; }, get owner() { return (AUTH.user && AUTH.user.id) || ''; } };
+// ⟦→ ecrans/FichePaire.jsx #5⟧
 // Les propositions d'une fusion (une PROPOSITION peut utiliser la ressemblance, §5 — c'est
 // toujours SON clic qui fusionne) : même photo exacte d'abord, puis même titre, puis les plus récentes.
 const proposerFusion = (tous, moi) => {
@@ -6659,33 +6414,7 @@ const proposerFusion = (tous, moi) => {
   const rang = ([, f]) => (pk && (String(f.photoK || '') === pk || photoKey(f.photo) === pk) ? 0 : t && normTitle(f.title) === t ? 1 : 2);
   return [...tous].sort((a, b) => rang(a) - rang(b) || (Number(b[0]) || 0) - (Number(a[0]) || 0));
 };
-function AtelierPaireCoque({ num, itemId = '', idFiche = '' }) {
-  const registre = React.useSyncExternalStore(MAG_FUSIONS.abonner, MAG_FUSIONS.lire);
-  const [fusionOuverte, setFusionOuverte] = React.useState(false);
-  const k = cleNum(num);
-  const paire = { numero: num, itemId };
-  const alias = aliasDuNumero(registre, num, cleNum);
-  const studio = { cle: k, lire: () => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, k)), ouvrir: () => ouvrirAtelier('studio', { num: k }) };
-  const certificat = { cle: cleCertificat(paire, cleNum), base: BASE_CERTIFICAT, dire: (t) => toast(t), confirmer: (o) => askConfirm(o) };
-  const defaire = async () => {
-    if (!alias) return;
-    const r = opsDefaire(alias.fusion.id, { registre: MAG_FUSIONS.lire(), fiches: load('vinted_annonce_numeros', {}) || {} });
-    if (!r.ok) { toast(tr('atelier.fusion.pasDefaite.' + r.raison)); return; }
-    if (!(await askConfirm({ title: tr('atelier.fusion.defaireTitre'), desc: tr('atelier.fusion.defaireDesc', { autres: [num, ...alias.autres].map((x) => 'N°' + x).join(' / ') }), ok: tr('atelier.fusion.defaire'), cancel: tr('atelier.annuler') }))) return;
-    gesteVrm(tr('atelier.fusion.defaite'), r.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser });
-  };
-  const fusion = alias ? { alias, defaisable: defaisable(alias.fusion), fin: finDefaire(alias.fusion), onDefaire: defaire }
-    : idFiche ? { ouvrir: () => setFusionOuverte(true) } : { raisonSans: 'sansFiche' };
-  return <>
-    <AtelierPaireLazy num={String(num)} Icon={Icon} studio={studio} certificat={certificat} fusion={fusion}/>
-    {fusionOuverte ? <FeuilleFusionLazy idFiche={String(idFiche)} fiches={load('vinted_annonce_numeros', {}) || {}} registre={MAG_FUSIONS.lire()}
-      vendus={(() => { try { return new Set((load('vinted_annonces_vendues', []) || []).map(String)); } catch (_) { return null; } })()}
-      caseDe={(x) => rangementDuNum(x) || ''} cleNum={cleNum} proposer={proposerFusion}
-      Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Feuille={SheetShellSurFiche} Bouton={Bouton} Segmente={Segmente}
-      onFusionner={(res) => { setFusionOuverte(false); gesteVrm(tr('atelier.fusion.faite'), res.ops, { [CLE_FUSIONS]: MAG_FUSIONS.poser }, null, 'fiches.fusion'); }}
-      onClose={() => setFusionOuverte(false)}/> : null}
-  </>;
-}
+// ⟦→ ecrans/FichePaire.jsx #6⟧
 // L'HÔTE (monté une fois, dans la coque) : le studio ouvert sur UNE paire (depuis la fiche ou
 // la séance), la séance photo, la recherche par couleur — ouverts par `ouvrirAtelier`.
 function HoteAtelier({ comptes }) {
@@ -6778,47 +6507,7 @@ function useInfosPaire(paire) {
   return infosDe(carte, paire, { cleNum, ambigu: (k) => amb.has(k) });
 }
 const paireIdentifiable = (numero, itemId) => !!(String(numero || '').trim() || /^\d{3,}$/.test(String(itemId || '')));
-// La ligne de la fiche paire, et sa feuille.
-// (15 nov., lot securite-ventes) « OÙ VENDRE CET ARTICLE ? » — la coque lit ce que la règle pure
-// (src/ouVendre.js) demande : les sites reliés (le profil du vendeur, `relies`), le statut Pro du ou des
-// comptes Vinted de l'article (`lecturePrixPro`, lu, jamais deviné), les frais LUS de ses commandes eBay et
-// de ses ventes Vestiaire (les mêmes listes que « Frais par site »). Lecture seule, aucun geste.
-function OuVendreCoque({ annonces = [], prixC = null, stats = null, comptes = null, ebay, vc }) {
-  const profil = useProfilVendeur();
-  const relies = (profil && profil.relies) || {};
-  // Le prix de départ : celui de SON annonce en ligne, par identité (`siVendue.prix` de la fiche, en centimes) ; sinon le
-  // prix rangé sur la fiche de l'annonce ; sinon rien (il le tape).
-  const prix = Number.isSafeInteger(prixC) && prixC > 0 ? prixC / 100 : (() => { const enL = (annonces || []).filter((x) => x && x.etat === 'en-ligne'); const a = enL.length === 1 ? enL[0] : null;
-    const st = a && stats ? stats[a.id] : null; const brut = st && st.prix != null && st.prix !== '' ? st.prix : (a ? a.price : null); const v = brut != null && typeof brut === 'object' ? brut.amount : brut; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
-  const uids = (() => { const d = [...new Set((annonces || []).map((a) => a && a.accountId).filter(Boolean).map(String))];
-    return d.length ? d : (Array.isArray(comptes) ? comptes.map((a) => String(a.vinted_user_id || '')).filter(Boolean).slice(0, 12) : []); })();
-  const cle = uids.join(',');
-  const [statuts, setStatuts] = useState(undefined);
-  useEffect(() => {
-    let mort = false;
-    if (!uids.length) { setStatuts(null); return undefined; }
-    Promise.all(uids.map((u) => lecturePrixPro(u).then((x) => (x && typeof x.pro === 'boolean' ? x.pro : null), () => null)))
-      .then((l) => { if (!mort) setStatuts(l); }, () => { if (!mort) setStatuts(null); });
-    return () => { mort = true; };
-  }, [cle]);
-  const sites = React.useMemo(() => ({
-    vinted: { relie: relies.vinted, frais: fraisVintedSelon(statutVinted(statuts)) },
-    leboncoin: { relie: relies.leboncoin, frais: { regle: 'aucune' } },
-    ebay: { relie: relies.ebay, frais: tauxEbay(Array.isArray(ebay) ? ebay : null, commandeEbayEngagee) },
-    vestiaire: { relie: relies.vestiaire, frais: tauxVestiaire(Array.isArray(vc) ? vc : null, fraisVc) },
-  }), [relies.vinted, relies.leboncoin, relies.ebay, relies.vestiaire, statuts, ebay, vc]);
-  return <OuVendre prixDepart={prix} sites={sites}/>;
-}
-function InfosPaireCoque({ numero = '', itemId = '', recreeDe = '' }) {
-  const paire = { numero, itemId, recreeDe };
-  const infos = useInfosPaire(paire);
-  const [ouvert, setOuvert] = React.useState(false);
-  if (!paireIdentifiable(numero, itemId)) return null;
-  return <Suspense fallback={null}>
-    <div className="vrm-plus-groupe" style={{ margin: '12px 0' }}><InfosPaireVueP infos={infos} numero={String(numero || '')} onEditer={infos && infos.cachee ? null : () => setOuvert(true)}/></div>
-    {ouvert ? <InfosPaireFeuilleP valeur={infos && !infos.cachee ? infos : null} numero={String(numero || '')} onEnregistrer={(x) => ecrireInfosPaire(paire, x)} onClose={() => setOuvert(false)}/> : null}
-  </Suspense>;
-}
+// ⟦→ ecrans/FichePaire.jsx #7⟧
 // La rangée d'aide au-dessus du champ de réponse (Vinted) : questions repérées (109) + infos (108).
 function AideReponseCoque({ messages = [], itemId = '', numero = '', recreeDe = '', tailleFiche = '', partie = false, valeur = '', onInserer, desactive = false }) {
   const paire = { numero, itemId, recreeDe };
@@ -11470,20 +11159,7 @@ const vmrEtat = (timeoutMs = 6000) => vmrDemande('etat', {}, timeoutMs);
 // ⚠️⚠️ (20 nov., décision de Julien) Une commande qui AGIT sur Vinted, Leboncoin ou Vestiaire (src/actionsExtension.js,
 //    `CMDS_PLATEFORME`) ne part plus de l'app : elle se fait dans le panneau de l'extension (« … dans l'extension »).
 const vmrCmd = (p, timeoutMs = 9000) => (p && estCommandePlateforme(p.cmd) ? Promise.resolve(refusPanneau(tr('actionsExt.refus'))) : refusHorsLigne('extension') ? Promise.resolve({ ok: false, error: tr('horsligne.interdit.extension'), horsLigne: true }) : p && RELAIS_CMDS.includes(p.cmd) && relaisVivant() ? relaisCmd(p) : vmrDemande('cmd', p, timeoutMs));
-// (28 oct.) Les gestes LONGS sur Vinted (recréer, passer en brouillon, refaire,
-// mettre un brouillon en ligne, modifier) : « pas de réponse à temps » n'est PAS
-// « pas fait ». L'extension a pu supprimer, créer ou publier pendant que l'app
-// attendait (file Vinted occupée, photos lentes) — dire « échec » faisait
-// relancer une annonce peut-être déjà traitée. Trois issues, jamais deux :
-// la réponse · `{ envoye: false }` (aucune extension ici : rien n'est parti) ·
-// `{ sansReponse: true }` (envoyée, pas de réponse : PAS SU).
-const TEXTE_SANS_REPONSE = "l'extension n'a pas répondu à temps : elle a peut-être fini. Regarde l'annonce sur Vinted avant de relancer";
-const attenteGeste = (ms) => { const f = typeof window !== 'undefined' && window.__VRM_ATTENTE_GESTE; return Number.isFinite(f) && f > 0 ? f : ms; };
-async function vmrCmdSuivi(p, timeoutMs) {
-  if (!vmrExtPresent()) return { accepte: false, envoye: false, raison: "l'extension ne répond pas dans ce navigateur : rien n'est parti" };
-  let r = null; try { r = await vmrCmd(p, attenteGeste(timeoutMs)); } catch (_) { r = null; }
-  return r || { sansReponse: true };
-}
+// ⟦→ ecrans/Feuilles.jsx #9⟧
 
 // ══════════════════════════════════════════════════════════════════════════════
 // LE RELAIS DU TÉLÉPHONE (extension 5.183) — « quand je suis sur mon téléphone
@@ -11926,6 +11602,9 @@ const poserLier = (v) => { __lier = v; try { if (v && (v.etat === 'attente' || v
 const LIER_RETOUR_CLE = 'vrm_lier_extension_oauth';
 const FOURNISSEURS_LIER = ['google', 'discord'];
 let __lierConnexion = null;      // { fournisseur, at } — consommé par AuthScreen
+// (27 nov., budget-vitesse) AuthScreen vit dans src/ecrans/Connexion.jsx (chargé à la demande) : un module ne réaffecte
+// pas une variable d'App — il la consomme par ce poseur.
+function oublierLierConnexion() { __lierConnexion = null; }
 let __lierRetourPerime = false;  // retour de Google après 10 min : le dire, avec le geste
 // Le bouton à nommer dans la fenêtre de l'extension : à un compte CRÉÉ avec
 // Google ou Discord, et seulement à une extension qui l'a (`lieroauth`, 5.325 —
@@ -14220,7 +13899,7 @@ const zonesCodesTampon = (rendu) => {
   }
   return out;
 };
-const recouvreTampon = (zones, b) => (zones || []).some((z) => b.x < z.x + z.w && b.x + b.w > z.x && b.y < z.y + z.h && b.y + b.h > z.y);
+// ⟦→ ecrans/Feuilles.jsx #10⟧
 // ② La page 1 redessinée telle qu'elle s'affiche, à l'échelle 1:1, sur une
 // page plus haute de `TAMPON.bande` : le cartouche va dans la bande, dessous.
 const pageAvecBande = async (PL, pdf, bold, reg, numero, titre) => {
@@ -16877,40 +16556,7 @@ function FicheConvVolet({ etat, fc, raison, site }) {
 }
 // La place d'un N° dans « Mes meubles » (par `cleNum`), écrite comme dans la fiche Vinted.
 const rangementDuNum = (num) => { if (!num) return null; try { const o = ouDansMeubles(num); if (o) return `${o.meuble.name || 'Meuble'} · ${o.libelle}`; } catch (_) {} return null; };
-// ⟦→ ecrans/Vestiaire.jsx #5⟧
-// La même composition, passée aux écrans qui vivent hors de ce fichier (eBay → Messages, src/ebayGestion.jsx).
-const COMPO_MESSAGES = { LigneConv, CadreFil, TeteFil, BulleConv, RapidesConv, ComposeConv, PiedSansEnvoi, FicheConvVolet, rapides: reponsesRapidesPartagees };
-// LA FICHE D'UN ÉCHANGE eBay (1er nov.) — par IDENTITÉ seulement (§5) : l'ItemID
-// que eBay rattache à l'échange, l'annonce captée de CE compte sous cet ItemID,
-// et le N° que porte SON SKU `VRM-{n°}` (ou le lien posé à la main), lu par
-// `numEbayLu` (la règle de l'écran eBay, §11 : un N° douteux ne désigne personne).
-// Sans ItemID : `null` ⇒ « Pas reliée ».
-const paireEbayDe = (m, annonces, compteNom) => {
-  const id = m && m.itemId != null ? String(m.itemId).trim() : '';
-  if (!/^\d{1,19}$/.test(id)) return null;
-  const a = annonces ? annonces.get(id) || null : null;
-  const num = numEbayLu(a && a.sku, id, null, a && a.depuis) || '';
-  const p = a && a.price != null && a.price !== '' ? Number(String(a.price).replace(',', '.')) : NaN;
-  const obs = a && Number.isInteger(a.observateurs) ? a.observateurs : null;
-  return { item: id, num, photo: a && /^https:\/\//.test(String(a.photo || '')) ? a.photo : null, titre: (a && a.title) || (m.titre || ''),
-    // Le prix de l'annonce dans SA devise (affiché, jamais converti ni compté, §5).
-    sous: [Number.isFinite(p) && p > 0 ? `${p.toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(p) ? 0 : 2, maximumFractionDigits: 2 })} ${!a.currency || a.currency === 'EUR' ? '€' : a.currency}` : null, 'eBay', compteNom || null],
-    blocs: [{ cle: 'rangement', lib: 'Rangée', val: rangementDuNum(num) }, { cle: 'attention', lib: 'Attention', val: obs != null ? `${obs} observateur${obs > 1 ? 's' : ''}` : null }],
-    lien: URL_ITEM_EBAY(id) ? { href: URL_ITEM_EBAY(id), texte: 'Voir l’annonce sur eBay ↗' } : null };
-};
-// Messages · eBay en volets : les annonces de CE compte (lecture projetée, §4.4),
-// puis l'écran d'avant (src/ebayGestion.jsx) avec la composition partagée.
-function EbayMessagesVolets({ compte, comptesEbay, ...p }) {
-  const [annonces, setAnnonces] = React.useState(null);   // Map ItemID → annonce · null pas encore lu / pas su
-  React.useEffect(() => { let vivant = true; (async () => {
-    let r = null; try { r = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items', Array.isArray(comptesEbay) ? comptesEbay : undefined); } catch (_) { r = null; }
-    if (!vivant || !r) return;
-    const m = new Map(); for (const a of r.items || []) { if (a && a.itemId != null && (a._compte || 'principal') === (compte || 'principal') && !m.has(String(a.itemId))) m.set(String(a.itemId), a); }
-    setAnnonces(m);
-  })(); return () => { vivant = false; }; }, [compte, comptesEbay]);
-  const nom = Array.isArray(comptesEbay) && comptesEbay.length >= 2 ? nomCompteEbay(comptesEbay.find((c) => c.ref === compte)) : '';
-  return <EbayMessages {...p} compte={compte} compo={COMPO_MESSAGES} paireDe={(m) => paireEbayDe(m, annonces, nom)}/>;
-}
+// ⟦→ ecrans/Plateformes.jsx #8⟧
 // ⚠️⚠️ NAVIGATION PAR TÂCHE (31 octobre, décision de Julien : « A · par tâche,
 // en améliorant encore », puis « pour l'espace, il faut totalement réorganiser
 // les onglets… tout peut être amélioré »). La barre ne range plus les écrans par
@@ -17445,20 +17091,7 @@ const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinte
 //    src/prixAttente.js) et part seule dès qu'un de ses navigateurs ouvre le site sur ce compte.
 //    Plus de second bouton, plus de feuille « Baisser le prix » ouverte par-dessus. Ne pas les remettre.
 const depPrixAttente = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: withOwner, conflit: SB_CONFLICT });
-const CAP_PRIX_SITE = { vinted: 'baisseprix', leboncoin: 'lbcprix', vestiaire: 'vcprix' };
-// Une extension qui sait relever les prix en attente est-elle CONNUE ? Celle de ce navigateur (le pont),
-// ou celle de l'ordinateur (son battement `relais_ext`, lu à l'ouverture de la feuille). « Pas su » ⇒ non.
-const extensionSaitAttendre = () => {
-  if (extSait('prixattente') === 'ok') return true;
-  const r = __relais;
-  return !!(r && r.ver && /^\d+\.\d+\.\d+$/.test(r.ver) && cmpVersion(r.ver, EXT_CAPACITES.prixattente) >= 0);
-};
-const envoisPrixVrm = (num) => envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE,
-  ici: (site) => extSait(CAP_PRIX_SITE[site]) === 'ok',
-  saitAttendre: extensionSaitAttendre,
-  // (20 nov., décision de Julien) Plus de baisse rangée par l'app (`cmd_prix_*`) : sur Vinted, Leboncoin et Vestiaire le prix
-  // se change dans le panneau de l'extension. Seul eBay part de la feuille.
-  deposer: async () => null });
+// ⟦→ ecrans/Feuilles.jsx #11⟧
 // Les commandes rangées PENDANT cette session : relues toutes les 30 s (page visible) et au signe de
 // l'extension ; leur issue est dite UNE fois (prix relu, ou pourquoi rien n'est parti). Lecture seule.
 const __prixSuivis = new Map();   // id → { num, site, cle }
@@ -17488,87 +17121,7 @@ function suivrePrixAttente(id, info) {
 }
 const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
 try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
-// La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
-// pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
-function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = false }) {
-  const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
-  const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
-  const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
-  const [formats, setFormats] = useState(null);         // { [idVinted]: true (format appris) | false } · null (pas su)
-  const { rn } = rechercheParNumero(num, numData, comptes);
-  const ex = extra && extra.num === num ? extra : null;
-  const lecture = !numData || !ex;
-  const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(num, rn, ex ? { ...ex, recettes, formats } : { lbcItems: undefined, vcItems: undefined, formats });
-  // Le « format appris » de chaque annonce Vinted de ce N° (`vrm_vinted_modele`, une date par annonce, jamais le corps : §4.4).
-  const idsVinted = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 12).join(',');
-  useEffect(() => {
-    if (!idsVinted) return undefined;
-    let vivant = true;
-    (async () => {
-      try {
-        const ids = idsVinted.split(',');
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_vinted_modele&select=${ids.map((id, i) => `f${i}:data->"${id}"->>at`).join(',')}`, { headers: sbAuth(), cache: 'no-store' });
-        if (!r.ok) return;
-        const rows = await r.json();
-        if (!vivant || !Array.isArray(rows)) return;
-        const l = rows[0] || {};
-        setFormats(Object.fromEntries(ids.map((id, i) => [id, !!l['f' + i]])));
-      } catch (_) {}
-    })();
-    return () => { vivant = false; };
-  }, [idsVinted]);
-  const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
-  const cles = sitesVus.filter((x) => x.site !== 'ebay').map((x) => x.cle).join(',');
-  const relire = React.useCallback(async () => {
-    if (!cles) { setAtt([]); return; }
-    setAtt(await lirePrixAttente(depPrixAttente(), cles.split(',')));
-  }, [cles]);
-  useEffect(() => { relire(); }, [relire]);
-  useEffect(() => {
-    let vivant = true;
-    if (extSait('prixattente') !== 'ok') lireRelais().then(() => { if (vivant) setSait(extensionSaitAttendre()); }).catch(() => {});
-    (async () => {
-      try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_prix_recette,vc_prix_recette)&select=id,appris:data->appris`, { headers: sbAuth() });
-        if (!r.ok) return;
-        const rows = await r.json();
-        if (!vivant || !Array.isArray(rows)) return;
-        const de = (id) => { const l = rows.find((x) => x && x.id === id); return l ? l.appris === true : false; };
-        setRecettes({ leboncoin: de('lbc_prix_recette'), vestiaire: de('vc_prix_recette') });
-      } catch (_) {}
-    })();
-    return () => { vivant = false; };
-  }, []);
-  // Tant qu'une baisse attend ou est prise : relue toutes les 20 s (page visible), et au signe de l'extension.
-  const enCours = Array.isArray(att) && att.some((v) => v.etat === 'attente' || v.etat === 'pris');
-  useEffect(() => {
-    const maj = () => relire();
-    window.addEventListener('vrm:prix-attente', maj);
-    const t = enCours ? setInterval(() => { if (!document.hidden) relire(); }, 20000) : null;
-    return () => { window.removeEventListener('vrm:prix-attente', maj); if (t) clearInterval(t); };
-  }, [enCours, relire]);
-  const reglageP = load(CLE_PRIX_PARTOUT, null);
-  const libelles = load('vinted_account_labels', {}) || {};
-  const compteDe = (uid) => { const a = (comptes || []).find((x) => String(x.vinted_user_id) === String(uid)); return a ? (libelles[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; };
-  // (19 nov., décision 1) La baisse par règle, réglée par compte Vinted de CE N° (éteinte par défaut, SON toucher).
-  const [regles, setRegles] = useState(() => load(REGLE_CLE, null));
-  const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
-    .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }))
-    // (19 nov., ext. 5.409) …et par compte LEBONCOIN de ce N° (`lbc:{compte}`, la même règle ; l'extension la lit dans
-    // `regleBaisseLbcTick` et passe par `baisserPrixLbc`). Vestiaire (20 nov., 5.410) : la règle se règle dans Automatisations.
-    .concat([...new Set(sitesVus.filter((x) => x.site === 'leboncoin' && x.compte).map((x) => 'lbc:' + String(x.compte).replace(/^lbc-account:/i, '')))]
-      .filter((k) => /^lbc:[\w:.-]{1,80}$/.test(k)).map((uid) => ({ uid, nom: 'Leboncoin', ...regleDuCompte(regles, uid) })));
-  const onRegle = null;   // (20 nov.) la baisse par règle se règle dans l'extension ; la feuille en dit l'état
-  return <PrixPartout key={num} num={rn.cle || num} focusPrix={focusPrix} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
-    onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
-    onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
-    onAppliquer={async ({ coches, prix, surEtat, gardeConfirme }) => {
-      const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: envoisPrixVrm(String(rn.cle || num)), surEtat, reglage: reglageP, gardeConfirme });
-      if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
-      relire();
-      return r;
-    }}/>;
-}
+// ⟦→ ecrans/Feuilles.jsx #12⟧
 // DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
 // sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
 // Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
@@ -19080,769 +18633,7 @@ const DOCS_LEGAUX = [
   // (13 nov., lot 50) Ce que VRM fait — et ne fait jamais (public/confiance.html), lisible sans compte.
   docLegal('/confiance', 'legal.confiance'),
 ];
-function LiensLegaux() {
-  return (
-    <nav aria-label={tr('legal.documents')} style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'4px 14px',marginTop:16,fontSize:12}}>
-      {DOCS_LEGAUX.map(([h,t]) => <a key={h} href={h} target="_blank" rel="noopener" style={{color:C.muted,textDecoration:'none'}}>{t}</a>)}
-    </nav>
-  );
-}
-
-// ── L'ÉCRAN DU CODE (double vérification) ─────────────────────────────────
-// Monté par `App` À LA PLACE du cœur : rien n'est lu tant qu'il est là.
-// `etatMfa` = 'verifier' : la session ne dit pas encore si un code est demandé
-// (rangée avant cette fonction, ou arrivée par un lien email) — on demande à
-// GoTrue. 'code' : on demande le code. Dans les deux cas, « pas su » (GoTrue
-// injoignable) se DIT, avec « Réessayer » ; on ne déconnecte jamais tout seul.
-// ── Compte créé par Discord/Google sans le savoir (30 octobre) ──────────────
-// Julien avait relié Discord à son compte (pseudo seulement), puis « Se
-// connecter avec Discord » a créé un SECOND compte VRM, vide. On le dit avant
-// d'ouvrir l'app, et on propose de supprimer ce compte vide (la route « Supprimer
-// mon compte », confirmée ici) pour pouvoir relier Discord au vrai compte.
-function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
-  const nom = fournisseur === 'google' ? 'Google' : 'Discord';
-  const [etape, setEtape] = React.useState('choix');
-  const [busy, setBusy] = React.useState(false);
-  const [err, setErr] = React.useState('');
-  // Ce Discord est-il celui déjà affiché (vérifié) sur un AUTRE compte VRM ?
-  // { email, pseudo } si oui · null sinon ou « pas su » (rien n'est dit).
-  const [deja, setDeja] = React.useState(null);
-  React.useEffect(() => {
-    if (fournisseur !== 'discord') return;
-    let fini = false;
-    fetch('/api/compte?mode=discord-deja', { headers: { ...enTeteSession() } })
-      .then(r => r.ok ? r.json() : null)
-      .then(j => { if (!fini && j && j.trouve === true && j.email) setDeja({ email: String(j.email), pseudo: String(j.pseudo || '') }); })
-      .catch(() => {});
-    return () => { fini = true; };
-  }, [fournisseur]);
-  const supprimer = async () => {
-    setBusy(true); setErr('');
-    try {
-      // (9 nov.) La route de « Supprimer mon compte » : ce compte vient d'être ouvert par
-      // Google/Discord (connexion de moins de 10 min), son clic ici est la confirmation.
-      const r = await fetch('/api/compte?mode=supprimer', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ confirmation: 'SUPPRIMER' }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(j?.message || 'Le compte n’a pas pu être supprimé. Réessaie.'); setBusy(false); return; }
-      // (13 nov., lot 51) Un compte qui n'est PAS vide part dans 30 jours (le serveur décide) : la phrase du serveur, telle quelle.
-      if (j && j.prevue) { setErr(j.message || 'La suppression de ce compte est prévue dans 30 jours.'); setBusy(false); return; }
-      setEtape('fait');
-      setTimeout(() => { authSignOut(); }, 6000);
-    } catch (_) { setErr('Le serveur ne répond pas. Rien n’a été supprimé, réessaie.'); setBusy(false); }
-  };
-  const boite = { maxWidth: 460, margin: '10vh auto 0', padding: 24, borderRadius: 14, background: C.card, color: C.text, border: `1px solid ${C.border}` };
-  return <div data-porte-nouveau-oauth={etape} style={{ minHeight: '100vh', background: C.bg, padding: 16, boxSizing: 'border-box' }}>
-    <div style={boite} role="dialog" aria-modal="true" aria-labelledby="vrm-nouveau-oauth-titre">
-      {etape === 'choix' && <>
-        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>{deja ? 'Ce Discord est déjà sur ton compte VRM' : 'Nouveau compte VRM ?'}</h1>
-        {deja
-          ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} sert de pseudo à <strong style={{ color: C.text }}>{deja.email}</strong>, pas pour te connecter. Ce nouveau compte est vide.</p>
-          : <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>}
-        <div style={{ display: 'grid', gap: 10 }}>
-          {deja && <Bouton variante="primaire" plein  data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</Bouton>}
-          <button type="button" className={`vrm-b ${deja ? 'vrm-b-discret' : 'vrm-b-primaire'} vrm-b-plein`} data-nouveau-oauth="continuer" onClick={onContinuer}>Oui, c’est un nouveau compte</button>
-          {!deja && <Bouton variante="secondaire" plein  data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</Bouton>}
-        </div>
-      </>}
-      {etape === 'confirmer' && <>
-        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>Supprimer ce compte vide ?</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Ton vrai compte n’est pas touché. Ensuite :</p>
-        <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
-        {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
-        <div style={{ display: 'grid', gap: 10 }}>
-          <Bouton variante="primaire" plein  data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</Bouton>
-          <Bouton variante="discret" plein  onClick={() => setEtape('choix')} disabled={busy}>Annuler</Bouton>
-        </div>
-      </>}
-      {etape === 'fait' && <>
-        <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
-        <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
-        <Bouton variante="primaire" plein  onClick={() => authSignOut()}>Aller à la connexion</Bouton>
-      </>}
-    </div>
-  </div>;
-}
-function PorteMfa({ session }) {
-  const etat = etatMfa(session);
-  const [passu, setPassu] = React.useState(false);
-  const [code, setCode] = React.useState('');
-  const [busy, setBusy] = React.useState(false);
-  const [err, setErr] = React.useState('');
-  const [essai, setEssai] = React.useState(0);
-  // 'verifier' : relire les facteurs, puis ranger la réponse dans la session.
-  React.useEffect(() => {
-    if (etat !== 'verifier') return;
-    let mort = false;
-    setPassu(false);
-    (async () => {
-      const f = await mfaLireFacteurs();
-      if (mort) return;
-      if (!f) { setPassu(true); return; }
-      const cur = AUTH.session;
-      if (!cur || cur.access_token !== session.access_token) return;
-      writeSession({ ...cur, totp: f.verifies.map((x) => String(x.id)), totpNoms: totpNoms(f.user) });
-    })();
-    return () => { mort = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etat, essai, session.access_token]);
-  // « Pas su » : on réessaie aussi tout seul, toutes les 15 s (le bouton reste).
-  React.useEffect(() => {
-    if (etat !== 'verifier' || !passu) return;
-    const t = setTimeout(() => setEssai((n) => n + 1), 15000);
-    return () => clearTimeout(t);
-  }, [etat, passu, essai]);
-  const envoyer = async (e) => {
-    e && e.preventDefault();
-    if (busy) return;
-    setErr(''); setPassu(false);
-    const ids = Array.isArray(session.totp) ? session.totp : [];
-    if (!ids.length) { setEssai((n) => n + 1); return; }
-    setBusy(true);
-    // Le code de N'IMPORTE LEQUEL de ses appareils (22 octobre) : on ne lui
-    // demande pas lequel, on les essaie tous (`mfaVerifierCodeParmi`).
-    let r = await mfaVerifierCodeParmi(ids, code);
-    // Liste périmée (un appareil retiré depuis un autre écran) : on relit les
-    // facteurs chez GoTrue et on réessaie UNE fois avec le même code — sinon
-    // un code juste serait refusé pour toujours.
-    if (r.introuvable) {
-      const f = await mfaLireFacteurs();
-      if (!f) { setBusy(false); setPassu(true); return; }
-      const cur = AUTH.session;
-      const frais = f.verifies.map((x) => String(x.id));
-      if (cur && cur.access_token === session.access_token) writeSession({ ...cur, totp: frais, totpNoms: totpNoms(f.user) });
-      if (!frais.length) { setBusy(false); return; }   // plus aucun appareil : `etatMfa` laisse entrer
-      r = await mfaVerifierCodeParmi(frais, code);
-    }
-    setBusy(false);
-    if (r.ok) return;            // la session passe en aal2 : `App` monte le cœur
-    if (r.passu) { setPassu(true); return; }
-    setErr(r.message || 'Code refusé.'); setCode('');
-  };
-  // Les appareils enregistrés, nommés (la session les porte — `totpNoms`).
-  const noms = (Array.isArray(session.totp) ? session.totp : []).map((id) => (session.totpNoms && session.totpNoms[id]) || '').filter(Boolean);
-  const plusieurs = Array.isArray(session.totp) && session.totp.length > 1;
-  const contact = contactEmail();
-  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12, padding:'13px 14px', fontSize:20, letterSpacing:6, textAlign:'center',
-    background:C.card, color:C.text, outline:'none', fontFamily:'inherit', fontVariantNumeric:'tabular-nums' };
-  const lien = { background:'none', border:'none', color:C.muted, fontSize:13, cursor:'pointer', fontFamily:'inherit', padding:'10px 4px', minHeight:44, textDecoration:'underline' };
-  return (
-    <div data-porte-mfa={etat} data-mfa-passu={passu ? '1' : '0'} style={{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px 20px'}}>
-      <div style={{width:'100%',maxWidth:380}}>
-        <div style={{textAlign:'center',marginBottom:22}}><VrmLogo size={64}/></div>
-        <form onSubmit={envoyer} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'20px 18px',boxShadow:C.shadow||'none'}}>
-          {etat === 'verifier' ? (<>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:6}}>{passu ? 'Vérification impossible pour l’instant' : 'Vérification de ta connexion…'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>
-              {passu
-                ? <>Service de connexion muet. Tu restes connecté : réessaie dans un instant.</>
-                : <>Je regarde si ton compte demande un code de vérification.</>}
-            </div>
-            {passu && <button type="button" data-mfa-reessayer="" onClick={() => setEssai((n) => n + 1)} style={{marginTop:14,width:'100%',minHeight:46,border:'none',borderRadius:12,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Réessayer</button>}
-          </>) : (<>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.4,marginBottom:4}}>Code de ton app d'authentification</div>
-            <div data-mfa-appareils={Array.isArray(session.totp) ? session.totp.length : ''} style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.5}}>
-              La double vérification est activée sur <b style={{color:C.text}}>{(session.user && session.user.email) || 'ton compte'}</b>. {plusieurs
-                ? <>Ouvre l'app d'authentification de <b style={{color:C.text}}>l'un</b> de tes appareils{noms.length ? <> ({noms.join(' · ')})</> : null} et tape le code à 6 chiffres affiché pour VRM — celui de n'importe lequel marche.</>
-                : <>Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.</>}
-            </div>
-            <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
-              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
-            {err && <div data-mfa-erreur="" style={{fontSize:13,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
-            {passu && <div data-mfa-injoignable="" style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginTop:10,lineHeight:1.45}}>Code pas vérifié (service muet). Tu restes connecté : réessaie.</div>}
-            <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6}
-              style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:12,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
-              {busy ? 'Vérification…' : passu ? 'Réessayer' : 'Valider'}
-            </button>
-            <div data-mfa-perdu={plusieurs ? 'autre-appareil' : 'contact'} style={{fontSize:12,color:C.muted,marginTop:14,lineHeight:1.5,borderTop:`1px solid ${C.border}`,paddingTop:12}}>
-              {plusieurs
-                ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec un AUTRE appareil, puis retire le perdu (Paramètres → Double vérification).</>
-                : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse e-mail de ton compte : {contact
-                  ? <a href={`mailto:${contact}`} style={{color:C.accentTexte,textDecoration:'none',display:'inline-flex',alignItems:'center',minHeight:44}}>{contact}</a>
-                  : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
-            </div>
-          </>)}
-        </form>
-        <div style={{textAlign:'center',marginTop:8}}>
-          <button type="button" data-mfa-deconnexion="" onClick={() => { authSignOut(); location.reload(); }} style={lien}>Se déconnecter</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── La vérification anti-robot de l'écran de connexion (src/captcha.js) ─────
-// Rendue SEULEMENT quand une clé de site Turnstile est posée : sans clé, rien —
-// ni widget, ni requête vers Cloudflare. Le widget se recharge sur « Réessayer ».
-function useCaptcha() {
-  const [e, setE] = React.useState(etatCaptcha);
-  React.useEffect(() => abonnerCaptcha(setE), []);
-  return e;
-}
-function CaptchaConnexion({ etat }) {
-  const ref = React.useRef(null);
-  const [essai, setEssai] = React.useState(0);
-  React.useEffect(() => monterWidget(ref.current, { sombre: C === THEMES.dark }), [essai]);
-  if (!captchaActif()) return null;
-  return (
-    <div data-captcha={etat.statut} style={{marginBottom:10}}>
-      <div ref={ref} data-captcha-widget="" style={{minHeight:etat.statut==='erreur'?0:65}}/>
-      {etat.statut === 'charge' && <div data-captcha-attente="" style={{fontSize:12,color:C.muted,lineHeight:1.45}}>{tr('auth.captcha.charge')}</div>}
-      {etat.statut === 'interactif' && <div data-captcha-attente="" style={{fontSize:12,color:C.text,lineHeight:1.45}}>{tr('auth.captcha.interactif')}</div>}
-      {etat.statut === 'erreur' && (
-        <div data-captcha-erreur="" style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',lineHeight:1.45}}>
-          {MSG_CAPTCHA_ERREUR}
-          <div><button type="button" data-captcha-reessayer="" onClick={() => setEssai((n) => n + 1)}
-            style={{marginTop:8,minHeight:46,border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:12,padding:'0 14px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{tr('commun.reessayer')}</button></div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AuthScreen() {
-  // Trois états : `undefined` = on sonde · `true` = la clé publique lit encore
-  // · `false` = fermée · `null` = pas su. Une seule requête, en lecture seule
-  // (§2.3 : une sonde n'écrit jamais dans sa base).
-  const [ouverte, setOuverte] = React.useState(undefined);
-  const [moyensConnexion,setMoyensConnexion]=React.useState(etatAuthSettings);
-  React.useEffect(()=>{
-    const actualiser=()=>setMoyensConnexion(etatAuthSettings());
-    const off=onAuthSettingsChange(actualiser);actualiser();return off;
-  },[]);
-  React.useEffect(() => {
-    let stop = false;
-    (async () => { const v = await sondeLectureSansCompte(); if (!stop) setOuverte(v); })();
-    return () => { stop = true; };
-  }, []);
-  // `?inscription` = le bouton « Créer mon compte » de la page d'accueil : on
-  // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
-  // des inscriptions en moins).
-  const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
-    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN || PARTENAIRE_DU_LIEN) ? 'up'
-    // 5.328 : « Mot de passe oublié ? » dans la carte de l'extension.
-    : /[?&]mot-de-passe-oublie(=|&|$)/.test(window.location.search || '') ? 'reset' : 'in')); // in · up · reset · newpw
-  const [email, setEmail] = React.useState('');
-  // Le prénom demandé à l'inscription : il sert au bonjour de l'accueil, rien
-  // d'autre. Rangé dans le même réglage synchronisé que le champ de Réglages
-  // (§11) — un seul propriétaire, `vrm_prenom`.
-  const [prenom, setPrenom] = React.useState('');
-  const [pw, setPw] = React.useState('');
-  const [motDePasseVisible, setMotDePasseVisible] = React.useState(false);
-  React.useEffect(()=>setMotDePasseVisible(false),[mode]);
-  const [busy, setBusy] = React.useState(false);
-  const [fournisseurEnCours,setFournisseurEnCours]=React.useState('');
-  const demandeEnCours=React.useRef(false);
-  const [err, setErr] = React.useState(() => (AUTH_REDIRECT && AUTH_REDIRECT.error) || '');
-  const [info, setInfo] = React.useState('');
-  // (13 nov., lot 54) « Offert par <nom choisi> » : lu SANS session par le code du lien (le nom seul).
-  // `undefined` en cours · `null` pas su (rien n'est dit) · { ouvert, connu, nom }.
-  const [apercuParrain, setApercuParrain] = React.useState(undefined);
-  React.useEffect(() => { const c = codeParrainGarde(); if (!c) { setApercuParrain(null); return; } let stop = false; lireApercuParrain(c).then((x) => { if (!stop) setApercuParrain(x); }); return () => { stop = true; }; }, []);
-  const [needConfirm, setNeedConfirm] = React.useState(false);   // compte créé, email pas encore confirmé
-  const [confirmLink, setConfirmLink] = React.useState('');      // lien du mail, collé à la main
-  const [resetEnvoye, setResetEnvoye] = React.useState('');      // (8 nov.) adresse à qui le lien vient de partir
-  // 22 oct. : GoTrue a refusé un email redemandé trop tôt (« after N seconds »)
-  // ⇒ les boutons qui envoient un email restent grisés jusqu'à `finAttente`, et
-  // la phrase dit le temps qui reste. Une autre adresse tapée remet à zéro.
-  const [finAttente, setFinAttente] = React.useState(0);
-  const resteAttente = useSecondesRestantes(finAttente);
-  const enAttenteEmail = resteAttente > 0;
-  const attendreEmail = (r) => { if (r && r.attente) { setFinAttente(Date.now() + r.attente * 1000); setErr(''); return true; } return false; };
-  const captcha = useCaptcha();
-  // Sans jeton anti-robot, les appels protégés ne partent pas : le bouton le DIT.
-  const attendCaptcha = captchaActif() && mode !== 'newpw' && captcha.statut !== 'pret';
-
-  // Retour « en arrière » depuis Google/Discord : le navigateur restaure la page
-  // depuis son cache (bfcache) avec l'état React FIGÉ — `busy` reste à true et le
-  // bouton « Se connecter » reste bloqué sur « ... ». `pageshow`+`persisted` est
-  // le seul signal d'une restauration bfcache : on débloque le bouton.
-  React.useEffect(() => {
-    const onShow = (e) => { if (e && e.persisted) {demandeEnCours.current=false;setBusy(false);setFournisseurEnCours('');} };
-    window.addEventListener('pageshow', onShow);
-    return () => window.removeEventListener('pageshow', onShow);
-  }, []);
-
-  const changerMode = (suivant) => {
-    if(busy||demandeEnCours.current)return;
-    setMode(suivant);setErr('');setInfo('');setNeedConfirm(false);setConfirmLink('');
-    // L'attente posée par NOTRE envoi réussi ne suit pas sur un autre écran (un refus de Supabase, lui, garde la sienne).
-    if(resetEnvoye){setResetEnvoye('');setFinAttente(0);}
-  };
-
-  const oauth = async (p, intention) => {
-    if(busy||demandeEnCours.current)return;
-    demandeEnCours.current=true;setErr('');setInfo('');setBusy(true);setFournisseurEnCours(p);
-    try {
-      const r=await oauthStart(p, intention||(mode==='up'?'inscription':'connexion'));
-      if (!r.ok) {demandeEnCours.current=false;setErr(r.error);setBusy(false);setFournisseurEnCours('');}
-    } catch (_) {demandeEnCours.current=false;setErr(tr('auth.err.ouverture'));setBusy(false);setFournisseurEnCours('');}
-    // Le verrou reste pris pendant le départ chez le fournisseur ; pageshow
-    // le libère si l’utilisateur revient en arrière avec le cache du navigateur.
-  };
-  // 8 nov. (5.325) : arrivé de l'extension par « Continuer avec Google /
-  // Discord » (`__lierConnexion`, posé au chargement si aucune session) : on
-  // part chez le fournisseur sans second clic — seulement s'il est ACTIVÉ chez
-  // Supabase (lu, jamais supposé). Pas activé ⇒ cet écran, et la phrase.
-  // « Pas su » (lecture ratée) ⇒ la phrase, la demande reste : « Réessayer »
-  // la relance. Une fois, puis oubliée (deux minutes au plus après l'arrivée).
-  const [lierFournisseur] = React.useState(() => (__lierConnexion && mode === 'in' && Date.now() - __lierConnexion.at < 2 * 60000) ? __lierConnexion.fournisseur : '');
-  const [lierFournisseurMot, setLierFournisseurMot] = React.useState('');
-  React.useEffect(() => {
-    if (!lierFournisseur || !__lierConnexion) return;
-    const nom = lierFournisseur === 'google' ? 'Google' : 'Discord';
-    if (moyensConnexion.statut === 'pret') {
-      __lierConnexion = null;
-      if (providerEnabled(lierFournisseur)) { setLierFournisseurMot(''); oauth(lierFournisseur); }
-      else setLierFournisseurMot(tr('auth.lier.pasOuverte', { nom }));
-    } else if (moyensConnexion.statut === 'erreur') setLierFournisseurMot(tr('auth.lier.pasVerifie', { nom }));
-    else if (moyensConnexion.statut === 'initial') loadAuthSettings();
-  }, [moyensConnexion.statut]);
-
-  const actionConfirmation = async (action) => {
-    if(busy||demandeEnCours.current||(action!=='confirmer'&&enAttenteEmail))return;
-    demandeEnCours.current=true;setBusy(true);setErr('');setInfo('');
-    try {
-      const r=await (action==='confirmer'?authConfirmFromLink(confirmLink,email):action==='renvoyer'?authResendConfirm(email):authMagicLink(email));
-      if(!r.ok){if(r.recovery){setMode('reset');setNeedConfirm(false);setConfirmLink('');}if(!attendreEmail(r))setErr(r.error);return;}
-      if(action==='confirmer'){
-        setNeedConfirm(false);setConfirmLink('');
-        setInfo(r.connected?tr('auth.info.compteConfirme'):tr('auth.info.adresseConfirmee'));
-        if(r.connected)setTimeout(()=>location.reload(),800);
-      } else if(action==='renvoyer')setInfo(tr('auth.info.nouvelEmail'));
-      else setInfo(tr('auth.info.lienEnvoye'));
-    } catch (_) {setErr(tr('auth.err.demande'));}
-    finally {demandeEnCours.current=false;setBusy(false);}
-  };
-
-  const submit = async (e) => {
-    e && e.preventDefault();
-    if(busy||demandeEnCours.current)return;
-    if (enAttenteEmail && (mode === 'up' || mode === 'reset')) return;
-    setErr(''); setInfo('');
-    if (mode !== 'newpw' && !email.trim()) { setErr(tr('auth.err.email')); return; }
-    if (mode !== 'reset' && !pw) {setErr(tr('auth.err.motDePasse'));return;}
-    if ((mode === 'up' || mode === 'newpw') && pw.length < 8) { setErr(tr('auth.err.court')); return; }
-    // Un mot de passe qui protège une comptabilité mérite mieux que « 12345678 ».
-    if ((mode === 'up' || mode === 'newpw') && /^(\d+|[a-z]+)$/i.test(pw)) { setErr(tr('auth.err.melange')); return; }
-    demandeEnCours.current=true;setBusy(true);
-    try {
-      if (mode === 'newpw') {
-        const r = await authSetPassword(pw);
-        if (!r.ok) setErr(r.error);
-        else { setInfo(tr('auth.info.mdpEnregistre')); setTimeout(()=>location.reload(), 900); }
-      } else if (mode === 'reset') {
-        const rr = await authReset(email);
-        if (rr && rr.captcha) { setErr(rr.error); return; }
-        if (rr && !rr.ok && attendreEmail({ attente: delaiDemandeEmail(rr.error) })) return;
-        if(!rr?.ok){setErr(tr('auth.err.envoiLien'));return;}
-        // Réponse volontairement identique que le compte existe ou non : sinon
-        // ce formulaire dirait à n'importe qui quels emails sont inscrits.
-        // (8 nov.) La phrase dit le geste ; « Renvoyer » attend l'intervalle de
-        // Supabase (60 s) sur le bouton lui-même.
-        const adresse=String(email).trim().toLowerCase();
-        setResetEnvoye(adresse);setFinAttente(Date.now()+60*1000);
-        setInfo(tr('auth.info.emailEnvoye', { adresse }));
-      } else if (mode === 'up') {
-        // On l'écrit AVANT de partir : `save` range dans le navigateur et le
-        // nuage suivra à la première synchro. Écrit seulement s'il l'a donné —
-        // on n'invente pas un prénom vide (§5 : mieux vaut un blanc qu'un faux).
-        try { if (prenom.trim()) save('vrm_prenom', prenom.trim()); } catch (_) {}
-        const r = await authSignUp(email, pw);
-        if (!r.ok) { if(attendreEmail(r)){} else if(r.incertain){setMode('in');setInfo(r.error);}else setErr(r.error); }
-        else if (r.needsConfirm) { setNeedConfirm(true); setMode('in'); setInfo(tr('auth.info.compteCree')); }
-        else location.reload();
-      } else {
-        const r = await authSignIn(email, pw);
-        if (!r.ok) { setErr(r.needsConfirm?'':r.error); setNeedConfirm(!!r.needsConfirm); }
-        // Rechargement volontaire après connexion : l'app relit alors le cloud
-        // du bon vendeur depuis un état propre. Sans ça, un composant déjà monté
-        // pourrait garder en mémoire les données du vendeur précédent.
-        else location.reload();
-      }
-    } catch (_) {setErr(tr('auth.err.demande'));}
-    finally { demandeEnCours.current=false;setBusy(false); }
-  };
-
-  // 16 px : sous 16 px, Safari iPhone ZOOME la page au toucher d'un champ.
-  const field = { width:'100%', boxSizing:'border-box', border:`1px solid ${C.border}`, borderRadius:12,
-    padding:'0 14px', height:50, fontSize:17, background:C.card, color:C.text, outline:'none', fontFamily:'inherit' };
-
-  // 21 oct. — « l'onglet connexion est nul » : un logo carré au milieu d'un
-  // fond gris, sans dire où l'on est. Deux colonnes sur ordinateur (la marque
-  // à gauche, sur l'ardoise de la page d'accueil ; le formulaire à droite),
-  // un en-tête de marque sur téléphone. La logique ne change pas.
-  return (
-    <div className="vrm-cx" data-espace="autres" data-connexion="">
-      <style>{`
-.vrm-cx{min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;background:${C.bg}}
-.vrm-cx-marque{position:relative;overflow:hidden;background:#1D1D1F;color:#F5F5F7;padding:calc(18px + env(safe-area-inset-top)) 20px 64px}
-.vrm-cx-marque:before{content:none}
-.vrm-cx-haut{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.vrm-cx-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
-.vrm-cx-logo img{width:36px;height:36px;border-radius:12px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
-.vrm-cx-logo b{font-size:20px;letter-spacing:-.04em;font-weight:700}
-.vrm-cx-retour{display:inline-flex;align-items:center;min-height:44px;font-size:15px;color:#98989D;text-decoration:none;font-weight:400}
-.vrm-cx-titre{position:relative;font-size:28px;line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:22px 0 0}
-.vrm-cx-titre span{display:block;color:#98989D}
-.vrm-cx-points{display:none}
-.vrm-cx-main{display:flex;justify-content:center;padding:0 16px 32px}
-.vrm-cx-boite{width:100%;max-width:400px;margin-top:-44px;position:relative}
-.vrm-cx-form{background:${C.card};border:0;border-radius:20px;padding:22px 20px;box-shadow:none}
-.vrm-cx-form input:focus{border-color:${C.accent}!important;box-shadow:0 0 0 3px ${C.accent}26}
-.vrm-cx-form button[type=submit]{min-height:50px;border-radius:999px!important;transition:transform 140ms cubic-bezier(0.23,1,0.32,1),opacity 140ms ease}
-.vrm-cx-form button[type=submit]:active{transform:scale(.98)}
-.vrm-cx-liens button{min-height:44px}
-.vrm-cx-exemple{margin:14px 0 0;text-align:center}
-.vrm-cx-exemple p{margin:0 0 8px;font-size:13px;line-height:1.45;color:${C.muted}}
-.vrm-cx-exemple a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:999px;border:0;background:rgba(118,118,128,${C.bg==='#000000'||C.bg==='#000'?'.24':'.12'});color:${C.text};font-size:15px;font-weight:600;text-decoration:none}
-.vrm-cx-exemple a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
-.vrm-cx-oublie{border:0;background:transparent;color:${C.accentTexte||C.accent};padding:4px 0;font:inherit;font-size:13px;font-weight:600;min-height:44px;cursor:pointer}
-.vrm-cx-aide-confirmation{margin-top:12px;border-top:1px solid ${C.border};padding-top:10px}
-.vrm-cx-aide-confirmation summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;color:${C.accentTexte||C.accent}}
-.vrm-cx-form button:disabled{cursor:default}
-.vrm-cx-champ{display:block;margin-bottom:12px;font-size:13px;font-weight:600;color:${C.text}}
-.vrm-cx-parrain{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.45;color:${C.text};background:${C.accent}0D;border:1px solid ${C.accent}40;border-radius:12px;padding:10px 12px;margin-bottom:14px}
-.vrm-cx-parrain-ic{display:flex;flex:none;color:${C.accentTexte||C.accent};margin-top:1px}
-.vrm-cx-parrain b{display:block;font-weight:600;overflow-wrap:anywhere}
-.vrm-cx-parrain-texte{display:block;color:${C.muted};font-size:13px}
-.vrm-cx-parrain-montrer{display:flex;align-items:center;gap:8px;min-height:44px;margin-top:4px;font-size:14px;color:${C.text};cursor:pointer}
-.vrm-cx-parrain-montrer input{width:20px;height:20px;margin:0;flex:none}
-.vrm-cx-champ>span:first-child{display:block;margin-bottom:6px}
-.vrm-cx-secret{position:relative;display:block}
-.vrm-cx-secret button{position:absolute;right:4px;top:3px;min-height:44px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:${C.accentTexte||C.accent};font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
-.vrm-cx-form button:focus-visible,.vrm-cx-form a:focus-visible{outline:2px solid ${C.accent};outline-offset:3px}
-.vrm-cx-regles{display:flex;flex-wrap:wrap;gap:5px 12px;margin:0 0 14px;padding:0;list-style:none;font-size:12px;line-height:1.5;color:${C.muted}}
-.vrm-cx-regles [data-valide=true]{color:${C.accentTexte||C.accent}}
-.vrm-cx-regles li:before{content:'○ ';font-weight:700}
-.vrm-cx-regles [data-valide=true]:before{content:'✓ '}
-.vrm-cx-form [role=status],.vrm-cx-form [role=alert]{overflow-wrap:anywhere}
-@media (min-width:900px){
- .vrm-cx{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr}
- .vrm-cx-marque{display:flex;flex-direction:column;padding:40px 56px}
- .vrm-cx-titre{font-size:clamp(34px,3vw,44px);margin-top:auto}
- .vrm-cx-points{display:grid;gap:14px;margin:28px 0 auto;padding:0;list-style:none;max-width:420px;position:relative}
- .vrm-cx-points li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.5;color:#98989D}
- .vrm-cx-points li b{color:#F5F5F7;font-weight:600}
- .vrm-cx-points i{width:28px;height:28px;border-radius:12px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:13px;color:#F5F5F7}
- .vrm-cx-pied{position:relative;font-size:13px;color:#98989D}
- .vrm-cx-main{align-items:center;padding:40px}
- .vrm-cx-boite{margin-top:0}
-}
-/* 27 oct. — Julien : « une animation sur l'onglet de connexion ». Une aurore lente
-   derrière la marque (trois halos sauge et pétrole qui dérivent, transform seul),
-   des étiquettes qui flottent (décor, aria-hidden, aucun chiffre : rien
-   d'inventé), puis l'entrée : titre, points et formulaire arrivent en cascade.
-   Rien si « réduire les animations ». */
-.vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#16181D;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#6E6E73;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
-.vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2C2C2E;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
-@keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
-@keyframes vrmCxDerive2{to{transform:translate3d(-22%,10%,0) scale(.9)}}
-@keyframes vrmCxDerive3{to{transform:translate3d(-12%,-18%,0) scale(1.15)}}
-.vrm-cx-etiquettes{display:none}
-.vrm-cx-titre,.vrm-cx-titre span,.vrm-cx-points li,.vrm-cx-boite{animation:vrmCxEntre .62s cubic-bezier(.23,1,.32,1) both}
-.vrm-cx-titre span{animation-delay:.09s}
-.vrm-cx-points li:nth-child(1){animation-delay:.18s}
-.vrm-cx-points li:nth-child(2){animation-delay:.26s}
-.vrm-cx-points li:nth-child(3){animation-delay:.34s}
-.vrm-cx-boite{animation-name:vrmCxMonte;animation-delay:.12s}
-@keyframes vrmCxEntre{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
-@keyframes vrmCxMonte{from{opacity:0;transform:translate3d(0,18px,0) scale(.98)}to{opacity:1;transform:none}}
-@media (min-width:1200px){
- .vrm-cx-etiquettes{display:block;position:absolute;inset:0;pointer-events:none}
- .vrm-cx-etiquettes span{position:absolute;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;color:#F5F5F7;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:vrmCxFlotte 7s ease-in-out infinite alternate,vrmCxEntre .7s cubic-bezier(.23,1,.32,1) both}
- .vrm-cx-etiquettes span:before{content:"";width:7px;height:7px;border-radius:50%;background:#F5F5F7;box-shadow:0 0 0 4px rgba(245,245,247,.14)}
- .vrm-cx-etiquettes span:nth-child(1){right:8%;top:13%;animation-delay:0s,.45s}
- .vrm-cx-etiquettes span:nth-child(2){right:36%;top:17%;animation-duration:8.5s,.7s;animation-delay:-2s,.55s}
- .vrm-cx-etiquettes span:nth-child(3){right:8%;bottom:22%;animation-duration:9s,.7s;animation-delay:-4s,.65s}
- .vrm-cx-etiquettes span:nth-child(4){right:32%;bottom:12%;animation-duration:7.8s,.7s;animation-delay:-1s,.75s}
-}
-@keyframes vrmCxFlotte{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,-12px,0)}}
-@media (prefers-reduced-motion:reduce){
- .vrm-cx-form button[type=submit]{transition:none}
- .vrm-cx-aurore i,.vrm-cx-etiquettes span,.vrm-cx-titre,.vrm-cx-titre span,.vrm-cx-points li,.vrm-cx-boite{animation:none}
-}
-`}</style>
-      <aside className="vrm-cx-marque">
-        <div className="vrm-cx-aurore" aria-hidden="true" data-cx-aurore=""><i/><i/><i/></div>
-        <div className="vrm-cx-etiquettes" aria-hidden="true"><span>{tr('auth.deco.colis')}</span><span>{tr('auth.deco.bordereau')}</span><span>{tr('auth.deco.vendu')}</span><span>{tr('auth.deco.retiree')}</span></div>
-        {/* (15 nov., lot site-public) Sur un grand écran, l'app elle-même à côté de la phrase : la capture de Ma journée
-            de la page d'accueil (mode exemple, au registre public/accueil/captures.json), dite « données d'exemple ». */}
-        <figure className="vrm-cx-apercu" data-cx-apercu="">
-          <span><picture><source srcSet="/accueil/journee-sombre.webp" media="(prefers-color-scheme: dark)" type="image/webp"/><img src="/accueil/journee-clair.webp" alt="" width="780" height="1688" loading="lazy" decoding="async"/></picture></span>
-          <figcaption>{tr('accueil.capture.legende')}</figcaption>
-        </figure>
-        <div className="vrm-cx-haut">
-          <a href="/" className="vrm-cx-logo" aria-label={tr('auth.logoAccueil')}>
-            <img src="/vrm-logo-v5-192.png" alt="" width="36" height="36"/><b>VRM</b>
-          </a>
-          {/* Retour vers la page d'accueil publique (main.jsx l'affiche à qui n'a
-              pas de session) : sans lui, l'écran de connexion est un cul-de-sac. */}
-          <a href="/" data-retour-accueil="" className="vrm-cx-retour">← {tr('auth.decouvrir')}</a>
-        </div>
-        <h1 className="vrm-cx-titre">{mode==='up' ? <>{tr('auth.marque.bienvenue')}<span>{tr('auth.marque.espace')}</span></> : <>{tr('auth.marque.revoir')}<span>{tr('auth.marque.attend')}</span></>}</h1>
-        <ul className="vrm-cx-points">
-          <li><i>1</i><span><b>{tr('auth.point1.titre')}</b>{tr('auth.point1.texte')}</span></li>
-          <li><i>2</i><span><b>{tr('auth.point2.titre')}</b>{tr('auth.point2.texte')}</span></li>
-          <li><i>3</i><span><b>{tr('auth.point3.titre')}</b>{tr('auth.point3.texte')}</span></li>
-        </ul>
-        <div className="vrm-cx-pied vrm-cx-points">{tr('auth.pied')}</div>
-      </aside>
-      <main className="vrm-cx-main">
-      <div className="vrm-cx-boite">
-        <form onSubmit={submit} className="vrm-cx-form" aria-busy={busy} aria-labelledby="vrm-cx-titre-formulaire">
-          <h2 id="vrm-cx-titre-formulaire" style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:-0.4,margin:'0 0 4px'}}>
-            {mode==='up' ? tr('auth.titre.up') : mode==='reset' ? tr('auth.titre.reset') : mode==='newpw' ? tr('auth.titre.newpw') : tr('auth.titre.in')}
-          </h2>
-          <div style={{fontSize:15,color:C.muted,marginBottom:mode==='in'?14:18,lineHeight:1.5}}>
-            {/* ⚠️ Ne PAS promettre l'isolation tant que la base ne la fait pas :
-                sans la colonne `owner` (§12), un compte créé ici tombe dans les
-                MÊMES données que le vendeur existant. Le dire avant, pas après. */}
-            {/* (2 nov.) « Pas su » ne vaut pas « non » (§5) : la sonde de schéma
-                qui n'a pas répondu (réseau, base lente) ne fait plus dire à une
-                personne qui s'inscrit que ses données seront partagées — seul un
-                « colonne absente » MESURÉ (400) le dit ; sinon, rien. */}
-            {mode==='up' ? (CLOISONNE
-              ? tr('auth.sous.cloisonne')
-              : SCHEMA_MESURE ? tr('auth.sous.pasCloisonne') : null)
-             : mode==='reset' ? tr('auth.sous.reset')
-             : mode==='newpw' ? tr('auth.sous.newpw')
-             : null /* « Ta boutique t'attend » est déjà dit au-dessus (§7) */}
-          </div>
-          {/* (13 nov., lot 54) Arrivé par un lien de parrainage : « Offert par <nom choisi> » — le nom que
-              le parrain a CHOISI (jamais son pseudo Vinted), sinon « un vendeur VRM ». Programme fermé,
-              code inconnu ou pas su : rien n'est promis. */}
-          {(mode==='up'||mode==='in') && apercuParrain && apercuParrain.ouvert && apercuParrain.connu && (
-            <div role="note" data-parrain-offert={apercuParrain.nom||''} className="vrm-cx-parrain">
-              <span className="vrm-cx-parrain-ic" aria-hidden="true"><Icon name="cadeau" size={20}/></span>
-              <span><b>{apercuParrain.nom ? tr('auth.parrain.offertPar', { nom: apercuParrain.nom }) : tr('auth.parrain.offertVendeur')}</b>
-                <span className="vrm-cx-parrain-texte">{mode==='up' ? tr('auth.parrain.texte') : tr('auth.parrain.texteConnexion')}</span>
-                {/* (25 nov.) Le filleul CHOISIT de montrer son prénom à son parrain — décoché par défaut. */}
-                {mode==='up' && <label className="vrm-cx-parrain-montrer"><input type="checkbox" data-parrain-montrer="" defaultChecked={(() => { try { return localStorage.getItem('vrm_parrain_montrer') === '1'; } catch (_) { return false; } })()}
-                  onChange={(e) => { try { if (e.target.checked) localStorage.setItem('vrm_parrain_montrer', '1'); else localStorage.removeItem('vrm_parrain_montrer'); } catch (_) {} }}/><span>{tr('auth.parrain.montrer')}</span></label>}</span>
-            </div>
-          )}
-          {/* 11 octobre : on arrive ici depuis « Se connecter » dans l'extension.
-              UNE connexion pour les deux : l'app connecte l'extension juste après. */}
-          {__lier && (mode==='in' || mode==='up') && (
-            <div data-lier-connexion="" style={{fontSize:13,color:C.text,background:`${C.accent}12`,border:`1px solid ${C.accent}55`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>
-              {tr('auth.lier.extension', { navigateur: NAV.de })}
-            </div>
-          )}
-          {/* (11 nov., lot DJ6) « Continuer avec Discord » sans compte VRM : rien n'a été créé (annulé par le serveur). */}
-          {AUTH_REDIRECT?.sansCompteFournisseur && mode==='in' && (()=>{ const p=AUTH_REDIRECT.sansCompteFournisseur, nom=p==='google'?'Google':'Discord'; return <div role="alert" data-sans-compte={p} style={{fontSize:15,color:C.text,border:`1px solid ${C.warn}66`,background:`${C.warn}10`,borderRadius:12,padding:'10px 12px',marginBottom:14,lineHeight:1.45}}>
-            <div style={{fontWeight:600}}>{tr('auth.sansCompte.titre', { nom })}</div>
-            <div style={{color:C.muted,marginTop:2}}>{tr('auth.sansCompte.texte', { nom })}</div>
-            {providerEnabled(p) && <button type="button" data-sans-compte-creer={p} disabled={busy} onClick={()=>oauth(p,'inscription')} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.sansCompte.creer', { nom })}</button>}
-          </div>; })()}
-          {lierFournisseurMot && (mode==='in' || mode==='up') && <div role="status" data-lier-fournisseur-mot={lierFournisseur} style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}>{lierFournisseurMot}</div>}
-          {__lierRetourPerime && (mode==='in' || mode==='up') && <div role="status" data-lier-retour-perime="" style={{fontSize:13,color:C.text,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:14,lineHeight:1.45}}><div>{tr('auth.perime.1')}</div><div>{tr('auth.perime.2')}</div></div>}
-
-          {(mode==='in'||mode==='up') && moyensConnexion.statut==='chargement' && <div role="status" style={{fontSize:12,color:C.muted,lineHeight:1.5,marginBottom:12}}>{tr('auth.moyens.chargement')}</div>}
-          {(mode==='in'||mode==='up') && moyensConnexion.statut==='erreur' && <div data-auth-moyens-indisponibles="" style={{fontSize:12,color:C.text,lineHeight:1.5,marginBottom:14,padding:'10px 12px',border:`1px solid ${C.border}`,borderRadius:12}}>
-            {tr('auth.moyens.erreur')}
-            <button type="button" disabled={busy} onClick={()=>loadAuthSettings()} style={{display:'block',minHeight:44,padding:'8px 0 0',border:0,background:'transparent',color:C.accentTexte,font:'inherit',fontWeight:600,cursor:busy?'default':'pointer'}}>{tr('auth.moyens.reessayer')}</button>
-          </div>}
-
-
-          {/* Création de compte alors que la confirmation par email est active :
-              on prévient AVANT, sinon on tape son mot de passe pour rien. */}
-          {mode==='up' && confirmRequired() && (
-            <div style={{fontSize:12,color:C.text,background:`${C.accent}08`,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 11px',marginBottom:14,lineHeight:1.5}}>
-              {tr('auth.confirmer.avant')}<b>{tr('auth.confirmer.gras')}</b>{tr('auth.confirmer.apres')}
-            </div>
-          )}
-
-          {/* ⚠️ LE PRÉNOM SE DEMANDE ICI, ET NULLE PART AILLEURS. L'accueil dit
-              « Bonjour » tout court tant qu'on ne le connaît pas — c'est honnête
-              mais froid, et aller le chercher dans Réglages, personne ne le
-              fait. À la création du compte, c'est la question la plus naturelle
-              du monde. Facultatif : un champ obligatoire de plus pour un
-              bonjour serait un péage. */}
-          {mode==='up' && (
-            <label className="vrm-cx-champ"><span>{tr('auth.champ.prenom')} <span style={{fontWeight:400,color:C.muted}}>{tr('auth.champ.facultatif')}</span></span>
-              <input type="text" autoComplete="given-name" placeholder={tr('auth.champ.prenomPlaceholder')}
-                disabled={busy} value={prenom} onChange={e=>setPrenom(e.target.value.slice(0,24))} style={field}/>
-            </label>
-          )}
-          {mode!=='newpw' && (
-            <label className="vrm-cx-champ"><span>{tr('auth.champ.email')}</span>
-              <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={tr('auth.champ.emailPlaceholder')} required
-                disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
-            </label>
-          )}
-          {mode!=='reset' && (
-            <div className="vrm-cx-champ"><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:6}}>
-                <label htmlFor="vrm-cx-password">{mode==='newpw'?tr('auth.titre.newpw'):tr('auth.champ.mdp')}</label>
-                {mode==='in' && <button type="button" disabled={busy} onClick={()=>changerMode('reset')} className="vrm-cx-oublie">{tr('auth.oublie')}</button>}
-              </div>
-              <span className="vrm-cx-secret">
-                <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
-                  aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
-                  placeholder={mode==='newpw'?tr('auth.champ.nouveauMdpPlaceholder'):tr('auth.champ.mdp')}
-                  disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
-                <button type="button" disabled={busy} aria-label={motDePasseVisible?tr('auth.mdp.masquerLabel'):tr('auth.mdp.afficherLabel')} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?tr('commun.masquer'):tr('commun.afficher')}</button>
-              </span>
-            </div>
-          )}
-          {(mode==='up'||mode==='newpw') && <ul id="vrm-cx-regles" className="vrm-cx-regles" aria-label={tr('auth.regles.label')}>
-            <li data-valide={pw.length>=8}>{tr('auth.regles.huit')}</li>
-            <li data-valide={pw.length>0&&!/^(\d+|[a-z]+)$/i.test(pw)}>{tr('auth.regles.melange')}</li>
-          </ul>}
-
-          {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
-          {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
-          {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
-              oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
-          {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? tr('auth.delai.bouton') : tr('auth.delai.secondes', { n: resteAttente })}</div>}
-          {needConfirm && mode==='in' && (
-            <div style={{fontSize:12,color:C.text,background:`${C.warn}10`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'10px 11px',marginBottom:10,lineHeight:1.5}}>
-              {tr('auth.attente.avant')}<b>{email}</b>{tr('auth.attente.apres')}
-              <div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}>
-                <button type="button" data-auth-renvoyer="" disabled={busy||enAttenteEmail}
-                  onClick={()=>actionConfirmation('renvoyer')}
-                  style={{border:`1px solid ${C.warn}`,background:'transparent',color:C.warn,
-                    borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  {enAttenteEmail ? tr('auth.renvoyerDans', { s: resteAttente }) : tr('auth.renvoyerEmail')}
-                </button>
-                <button type="button" data-auth-lien-connexion="" disabled={busy||enAttenteEmail}
-                  onClick={()=>actionConfirmation('lien')}
-                  style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,
-                    borderRadius:12,padding:'9px 13px',fontSize:12,fontWeight:600,cursor:(busy||enAttenteEmail)?'default':'pointer',opacity:enAttenteEmail?0.5:1,fontFamily:'inherit'}}>
-                  {tr('auth.lienConnexion')}
-                </button>
-              </div>
-              <details className="vrm-cx-aide-confirmation">
-                <summary>{tr('auth.lienAide.q')}</summary>
-              <div style={{marginTop:8,fontSize:12,color:C.muted,lineHeight:1.5}}>
-                {/* « il renvoie vers une adresse de test » : vrai le 5 octobre (Site URL
-                    resté sur localhost:3000, mesuré dans les journaux), faux dès que
-                    Julien règle Supabase. La phrase ne dit plus que ce qui reste vrai
-                    dans les deux cas. */}
-                {tr('auth.lienAide.1')}<i>{tr('auth.lienAide.2')}</i>{tr('auth.lienAide.3')}
-                <b style={{color:C.text}}>{tr('auth.lienAide.4')}</b>{tr('auth.lienAide.5')}
-              </div>
-              <input aria-label={tr('auth.lienAide.label')} value={confirmLink} onChange={e=>setConfirmLink(e.target.value)} placeholder={tr('auth.lienAide.placeholder')}
-                style={{width:'100%',boxSizing:'border-box',marginTop:8,border:`1px solid ${C.border}`,borderRadius:12,
-                  padding:'10px 11px',fontSize:17,background:C.card,color:C.text,outline:'none',fontFamily:'inherit'}}/>
-                <button type="button" disabled={busy||!confirmLink.trim()}
-                  onClick={()=>actionConfirmation('confirmer')}
-                  style={{border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'9px 13px',
-                    fontSize:12,fontWeight:600,cursor:(busy||!confirmLink.trim())?'default':'pointer',opacity:(busy||!confirmLink.trim())?0.5:1,fontFamily:'inherit'}}>
-                  {tr('auth.lienAide.confirmer')}
-                </button>
-              </details>
-            </div>
-          )}
-          {info && <div role="status" aria-live="polite" style={{fontSize:13,color:C.accentTexte,background:`${C.accent}12`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{info}</div>}
-
-          {/* (8 nov., Julien) « Tu as déjà un lien qui ne s'ouvre pas ? … colle le
-              lien reçu » le déroutait : la page de récupération propose elle-même
-              un nouvel e-mail (et la voie « coller ») quand un lien a échoué. */}
-          {/* L'attente ne porte que sur ce qui ENVOIE un email (inscription, lien de
-              mot de passe) — jamais sur « Se connecter ». */}
-          {(()=>{ const bloque = busy || attendCaptcha || (enAttenteEmail && (mode==='up'||mode==='reset')); return (
-          <button type="submit" data-auth-valider="" disabled={bloque} style={{width:'100%',border:'none',background:C.accent,color:C.onAccent||'#fff',
-            borderRadius:999,padding:'13px',fontSize:15,fontWeight:600,cursor:bloque?'default':'pointer',opacity:bloque?0.6:1,fontFamily:'inherit'}}>
-            {busy ? (fournisseurEnCours?tr('auth.bouton.ouverture'):mode==='up'?tr('auth.bouton.creation'):mode==='reset'?tr('auth.bouton.envoiLien'):mode==='newpw'?tr('auth.bouton.enregistrement'):tr('auth.bouton.connexion')) : (enAttenteEmail && mode==='reset' && resetEnvoye) ? tr('auth.renvoyerDans', { s: resteAttente }) : (enAttenteEmail && (mode==='up'||mode==='reset')) ? tr('auth.reessaieDans', { s: resteAttente }) : attendCaptcha ? (captcha.statut==='erreur' ? tr('auth.captcha.indisponible') : captcha.statut==='interactif' ? tr('auth.captcha.coche') : tr('auth.captcha.enCours')) : mode==='up' ? tr('auth.bouton.creer') : mode==='reset' ? (resetEnvoye ? tr('auth.bouton.renvoyer') : tr('auth.bouton.envoyerLien')) : mode==='newpw' ? tr('commun.enregistrer') : tr('auth.titre.in')}
-          </button>);})()}
-          {/* (15 nov., lot site-public) Google / Discord SOUS le formulaire, après un « ou » : l'e-mail et le
-              mot de passe d'abord (le chemin que tout le monde a). On n'affiche QUE les fournisseurs
-              réellement activés côté Supabase : un bouton qui mène à une page d'erreur JSON vaut moins
-              que pas de bouton du tout. */}
-          {mode!=='newpw' && mode!=='reset' && (()=>{
-            const dispo = OAUTH_PROVIDERS.filter(p => providerEnabled(p.id));
-            if (!dispo.length) return null;
-            return (<div data-cx-fournisseurs="">
-              <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0 12px'}}>
-                <span style={{flex:1,height:1,background:C.border}}/>
-                <span style={{fontSize:13,color:C.muted,fontWeight:400}}>{tr('auth.ou')}</span>
-                <span style={{flex:1,height:1,background:C.border}}/>
-              </div>
-              {dispo.map(p => (
-                <button key={p.id} type="button" onClick={()=>oauth(p.id)} disabled={busy}
-                  style={{width:'100%',minHeight:48,display:'flex',alignItems:'center',justifyContent:'center',gap:10,
-                    border:`1px solid ${C.border}`,background:C.bg,color:C.text,borderRadius:999,padding:'12px',
-                    fontSize:15,fontWeight:600,cursor:busy?'default':'pointer',marginBottom:9,fontFamily:'inherit'}}>
-                  <BrandMark id={p.id}/> {fournisseurEnCours===p.id ? tr('auth.fournisseur.ouverture', { nom: p.label }) : mode==='up' ? tr('auth.fournisseur.creer', { nom: p.label }) : tr('auth.fournisseur.continuer', { nom: p.label })}
-                </button>
-              ))}
-            </div>);
-          })()}
-          {/* Acceptation des conditions AVANT la création du compte (art. 1127-1
-              C. civ., RGPD art. 13 : l'information est donnée au moment de la
-              collecte). */}
-          {mode==='up' && (
-            <div style={{fontSize:12,color:C.muted,lineHeight:1.5,marginTop:10,textAlign:'center'}}>
-              {tr('auth.cgu.1')}<a href="/legal/cgu.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.2')}</a>{tr('auth.cgu.3')}
-              <a href="/legal/confidentialite.html" target="_blank" rel="noopener" style={{color:C.accentTexte}}>{tr('auth.cgu.4')}</a>.
-            </div>
-          )}
-
-          <div className="vrm-cx-liens" style={{display:mode==='newpw'?'none':'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginTop:8,flexWrap:'wrap'}}>
-            {/* ⚠️ INSCRIPTIONS FERMÉES tant que la base ne sépare pas les
-                vendeurs. Sinon la première personne qui crée un compte tombe
-                directement dans les données de Julien : son garage, ses ventes,
-                sa comptabilité. Le lien réapparaît seul après la migration. */}
-            {mode!=='reset' && ((CLOISONNE || mode==='up') ? (
-              <button type="button" disabled={busy} onClick={()=>changerMode(mode==='up'?'in':'up')}
-                style={{border:'none',background:'transparent',color:C.accentTexte,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                {mode==='up' ? tr('auth.dejaCompte') : tr('auth.creerCompte')}
-              </button>
-            ) : (
-              <span style={{fontSize:15,color:C.muted,fontWeight:600}}>{tr('auth.inscriptionsBientot')}</span>
-            ))}
-            {mode==='reset' && (
-              <button type="button" disabled={busy} onClick={()=>changerMode('in')}
-                style={{border:'none',background:'transparent',color:C.muted,fontSize:15,fontWeight:600,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
-                {tr('commun.retour')}
-              </button>
-            )}
-          </div>
-        </form>
-        {/* (13 nov., lot 48) VRM rempli de données INVENTÉES, sans compte (src/modeExemple.js) :
-            un vrai lien, rien n'est enregistré ni envoyé ; le bandeau propose « Créer mon compte ». */}
-        {/* (14 nov., lot 119) Se connecter avec l'iPhone déjà connecté : un QR, son clic, une session neuve (api/_lib/qr-connexion.js). */}
-        {mode==='in' && !__lier && <details className="vrm-cx-qr" data-cx-qr="" style={{maxWidth:420,margin:'0 auto 16px',width:'100%'}}>
-          <summary style={{cursor:'pointer',fontSize:15,fontWeight:600,color:C.accentTexte||C.accent,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>{tr('confort.qr.ouvrir')}</summary>
-          <QrOrdinateur onSession={(j)=>{ writeSession(sessionFrom(j)); }}/>
-        </details>}
-        {(mode==='in'||mode==='up') && !__lier && <div className="vrm-cx-exemple" data-cx-exemple="">
-          <p>{tr('auth.exemple.note')}</p>
-          <a href="/?exemple" data-cx-exemple-entrer="">{tr('auth.exemple')}</a>
-        </div>}
-        <LiensLegaux/>
-        {/* (11 nov., lot traduction) La langue, avant même d'avoir un compte. */}
-        <div style={{display:'flex',justifyContent:'center',color:C.muted,fontSize:12}}><ChoixLangue/></div>
-        {/* ⚠️⚠️ CETTE PHRASE AFFIRMAIT UNE PROTECTION QUE `CLOISONNE` NE MESURE
-            PAS. `CLOISONNE` dit seulement que la colonne `owner` EXISTE — et la
-            migration autorise explicitement de s'arrêter là (« garde RLS
-            désactivé, n'applique que l'étape 1 »). Dans cet état la porte
-            promettait « chaque vendeur ne voit que ses propres données ·
-            l'isolation est appliquée par la base » pendant que le panneau de
-            Réglages disait, sur la MÊME base, « la clé publique permet encore
-            de tout écrire et effacer ». Deux verdicts sur une notion (§11), et
-            le faux était celui qu'une nouvelle personne lit en premier, juste
-            avant de confier ses jetons Vinted.
-            ⇒ On MESURE (`sondeLectureSansCompte`, la règle du panneau), et on
-            ne dit rien tant qu'on ne sait pas : « pas su » ne vaut pas « oui ». */}
-        <div style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:16,lineHeight:1.5,minHeight:32}}>
-          {!CLOISONNE
-            ? <><b style={{color:C.warn}}>{tr('auth.isolation.inactive.titre')}</b><br/>{tr('auth.isolation.inactive.texte')}</>
-            : ouverte === true
-            ? <><b style={{color:C.warn}}>{tr('auth.isolation.ouverte.titre')}</b><br/>{tr('auth.isolation.ouverte.texte')}</>
-            : ouverte === false
-            ? <>{tr('auth.isolation.fermee.1')}<br/>{tr('auth.isolation.fermee.2')}</>
-            : null /* en cours, ou pas su : on n'affirme rien */}
-        </div>
-      </div>
-      </main>
-    </div>
-  );
-}
+// ⟦→ ecrans/Connexion.jsx #7⟧
 
 // Carte d'accueil affichée tant qu'aucun compte Vinted n'est connecté : guide
 // le nouvel utilisateur en 3 étapes (installer l'extension, se connecter sur
@@ -20467,70 +19258,7 @@ function useHorsLigneTout() {
   React.useEffect(() => suivreHorsLigne(() => setPorte(horsLigneActif())), []);
   return nav || porte;
 }
-const texteValeurHL = (g, v) => {
-  if (v === undefined || v === null || v === '' || v === false) return tr('horsligne.feuille.sansValeur');
-  if (v === true) return '✓';
-  if (typeof v === 'object') {
-    if (g.quoi === 'achat') return [v.title, v.price != null && v.price !== '' ? `${String(v.price).replace('.', ',')} €` : null, v.numero ? `N°${v.numero}` : null].filter(Boolean).join(' · ') || tr('horsligne.feuille.sansValeur');
-    return Object.entries(v).filter(([, x]) => x != null && typeof x !== 'object').map(([c, x]) => `${c} : ${x}`).join(' · ').slice(0, 120);
-  }
-  if (g.quoi === 'prix') return `${String(v).replace('.', ',')} €`;
-  if (/^\d{4}-\d\d-\d\dT/.test(String(v))) return '✓';
-  return String(v).slice(0, 140);
-};
-const sujetHL = (g) => {
-  const quoi = tr('horsligne.quoi.' + (g.quoi || 'fiche'));
-  const s0 = g.chemin && g.chemin[0];
-  const id = typeof s0 === 'string' ? s0 : s0 && s0.id != null ? '' : s0 && s0.el != null ? String(s0.el) : '';
-  if (g.quoi === 'prix' && id) return `${quoi} · N°${id}`;
-  if (g.k === 'vinted_annonce_numeros' && g.chemin[1] === 'numero') return `N° · ${quoi}`;
-  return quoi;
-};
-// Le geste qui parle pour son groupe : le prix ou le N° d'une fiche (pas sa date), sinon le premier.
-const principalHL = (gr) => gr.find((g) => g.k === 'vinted_annonce_numeros' && ['buyPrice', 'numero'].includes(g.chemin && g.chemin[1])) || gr[0];
-const sujetGroupeHL = (g) => {
-  if (g.k === 'vinted_annonce_numeros' && g.chemin && g.chemin[1] === 'buyPrice') {
-    let n = ''; try { n = String(((load('vinted_annonce_numeros', {}) || {})[g.chemin[0]] || {}).numero || ''); } catch (_) { n = ''; }
-    return tr('horsligne.quoi.prix') + (n ? ` · N°${n}` : '');
-  }
-  return sujetHL(g);
-};
-const valeurGroupeHL = (g, v) => (g.k === 'vinted_annonce_numeros' && g.chemin && g.chemin[1] === 'buyPrice' && v != null && v !== '' ? `${String(v).replace('.', ',')} €` : texteValeurHL(g, v));
-function FeuilleGestesHL({ onFermer }) {
-  const [, maj] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => { const f = () => maj(); window.addEventListener('vrm:gestes-hl', f); rafraichirGestesHL(); return () => window.removeEventListener('vrm:gestes-hl', f); }, []);
-  const liste = (_gestesHL.owner === AUTH.user?.id ? _gestesHL.liste : []) || [];
-  const atr = groupesGestesHL(liste, 'atrancher'), att = groupesGestesHL(liste, 'attente').sort((a, b) => a[0].seq - b[0].seq);
-  return (
-    <SheetShell onClose={onFermer} z={Z_CONFIRMATION}>
-      <div data-gestes-hl-feuille="" style={{ padding: '6px 4px 18px' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: '0 0 12px' }}>{tr('horsligne.feuille.titre')}</h2>
-        {!atr.length && !att.length ? <p style={{ color: C.muted, fontSize: 13 }}>{tr('horsligne.feuille.vide')}</p> : null}
-        {atr.length ? <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, margin: '6px 0 8px' }}>{tr('horsligne.feuille.atrancher')}</h3> : null}
-        {atr.map((gr) => { const g = principalHL(gr), ids = gr.map((x) => x.id); return (
-          <div key={g.id} data-geste-atrancher={g.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: C.card }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>{sujetGroupeHL(g)}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 15, lineHeight: 1.4 }}>
-              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ici')}</span><span data-geste-mien="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.apres)}</span>
-              <span style={{ color: C.muted }}>{tr('horsligne.feuille.ailleurs')}</span><span data-geste-autre="" style={{ color: C.text, overflowWrap: 'anywhere' }}>{valeurGroupeHL(g, g.nuage)}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <Bouton variante="secondaire" data-geste-garder="mien" onClick={() => trancherGesteHL(ids, 'mien')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderMienne')}</Bouton>
-              <Bouton variante="secondaire" data-geste-garder="autre" onClick={() => trancherGesteHL(ids, 'autre')} style={{ minHeight: 44 }}>{tr('horsligne.feuille.garderAutre')}</Bouton>
-            </div>
-          </div>
-        ); })}
-        {att.length ? <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, margin: '12px 0 8px' }}>{tr('horsligne.feuille.attente')}</h3> : null}
-        {att.map((gr) => { const g = principalHL(gr); return (
-          <div key={g.id} data-geste-attente={g.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: `1px solid ${C.border}`, padding: '10px 2px', fontSize: 15 }}>
-            <span style={{ color: C.text }}>{sujetGroupeHL(g)}</span>
-            <span style={{ color: C.muted, textAlign: 'right', overflowWrap: 'anywhere' }}>{g.ligne ? '✓' : valeurGroupeHL(g, g.apres)}</span>
-          </div>
-        ); })}
-      </div>
-    </SheetShell>
-  );
-}
+// ⟦→ ecrans/Feuilles.jsx #13⟧
 function GestesHorsLigneCoque({ tab, ongletDedie }) {
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const [ouvert, setOuvert] = React.useState(false);
@@ -20569,185 +19297,7 @@ function GestesHorsLigneCoque({ tab, ongletDedie }) {
     </>
   );
 }
-function LigneHorsLigne({ children, date }) {
-  return (
-    <div role="status" data-hors-ligne-ligne="" data-hors-ligne-date={date || undefined}
-      style={{display:'flex',alignItems:'center',gap:10,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'12px 14px',marginBottom:14}}>
-      <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="cloudOff" size={18}/></span>
-      <span style={{fontSize:13,fontWeight:600,color:C.text,lineHeight:1.4}}>{children}</span>
-    </div>
-  );
-}
-// (6 nov., v36) LA LIGNE DU DERNIER ÉTAT : « Hors connexion — dernier état du
-// 6 nov. à 17:36 » — le JOUR toujours (une heure seule se lisait « aujourd'hui »
-// et un état de la veille passait pour frais), une fois, sobre. Au-delà de
-// `ETAT_VIEUX_H` (12 h) une seconde ligne, ambre, dit qu'il a pu changer : jamais
-// une donnée périmée présentée comme fraîche (§5). Les gestes notés ici partent
-// au retour du réseau (la file d'envoi, `EnAttenteEnvoi` dit combien).
-function LigneEtatHorsLigne({ at, maintenant }) {
-  const h = ageEtatH(at, maintenant);
-  return (<>
-    <LigneHorsLigne date={new Date(at).toISOString()}>Hors connexion — dernier état du {quandEtat(at)}. Ce que tu notes ici part au retour du réseau.</LigneHorsLigne>
-    {etatVieux(at, maintenant) ? (
-      <div role="note" data-hors-ligne-vieux={Math.floor(h || 0)} style={{border:`1px solid ${C.warn}66`,background:`${C.warn}12`,borderRadius:12,padding:'10px 14px',margin:'-6px 0 14px',fontSize:13,color:C.text,lineHeight:1.45}}>
-        État de plus {h >= 24 ? 'd’un jour' : `de ${ETAT_VIEUX_H} h`} : vérifie au comptoir.
-      </div>) : null}
-  </>);
-}
-function QrHorsLigne({ qr, code }) {
-  const [etat, setEtat] = React.useState('charge');
-  if (!qr) return null;
-  const src = /^data:image\//i.test(qr) ? qr : adresseQrLocale(qr);
-  if (etat === 'ko') return <div data-hl-qr="ko" style={{flexShrink:0,width:92,fontSize:11,color:C.muted,lineHeight:1.35,textAlign:'center'}}>{code ? 'QR pas gardé ici — donne le code' : 'QR pas gardé sur cet appareil'}</div>;
-  return <img data-hl-qr={etat} src={src} alt="QR de retrait" width={92} height={92} onLoad={() => setEtat('ok')} onError={() => setEtat('ko')}
-    style={{flexShrink:0,width:92,height:92,borderRadius:12,background:'#fff',border:`1px solid ${C.border}`,objectFit:'contain'}}/>;
-}
-// (6 nov., v36) LES GESTES HORS RÉSEAU — des NOTES de l'appareil, jamais une
-// action chez Vinted ou un transporteur : « J'ai retiré » (`vrm_colis_collected`
-// par l'identité du colis, ou `vinted_pickup_done` par sa transaction) et
-// « Colis fait » (`vinted_ship_done`). Ils passent par `save` comme en ligne : la
-// FILE D'ENVOI (src/fileEnvoi.js) les garde et les rejoue au retour du réseau
-// (fusion clé par clé, jamais un écrasement). Un colis sans identité gardée
-// (photo d'avant le 6 nov.) n'a pas de geste : refusé et dit, jamais deviné.
-const CLES_GESTES_HL = ['vrm_colis_collected', 'vrm_colis_collected_at', 'vinted_pickup_done', 'vinted_ship_done'];
-function useGestesHorsLigne() {
-  const lire = () => ({ collected: load('vrm_colis_collected', []) || [], collectedAt: load('vrm_colis_collected_at', {}) || {}, pickup: load('vinted_pickup_done', {}) || {}, ship: load('vinted_ship_done', {}) || {} });
-  const [g, setG] = React.useState(lire);
-  React.useEffect(() => {
-    const f = (e) => { if (!e || !e.detail || CLES_GESTES_HL.includes(e.detail.k)) setG(lire()); };
-    const st = (e) => { if (!e || e.key == null || CLES_GESTES_HL.includes(e.key)) setG(lire()); };
-    window.addEventListener('vrm:save', f); window.addEventListener('storage', st);
-    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', st); };
-  }, []);
-  const attente = (k) => { try { return enFile(k) || !!_saveTimers[k]; } catch (_) { return false; } };
-  const etatRetrait = (r) => {
-    const fait = r.cle ? g.collected.map(String).includes(r.cle) : r.tx ? !!g.pickup[r.tx] : false;
-    if (!fait) return '';
-    return attente(r.cle ? 'vrm_colis_collected' : 'vinted_pickup_done') ? 'attente' : 'note';
-  };
-  const etatFait = (e) => (e.tx && g.ship[e.tx] ? (attente('vinted_ship_done') ? 'attente' : 'note') : '');
-  const ecrire = (k, v) => { save(k, v); };
-  const retirer = (r, oui) => {
-    if (r.cle) {
-      const n = oui ? colisRetireApres(g.collected, g.collectedAt, r.cle, new Date().toISOString()) : colisRetireAnnule(g.collected, g.collectedAt, r.cle);
-      if (!n) return;
-      setG((x) => ({ ...x, collected: n.liste, collectedAt: n.dates }));
-      ecrire('vrm_colis_collected', n.liste); ecrire('vrm_colis_collected_at', n.dates);
-    } else if (r.tx) {
-      const n = oui ? marqueApres(g.pickup, r.tx, new Date().toISOString()) : marqueAnnulee(g.pickup, r.tx);
-      if (!n) return;
-      setG((x) => ({ ...x, pickup: n })); ecrire('vinted_pickup_done', n);
-    }
-  };
-  const faire = (e, oui) => {
-    const n = oui ? marqueApres(g.ship, e.tx, Date.now()) : marqueAnnulee(g.ship, e.tx);
-    if (!n) return;
-    setG((x) => ({ ...x, ship: n })); ecrire('vinted_ship_done', n);
-  };
-  return { etatRetrait, etatFait, retirer, faire };
-}
-// Le bouton d'un geste hors réseau, et ce qu'il est devenu (noté, en attente).
-function GesteHorsLigne({ etat, libelle, fait, peut, onOui, onNon, attrs = {} }) {
-  if (etat) return (
-    <span style={{display:'inline-flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-      <span style={{fontSize:12,fontWeight:600,color:C.text}}>{fait}{etat === 'attente' ? ' · part au retour du réseau' : ''}</span>
-      <Bouton variante="discret" className="vrm-b-petit" data-hl-annuler="" onClick={onNon}>Annuler</Bouton>
-    </span>);
-  if (!peut) return <Bouton variante="secondaire" className="vrm-b-petit" disabled aria-disabled="true" data-hl-geste="" title="Ce colis vient d’un état gardé sans son identité : il faut le réseau" style={{flexShrink:0}}>{libelle}</Bouton>;
-  return <Bouton variante="secondaire" className="vrm-b-petit" data-hl-geste="" data-hl-file="" onClick={onOui} style={{flexShrink:0}} {...attrs}>{libelle}</Bouton>;
-}
-// Une ligne de colis hors ligne (à retirer, ou à vérifier). La raison d'un colis
-// « à vérifier » vient de LA règle (`etatRetrait`) : « délai dépassé le … » si
-// une date limite a été LUE, sinon « plus de N jours au point relais » (la garde
-// de son transporteur) — jamais « hors délai » sans date limite (revue du 23 oct.).
-// (6 nov.) `sansLieu` : rangée dans la carte de SON point relais, le lieu est dit
-// par la carte ; « En grand » et « J'ai retiré » marchent sans réseau.
-function LigneRetraitHorsLigne({ r, i, quand, maintenant, verifier = false, sansLieu = false, gestes, onEnGrand }) {
-  const jj = (j) => new Date(j + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
-  const reste = !verifier && r.limite ? joursAvantJour(r.limite, maintenant) : null;
-  const delai = verifier
-    ? (r.raison === 'delai_depasse' ? `délai de retrait dépassé${r.limite ? ` le ${jj(r.limite)}` : ''}`
-      : r.raison === 'trop_long' ? `au point relais depuis plus de ${Number.isFinite(r.garde) ? r.garde : GARDE_MAX_J} jours` : 'à vérifier')
-    : (reste == null ? '' : reste < 0 ? `délai de retrait passé (${jj(r.limite)})` : reste === 0 ? "à retirer aujourd'hui" : `à retirer avant le ${jj(r.limite)}`);
-  const etat = gestes ? gestes.etatRetrait(r) : '';
-  return (
-    <div data-hl-retrait={verifier ? 'a-verifier' : ''} data-hl-raison={verifier ? (r.raison || 'inconnue') : undefined} data-hl-retire={etat || undefined}
-      style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderTop:i ? `1px solid ${C.border}` : 'none',opacity:etat ? 0.75 : 1}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.titre || (sansLieu ? '' : r.lieu) || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis')}</div>
-        <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>{[(r.titre && !sansLieu) ? r.lieu : '', (r.titre || r.lieu) ? r.transporteur : '', r.suivi && `n°${r.suivi}`, r.compte, delai].filter(Boolean).join(' · ')}</div>
-        {!r.code && Array.isArray(r.desaccord) && r.desaccord.length > 1
-          ? <div className="vrm-sensible" data-stream-type="code" data-hl-desaccord="" style={{marginTop:6,fontSize:13,fontWeight:700,color:C.warn}}>2 codes : {r.desaccord.map((d) => d.code).join(' / ')} — vérifie sur place</div>
-          : r.code
-          ? <div className="vrm-sensible" data-stream-type="code" data-hl-code={r.code} style={{display:'inline-block',marginTop:8,fontSize:20,fontWeight:700,letterSpacing:1.2,color:C.text,background:C.card2 || C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'5px 12px'}}>{r.code}</div>
-          : !r.qr && <div style={{marginTop:6,fontSize:12,color:C.muted}}>Code pas lu à {quand}.</div>}
-        <div style={{marginTop:8,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          {(r.code || r.qr) && onEnGrand ? <Bouton variante="secondaire" className="vrm-b-petit" data-hl-en-grand-ouvrir="" onClick={() => onEnGrand(r)} aria-label="Afficher le code et le QR en grand">En grand</Bouton> : null}
-          <GesteHorsLigne etat={etat} libelle={verifier ? "Je l'ai eu" : "J'ai retiré"} fait="Noté retiré" peut={!!(gestes && (r.cle || r.tx))}
-            onOui={() => gestes.retirer(r, true)} onNon={() => gestes.retirer(r, false)} attrs={{ 'data-hl-retire-btn': '' }}/>
-        </div>
-      </div>
-      <QrHorsLigne qr={r.qr} code={r.code}/>
-    </div>
-  );
-}
-// « En grand » SANS réseau (6 nov., v36) : la même feuille lumineuse qu'en ligne
-// (classes `vrm-eg-*`, écran gardé allumé), nourrie par le dernier état — le QR
-// vient de la réserve du service worker (`/hl-qr`) ou de la photo (`data:`) ;
-// jamais un QR fabriqué. La date de l'état y est redite (on est au comptoir).
-function EnGrandHorsLigne({ r, at, onClose }) {
-  const [qrKo, setQrKo] = React.useState(false);
-  const src = !r.qr ? '' : /^data:image\//i.test(r.qr) ? r.qr : adresseQrLocale(r.qr);
-  const avecQr = !!src && !qrKo;
-  const titre = r.titre || (r.transporteur ? `Colis ${r.transporteur}` : 'Colis');
-  const j = r.limite ? joursAvantJour(r.limite) : null;
-  const lim = j == null ? null : j < 0 ? 'Délai de retrait dépassé' : j === 0 ? 'Dernier jour pour le retirer' : j === 1 ? 'À retirer demain au plus tard'
-    : `À retirer avant le ${new Date(r.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
-  return (
-    <SheetShell lumineuse onClose={onClose} titre={titre} sousTitre={r.lieu || null} maxWidth={440} z={Z_CONFIRMATION - 3}
-      className="vrm-eg" aria-label="Code et QR de retrait" data-hl-en-grand="" data-hl-en-grand-code-v={r.code || ''}>
-      <GardeEcranAllume/>
-      <div className="vrm-eg-corps">
-        {avecQr ? <img className="vrm-eg-qr" data-hl-en-grand-qr="" src={src} alt="QR de retrait" onError={() => setQrKo(true)}/> : null}
-        {src && qrKo ? <p className="vrm-eg-mode">QR pas gardé sur cet appareil{r.code ? ' — donne le code.' : '.'}</p> : null}
-        {r.code ? <div className={'vrm-eg-code' + (avecQr ? ' avec-qr' : '')}><span className="vrm-eg-code-l">Code de retrait</span><span className="vrm-eg-code-v vrm-sensible" data-stream-type="code" data-hl-en-grand-code="">{r.code}</span></div> : null}
-        {!r.code && !avecQr && r.suivi ? <div className="vrm-eg-code is-suivi"><span className="vrm-eg-code-l">Numéro de colis</span><span className="vrm-eg-code-v">{r.suivi}</span></div> : null}
-        <ul className="vrm-eg-faits">
-          {lim ? <li className={j <= 1 ? 'is-ambre' : ''}>{lim}</li> : null}
-          {r.suivi && (r.code || avecQr) ? <li>{r.transporteur ? `${r.transporteur} · ` : ''}n° {r.suivi}</li> : null}
-          {r.compte ? <li>{r.compte}</li> : null}
-          <li data-hl-en-grand-date="">Hors connexion — dernier état du {quandEtat(at)}</li>
-        </ul>
-        {avecQr ? <p className="vrm-eg-note">Luminosité au maximum : le lecteur lit mal un écran sombre.</p> : null}
-      </div>
-    </SheetShell>
-  );
-}
-// Ce qui ne part PAS en file : dit une fois, là où on le chercherait.
-const RefusHorsLigne = () => <p data-hl-refuse="" style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'-4px 2px 14px'}}>Bordereau, impression et réponses demandent le réseau. Un bordereau déjà ouvert se rouvre.</p>;
-// (9 nov.) LES BORDEREAUX DÉJÀ OUVERTS, hors connexion (src/bordereauxHorsLigne.js) : pour
-// chaque colis à déposer qui porte ses lignes de bordereau (son identité), le PDF gardé
-// ici devient un vrai lien (un `<a>` : il s'ouvre aussi sur iPhone, sans fenêtre réservée).
-// Pas gardé ⇒ dit, jamais un faux bouton. Rien n'est téléchargé.
-function usePdfsHorsLigne(uid, lignes) {
-  const [urls, setUrls] = React.useState({});
-  const sig = (lignes || []).map((e) => (e && e.tx ? e.tx + ':' + (e.pdf || []).join(',') : '')).join('|');
-  React.useEffect(() => {
-    let vivant = true; const faites = [];
-    (async () => {
-      const out = {};
-      for (const e of lignes || []) {
-        if (!e || !e.tx || !Array.isArray(e.pdf) || !e.pdf.length) continue;
-        const b = await lirePdfGarde(uid, e.pdf);
-        if (b) { try { const u = URL.createObjectURL(b); faites.push(u); out[e.tx] = u; } catch (_) {} } else out[e.tx] = '';
-      }
-      if (vivant) setUrls(out); else faites.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} });
-    })();
-    return () => { vivant = false; setTimeout(() => faites.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }), 60000); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid, sig]);
-  return urls;
-}
+// ⟦→ ecrans/HorsLigne.jsx #1⟧
 // (9 nov.) L'INVENTAIRE HORS CONNEXION : la feuille de l'inventaire (src/InventaireStock.jsx,
 // chargée à la demande — son morceau est déjà sur l'appareil si le Stock a été ouvert) jugée
 // contre la DERNIÈRE liste des paires que le Stock a lue (src/inventaireHorsLigne.js), avec
@@ -20829,154 +19379,7 @@ const ONGLETS_COLIS_HL = ['cat_bord', 'retraits', 'cat_achats', 'cat_expedition'
 // (11 nov.) Les onglets qui gardent leur vue hors ligne DÉDIÉE (la photo de Ma journée, les codes, le relais, le dépôt) ;
 // tous les autres écrans se lisent hors ligne depuis la copie de l'appareil.
 const ONGLETS_HL_DEDIES = ['journee', ...ONGLETS_COLIS_HL];
-function JourneeHorsLigne({ uid, tab }) {
-  const [, tic] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => { const t = setInterval(tic, 60000); return () => clearInterval(t); }, []);
-  const photo = React.useMemo(() => { try { return lirePhoto(uid, localStorage); } catch (_) { return null; } }, [uid]);
-  const gestes = useGestesHorsLigne();
-  const [enGrand, setEnGrand] = React.useState(null);
-  // (10 nov., lots AU/AY) Le mode « dépôt » et le mode relais SANS réseau : la photo gardée sur CET appareil
-  // pour CE compte (datée « vue à hh:mm »), les gestes de toujours (« Déposé » ⇒ file d'envoi).
-  const [relaisHL, setRelaisHL] = React.useState(false);
-  const colis = ONGLETS_COLIS_HL.includes(tab);
-  const pdfs = usePdfsHorsLigne(uid, photo ? photo.envoyer : []);
-  // (9 nov.) Le Stock hors connexion : l'inventaire contre la dernière liste gardée.
-  if (tab === 'garage') return (
-    <div data-hors-ligne="stock" style={{padding:'16px 14px 40px'}}>
-      <h2 data-hl-titre="" style={{fontSize:20,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{tr('nav.garage')}</h2>
-      <LigneHorsLigne>{tr('journee.horsConnexionInventaire')}</LigneHorsLigne>
-      <BlocInventaireHorsLigne uid={uid}/>
-    </div>
-  );
-  // L'en-tête dit déjà « Ma journée » quand c'est l'écran demandé ; sur un autre
-  // onglet, le titre dit ce qu'on voit à la place (§7 : un titre par écran).
-  const titre = tab === 'journee' ? null : <h2 data-hl-titre="" style={{fontSize:20,fontWeight:700,color:C.text,margin:'4px 2px 12px',letterSpacing:-0.3}}>{colis ? (tab === 'ventes' ? tr('historiqueSites.type.ventes') : tab === 'achats' ? tr('historiqueSites.type.achats') : 'Colis') : tr('reglages.ma-journee.lib')}</h2>;
-  if (!photo) return (
-    <div data-hors-ligne="sans-photo" style={{padding:'16px 14px 40px'}}>
-      {titre}
-      <LigneHorsLigne>{tr('journee.horsConnexionAucune')} {colis ? tr('journee.colis') : tr('journee.journee')} {tr('journee.iciFeraAvec')}</LigneHorsLigne>
-      <BlocCodesHorsLigne/>
-      {!colis ? <div style={{marginTop:12}}><BlocInventaireHorsLigne uid={uid}/></div> : null}
-    </div>
-  );
-  const maintenant = Date.now();
-  const quand = heurePhoto(photo.at, maintenant);
-  const soir = listeDuSoir(photo, maintenant);
-  const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
-  const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
-  const limiteTxt = (e) => {
-    // (22 oct.) Une ligne qui porte sa limite exacte la dit comme Colis (l'heure
-    // lue dans l'email, « en retard » passé l'heure) — `texteLimiteEnvoi`, §11.
-    if (Number.isFinite(e.limiteAt) && e.jour) return texteLimiteEnvoi({ jour: e.jour, heure: e.heure || null, at: e.limiteAt, limite: e.estimee ? 'estimee' : 'email' }, maintenant) || '';
-    const j = joursAvantJour(e.limite, maintenant);
-    if (j == null) return '';
-    if (j < 0) return 'date limite passée';
-    if (j === 0) return "à poster aujourd'hui";
-    if (j === 1) return 'à poster demain au plus tard';
-    return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
-  };
-  const blocEnvoyer = (<>
-    {tete(tr('journee.deposer'), photo.nEnvoyer)}
-    {/* (20 nov., chasse-bugs-2 — décision « 4 oui » du 19 nov.) Plus de « Je dépose » ni de « Déposé » : le dépôt est constaté par le
-        suivi du transporteur. Une marque « Déposé » notée AVANT reste lue (« Noté déposé »), sans geste pour la refaire. */}
-    <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
-      {photo.envoyer.length === 0
-        ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>{trj('journee.aucunColisEnvoyer3', { quand: quand })}</div>
-        : photo.envoyer.map((e, i) => { const ef = gestes.etatFait(e); return (
-          <div key={i} data-hl-colis="" data-hl-fait={ef || undefined} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderTop:i ? `1px solid ${C.border}` : 'none',flexWrap:'wrap'}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.numero ? `N°${e.numero} · ` : ''}{e.titre || tr('journee.sansTitre')}</div>
-              <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[e.plateforme === 'ebay' ? 'eBay' : 'Vinted', e.compte, limiteTxt(e)].filter(Boolean).join(' · ')}</div>
-            </div>
-            {e.tx && Array.isArray(e.pdf) && e.pdf.length ? (pdfs[e.tx]
-              ? <a className="vrm-b vrm-b-secondaire vrm-b-petit" data-hl-pdf={e.tx} href={pdfs[e.tx]} target="_blank" rel="noopener" download={`bordereau${e.numero ? '-N' + e.numero : ''}.pdf`} style={{flexShrink:0}}>{tr('journee.bordereau')}</a>
-              : (pdfs[e.tx] === '' ? <span data-hl-pdf-absent={e.tx} style={{fontSize:12,color:C.muted,flexShrink:0}}>{tr('journee.bordereauGardeIci')}</span> : null)) : null}
-            {ef ? <span data-hl-fait-lu={ef} style={{fontSize:12,fontWeight:600,color:C.text}}>Noté déposé{ef === 'attente' ? ' · part au retour du réseau' : ''}</span> : null}
-            {!e.tx ? <span data-hl-sans-geste="" style={{flexBasis:'100%',fontSize:12,color:C.muted}}>{e.plateforme === 'ebay' ? tr('journee.ebayDepotSuit') : tr('journee.colisGardeSans')}</span> : null}
-          </div>); })}
-      {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>{trj('annonces.autres2', { x: photo.nEnvoyer - photo.envoyer.length })}</div>}
-    </div>
-    <RefusHorsLigne/>
-  </>);
-  const ligneRet = (r, i, extra = {}) => <LigneRetraitHorsLigne key={i} r={r} i={i} quand={quand} maintenant={maintenant} gestes={gestes} onEnGrand={setEnGrand} {...extra}/>;
-  const blocAVerifier = (photo.nAVerifier || 0) > 0 ? (<>
-    {tete(tr('journee.verifier'), photo.nAVerifier)}
-    <div data-hl-a-verifier={photo.nAVerifier} style={carte}>
-      <div style={{fontSize:12,color:C.muted,padding:'8px 0 4px',lineHeight:1.45}}>{tr('journee.sansDoute')} {photo.nAVerifier > 1 ? 'repartis' : 'reparti'} {tr('journee.chezVendeurComptes')}{photo.aVerifier.length ? tr('journee.ceuxCiOnt', { n: String(photo.aVerifier.length) }) : ''}</div>
-      {photo.aVerifier.map((r, i) => ligneRet(r, i + 1, { verifier: true }))}
-    </div>
-  </>) : null;
-  const feuille = enGrand ? <EnGrandHorsLigne r={enGrand} at={photo.at} onClose={() => setEnGrand(null)}/> : null;
-  // ── COLIS hors réseau : à retirer d'abord (on est au relais), une carte par
-  //    point (son lieu), puis à vérifier, puis à envoyer.
-  if (colis) {
-    const points = pointsDeRetrait(photo.retirer);
-    return (
-      <div data-hors-ligne="colis" style={{padding:'16px 14px 40px'}}>
-        {titre}
-        <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
-        {tete(tr('journee.retirer'), photo.nRetirer)}
-        {photo.retirer.length ? <div className="vrm-pas-a-pas-rangee" data-relais-rangee="hors-ligne"><Bouton variante="secondaire" icone="qr" data-relais-ouvrir="photo" onClick={() => setRelaisHL(true)} style={{ minHeight: 44 }}>{tr('journee.modeRelais')}</Bouton></div> : null}
-        {relaisHL ? <ModeRelais Photo={PhotoVinted} horsLigne vueA={photo.at} colis={photo.retirer.map((r, i) => ({ cle: 'hl:' + (r.id || r.cle || r.tx || i), ident: r.id || '', titre: r.titre || (r.transporteur ? tr('journee.colis2', { transporteur: String(r.transporteur) }) : 'Colis'), lieu: r.lieu || '', code: r.code || '',
-            desaccord: r.desaccord || null, suivi: r.suivi || '', qr: /^data:image\//i.test(String(r.qr || '')) ? r.qr : '', sansQrHorsLigne: !!r.qr && !/^data:image\//i.test(String(r.qr || '')) }))}
-          note={`Aucun colis à retirer à ${quand}.`} onFermer={() => setRelaisHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
-        <div data-hl-retirer={photo.nRetirer}>
-          {points.length === 0
-            ? <div style={{...carte,fontSize:13,color:C.muted,padding:'12px 14px'}}>{trj('journee.aucunColisRetirer3', { quand: quand })}</div>
-            : points.map((p, k) => (
-              <div key={p.cle} data-hl-point={p.lieu || p.nom} style={carte}>
-                <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 0 4px'}}>
-                  <span aria-hidden="true" style={{display:'flex',color:C.muted}}><Icon name="pin" size={15}/></span>
-                  <span style={{fontSize:15,fontWeight:700,color:C.text,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</span>
-                  <span style={{marginLeft:'auto',fontSize:12,color:C.muted,flexShrink:0}}>{trj('journee.colis4', { x: p.colis.length })}</span>
-                </div>
-                {p.colis.map((r, i) => ligneRet(r, i + 1, { sansLieu: !!p.lieu }))}
-              </div>))}
-          {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'0 2px 12px'}}>{trj('annonces.autres2', { x: photo.nRetirer - photo.retirer.length })}</div>}
-        </div>
-        {blocAVerifier}
-        {blocEnvoyer}
-        {feuille}
-      </div>
-    );
-  }
-  return (
-    <div data-hors-ligne="photo" style={{padding:'16px 14px 40px'}}>
-      {titre}
-      <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
-      {soir && soir.n > 0 && (
-        <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-verif={soir.aVerifier} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,marginBottom:4}}>{tr('journee.listeSoir')}</div>
-          <div style={{fontSize:15,color:C.text,lineHeight:1.45}}>
-            {tr('journee.demain')} <b>{trj('journee.colis4', { x: soir.n })}</b> {tr('journee.poster')}{soir.enRetard || soir.aVerifier || soir.demain ? ' — ' : ''}
-            {[soir.enRetard ? `${soir.enRetard} déjà en retard` : '', soir.aVerifier ? `${soir.aVerifier} à vérifier sur Vinted (date estimée passée)` : '',
-              soir.demain ? `${soir.demain} avec la date limite demain` : ''].filter(Boolean).join(', ')}.
-          </div>
-        </div>
-      )}
-      {photo.nePasPoster > 0 && (
-        <div data-hl-ne-pas-poster={photo.nePasPoster} style={{...carte,padding:'12px 14px',borderColor:`${C.warn}88`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.text}}>{tr('journee.poste')} {photo.nePasPoster > 1 ? tr('journee.cesColisEbay', { nePasPoster: String(photo.nePasPoster) }) : tr('journee.colisEbay')}</div>
-          <div style={{fontSize:13,color:C.muted,marginTop:2}}>{tr('journee.acheteurDemandeAnnulation')}</div>
-        </div>
-      )}
-      {blocEnvoyer}
-      {tete(tr('journee.retirer'), photo.nRetirer)}
-      {/* (revue du 23 oct.) Les mêmes colis que la tuile « À retirer » en ligne ;
-          la date limite LUE (et elle seule) est dite. Les colis « à vérifier »
-          ont leur bloc, en dessous, avec leur raison. */}
-      <div data-hl-retirer={photo.nRetirer} style={carte}>
-        {photo.retirer.length === 0
-          ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>{trj('journee.aucunColisRetirer3', { quand: quand })}</div>
-          : photo.retirer.map((r, i) => ligneRet(r, i))}
-        {photo.nRetirer > photo.retirer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>{trj('annonces.autres2', { x: photo.nRetirer - photo.retirer.length })}</div>}
-      </div>
-      {blocAVerifier}
-      <BlocInventaireHorsLigne uid={uid}/>
-      {feuille}
-    </div>
-  );
-}
+// ⟦→ ecrans/HorsLigne.jsx #2⟧
 
 // Une LIGNE de panne, à poser LÀ OÙ un « rien à faire » mentirait. Le bloc
 // complet ci-dessus est rendu UNE fois par la coque, au-dessus de l'écran :
@@ -21755,327 +20158,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
     </div>
   );
 }
-
-// `titreNeuf` : ce que dit le titre quand rien n'est encore branché. Les deux
-// écrans n'ouvrent pas la même conversation (« Bienvenue » sur le tableau de
-// bord, « ta journée est vide » sur l'accueil) — mais les ÉTAPES, elles, sont
-// les mêmes, et c'est tout ce qui compte.
-// ── MINI-TUTO ILLUSTRÉ DE L'ÉTAPE COURANTE (26 octobre, demande de Julien) ────
-// L'onboarding était 100 % texte. Une petite illustration DÉMONTRE le geste de
-// l'étape en cours (installer · connecter · passer sur Vinted) — tier « première
-// fois / explication », le seul où le motion est justifié (skill `animate`, §7 :
-// sobriété). transform/opacity SEULEMENT, la courbe de sortie du projet
-// (0.23,1,0.32,1), et tout sous `prefers-reduced-motion` : l'état final reste
-// lisible, animation OFF. `aria-hidden` : purement décoratif — c'est le titre et
-// le texte au-dessus qui portent le sens (et que `premierjour.cjs` lit).
-const TUTO_CLES = ['install', 'lien', 'vinted'];
-function TutoIllustration({ n }) {
-  const cle = TUTO_CLES[Math.min(Math.max(n, 1), 3) - 1];
-  const vert = INV_STATUS.online.color;
-  return (
-    <div className="vrm-tuto" data-tuto={cle} aria-hidden="true" style={{ margin: '2px 0 16px' }}>
-      <style>{`
-.vrm-tuto{display:flex;justify-content:center}
-.vrm-tuto svg{width:100%;max-width:300px;height:auto;animation:vrmTutoIn .5s cubic-bezier(.23,1,.32,1) both}
-@keyframes vrmTutoIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes vrmTutoDrop{0%{opacity:0;transform:translateY(-15px)}60%{opacity:1}100%{opacity:1;transform:none}}
-@keyframes vrmTutoPulse{0%{opacity:.5;transform:scale(.7)}70%,100%{opacity:0;transform:scale(1.9)}}
-@keyframes vrmTutoDraw{from{stroke-dashoffset:var(--l)}to{stroke-dashoffset:0}}
-@keyframes vrmTutoPop{0%{opacity:0;transform:scale(.2)}70%{transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
-@keyframes vrmTutoFlux{0%{opacity:0;transform:translateX(0)}15%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateX(70px)}}
-.vt-drop{animation:vrmTutoDrop 1s cubic-bezier(.23,1,.32,1) .3s both;transform-box:fill-box;transform-origin:center}
-.vt-pulse{animation:vrmTutoPulse 2.4s ease-out 1.1s infinite;transform-box:fill-box;transform-origin:center}
-.vt-draw{stroke-dasharray:var(--l);animation:vrmTutoDraw .8s cubic-bezier(.23,1,.32,1) .5s both}
-.vt-pop{animation:vrmTutoPop .5s cubic-bezier(.23,1,.32,1) 1.35s both;transform-box:fill-box;transform-origin:center}
-.vt-flux{animation:vrmTutoFlux 2.8s ease-in-out infinite;transform-box:fill-box}
-.vt-flux.b{animation-delay:.95s}.vt-flux.c{animation-delay:1.9s}
-@media (prefers-reduced-motion:reduce){.vrm-tuto svg,.vrm-tuto .vt-drop,.vrm-tuto .vt-pulse,.vrm-tuto .vt-draw,.vrm-tuto .vt-pop,.vrm-tuto .vt-flux{animation:none!important}}
-      `}</style>
-      {cle === 'install' && (
-        <svg viewBox="0 0 300 108" role="img">
-          <rect x="18" y="16" width="264" height="80" rx="11" fill={C.bg} stroke={C.border} strokeWidth="2"/>
-          <rect x="18" y="16" width="264" height="22" rx="11" fill={C.card}/>
-          <circle cx="33" cy="27" r="3" fill={C.muted}/><circle cx="44" cy="27" r="3" fill={C.muted}/><circle cx="55" cy="27" r="3" fill={C.muted}/>
-          <rect x="72" y="21" width="150" height="12" rx="6" fill={C.bg} stroke={C.border}/>
-          <circle className="vt-pulse" cx="251" cy="27" r="12" fill="none" stroke={C.accent} strokeWidth="2"/>
-          <g className="vt-drop"><rect x="241" y="17" width="20" height="20" rx="5" fill={C.accent}/><path d="M245 22l6 10 6-10" fill="none" stroke={C.onAccent||'#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></g>
-          <rect x="34" y="50" width="120" height="7" rx="3.5" fill={C.border}/>
-          <rect x="34" y="64" width="150" height="7" rx="3.5" fill={C.border}/>
-          <rect x="34" y="78" width="90" height="7" rx="3.5" fill={C.border}/>
-        </svg>
-      )}
-      {cle === 'lien' && (
-        <svg viewBox="0 0 300 108" role="img">
-          <rect x="20" y="36" width="78" height="40" rx="9" fill={C.card} stroke={C.border} strokeWidth="2"/>
-          <path d="M34 50l18 12 18-12" fill="none" stroke={C.muted} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="34" y="48" width="36" height="20" rx="3" fill="none" stroke={C.muted} strokeWidth="2.4"/>
-          <rect x="202" y="36" width="78" height="40" rx="9" fill={C.accent}/>
-          <path d="M224 48l8 16 8-16" fill="none" stroke={C.onAccent||'#fff'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-          <path className="vt-draw" style={{ ['--l']: 104 }} d="M98 56h104" fill="none" stroke={C.accent} strokeWidth="3" strokeLinecap="round" strokeDasharray="7 7"/>
-          <g className="vt-pop"><circle cx="150" cy="56" r="15" fill={vert}/><path d="M143 56l5 5 9-10" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></g>
-        </svg>
-      )}
-      {cle === 'vinted' && (
-        <svg viewBox="0 0 300 108" role="img">
-          <rect x="20" y="26" width="74" height="60" rx="10" fill={C.card} stroke={C.border} strokeWidth="2"/>
-          <path d="M40 42l10 26 10-26" fill="none" stroke={C.accent} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="206" y="26" width="74" height="60" rx="10" fill={C.bg} stroke={C.accent} strokeWidth="2"/>
-          <path d="M224 56l6 6 12-14" fill="none" stroke={C.accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect className="vt-flux" x="112" y="50" width="22" height="16" rx="4" fill={C.accent}/>
-          <rect className="vt-flux b" x="112" y="50" width="22" height="16" rx="4" fill={C.accent} opacity="0.75"/>
-          <rect className="vt-flux c" x="112" y="50" width="22" height="16" rx="4" fill={C.accent} opacity="0.55"/>
-        </svg>
-      )}
-    </div>
-  );
-}
-function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
-  const { extAuth, etape, relire } = useEtapePont();
-  const sansSouris = useSansSouris();
-  // ⚠️⚠️ Revue du 11 octobre : « je la connecte d'ici, sans rien à taper » était
-  //    écrit à une 5.164, qui ne reçoit plus rien de l'app (0 envoi en 25 s), et
-  //    « clique son icône, puis « Se connecter avec VRM » » nommait un bouton que
-  //    sa fenêtre n'a pas. Les mêmes voies que l'en-tête (`voieConnexionExt`).
-  const voie = voieConnexionExt();
-  const boutique = boutiqueIci();
-  const orion = boutiqueOrion();   // Orion (Mac, iPhone) : la boutique de Chrome ou de Firefox, une fois publiée
-  const mobile = mobileIci();      // 19 oct. : ios · firefox-android · samsung · android · autre
-  const [deconnectee, setDeconnectee] = React.useState(false);
-  const deconnecter = () => { if (deconnecterExtensionAncienne()) { setDeconnectee(true); setTimeout(relire, 900); } };
-  // ⚠️⚠️ « CE N'EST PAS NATUREL » — Julien, 16 septembre, en regardant le
-  //    premier écran. Il avait raison : c'était une notice de montage. Quatre
-  //    étapes numérotées d'un coup, « Mode développeur », « extension non
-  //    empaquetée », « dézippe » — du vocabulaire d'informaticien (§2.7) sur la
-  //    toute première page, à quelqu'un qui n'en est pas un.
-  //    ⇒ UNE SEULE étape à la fois, en gros et en français ; les autres restent
-  //      visibles mais en sourdine, pour savoir où on en est. L'écran AVANCE
-  //      TOUT SEUL (le pont prévient), et il le dit — c'est ça qui fait qu'on
-  //      se sent accompagné plutôt que mis au travail.
-  const fait = { ext: etape !== 'absente' && etape !== 'demande', lien: etape === 'connectee' };
-  // L'étape COURANTE, mesurée. Jamais « coche ce que tu as fait » : savoir
-  // qu'elle répond vaut mieux qu'une case à cocher.
-  const n = !fait.ext ? 1 : !fait.lien ? 2 : 3;
-  const ETAPES = [
-    { t: `Installer l’extension ${NAV.dansNu}`, c: 'extension' },
-    { t: 'La connecter à ton compte VRM — le même e-mail qu’ici, en un clic', c: 'lien' },
-    { t: 'Passer une fois sur vinted.fr', c: 'vinted' },
-  ];
-
-  // ── CE QUI SE PASSE MAINTENANT, en une phrase qu'on lit sans effort ───────
-  const titre = etape === 'autrecompte' ? 'Ton extension range dans une autre boutique'
-    : etape === 'pasconnectee' ? 'Plus qu’une chose : lui dire que c’est toi'
-    : etape === 'connectee' ? 'Tout est prêt — il ne manque qu’un tour sur Vinted'
-    : (titreNeuf || 'Bienvenue — on branche ta boutique en trois minutes');
-
-  const corps = etape === 'autrecompte' ? (
-    <>
-      <p style={{margin:'0 0 10px'}}>
-        {NAV.Dans}, l’extension est connectée sous <b style={{color:C.text}}>{extAuth.email}</b>. Toi, tu es sur <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ce compte'}</b>.
-      </p>
-      <p style={{margin:0}}>
-        Tout part dans l’autre boutique ; celle-ci reste vide.{' '}
-        {voie === 'retard'
-          ? <>Et celle-ci ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM : mets-la à jour (bouton ci-dessous) et je la reconnecterai à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> — ou déconnecte-la d’ici, puis clique son icône {NAV.hautDe} et connecte-toi avec l’e-mail et le mot de passe de ton compte VRM.</>
-          : voie === 'serveur'
-            ? <>Le serveur n’a pas pu préparer sa connexion : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</>
-            : <>Je la reconnecte à <b style={{color:C.text}}>{(AUTH.user&&AUTH.user.email)||'ton compte'}</b> dès que cette page est devant toi — rien à taper. Si ça persiste, recharge cette page.</>}
-      </p>
-    </>
-  ) : etape === 'pasconnectee' ? (
-    <>
-      <p style={{margin:'0 0 10px'}}>Ton extension est là 👍, mais pas encore reliée à ton compte.</p>
-      {voie === 'retard' ? (
-        <><p style={{margin:'0 0 6px'}}>Version {vmrExtVersion() || '?'} trop ancienne : mets-la à jour.</p><p style={{margin:0}}>Sinon, son icône {NAV.hautDe} : <b style={{color:C.text}}>e-mail et mot de passe VRM</b> (pas Vinted).</p></>
-      ) : voie === 'serveur' ? (
-        fenetreAncienne()
-          ? <p style={{margin:0}}>Clique son icône {NAV.hautDe} : <b style={{color:C.text}}>e-mail et mot de passe VRM</b> (pas Vinted).</p>
-          : <p style={{margin:0}}>Clique son icône {NAV.hautDe}, puis <b style={{color:C.text}}>« avec mon mot de passe VRM »</b>.</p>
-      ) : voie === 'page' ? (
-        /* Relecture croisée de la 5.174 : une 5.164/5.170, connectée par l'ancien
-           message de la page — sa fenêtre n'a pas « Se connecter avec VRM ». */
-        <div style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : recharge, ou son icône. <Pourquoi>Clique son icône {NAV.hautDe} et connecte-toi avec l’e-mail et le mot de passe VRM (pas Vinted).</Pourquoi></div>
-      ) : (
-        <p style={{margin:0}}>Je la connecte d’ici, <b style={{color:C.text}}>sans rien à taper</b>. Sinon : son icône {NAV.hautDe}, puis <b style={{color:C.text}} data-bouton-lier-ext="">{boutonLierExt()}</b>.</p>
-      )}
-    </>
-  ) : etape === 'connectee' ? (
-    <>
-      <p style={{margin:'0 0 10px'}}>Ton extension est reliée ✓ : elle range ce que <b style={{color:C.text}}>tu</b> vois sur Vinted.</p>
-      <p style={{margin:0}}>Ouvre <b style={{color:C.text}}>vinted.fr</b>, connecté, et passe sur ton dressing.</p>
-    </>
-  ) : etape === 'muette' ? (
-    <p style={{margin:0}}>Ton extension ne répond pas : recharge la page.</p>
-  ) : (sansSouris && boutique.nav === 'firefox' && estAndroid() && boutique.lien) ? (
-    /* 5.188 : Firefox pour Android ACCEPTE l'extension — mais seulement depuis
-       sa boutique (aucun zip ne s'installe sur un téléphone). Lien PUBLIÉ
-       seulement (`LIENS_BOUTIQUES`) : sinon, la phrase d'avant. */
-    <>
-      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
-        <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici.</p>
-      )}
-      <p style={{margin:0}} data-premiers-boutique="firefox-android">Installe-la depuis la boutique Firefox, puis reviens ici.</p>
-    </>
-  ) : sansSouris ? (
-    /* ⚠️ Dérouler la marche à suivre Chrome sur un appareil qui ne peut pas la
-       suivre, c'est donner du travail impossible — et proposer d'y télécharger
-       un zip, c'est pire. On dit OÙ ça se passe, et rien d'autre. */
-    <>
-      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
-        <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici.</p>
-      )}
-      {/* 19 octobre : le BON geste selon le navigateur du téléphone (mesuré,
-          docs/boutiques-extension.md) — jamais une boutique qui n'existe pas. */}
-      {(mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo') && <p style={{margin:'0 0 10px'}} data-premiers-mobile={mobile}>
-        {mobile === 'samsung'
-          ? <><b style={{color:C.text}}>Samsung Internet</b> n’accepte pas cette extension.</>
-          : mobile === 'duckduckgo'
-          ? <><b style={{color:C.text}}>DuckDuckGo</b> n’accepte aucune extension.</>
-          : <>{nomNavigateurIci()} sur Android n’accepte aucune extension.</>}{' '}
-        {LIENS_BOUTIQUES.firefox
-          ? <>Sur ce téléphone, <b style={{color:C.text}}>Firefox pour Android</b> (gratuit) l’accepte&nbsp;: installe Firefox (bouton ci-dessous), ouvre <b style={{color:C.text}}>vrm.center</b> dedans, et l’écran te guidera.</>
-          : <>Sur Android, seul <b style={{color:C.text}}>Firefox</b> l’accepte, et la version Firefox de l’extension n’est pas encore en ligne.</>}
-      </p>}
-      {mobile === 'firefox-android' && <p style={{margin:'0 0 10px'}} data-premiers-mobile="firefox-android-pas-encore">La version Firefox de l’extension n’est pas encore en ligne.</p>}
-      {mobile!=='ios-orion'&&<p style={{margin:0}}>
-        {mobile === 'firefox-android' || mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'
-          ? <>En attendant, cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: ouvre </>
-          : <>Cette première étape se passe <b style={{color:C.text}}>sur un ordinateur</b>&nbsp;: c’est là que vit l’extension, et ton appareil n’en accepte pas. Ouvre </>}
-        <b style={{color:C.text}}>vrm.center</b> sur ton ordinateur : tu y retrouveras cet écran{mobile === 'ios' ? <span data-premiers-relais="ios">, puis l’iPhone fera agir l’ordinateur allumé</span> : null}.
-      </p>}
-      {mobile === 'ios-orion' && <div style={{margin:'10px 0 0'}} data-premiers-orion="dans-orion">Paquet <b style={{color:C.text}}>Orion iPhone/iPad</b> ci-dessous : importe-le dans Extensions. <a href={NOTICE_ORION} target="_blank" rel="noreferrer" style={{color:C.accentTexte}}>Les étapes</a> <Pourquoi>Importe-le depuis le menu Extensions d’Orion, puis autorise VRM sur les sites utilisés. Le fonctionnement sur ton appareil reste à vérifier.</Pourquoi></div>}
-      {orion && mobile === 'ios' && <p style={{margin:'10px 0 0'}} data-premiers-orion="telephone">Sur iPhone, le navigateur <b style={{color:C.text}}>Orion</b> (gratuit) l’installe aussi, pas encore essayé.</p>}
-    </>
-  ) : boutique.lien ? (
-    /* 5.188 : la fiche de CE navigateur est publiée — un seul geste, « Ajouter ». */
-    <>
-      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
-        <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici. Jamais ton mot de passe.</p>
-      )}
-      <p style={{margin:0}} data-premiers-boutique={boutique.nav}>Bouton ci-dessous, puis «&nbsp;Ajouter&nbsp;». L’écran avance tout seul.</p>
-    </>
-  ) : (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion') ? (
-    /* Le zip est un paquet Chromium : Firefox et Safari ne l'installent pas.
-       Firefox : paquet prêt, mais pas encore publié (`LIENS_BOUTIQUES`) ;
-       Safari : aucune version. On dit où ça marche aujourd'hui, sans promesse. */
-    <>
-      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
-        <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici.</p>
-      )}
-      <p style={{margin:0}} data-premiers-boutique={boutique.nav + '-pas-encore'}>
-        {boutique.nav === 'orion'
-          ? <>Pas encore pour Orion : ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera.</>
-          : boutique.nav === 'firefox'
-          ? <>Pas encore pour Firefox : ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera.</>
-          : <>{nomNavigateurIci()} n’accepte pas cette extension : ouvre <b style={{color:C.text}}>vrm.center</b> dans Chrome, Edge, Brave ou Opera.</>}
-      </p>
-      {boutique.nav === 'safari' && orion && <p style={{margin:'10px 0 0'}} data-premiers-orion="safari">Proche de Safari&nbsp;: <b style={{color:C.text}}>Orion</b> (gratuit) l’installe, pas encore essayé.</p>}
-    </>
-  ) : (
-    <>
-      {dansGuide ? null : introNeuf ? <p style={{margin:'0 0 10px'}}>{introNeuf}</p> : (
-        <p style={{margin:'0 0 10px'}}>Une petite extension lit tes pages Vinted et range tout ici. Jamais ton mot de passe.</p>
-      )}
-      <p style={{margin:'0 0 4px'}}>Commence par la télécharger. Ensuite&nbsp;:</p>
-      <ul style={{margin:'6px 0 0',padding:'0 0 0 18px',lineHeight:1.7}}>
-        <li>ouvre le fichier pour le décompresser&nbsp;— tu obtiens un dossier <b style={{color:C.text}}>VRM-extension</b>&nbsp;;</li>
-        <li>{NAV.dansNu}, {NAV.pageExt ? <>va sur <code style={{fontSize:12,background:C.bg,padding:'1px 5px',borderRadius:6}}>{NAV.pageExt}</code></> : <>ouvre la page des extensions</>}&nbsp;;</li>
-        <li>allume <b style={{color:C.text}}>Mode développeur</b>, en haut à droite (normal, hors magasin)&nbsp;;</li>
-        <li>clique <b style={{color:C.text}}>Charger l’extension non empaquetée</b> et choisis le dossier.</li>
-      </ul>
-    </>
-  );
-
-  // ⚠️ Le bouton propose le geste qui DÉBLOQUE, jamais le suivant : envoyer sur
-  //    Vinted quelqu'un dont l'extension n'est pas connectée, c'est le faire
-  //    capter dans le vide — et dans le cas « autre compte », dans la boutique
-  //    d'un autre. Quand le geste se passe dans Chrome (cliquer l'icône de
-  //    l'extension), une page web ne peut pas l'ouvrir : on ne met alors AUCUN
-  //    bouton principal.
-  // Une extension qui ne sait pas recevoir la connexion de VRM : le geste qui
-  // débloque est de la METTRE À JOUR (le zip), et — si elle range chez un autre —
-  // de la déconnecter d'ici (son icône, connectée, ouvre VRM : pas sa fenêtre).
-  const majLiaison = fait.ext && !fait.lien && voie === 'retard' && (etape === 'pasconnectee' || etape === 'autrecompte');
-  // (8 nov.) Le fichier Orion ne se met jamais à jour seul : dès que la fiche
-  // Firefox est publiée (`orion`), c'est elle qu'on propose (branche plus bas).
-  const bouton = (!fait.ext && mobile==='ios-orion' && !orion)
-    ? <a href={`${LIEN_ORION_FICHIER}?v=${EXT_ATTENDUE}`} download data-premiers-geste="orion-fichier" className="vrm-b vrm-b-primaire">Télécharger pour Orion</a>
-    : (!fait.ext && boutique.lien && (!sansSouris || (boutique.nav === 'firefox' && estAndroid())))
-    ? <a href={boutique.lien} target="_blank" rel="noreferrer" data-premiers-geste="boutique" className="vrm-b vrm-b-primaire">Installer depuis la boutique</a>
-    : (!fait.ext && orion && (boutique.nav === 'safari' || boutique.nav === 'orion') && !(sansSouris && estAndroid()))
-    ? <a href={orion} target="_blank" rel="noreferrer" data-premiers-geste="orion" className="vrm-b vrm-b-primaire">Installer dans Orion</a>
-    : (!fait.ext && sansSouris && LIENS_BOUTIQUES.firefox && (mobile === 'samsung' || mobile === 'android' || mobile === 'duckduckgo'))
-    ? <a href={LIEN_FIREFOX_ANDROID} target="_blank" rel="noreferrer" data-premiers-geste="firefox-android" className="vrm-b vrm-b-primaire">Installer Firefox pour Android</a>
-    : (!fait.ext && sansSouris)
-    ? null   // un zip sur un téléphone est du poids mort, pas un geste
-    : (!fait.ext && (boutique.nav === 'firefox' || boutique.nav === 'safari' || boutique.nav === 'samsung' || boutique.nav === 'duckduckgo' || boutique.nav === 'orion'))
-    ? null   // le zip est un paquet Chromium : rien à proposer ici
-    : !fait.ext
-    ? <a href="/VRM-extension.zip" download className="vrm-b vrm-b-primaire">Télécharger l’extension</a>
-    : majLiaison
-      ? <>
-          {installerExtensionIci().boutique
-            ? <a href={installerExtensionIci().lien} target="_blank" rel="noreferrer" data-premiers-geste="maj-boutique" className="vrm-b vrm-b-primaire">Mettre à jour depuis la boutique</a>
-            : <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>}
-          {etape === 'autrecompte' && <Bouton variante="secondaire"  data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : `Déconnecter l’extension ${NAV.de}`}</Bouton>}
-        </>
-    : etape === 'connectee'
-      ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr</a>
-      : null;
-
-  return (
-    /* ⚠️ L'ÉTAT DÉCIDÉ EST PORTÉ PAR LA CARTE (`data-etape`). Un contrôle posé
-       sur la PHRASE est vert le jour où quelqu'un reformule — c'est arrivé
-       vingt-trois fois dans ce projet. Le banc juge l'état rendu et ses
-       conséquences (quel bouton, quelles adresses nommées) ; le texte reste
-       libre. */
-    <div className={dansGuide ? 'vrm-premiers-sans-cadre' : 'vrm-card'} data-etape={etape} data-voie={fait.ext && !fait.lien ? voie : undefined} style={{padding:'22px 20px',border:`1px solid ${etape==='autrecompte'?C.warn+'66':C.border}`,borderRadius:12,background:C.card}}>
-      {/* Où on en est — trois pastilles, lisibles d'un coup d'œil. (6 nov.) Dans le
-          guide de démarrage, c'est le guide qui dit où on en est : ni pastilles ni
-          liste ici, une seule carte (`dansGuide`). */}
-      {!dansGuide && <div style={{display:'flex',gap:6,marginBottom:14}}>
-        {ETAPES.map((e,k)=>(
-          <span key={e.c} style={{flex:1,height:4,borderRadius:999,background:(k+1)<=n?C.accent:C.border,opacity:(k+1)===n?.55:1}}/>
-        ))}
-      </div>}
-      {/* Mini-tuto illustré de l'étape courante — sur le parcours normal (3 étapes),
-          pas sur un état-problème où un autre message doit dominer. */}
-      {['absente','demande','pasconnectee','connectee'].includes(etape) && <TutoIllustration n={n}/>}
-      {/* (6 nov.) Dans le guide, le titre d'accueil et l'introduction se taisent : l'étape
-          et son « pourquoi » les disent déjà. Un titre d'ÉTAT (autre boutique, pas connectée…) reste. */}
-      {!(dansGuide && titre === (titreNeuf || 'Bienvenue — on branche ta boutique en trois minutes')) && <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:-0.3}}>{titre}</div>}
-      <div style={{fontSize:13,color:C.muted,marginTop:7,lineHeight:1.6}}>{corps}</div>
-
-      {(bouton || onNav) && (
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16,alignItems:'center'}}>
-          {bouton}
-          <Bouton variante="discret" onClick={()=>onNav&&onNav('vintedaccounts')}>Mes comptes liés ›</Bouton>
-        </div>
-      )}
-
-      {/* Les autres étapes restent VISIBLES, en sourdine : savoir ce qui reste
-          rassure, le détail de chacune arrive à son tour. */}
-      {!dansGuide && <ol className="vrm-stagger" style={{margin:'12px 0 0',padding:'0 0 0 18px',fontSize:12,color:C.muted,lineHeight:1.9}}>
-        {ETAPES.map((e,k)=>(
-          <li key={e.c} style={{color:(k+1)===n?C.text:C.muted,fontWeight:(k+1)===n?600:400}}>
-            {(k+1)<n && <span style={{color:INV_STATUS.online.color,fontWeight:700,marginRight:5}}>✓</span>}{e.t}
-          </li>
-        ))}
-      </ol>}
-      {/* L'écran avance TOUT SEUL : le pont prévient dès que l'extension
-          répond. Le dire, c'est la différence entre « on t'accompagne » et
-          « débrouille-toi ». On ne promet aucun délai pour autant. */}
-      <div style={{fontSize:12,color:C.muted,marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`,lineHeight:1.55}}>
-        {etape==='absente'
-          ? (sansSouris
-            ? <>Rien ne presse : ton compte t’attend.</>
-            : <>Je regarde en direct&nbsp;: dès que l’extension est là, cet écran passe à la suite tout seul.</>)
-          : etape==='muette' ? <>Rien n’est perdu&nbsp;: c’est la question qui n’a pas abouti, pas tes données.</>
-          : <>Cet écran suit tout seul&nbsp;: dès que c’est fait, il passe à la suite.</>}
-      </div>
-
-    </div>
-  );
-}
+// ⟦→ ecrans/Guide.jsx #1⟧
 
 // ── LE GUIDE DE DÉMARRAGE, BRANCHÉ SUR LES PREUVES DE L'APP (6 nov.) ─────────
 // La règle et les textes : src/guideDemarrage.js ; le dessin : src/GuideDemarrage.jsx.
@@ -22218,104 +20301,7 @@ function useAbonnementLu() {
   }, []);
   return x;
 }
-// (20 nov., Julien : « un parcours de 5 minutes ») « BIEN DÉMARRER » (src/parcoursNouveau/Demarrage.jsx) : un sommaire
-// et six pages poussées, style Paramètres. Les preuves EN DIRECT, relues toutes les 5 s pendant qu'une page attend :
-//   · l'extension — la règle de la page « Extension » (`etatNavigateur`, src/extension/peutFaire.js) sur les faits
-//     de CE navigateur (`faitsExtensionApp`), qui changent dès que le pont répond (`useExtVivante`) ;
-//   · les comptes captés — `fetchVintedAccounts` (Vinted), `useComptesAutresSites` (Leboncoin, Vestiaire, eBay) ;
-//   · la méthode d'étiquetage — les trois clés de src/etiquetage/methode.js (`EtiquetageReglage`, le même écran
-//     que Paramètres → Stock, qui n'écrit QUE ces clés) ;
-//   · le premier import — `import_vinted_{uid}` (`lireImportDepart`, lu, jamais deviné).
-// Écritures : la position (`vrm_parcours_nouveau`), ses sites, sa méthode d'étiquetage — sur SES gestes, par `save`.
-const Demarrage = aLaDemande(() => import('./parcoursNouveau/Demarrage.jsx'));
-const EtiquetageReglageParcours = aLaDemande(() => import('./etiquetage/EtiquetageReglage.jsx'));
-const CLES_ETIQUETAGE_PN = ['vrm_numero_ecrit', 'vrm_num_prefixe', 'vrm_etiquetage'];
-const lireEtiquetagePN = () => ({ numeroEcrit: load('vrm_numero_ecrit', null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load('vrm_etiquetage', null) });
-const ecrireEtiquetagePN = (ecritures) => Promise.all((ecritures || []).filter((w) => CLES_ETIQUETAGE_PN.includes(w.cle)).map((w) => new Promise((res) => {
-  if (w.cle === 'vrm_num_prefixe' && !ecrireCopieLocale('vrm_num_prefixe', w.valeur)) { res(false); return; }
-  save(w.cle, w.valeur, (ok) => res(ok !== false));
-  try { window.dispatchEvent(new Event(w.cle === 'vrm_num_prefixe' ? 'vrm-prefixe' : w.cle === 'vrm_numero_ecrit' ? 'vrm-numero-ecrit' : 'vrm-etiquetage')); } catch (_) {}
-}))).then((r) => r.every(Boolean));
-function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
-  const [, maj] = React.useReducer((n) => n + 1, 0);
-  React.useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || [CLE_PARCOURS_NOUVEAU, CLE_PLATEFORMES, ...CLES_ETIQUETAGE_PN].includes(k)) maj(); };
-    window.addEventListener('vrm:save', f);
-    const off = onCloudReady(maj);
-    return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
-  }, []);
-  const sansSouris = useSansSouris();
-  useExtVivante();
-  const pret = isCloudReady();
-  const pos = pret ? lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null)) : null;
-  // Ouvert à SON étape (reprise) ; jamais commencé ⇒ le sommaire. `etapeForcee` 'sommaire' : depuis Paramètres.
-  const forcee = ETAPES_NOUVEAU.includes(etapeForcee) ? etapeForcee : null;
-  const [ici, setIci] = React.useState(() => (etapeForcee ? forcee : (pos && pos.vues && pos.vues.length ? pos.etape : null)));
-  React.useEffect(() => { if (etapeForcee) setIci(forcee); }, [etapeForcee]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Relire pendant qu'une page attend une preuve (extension, comptes, import) : toutes les 5 s, page visible.
-  const [tour, setTour] = React.useState(0);
-  const attend = ici === 'extension' || ici === 'comptes' || ici === 'historique' || ici === null || ici === 'pret';
-  React.useEffect(() => {
-    if (!attend) return undefined;
-    const pousse = () => { if (document.visibilityState === 'visible') setTour((t) => t + 1); };
-    const t = setInterval(pousse, 5000);
-    window.addEventListener('focus', pousse); document.addEventListener('visibilitychange', pousse);
-    return () => { clearInterval(t); window.removeEventListener('focus', pousse); document.removeEventListener('visibilitychange', pousse); };
-  }, [attend]);
-  const { etat: arrivee } = useParcoursArrivee({ comptes, actif: true, tour });
-  const [vinted, setVinted] = React.useState(() => (Array.isArray(comptes) ? comptes : undefined));
-  React.useEffect(() => {
-    if (!tour) return undefined;
-    let mort = false;
-    fetchVintedAccounts().then((r) => { if (!mort) setVinted(Array.isArray(r) ? r : null); }).catch(() => { if (!mort) setVinted(null); });
-    return () => { mort = true; };
-  }, [tour]);
-  const [autres, relireAutres] = useComptesAutresSites(true);
-  React.useEffect(() => { if (tour && ici === 'comptes') relireAutres(); }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [imports, setImports] = React.useState(undefined);
-  const listeVinted = Array.isArray(vinted) ? vinted : (Array.isArray(comptes) ? comptes : vinted);
-  const uids = (Array.isArray(listeVinted) ? listeVinted : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).join(',');
-  React.useEffect(() => {
-    let mort = false;
-    lireImportDepart(uids ? uids.split(',') : [], (q) => lireTout(q)).then((r) => { if (!mort) setImports(r); }).catch(() => { if (!mort) setImports(null); });
-    return () => { mort = true; };
-  }, [uids, ici, tour]);
-  const plateformes = pret ? lirePlateformes(load(CLE_PLATEFORMES, null)) : undefined;
-  const numerotation = pret ? load(CLE_NUMERO_ECRIT, null) : undefined;
-  const etats = etatsParcoursNouveau({ session: !!(AUTH.user && AUTH.user.id), plateformes, arrivee, numerotation, imports, etiquetage: pret ? lireEtiquetagePN() : undefined });
-  const navExt = (() => { try { return etatNavigateurPN(faitsExtensionApp(sansSouris)); } catch (_) { return null; } })();
-  const ext = etatExtensionDirect(navExt, etats.extension);
-  const sites = plateformes && plateformes.sites && plateformes.sites.length ? plateformes.sites : ['vinted'];
-  const captes = comptesCaptes(sites, {
-    vinted: Array.isArray(listeVinted) ? listeVinted.map((a) => ({ nom: (a && (a.login || a.username)) || '' })) : listeVinted,
-    leboncoin: autres ? autres.leboncoin : undefined, vestiaire: autres ? autres.vestiaire : undefined, ebay: autres ? autres.ebay : undefined,
-  });
-  const etatsVus = { ...etats, extension: ext, comptes: { etat: sites.every((s) => captes[s] && captes[s].etat === 'fait') ? 'fait' : sites.some((s) => captes[s] && captes[s].etat === 'encours') ? 'encours' : 'afaire' } };
-  const ranger = (geste, etape) => save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), geste, { etape }));
-  const aller = (e) => {
-    if (e === null) { setIci(null); return; }
-    if (!ETAPES_NOUVEAU.includes(e)) return;
-    setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
-  };
-  const ecrire = (cle, v) => new Promise((res) => save(cle, v, (ok) => res(ok !== false)));
-  const prenom = String(load('vrm_prenom', '') || '').trim().slice(0, 30);
-  const fermerPlusTard = () => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); };
-  const allerAilleurs = (url) => { ranger('aller', ici || 'plateformes'); if (onFermer) onFermer('plusTard'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: url })); } catch (_) {} };
-  return <><FermeAuRetour fermer={() => { if (ici) setIci(null); else fermerPlusTard(); }}/>
-    <Suspense fallback={null}><Demarrage etape={ici} etats={etatsVus} ext={ext} navExt={navExt} inst={installationIci({ liens: LIENS_BOUTIQUES })} pageExt={NAV.pageExt || ''}
-      captes={captes} sites={sites} telephone={!!sansSouris} prenom={prenom}
-      plateformesDepart={plateformes && plateformes.sites ? plateformes.sites : []}
-      etiquetage={ici === 'etiquetage' ? <Suspense fallback={null}><EtiquetageReglageParcours lire={lireEtiquetagePN} archive={archiveNumeros()} ecrire={ecrireEtiquetagePN}/></Suspense> : null}
-      onAller={aller}
-      onPlusTard={fermerPlusTard}
-      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); if (onFermer) onFermer('fin'); }}
-      onChoisirPlateformes={(s) => { const v = reglagePlateformes(s); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
-      onBrancher={navExt && navExt.geste === 'brancher' ? () => { brancherExtensionApp(); setTimeout(() => setTour((t) => t + 1), 1500); } : null}
-      onExemple={bacASableEtape() ? null : () => entrerModeExemple()}
-      onEbay={() => allerAilleurs('?tab=plat_ebay&section=compte')}
-      onDetailsExtension={() => { ranger('aller', ici || 'extension'); if (onFermer) onFermer('plusTard'); setTimeout(ouvrirPageExtension, 0); }}
-    /></Suspense></>;
-}
+// ⟦→ ecrans/Feuilles.jsx #14⟧
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.
 function PlateformesSetting({ initial = false }) {
   const p = useProfilVendeur();
@@ -23543,35 +21529,7 @@ const lbcExpediee = o => {
   return /in[_ -]?transit|out[_ -]?for[_ -]?delivery|shipped|dispatched|collected|en cours de livraison|colis (?:envoye|depose|remis)|expedie(?:e|s)?\b|pris en charge|collecte par/.test(t);
 };
 const lbcEuro = (p) => p == null ? '' : (Number(p) / 100).toFixed(2).replace('.', ',') + '\u00a0€';
-// Carte d'une transaction Leboncoin — comme Vinted : photo · titre · statut +
-// transporteur · prix. Partagée par Ventes ET Achats (§11 : une seule forme).
-function CarteLbc({ o, num = '', benef = null, floute = false, compte = undefined }) {
-  // (29 oct., Julien : « côté vente, fais les mêmes modifications que pour
-  // Vinted ; enlève N° ») Le titre d'une vente est celui de l'annonce, sans N° :
-  // le N° (identité stricte, §5) reste dans le tiroir (« Fiche article N°… »),
-  // le bénéfice en meta. Rien n'est affiché qui ne soit connu (jamais 0).
-  const titre = o.title || '';
-  // (27 oct., « pareil que Vinted ») La ligne repliée dit QUAND (la date de
-  // VENTE relevée, jamais `at` = heure de capture) et PAR QUOI elle part ;
-  // l'étape qui demande un geste (colis à envoyer) passe en ambre.
-  const dv = Date.parse(o.dateVente || '');
-  const sous = [isNaN(dv) ? '' : new Date(dv).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(new Date(dv).getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }), o.deliveryLabel || ''].filter(Boolean).join(' · ');
-  // « À envoyer » = la règle de l'onglet Colis (vente prouvée, ni annulée, ni
-  // finalisée, pas encore partie) — jamais une lecture du libellé (§11).
-  const aLabel = !!(o.label && (o.label.voucherUrl || o.label.qrUrl || o.label.reference));
-  const ton = lbcAnnulee(o) ? 'annule' : ((o.isSeller === true || (o.isSeller !== false && aLabel)) && !lbcFinalisee(o) && !lbcExpediee(o) && !((load('vrm_lbc_colis_done', {}) || {})[o.txId]) ? 'action' : '');
-  // (28 oct.) L'état de la LIGNE dit la règle qui compte la vente (§11) :
-  // « Paiement effectué » (l'étape brute de Leboncoin) s'affichait — coupé à
-  // 390 px — sur une vente que les totaux comptent finalisée. L'étape brute
-  // reste dans le détail.
-  const etatCourt = lbcAnnulee(o) ? 'Annulée' : lbcFinalisee(o) ? 'Finalisée' : ton === 'action' ? 'À envoyer' : lbcExpediee(o) ? 'En transit' : (o.stepLabel || o.stepStatus || '');
-  // (3 nov., critique #3) La frise de Vinted, sur ce que l'extension a LU de la transaction :
-  // « Postée » = expédiée, « Livrée » et « Payée » = finalisée (Leboncoin verse à la finalisation).
-  const friseLbc = lbcAnnulee(o) ? null : <Frise etapes={friseVenteLue({ vendue: true, postee: lbcExpediee(o) || lbcFinalisee(o), livree: lbcFinalisee(o), payee: lbcFinalisee(o) }, { geste: ton === 'action' })} cle={'lbc' + o.txId} className="vrm-fu-ligne-frise" label="Où en est la vente"/>;
-  return <LigneVente frise={friseLbc} numerosArticle={num?[num]:[]} plateforme="leboncoin" data={{ 'data-lbc-vente': String(o.txId), 'data-lbc-etat': etatCourt, 'data-flou': floute ? '1' : '0' }} floute={floute} photo={photoArticle(o)} titre={titre} sous={sous} compte={compte} ton={ton} montant={montant(o.price != null && String(o.price).trim() !== '' ? Number(o.price) / 100 : null)} etat={motEtatVente(etatCourt)}
-    suite={o.isSeller === true ? <><RemiseMainPropre o={o} num={num} eligible={!lbcAnnulee(o) && !lbcExpediee(o) && (!lbcFinalisee(o) || /main propre/i.test(String(o.deliveryLabel || '')))}/><FactureAutreVente plateforme="leboncoin" vente={o} deps={DEPS_FACTURE}/></> : null}
-    meta={<>{o.stepLabel || o.stepStatus || ''}{o.deliveryLabel ? ` · ${o.deliveryLabel}` : ''}{benef != null ? <span data-lbc-benef={benef.toFixed(2)} style={{ color: benef >= 0 ? C.text : C.warn, fontWeight: 600 }}> · marge avant frais {fmt(benef)}</span> : null}</>}/>;
-}
+// ⟦→ ecrans/Plateformes.jsx #9⟧
 // L'étape d'un ACHAT Leboncoin, dans les mêmes mots et les mêmes couleurs que
 // celle d'un achat Vinted (`etapeAchat`) : Annulé · Reçu · En transit · Payé.
 // Elle lit ce que l'extension capte (colis, liste v3), jamais un mot deviné.
@@ -23615,80 +21573,7 @@ function lbcArgent(lbcVentes) {
   const recuS = sommeConnue(finals, prixLbcSu), attenteS = sommeConnue(enCours, prixLbcSu);
   return { n: ventes.length, actives: actives.length, recu: recuS.total, recuS, nRecu: finals.length, attente: attenteS.total, attenteS, nAttente: enCours.length };
 }
-// Résumé COMPACT d'une plateforme, toujours visible en haut de son onglet —
-// la même forme que `VintedResume` (Julien : « eBay et Leboncoin comme Vinted :
-// le résumé en haut, puis Ventes / Achats / Annonces, pas d'Aperçu »).
-// Une valeur inconnue s'écrit « — », jamais 0 (§7).
-function PlatResume({ cases, note, dark, baseKO }) {
-  if (baseKO) return null;   // la coque dit déjà la panne (§7)
-  // (14 nov., refonte visible — AJOUT 3) Plus de repli « Chiffres » ni de carte encadrée en tête des sites :
-  // UNE bande de chiffres (src/ui/BandeChiffres, ≤ 72 px, sur le fond de la page). Un montant PAS SU
-  // n'a pas de case (jamais une carte « — ») ; la note (un compte illisible) reste, en une ligne.
-  // Les valeurs sont celles d'avant (`cases`, calculées par l'écran) : rien de recalculé.
-  const items = (cases || []).map(([lib, val], i) => ({ cle: 'c' + i, n: val == null ? null : val, l: lib }));
-  if (!items.some((x) => x.n != null) && !note) return null;
-  return (
-    <div className="vrm-pf-resume" data-plat-resume="1" data-plat-resume-dark={dark ? '1' : undefined}>
-      <BandeChiffres items={items}/>
-      {note && <div className="vrm-pf-note" style={{ color: C.muted }}>{note}</div>}
-    </div>
-  );
-}
-function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = false }) {
-  const [filtre,setFiltre]=useVueSession('leboncoin-ventes-filtre','all');
-  const [recherche,setRecherche]=useVueSession('leboncoin-ventes-recherche','');
-  const ventes=lbcVentes.ventes || [];
-  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
-  const lbcOuvert = useCompteLbcOuvert();
-  // (9 nov., soir, lot AJ) La plus récente en haut, TOUS COMPTES MÉLANGÉS (date de vente lue, sinon la date
-  // relevée par l'extension ou datée à la main) ; sans date en bas — la règle unique (src/ordreRecent.js).
-  const datesLbcV = React.useMemo(() => lireDatesLbc(), [lbcVentes]);
-  const visibles=ordreRecent(ventes.filter(o=>(!recherche || String(o.title || '').toLowerCase().includes(recherche.toLowerCase()))
-    && (filtre==='all' || (filtre==='cancelled'?lbcAnnulee(o):filtre==='done'?lbcFinalisee(o):!lbcAnnulee(o)&&!lbcFinalisee(o)))), (o) => quandLeboncoin(o, datesLbcV));
-  // ── BÉNÉFICE PAR VENTE (parité Vinted/eBay, 26 oct.) ──────────────────────
-  // N° et bénéfice par IDENTITÉ seulement (§5) : `numeroLbcIdentite` (lien posé
-  // à la main > référence VRM de l'annonce, '' si ambigu), puis le prix d'achat
-  // SAISI de cette paire (`vinted_buyprice_by_num`, via `prixAchatDe` — la MÊME
-  // source que Vinted/eBay, §11). Prix d'achat inconnu ⇒ pas de bénéfice (jamais
-  // 0 : un total partiel présenté comme complet est pire qu'un absent).
-  const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
-  const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
-  const numerosFiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [lbcVentes]);
-  // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
-  // lien posé à la main suffit déjà (c'est l'identité la plus forte).
-  const [itemsLbc, setItemsLbc] = useState(null);
-  useEffect(() => { let m = false; lbcAnnoncesSession().then((it) => { if (!m) setItemsLbc(it || null); }).catch(() => {}); return () => { m = true; }; }, []);
-  // (5 nov.) Les noms de ses comptes Leboncoin, pour écrire le compte sur chaque vente.
-  const annLbc = useAnnuaireLbc();
-  const infoVente = (o) => {
-    const num = numeroLbcIdentite(o, itemsLbc, liens);
-    const prix = o.price != null ? Number(o.price) / 100 : null;
-    // ⚠️ BÉNÉFICE SEULEMENT SI UNE SEULE FICHE PORTE CE N° (revue du 26 oct.,
-    //    §11) — le MÊME garde que le total de la compta (`ficheUniqueDuNumero`
-    //    → `achatDuNum`). Mesuré : 13 N° hérités d'août sont portés par
-    //    plusieurs fiches à des prix d'achat différents ; `buyByNum[num]` n'en
-    //    garde qu'UN (arbitraire). La carte montrait alors un bénéfice que le
-    //    total disait « inconnu » : un chiffre d'argent faux présenté comme
-    //    certain. Le N° reste affiché (l'identité de la vente est connue) ;
-    //    seul le bénéfice est tu quand le coût est ambigu.
-    const fiche = num ? ficheUniqueDuNumero(numerosFiches, num) : null;
-    // (11 nov., famille « une règle par notion ») la règle de la ligne (`beneficeLigneVente` → `beneficePaire`) :
-    //    le prix d'achat de LA fiche (puis son miroir), moins les frais saisis — la même que le total.
-    const r = fiche && prix != null ? beneficeLigneVente(prix, { ...fiche, buyPrice: prixAchatDe(fiche, buyByNum) }, { annulee: lbcAnnulee(o) }) : null;
-    const achat = r ? r.achat : null;
-    const benef = r ? r.benefice : null;
-    return { num, benef, achat, compte: compteVenteLbc(o, itemsLbc, annLbc) };
-  };
-  return <div>
-    <ScreenHead icon="cash" title="Ventes"/>
-    <FiltresVentes plateforme="leboncoin" value={filtre} onChange={setFiltre} search={recherche} onSearch={setRecherche} count={visibles.length} cancelled/>
-    <FiabiliteVentes perimetre="Leboncoin · ventes finalisées" lignes={visibles.map(o=>{const info=infoVente(o);return {incluse:lbcFinalisee(o)&&!lbcAnnulee(o),achatConnu:info.achat!=null,prixConnu:o.price!=null&&String(o.price).trim()!==''&&Number.isFinite(Number(o.price)),valide:info.benef!=null,fraisSuivis:false};})}/>
-    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,overflow:'hidden'}}><ListeParCompte lignes={visibles} ouvert={lbcOuvert} floute={(o)=>lbcFloute(lbcOuvert, o.account)} compteDe={(o)=>idCompteLbcApp(o.account)} unite="vente" libelle="Compte ouvert sur Leboncoin" nomDe={(id)=>nomCompteLbcGroupe(annLbc, id)}
-      rendre={(o)=><CarteLbc key={o.txId} o={o} {...infoVente(o)} floute={lbcFloute(lbcOuvert, o.account)}/>}/></div>
-    {!visibles.length && <p style={{fontSize:12,color:C.muted,padding:'12px 0'}}>Aucune vente dans cette sélection.</p>}
-    {lbcVentes.inconnues>0 && <details style={{marginTop:12,fontSize:12,color:C.muted}}><summary>Transactions à confirmer ({lbcVentes.inconnues})</summary><p>Ouvre tes transactions sur Leboncoin pour lire leur côté acheteur ou vendeur.</p></details>}
-  </div>;
-}
+// ⟦→ ecrans/Plateformes.jsx #10⟧
 // ⟦→ ecrans/Comptabilite.jsx #221⟧
 // ⟦→ ecrans/Ebay.jsx #7⟧
 // ⚠️ LA LIVRAISON EST GÉRÉE PAR eBay (Julien, 27 sept. : « c'est pas moi qui
@@ -24636,53 +22521,7 @@ function useEbayPaires(comptes) {
   })(); return () => { stop = true; }; }, [comptes, nuage]);
   return { paires, enLigne, toutesLues, pret, doubles, chezMoi: chezMoiS };
 }
-// ⟦→ ecrans/Ebay.jsx #22⟧
-
-// ── eBay · VENTES (commandes captées par l'API officielle) ──────────────────
-// Même esprit que les Ventes Leboncoin : on rend ce qui est MESURÉ (ebay_orders),
-// jamais un chiffre inventé. Skin eBay (noir). La place de la photo est réservée.
-// ── eBAY → ACHATS (29 octobre) : la recherche et le fil, puis les achats
-// gagnés, repliés. Le repère de revente est celui du MODÈLE, calculé par LA
-// règle `moyennesParModele` sur ses ventes Vinted (comptes écartés exclus,
-// §11) — dit « le modèle, pas cette paire ». Ventes pas lues ⇒ aucun repère.
-// (30 oct., revue) La session du fil eBay : au réveil, attendre le renouvellement
-// en cours plutôt que d'envoyer un jeton expiré ; sur un 401, renouveler puis
-// réessayer une fois. Trois états : true · false (refusé, plus de session) · null (pas su).
-const SESSION_FIL_EBAY={
-  prete:async()=>{ if(!AUTH.session) return true; if(authValid()) return true; return authRefresh(); },
-  renouveler:()=>authRefresh(),
-};
-function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={},sansGagnes=false}){
-  const {ventes}=useVentesCoque();
-  const repere=React.useMemo(()=>{
-    if(!Array.isArray(ventes))return null;
-    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
-    const V=moyennesParModele(ventes,(o)=>compteEcarte(o&&o._acc&&o._acc.vinted_user_id,hAcc,panelOff||{}));
-    // (30 oct.) Pas de repère sur une clé générique (« air max ») ni sur un accessoire
-    // ou une taille enfant (« lacets », « boîte vide », « enfant ») : mieux vaut un blanc qu'un faux.
-    return (titre)=>{const k=extractModel(titre);if(!repereAdmis(titre,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,moyenne:e.s/e.n,n:e.n};};
-  },[ventes,panelOff]);
-  // (11 nov., lot alertes-ebay) La revente d'une recherche en alerte, à défaut de SON prix : la MÉDIANE
-  // de ses ventes du modèle de la recherche (même règle que le repère : ≥ 3 ventes, jamais une clé
-  // générique ni un accessoire). Ventes pas lues ⇒ undefined (« pas su »), rien ⇒ null.
-  const revente=React.useMemo(()=>{
-    if(!Array.isArray(ventes))return ()=>undefined;
-    const hAcc=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
-    const V=moyennesParModele(ventes,(o)=>compteEcarte(o&&o._acc&&o._acc.vinted_user_id,hAcc,panelOff||{}));
-    return (mots)=>{const k=extractModel(mots);if(!repereAdmis(mots,k))return null;const e=k&&V[k];if(!e||e.n<REPERE_MIN)return null;return {modele:k,mediane:mediane(e.prix),n:e.n};};
-  },[ventes,panelOff]);
-  const [gagnes,setGagnes]=React.useState(false);
-  return <div style={{padding:16}} data-ebay-achats-onglet="">
-    <Suspense fallback={null}><AlertesEbay headers={headers} theme={C} revente={revente} contexte={contexte}/></Suspense>
-    <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
-    <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
-    {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
-    {sansGagnes?null:<details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
-      <summary>Tes achats gagnés sur eBay · 60 derniers jours</summary>
-      {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div>}
-    </details>}
-  </div>;
-}
+// ⟦→ ecrans/Plateformes.jsx #11⟧
 function EbayActionCompte({vue,comptes,onCompte,children}){
  if(comptes===undefined)return <p>Lecture des comptes eBay…</p>;
  if(comptes===null)return <LignePanne>Les comptes eBay n’ont pas pu être lus. Actualise avant de continuer.</LignePanne>;
@@ -24783,35 +22622,7 @@ function ExtVestiaireCompte() {
     <b>Ce que l'extension lit sur Vestiaire n'arrive pas ici.</b> {g.texte}
   </div>;
 }
-// ⟦→ ecrans/Vestiaire.jsx #8⟧
-// ══════════════════════════════════════════════════════════════════════════════
-// UN SEUL N° POUR UN ARTICLE SUR VINTED ET VESTIAIRE (3 nov.) — src/lienVestiaire.js
-// ══════════════════════════════════════════════════════════════════════════════
-// « Relier » sur une annonce Vestiaire (vers un article Vinted) ou sur une fiche
-// Vinted (vers une annonce Vestiaire) : l'événement `vrm:lien-vc` ouvre UNE
-// feuille (`HoteLienVc`, monté dans AppCoeur). Suggestions par ressemblance
-// (marque + taille, couleur ; jamais la photo), mais SON toucher seul relie (§5).
-// Le N° qui reste est celui de l'annonce Vinted (déjà sur le carton) ; celui que
-// VRM avait donné à l'annonce Vestiaire reste servi (jamais redonné) et passe
-// dans « N° à barrer » jusqu'à « C'est écrit ». Défaire rend l'état d'avant.
-const PhotoLienVc = ({ src }) => (/vestiairecollective\./i.test(String(src || ''))
-  ? <PhotoVc src={src} style={{ width: '100%', height: '100%' }}/>
-  : <PhotoVinted src={src} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>);
-const REFUS_LIEN_VC = { identite: 'Article illisible — rien n’est relié', 'sans-numero': 'L’article Vinted n’a pas encore de N° — rien n’est relié', 'deja-relie': 'Déjà relié', 'vinted-deja-relie': 'Cet article Vinted est déjà relié à une autre annonce Vestiaire' };
-// Relier (sur SON toucher, confirmé). `productId` Vestiaire, `item` + `numVinted` Vinted.
-async function relierVc({ productId, item, numVinted, titre }) {
-  if (!isCloudReady()) { toast('Tes données ne sont pas encore chargées — réessaie dans un instant'); return false; }
-  const liens = vcCarte('vrm_vc_liens');
-  const numVc = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(productId)] || '';
-  const r = poserLienVc({ liens, productId, item, numeroVinted: numVinted, numeroVc: numVc, cleNum });
-  if (r.refus) { toast(REFUS_LIEN_VC[r.refus] || 'Rien n’est relié'); return false; }
-  const de = r.liens[String(productId)].de;
-  const ok = await askConfirm({ title: `Un seul N° : N°${numVinted}`, desc: [titre ? `« ${String(titre).slice(0, 60)} »` : '', de ? `N°${de} → N°${numVinted} là où l’article est rangé.` : ''].filter(Boolean).join('\n'), ok: 'Relier', cancel: 'Annuler' });
-  if (!ok) return false;
-  vcPoser('vrm_vc_liens', poserLienVc({ liens: vcCarte('vrm_vc_liens'), productId, item, numeroVinted: numVinted, numeroVc: numVc, cleNum }).liens || vcCarte('vrm_vc_liens'));
-  toast(de ? `Relié · N°${numVinted} · barre le N°${de}` : `Relié · N°${numVinted}`);
-  return true;
-}
+// ⟦→ ecrans/Feuilles.jsx #15⟧
 async function defaireVc(productId) {
   const e = lienDe(vcCarte('vrm_vc_liens'), productId);
   if (!e) return false;
@@ -25154,131 +22965,7 @@ function BlocBarrerVc({ titres = {} }) {
     </div>)}
   </section>;
 }
-// La feuille ouverte : candidats Vinted (sens 'vc') ou Vestiaire (sens 'vinted').
-function LienVcOuvert({ cible, comptes, onFermer }) {
-  const vcLoc = useVcLocal();
-  const { paires, pret } = useEbayPaires(cible.sens === 'vc' ? comptes : null);
-  const [vc, setVc] = React.useState(undefined);   // undefined en cours · null pas su · { items, liens }
-  React.useEffect(() => {
-    if (cible.sens !== 'vinted') return undefined;
-    let vivant = true;
-    (async () => {
-      const r = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`);
-      if (!vivant) return;
-      if (!Array.isArray(r)) { setVc(null); return; }
-      const x = r[0] || {};
-      setVc({ items: (x.items && typeof x.items === 'object') ? x.items : {}, liens: (x.liens && typeof x.liens === 'object') ? x.liens : {}, capturedAt: x.capturedAt || '' });
-    })();
-    return () => { vivant = false; };
-  }, [cible.sens]);
-  let candidats = [], lecture = false, panne = false;
-  if (cible.sens === 'vc') {
-    lecture = !pret;
-    const pris = new Set(Object.values(vcLoc.liens || {}).map((e) => String((e && e.item) || '')));
-    candidats = (paires || []).filter((p) => p.num && !pris.has(String(p.id))).map((p) => ({ id: p.id, num: p.num, titre: p.title, photo: p.cover || '', marque: p.marque, taille: p.taille, couleur: p.couleur, detail: [p.marque, p.taille].filter(Boolean).join(' · ') }));
-  } else {
-    lecture = vc === undefined; panne = vc === null;
-    if (vc) candidats = Object.entries(vc.items).filter(([id, it]) => it && typeof it === 'object'
-      && vcReliable({ productId: id, item: it, liensPub: vc.liens, liens: vcLoc.liens, cleNum })
-      && !['retiree', 'vendue'].includes(etatAnnonceVcBrut(it, false, vc.capturedAt)))
-      .map(([id, it]) => ({ id, num: numVcAnnonce(id, it, vc.liens, vcLoc.auto), titre: it.titre || '', photo: it.photo || '', detail: it.prix && isFinite(Number(it.prix.valeur)) ? fmt(it.prix.valeur) : '' }));
-  }
-  const suggestions = React.useMemo(() => suggestionsLienVc({ cible, candidats, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [cible, candidats.length, lecture]);
-  const onRelier = async (c) => {
-    const fait = cible.sens === 'vc'
-      ? await relierVc({ productId: cible.id, item: c.id, numVinted: c.num, titre: c.titre })
-      : await relierVc({ productId: c.id, item: cible.id, numVinted: cible.num, titre: c.titre });
-    if (fait) onFermer();
-  };
-  return <FeuilleLienVc cible={cible} candidats={candidats} suggestions={suggestions} lecture={lecture} panne={panne} onRelier={onRelier} onFermer={onFermer} Photo={PhotoLienVc}/>;
-}
-// ⟦→ ecrans/Comptabilite.jsx #226⟧
-function HoteLienVc({ comptes }) {
-  const [cible, setCible] = React.useState(null);
-  React.useEffect(() => {
-    // (19 nov.) Le sens inverse (« Relier à Vestiaire » depuis la fiche Vinted) : LE parcours « Relier mes annonces », sur Vestiaire,
-    // cet article proposé en tête de chaque annonce (son N° tapé) — les mêmes gardes, SON toucher relie. L'ancienne feuille n'est plus ouverte.
-    const f = (e) => { const d = e && e.detail; if (!d || d.sens !== 'vinted' || d.id == null) return; ouvrirLiaison({ site: 'Vestiaire', article: { id: String(d.id), numero: String(d.num || '') } }); };   // (19 nov.) sens 'vc' : le parcours « Relier mes annonces » (LiaisonCoque)
-    window.addEventListener('vrm:lien-vc', f);
-    return () => window.removeEventListener('vrm:lien-vc', f);
-  }, []);
-  if (!cible) return null;
-  return <>{<FermeAuRetour fermer={() => setCible(null)}/>}<LienVcOuvert key={cible.sens + cible.id} cible={cible} comptes={comptes} onFermer={() => setCible(null)}/></>;
-}
-// ══════════════════════════════════════════════════════════════════════════════
-// PUBLIER AILLEURS — LE PARCOURS GUIDÉ (5 nov., règle : src/publierAilleurs.js)
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien : « Vinted → Leboncoin, Vestiaire et eBay : beaucoup plus accompagné,
-// pro, pointilleux et fiable ». Les paires proposables sont celles de la source
-// partagée (`useEbayPaires` : en ligne sur Vinted ou « toujours chez moi », §11) ;
-// ce qui part est construit par les règles des moteurs (`lbcTitre`,
-// `descriptionLbcDe`, `descriptionEbayPropre`) ; ce qui manque par la
-// vérification de l'app ; « vue en ligne » par `sitesDuNumero` (identité).
-// « Publier » ouvre le moteur EXISTANT sur CET article — la fiche Leboncoin
-// (`DEMANDE_LBC_FICHE`), le formulaire eBay (`DEMANDE_EBAY_PAIRE`), la ligne
-// Vestiaire (`DEMANDE_VC_PAIRE`) — avec toutes ses gardes : rien ne part d'ici.
-function HotePublierAilleurs({ comptes, num, site, sitesVus, manquesLecture, lecture, onChoisir, onFermer, onNav }) {
-  const { paires, pret } = useEbayPaires(comptes);
-  const { jobs } = useExtVivante();
-  // Les marques « déjà publiée » (Leboncoin, Vestiaire) et les brouillons eBay de
-  // ses paires : trois états (undefined en cours · null pas su · Set).
-  const [postes, setPostes] = React.useState({ leboncoin: undefined, vestiaire: undefined });
-  const [brouillons, setBrouillons] = React.useState(undefined);
-  React.useEffect(() => {
-    let vivant = true;
-    const ids = async (id) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=ids:data->ids`, { headers: sbAuth() }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? new Set(((j[0] && j[0].ids) || []).map(String)) : null; } catch (_) { return null; } };
-    (async () => {
-      const [lbc, vc] = await Promise.all([ids('vinted_lbc_posted'), ids('vinted_vc_posted')]);
-      // ⚠️ (relecture du 5 nov.) Un brouillon eBay MIS EN LIGNE (ou programmé) garde sa ligne avec
-      //    `programme.itemId` (`lireBrouillonsEbay`) : il n'est plus « préparé », il est PUBLIÉ —
-      //    le dire « préparée » proposait « Reprendre sur eBay » sur une annonce déjà en ligne.
-      let br = null;
-      try { const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_brouillons&select=items:data->items`, { headers: sbAuth() }); if (r.ok) { const j = await r.json(); const it = Array.isArray(j) && j[0] && j[0].items; const l = (Array.isArray(it) ? it : Object.values(it || {})).filter((b) => b && b.pairId != null);
-        const publie = (b) => !!((b.programme && b.programme.itemId) || b.itemId);
-        br = { prepares: new Set(l.filter((b) => !publie(b)).map((b) => String(b.pairId))), publies: new Set(l.filter(publie).map((b) => String(b.pairId))) }; } } catch (_) { br = null; }
-      if (vivant) { setPostes({ leboncoin: lbc, vestiaire: vc }); setBrouillons(br); }
-    })();
-    return () => { vivant = false; };
-  }, [num]);
-  const liste = pret ? paires : undefined;
-  const k = num ? cleNum(num) : '';
-  const paire = k && Array.isArray(liste) ? (liste.find((p) => cleNum(p.num) === k) || null) : null;
-  const fiches = load('vinted_annonce_numeros', {}) || {};
-  const cartes = React.useMemo(() => {
-    if (!paire) return [];
-    const fiche = fiches[String(paire.id)] || {};
-    let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
-    const famille = familleArticle({ titre: paire.title, taille: paire.taille, marque: paire.marque }).famille;
-    const etats = etatsPaire(paire, { sitesVus: lecture ? null : sitesVus, manquesLecture, jobs, brouillonsEbay: brouillons ? brouillons.prepares : null, publiesEbay: brouillons ? brouillons.publies : null,
-      postes: { leboncoin: postes.leboncoin === undefined ? null : postes.leboncoin, vestiaire: postes.vestiaire === undefined ? null : postes.vestiaire } });
-    return SITES_PUBLIER.map((sx) => {
-      const apercu = apercuEnvoi(sx, paire, { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), titreVc: (m, t, ta) => lbcTitre(m, t, ta, 80), titreEbay: (t, ta) => ebayTitre(t || '', ta || ''),
-        descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (pp) => (pp && pp.desc) || descriptionDeFaits(pp || {}) });
-      return { site: sx, apercu, manques: manquesEnvoi(sx, apercu, { achat, famille, mpLbc: mpChoisi(fiche, 'lbc'), horsVinted: paire.chezMoi === true, facultatifs: champsFacultatifs(vendActuel()) }), etat: etats[sx], lien: lienVu(sx, sitesVus) };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paire, sitesVus, manquesLecture, lecture, jobs, postes, brouillons]);
-  const publier = (sx) => {
-    if (!paire) return;
-    const id = String(paire.id), at = Date.now();
-    // (20 nov., décision de Julien) Leboncoin et Vestiaire : la publication se fait dans le panneau de l'extension, sur le
-    // site, depuis CETTE annonce Vinted (son identifiant) ; eBay reste ici (API serveur, pas de panneau).
-    // (24 nov., lot agir-tout) Leboncoin DEPUIS VRM (la file, compte Leboncoin ouvert par une extension connectée) ; Vestiaire
-    // reste au panneau : VRM n'y clique jamais « Publier » à sa place (il relit et publie lui-même).
-    if (sx === 'leboncoin') { publierLbcDepuisVrm(id, { panneau: () => ouvrirPanneau({ site: sx, page: 'publier', ids: [id], action: 'publier' }) }); onFermer(); return; }
-    if (sx === 'vestiaire') { ouvrirPanneau({ site: sx, page: 'publier', ids: [id], action: 'publier' }); onFermer(); return; }
-    if (sx === 'ebay') { DEMANDE_EBAY_PAIRE.id = id; DEMANDE_EBAY_PAIRE.at = at; onNav && onNav('ebay_annonces'); }
-    // L'écran du site est rendu d'abord ; la feuille se ferme ensuite (son retour
-    // d'historique ne doit pas ramener l'écran d'avant — même piège que « qui dorment »).
-    setTimeout(() => onFermer(), 400);
-  };
-  const avis = num && Array.isArray(liste) && !paire ? `N°${num} n’est pas proposable ici (vendu, plus en ligne, ou à trancher).` : '';
-  return <PublierAilleurs paire={paire} paires={liste} lecture={lecture} cartes={cartes} partout={lecture ? [] : partoutLeMeme(sitesVus)} siteDemande={site}
-    avis={avis} chercher={(l, q) => chercherPaires(l, q, cleNum)} onChoisir={(p) => onChoisir(String(p.num))} onChanger={() => onChoisir(null)}
-    onPublier={publier} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}/>;
-}
+// ⟦→ ecrans/Feuilles2.jsx #3⟧
 // L'entrée, en tête d'Annonces · Leboncoin / eBay / Vestiaire.
 function EntreePublierAilleurs({ site }) {
   return (
@@ -25292,31 +22979,7 @@ function EntreePublierAilleurs({ site }) {
     </div>
   );
 }
-// ══════════════════════════════════════════════════════════════════════════════
-// PUBLIER PARTOUT — DEPUIS L'ANNONCE VINTED (11 nov., règle : src/publierPartout.js)
-// ══════════════════════════════════════════════════════════════════════════════
-// Julien : « Publier partout en un geste — mais ça doit PARTIR DE L'ANNONCE VINTED ».
-// `nums` : les N° des annonces (une, ou la sélection d'Annonces → Actions). La paire
-// est celle de la source partagée (`useEbayPaires`), EN LIGNE sur Vinted seulement ;
-// « déjà en ligne ailleurs » par `sitesDuNumero` (identité, jamais un titre). Chaque
-// site part par SA voie, l'un après l'autre : Leboncoin `lbcPublier` (+ la fiche,
-// `valideAnnonceLbc`), Vestiaire `vcPreparer`, eBay un brouillon
-// (`preparerBrouillonPartout`, jamais publié d'ici). Gardes de l'extension
-// (compte de l'onglet, 50 actions/h, une requête à la fois) inchangées.
-const ATTENTE_DEPOT_MS = 6 * 60000;
-function attendreFinJob(jobId, ms = ATTENTE_DEPOT_MS) {
-  return new Promise((ok) => {
-    const t0 = Date.now();
-    const tic = () => {
-      const j = __vmrJobs[jobId];
-      const e = j && String(j.etape || '');
-      if (e === 'fait' || e === 'abandonne' || e === 'echec') { ok({ etape: e, raison: (j && j.raison) || '' }); return; }
-      if (Date.now() - t0 > ms) { ok({ etape: 'delai' }); return; }
-      setTimeout(tic, 1500);
-    };
-    setTimeout(tic, 1500);
-  });
-}
+// ⟦→ ecrans/Feuilles.jsx #17⟧
 // ══════════════════════════════════════════════════════════════════════════════
 // (14 nov., lot argent-prix) LES DEUX FEUILLES DE LA COQUE — chargées à la demande (src/ArgentPrix.jsx)
 // ══════════════════════════════════════════════════════════════════════════════
@@ -25403,125 +23066,7 @@ function HoteRemiseSoldes({ comptes, onFermer }) {
     <Natif.Bouton variante="texte" large onClick={() => { for (const so of proposes) ecrire((e) => garderSolde(e, so.id)); onFermer(); }}>{tr('actionsExt.garderSoldes')}</Natif.Bouton>
   </FeuilleExtension>;
 }
-function HotePublierPartout({ comptes, nums, numData, onFermer }) {
-  const { paires, pret } = useEbayPaires(comptes);
-  useExtVivante();
-  const sansSouris = useSansSouris();
-  const [reglage, setReglage] = React.useState(() => reglagePrix(load(CLE_PRIX_PARTOUT, null)));
-  const [saisies, setSaisies] = React.useState({});
-  // (11 nov. soir) Les paramètres de publication par défaut (Leboncoin, Vestiaire) : '' = auto.
-  const [params, setParams] = React.useState(() => reglageParams(load(CLE_PARAMS_PARTOUT, null), { etatsLbc: LBC_ETATS }));
-  // (15 nov.) SES réponses aux correspondances, par catégorie Vinted (synchronisées) ; écrites sur SON clic seulement.
-  const [memoire, setMemoire] = React.useState(() => lireCorrespondances(load(CLE_CORRESPONDANCES, null)));
-  // Une extension qui porte catégorie et critères (5.381) — sinon Leboncoin les devinerait : la feuille le dit.
-  const lbcCriteres = (relaisVivant() ? 'ok' : extSait('lbccriteres')) === 'ok';
-  // (16 nov., lot plateformes-restes) Vestiaire : l'extension reçoit la catégorie choisie (`vcPreparer`, 5.399) et ne
-  // la pose que si elle existe telle quelle dans le catalogue de dépôt capté ; sinon « à finir sur Vestiaire ».
-  const vcCategorie = extSait('vccategorie') === 'ok';
-  // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
-  const [autres, setAutres] = React.useState(undefined);
-  const relire = React.useCallback(async () => {
-    try { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; } catch (_) {}
-    const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
-      lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
-    const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
-    setAutres({ lbcItems: lbc ? lbc.items || {} : null, lbcPubliees: lbc ? lbc.publiees || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
-  }, []);
-  React.useEffect(() => { relire(); }, [relire]);
-  const voulus = React.useMemo(() => [...new Set((nums || []).map((n) => cleNum(n)).filter(Boolean))], [nums]);
-  const fiches = load('vinted_annonce_numeros', {}) || {};
-  const choisies = pret && Array.isArray(paires) ? voulus.map((k) => paires.find((p) => !p.chezMoi && cleNum(p.num) === k) || null).filter(Boolean) : undefined;
-  const lecture = !numData || autres === undefined;
-  const regles = { titreLbc: (m, t, ta) => lbcTitre(m, t, ta), titreVc: (m, t, ta) => lbcTitre(m, t, ta, 80), titreEbay: (t, ta) => ebayTitre(t || '', ta || ''),
-    descriptionLbc: (o) => descriptionLbcDe(o), descriptionEbay: (pp) => (pp && pp.desc) || descriptionDeFaits(pp || {}),
-    etatsLbc: LBC_ETATS, categorieLbc: (t, d, ta, m) => categorieLbcDe(t, d, ta, '', m),
-    // La ville que la voie Leboncoin tape (Réglages de VRM) ; vide ⇒ celle de son profil Leboncoin.
-    ville: String(load('vrm_ville', '') || '').trim() };
-  const ext = {
-    leboncoin: (raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' }) || {}).texte || '',
-    vestiaire: (raisonExtGlobale(sansSouris, { cap: 'vcpublier', role: 'prépare tes annonces Vestiaire' }) || {}).texte || '',
-    ebay: '',
-  };
-  const enLigneDe = (p) => {
-    if (lecture) return { leboncoin: null, vestiaire: null, ebay: null };
-    const { rn } = rechercheParNumero(String(p.num), numData, comptes);
-    if (!rn || rn.etat === 'invalide') return { leboncoin: null, vestiaire: null, ebay: null };
-    const r = sitesPrixDe(String(p.num), rn, autres);
-    return { leboncoin: enLigneSur('leboncoin', r.sites, r.manques), vestiaire: enLigneSur('vestiaire', r.sites, r.manques), ebay: enLigneSur('ebay', r.sites, r.manques) };
-  };
-  const lignes = choisies === undefined ? undefined : choisies.map((p) => {
-    const fiche = fiches[String(p.id)] || {};
-    let achat = null; try { achat = prixAchatDe(fiche, load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achat = null; }
-    // Ce que la règle d'avant (la même dans l'extension) poserait d'elle-même, d'après le chemin Vinted connu.
-    const t = p.catalogId != null ? TABLE_VINTED[String(p.catalogId)] : null;
-    let categorieVoie = ''; try { categorieVoie = categorieLbcDe(p.title, p.desc, p.taille, t ? t.chemin : '', p.marque); } catch (_) { categorieVoie = ''; }
-    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat, memoire, lbcCriteres, vcCategorie, categorieVoie,
-      famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
-  });
-  const vus = {};
-  for (const l of lignes || []) for (const x of l.sites) if (x.deja === true) vus[l.id + ':' + x.site] = true;
-  const parId = new Map((choisies || []).map((p) => [String(p.id), p]));
-  // (20 nov., décision de Julien) Leboncoin et Vestiaire se publient dans le panneau de l'extension (la feuille montre
-  // « Publier dans l'extension » sur leur case) : rien ne part d'ici. eBay : l'API serveur, comme avant.
-  const refusSite = async () => refusPanneau(tr('actionsExt.refus'));
-  const envoyer = {
-    leboncoin: refusSite,
-    vestiaire: refusSite,
-    ebay: async (e) => {
-      const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
-      // (15 nov.) LA catégorie eBay qu'il a choisie (parmi celles qu'eBay propose) ; sans elle, aucune n'est devinée.
-      const cat = e.corr && e.corr.valeurs && e.corr.valeurs.categorie ? e.corr.valeurs.categorie : null;
-      try { const m = await import('./ecrans/Ebay.jsx'); return await m.preparerBrouillonPartout(p, { prix: e.apercu.prix, titre: e.apercu.titre, categorie: cat }); }
-      catch (_) { return { accepte: false, code: 'charge', raison: 'l’écran eBay n’a pas pu se charger — réessaie' }; }
-    },
-  };
-  // Le lancement : le plan, le suivi commun (VRM figé, détail, barre — SuiviTravail, via
-  // src/publierPartoutSuivi.js), puis l'envoi l'un après l'autre. « Mettre en pause » attend
-  // ENTRE deux envois (`continuer()`), « Reprendre » repart d'où il en était.
-  const lancer = async ({ coches, surEtat, surTotal }) => {
-    const plan = planPartout(lignes || [], coches);
-    if (typeof surTotal === 'function') surTotal(plan.length);
-    const sv = suiviPourPartout(await chargerSuivi(), plan, { uid: String(vendActuel() || '') });
-    const res = await executerPartout({ plan, envoyer, attendre: (j) => attendreFinJob(j),
-      surEtat: (cle, e) => { surEtat(cle, e); if (sv) sv.surEtat(cle, e); }, doitSArreter: sv ? sv.doitSArreter : undefined });
-    if (sv) sv.terminer();
-    return res;
-  };
-  // (11 nov. soir) eBay : SES réglages de publication par défaut (lot ebay-complet, src/ebay/parametres.js) —
-  // le brouillon les reprend à sa mise en ligne ; la feuille les nomme (« Offres · Retours 30 j »).
-  let ebayReglages = [];
-  try { ebayReglages = resumeReglagesEbayPP(defautsEbayDepuis(load(CLE_DEFAUTS_EBAY_PP, null))).map((x) => tr(x.cle, x.vars || {})); } catch (_) { ebayReglages = []; }
-  return <PublierPartout lignes={lignes} lecture={lecture} reglage={reglage} params={params} etatsLbc={LBC_ETATS} saisies={saisies} vus={vus} ebayReglages={ebayReglages}
-    exclues={choisies === undefined ? 0 : voulus.length - choisies.length}
-    onReglage={(site, r) => setReglage((x) => { const n = reglagePrix({ ...x, [site]: r }); save(CLE_PRIX_PARTOUT, n); return n; })}
-    onParam={(site, champ, val) => setParams((x) => { const n = reglageParams({ ...x, [site]: { ...((x && x[site]) || {}), [champ]: val } }, { etatsLbc: LBC_ETATS }); save(CLE_PARAMS_PARTOUT, n); return n; })}
-    memoire={memoire}
-    /* (15 nov.) SA réponse à une correspondance : pour CETTE annonce, et retenue pour sa catégorie Vinted. */
-    onRepondre={(id, site, champ, val) => {
-      setSaisies((x) => { const a = x[id] || {}; const c = a.corr || {}; return { ...x, [id]: { ...a, corr: { ...c, [site]: { ...(c[site] || {}), [champ]: val } } } }; });
-      const p = parId.get(String(id));
-      if (p && champ !== 'marque' && p.catalogId != null && p.catalogId !== '' && isCloudReady()) {
-        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, site, champ, val);
-        save(CLE_CORRESPONDANCES, n); setMemoire(n);
-      }
-      if (p && site === 'leboncoin' && champ === 'marque' && p.marque && isCloudReady()) {
-        const n = retenirCorrespondance(load(CLE_CORRESPONDANCES, null), p.catalogId, 'leboncoin', 'marque', { vinted: p.marque, libelle: val });
-        save(CLE_CORRESPONDANCES, n); setMemoire(n);
-      }
-    }}
-    /* Les catégories qu'eBay propose (API Taxonomy, sur SON jeton, lecture seule) : `null` = pas su. */
-    onChercherEbay={async (q) => {
-      try { const { j } = await appelEbay({ action: 'parametres', q: String(q || '').slice(0, 80) }); return j && j.ok && Array.isArray(j.categories) ? j.categories : null; } catch (_) { return null; }
-    }}
-    onParamAnnonce={(id, site, champ, val) => setSaisies((x) => { const a = x[id] || {}; const pr = a.params || {}; return { ...x, [id]: { ...a, params: { ...pr, [site]: { ...(pr[site] || {}), [champ]: val } } } }; })}
-    onSaisie={(id, champ, val) => setSaisies((x) => {
-      const a = x[id] || {};
-      if (champ === 'prixSite' && val && typeof val === 'object') return { ...x, [id]: { ...a, prixSite: { ...(a.prixSite || {}), [val.site]: val.valeur } } };
-      return { ...x, [id]: { ...a, [champ]: val } };
-    })}
-    onLancer={lancer}
-    onRelire={relire} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}/>;
-}
+// ⟦→ ecrans/Feuilles.jsx #18⟧
 // ⟦→ ecrans/Vestiaire.jsx #9⟧
 // ══════════════════════════════════════════════════════════════════════════════
 // VESTIAIRE COLLECTIVE : TES VENTES (27 octobre, 5.237)
@@ -28715,98 +26260,7 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
       </div>}
   </>);
 }
-// ⟦→ ecrans/Stock.jsx #8⟧
-
-/* ── App ─────────────────────────────────────────────── */
-
-/* ── BackupModal ─────────────────────────────────────── */
-function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
-  const exportData=()=>{
-    const data={
-      catalog,sales,garageGrid,blockedCells,
-      exportedAt:new Date().toISOString(),
-      version:'1.0',
-    };
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=`vrm-backup-${jourParis()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-  
-  const importData=(e)=>{
-    const file=e.target.files[0];
-    if(!file) return;
-    const reader=new FileReader();
-    reader.onload=async (ev)=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        if(!data.catalog&&!data.sales){
-          toast('❌ Fichier invalide : pas de données détectées');
-          return;
-        }
-        if(await askConfirm(`Importer cette sauvegarde ?\n\nCatalogue: ${data.catalog?.length||0} articles\nVentes: ${data.sales?.length||0} ventes\n\n⚠️ Tes données actuelles seront remplacées.`)){
-          onImport(data);
-        }
-      }catch(err){
-        toast('❌ Erreur de lecture : '+err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-  
-  return (
-    <div onClick={onClose} style={{
-      position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:100,
-      display:'flex',alignItems:'center',justifyContent:'center',padding:20,
-      animation:'fadeIn 0.2s',
-    }}>
-      <FermeAuRetour fermer={onClose}/>
-      <div onClick={e=>e.stopPropagation()} style={{
-        background:C.card,border:`1px solid ${C.border}`,borderRadius:12,
-        padding:24,maxWidth:480,width:'100%',
-      }}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-          <h3 style={{margin:0,color:C.accentTexte,fontSize:20,fontWeight:600}}>💾 Sauvegarde</h3>
-          <button className="vrm-icon-control" type="button" aria-label="Fermer la fenêtre" onClick={onClose} style={{background:'transparent',border:'none',color:C.muted,fontSize:20,cursor:'pointer'}}><Icon name="close" size={15}/></button>
-        </div>
-        
-        <div style={{fontSize:12,color:C.muted,marginBottom:18,lineHeight:1.5}}>
-          Toutes tes données dans un fichier, à restaurer partout.
-        </div>
-        
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:14}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:4}}>📤 Exporter</div>
-            <div style={{fontSize:12,color:C.text,marginBottom:10}}>
-              <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
-            </div>
-            <Btn small onClick={exportData}>Télécharger la sauvegarde</Btn>
-          </div>
-
-          <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:14}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:4}}>📥 Restaurer</div>
-            <div style={{fontSize:12,color:C.text,marginBottom:10}}>
-              ⚠️ Cela remplacera toutes tes données actuelles
-            </div>
-            <label style={{display:'inline-block',cursor:'pointer'}}>
-              <input type="file" accept=".json" onChange={importData} style={{display:'none'}}/>
-              <span style={{
-                display:'inline-block',background:C.warn,color:'#000',
-                border:'none',borderRadius:12,padding:'5px 12px',
-                fontSize:12,fontWeight:400,fontFamily:'inherit',
-              }}>📁 Choisir un fichier JSON</span>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ⟦→ ecrans/Feuilles2.jsx #4⟧
 // ⟦→ ecrans/Reglages.jsx #31⟧
 // (6 nov.) La MÊME lecture, avec la date de deux lignes par compte : sa liste de
 // VENTES (`orders_sold`) et ses ANNONCES (`listings`). Mesuré le 6 nov. : un
@@ -30758,47 +28212,7 @@ function StatsPilotageApp({ liveStats, onNav }) {
     onAutomatisations={() => { try { ouvrirPanneau({ site: 'vinted', page: 'automatisations' }); } catch (_) { if (onNav) onNav('settings'); } }}
     onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
 }
-// ═══════════════════════════════════════════════════════════════════════════
-// (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
-// ═══════════════════════════════════════════════════════════════════════════
-// Les sources sont celles de la carte « Semaine du … » (`JournalSemaineCarte`) et de la frise :
-// les lignes de `ventesFaites` de la coque (comptes sélectionnés), `vrm_benefice_jours`, ses
-// gestes « Colis fait », le reçu publié par Ventes (`recuPublieEntre`, + ventes à dater) et
-// `vrm_paires_dorment`. Les bornes, la comparaison et « qui dorment » : src/maSemaine.js
-// (les bornes et la règle du bilan en notification, api/_lib/bilan-semaine.js).
-const REGLES_SEMAINE = { bilanLignes, beneficeDesJours, chiffreBrut };
-function EcranMaSemaine({ liveStats, onNav, entete }) {
-  const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
-  const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
-  const [lbcF] = useLigneSynchro('vrm_lbc_colis_done', lireLbcDone);
-  const [vcF] = useLigneSynchro('vrm_vc_colis_done', lireVcDone);
-  const [dorment] = useLigneSynchro('vrm_paires_dorment', lirePairesDorment);
-  const ligneUrssaf = useLigneUrssaf();
-  const [lundi, setLundi] = React.useState(() => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; return l; });
-  React.useEffect(() => {
-    const f = () => { const l = DEMANDE_SEMAINE.lundi; DEMANDE_SEMAINE.lundi = null; setLundi(l); };
-    window.addEventListener('vrm:semaine', f);
-    return () => window.removeEventListener('vrm:semaine', f);
-  }, []);
-  // L'heure qui passe : la semaine en cours finit MAINTENANT (relue chaque minute, et au retour).
-  const [maintenant, setMaintenant] = React.useState(() => Date.now());
-  React.useEffect(() => {
-    const t = setInterval(() => setMaintenant(Date.now()), 60000);
-    const vu = () => { if (document.visibilityState === 'visible') setMaintenant(Date.now()); };
-    document.addEventListener('visibilitychange', vu);
-    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vu); };
-  }, []);
-  const vendu = venduEtat(liveStats) !== 'lu' ? (venduEtat(liveStats) === 'pasSu' ? null : undefined)
-    : { lignes: liveStats.venduLignes, manque: [...(liveStats.venduManque || []), ...(liveStats.venduEnAttente ? ['lecture en cours'] : [])], nonComptees: liveStats.venduNonComptees || [] };
-  const M = React.useMemo(() => maSemaine({
-    maintenant, lundi, vendu, joursBenef: pub, dorment,
-    colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {},
-    recuEntre: (de, a) => ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a }, maintenant), ligneUrssaf),
-    R: REGLES_SEMAINE,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);
-  return <MaSemaine M={M} entete={entete} onSemaine={setLundi} onNav={onNav} vitesse={<LigneVitesse owner={(AUTH.user && AUTH.user.id) || ''}/>}/>;
-}
+// ⟦→ ecrans/MaSemaine.jsx #3⟧
 // Le liveStats de la coque, donné à toute carte sans le passer de main en main
 // (les écrans eBay ou Vestiaire ne le reçoivent pas) : la MÊME valeur que Ma journée.
 const LiveStatsCarte = React.createContext(null);
@@ -30974,148 +28388,7 @@ function PlaceurTampon() {
   const fin = (r) => { const res = q.resolve; setQ(null); res(r); };
   return <PlaceurTamponFeuille key={q.forme && q.forme.cle} q={q} fin={fin}/>;
 }
-function PlaceurTamponFeuille({ q, fin }) {
-  const page = React.useRef(null), scene = React.useRef(null);
-  const [etat, setEtat] = React.useState('charge');           // charge · pret · ko
-  const [geo, setGeo] = React.useState(null);                 // { W, H, ppt }
-  const [auto, setAuto] = React.useState(null);               // { x, y, w, v } ou null (fiche)
-  const [imgs, setImgs] = React.useState([]);                 // par variante : { url, cw, ch }
-  const [codes, setCodes] = React.useState([]);
-  const [boite, setBoite] = React.useState(null);             // { x, y, w, v } en points
-  const [libre, setLibre] = React.useState(false);
-  const [toujours, setToujours] = React.useState(true);
-  const [raison, setRaison] = React.useState('');
-  const etatRef = React.useRef({}); etatRef.current = { geo, boite, imgs };
-  React.useEffect(() => {
-    let vivant = true;
-    (async () => {
-      const PL = await import('pdf-lib');
-      const doc = await PL.PDFDocument.load(q.octets);
-      const pg = doc.getPages()[0], { w: W, h: H } = tailleAffichee(pg);
-      const bold = await doc.embedFont(PL.StandardFonts.HelveticaBold), reg = await doc.embedFont(PL.StandardFonts.Helvetica);
-      // Le cartouche de chaque variante, rendu par pdf.js (fond blanc compris).
-      const images = [];
-      for (let v = 0; v < CARTOUCHES.length; v++) {
-        const d2 = await PL.PDFDocument.create(), b2 = await d2.embedFont(PL.StandardFonts.HelveticaBold), r2 = await d2.embedFont(PL.StandardFonts.Helvetica);
-        const c = cartoucheLibre(b2, r2, q.numero, q.titre, v); if (!c) { images.push(null); continue; }
-        const p2 = d2.addPage([c.w, c.h]); ecrireCartouche(PL, p2, c, 0, 0, 1, true);
-        const cv = document.createElement('canvas'); await dessinerPdf(cv, await d2.save(), { largeur: c.w * 3 });
-        images.push({ url: cv.toDataURL('image/png'), cw: c.w, ch: c.h });
-      }
-      const rendu = await rendrePremierePage(doc);
-      const place = await chercherPlaceTampon(doc, bold, reg, q.numero, q.titre, rendu);
-      const zones = zonesCodesTampon(rendu);
-      const dispoW = Math.min(window.innerWidth - 48, 640), dispoH = Math.max(220, window.innerHeight - 300);
-      const largeur = Math.max(160, Math.min(dispoW, dispoH * W / H));
-      await dessinerPdf(page.current, q.octets, { largeur });
-      if (!vivant) return;
-      const a = place ? { x: place.x, y: place.y, w: place.c.w, v: place.v } : null;
-      let b = null, lib = false;
-      if (choixTamponValide(q.choix)) {
-        const pl = placeLibreTampon(pg, bold, reg, q.numero, q.titre, q.choix);
-        if (pl) { b = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, v: q.choix.v | 0 }; lib = true; }
-      }
-      if (!b) b = a || (images[0] ? { x: Math.max(0, (W - images[0].cw) / 2), y: Math.max(0, (H - images[0].ch) / 2), w: Math.min(W, images[0].cw), v: 0 } : null);
-      setGeo({ W, H, ppt: largeur / W }); setAuto(a); setImgs(images); setCodes(zones); setBoite(b); setLibre(lib); setEtat(b ? 'pret' : 'ko');
-    })().catch((e) => { if (vivant) { setEtat('ko'); setRaison(String((e && e.message) || e).slice(0, 120)); } });
-    return () => { vivant = false; };
-  }, [q]);
-  const img = boite && imgs[boite.v];
-  const hDe = (b) => { const im = imgs[b.v]; return im ? b.w * im.ch / im.cw : 0; };
-  // Bornes : dans la page, jamais plus petit que lisible (N° 9 pt, titre 5 pt).
-  const borner = (b, { aimant = true } = {}) => {
-    const { geo: g, imgs: ims } = etatRef.current; const im = ims[b.v]; if (!g || !im) return b;
-    const wMax = Math.min(g.W, g.H * im.cw / im.ch), wMin = Math.min(wMax, im.cw * echelleMiniTampon(CARTOUCHES[b.v]));
-    const w = Math.max(wMin, Math.min(wMax, b.w)), h = w * im.ch / im.cw;
-    let x = Math.max(0, Math.min(g.W - w, b.x)), y = Math.max(0, Math.min(g.H - h, b.y));
-    if (aimant) {   // aimantation douce : à 10 px d'un bord, il s'y colle
-      const a = 10 / g.ppt;
-      if (x < a) x = 0; else if (g.W - (x + w) < a) x = g.W - w;
-      if (y < a) y = 0; else if (g.H - (y + h) < a) y = g.H - h;
-    }
-    return { ...b, x, y, w };
-  };
-  const pointeurs = React.useRef(new Map()), geste = React.useRef(null);
-  const enPoints = (e) => { const r = page.current.getBoundingClientRect(), g = etatRef.current.geo; return { x: (e.clientX - r.left) / g.ppt, y: (e.clientY - r.top) / g.ppt }; };
-  const bas = (e) => {
-    const { geo: g, boite: b } = etatRef.current; if (!g || !b || etat !== 'pret') return;
-    e.preventDefault();
-    try { scene.current.setPointerCapture(e.pointerId); } catch (_) {}
-    pointeurs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const p = enPoints(e), h = hDe(b);
-    if (pointeurs.current.size >= 2) {
-      const [u, v] = [...pointeurs.current.values()];
-      geste.current = { type: 'pince', d0: Math.hypot(u.x - v.x, u.y - v.y) || 1, w0: b.w, cx: b.x + b.w / 2, cy: b.y + h / 2 };
-      return;
-    }
-    if (e.target && e.target.closest && e.target.closest('[data-tampon-poignee]')) geste.current = { type: 'taille', x0: p.x, w0: b.w };
-    else if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + h) geste.current = { type: 'glisse', dx: p.x - b.x, dy: p.y - b.y };
-    else { geste.current = { type: 'glisse', dx: b.w / 2, dy: h / 2 }; setBoite(borner({ ...b, x: p.x - b.w / 2, y: p.y - h / 2 })); }
-    setLibre(true);
-  };
-  const bouge = (e) => {
-    if (!pointeurs.current.has(e.pointerId)) return;
-    pointeurs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const G = geste.current, { boite: b } = etatRef.current; if (!G || !b) return;
-    e.preventDefault();
-    if (G.type === 'pince' && pointeurs.current.size >= 2) {
-      const [u, v] = [...pointeurs.current.values()], w = G.w0 * (Math.hypot(u.x - v.x, u.y - v.y) / G.d0);
-      const h = hDe({ ...b, w }); setBoite(borner({ ...b, w, x: G.cx - w / 2, y: G.cy - h / 2 }, { aimant: false }));
-    } else if (G.type === 'taille') { const p = enPoints(e); setBoite(borner({ ...b, w: G.w0 + (p.x - G.x0) }, { aimant: false })); }
-    else if (G.type === 'glisse') { const p = enPoints(e); setBoite(borner({ ...b, x: p.x - G.dx, y: p.y - G.dy })); }
-  };
-  const haut = (e) => { pointeurs.current.delete(e.pointerId); if (!pointeurs.current.size || (geste.current && geste.current.type === 'pince')) geste.current = null; };
-  const clavier = (e) => {
-    const b = etatRef.current.boite; if (!b) return;
-    const pas = e.shiftKey ? 10 : 2, d = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
-    if (d) { e.preventDefault(); setLibre(true); setBoite(borner({ ...b, x: b.x + d[0], y: b.y + d[1] }, { aimant: false })); return; }
-    if (e.key === '+' || e.key === '=' || e.key === '-') { e.preventDefault(); setLibre(true); setBoite(borner({ ...b, w: b.w * (e.key === '-' ? 1 / 1.06 : 1.06) }, { aimant: false })); }
-  };
-  const revenir = () => { setLibre(false); if (auto) setBoite(auto); };
-  const choix = () => (libre && boite && geo ? { vx: boite.x / geo.W, vy: boite.y / geo.H, vw: boite.w / geo.W, v: boite.v } : null);
-  const imprimer = () => fin({ choix: choix(), toujours });
-  const fiche = !libre && !auto;
-  const h = boite ? hDe(boite) : 0;
-  const surCode = !!boite && !fiche && recouvreTampon(codes, { x: boite.x, y: boite.y, w: boite.w, h });
-  const ppt = geo ? geo.ppt : 1;
-  return createPortal(<div data-placeur-tampon={etat} data-raison={raison || undefined} data-forme={q.forme && q.forme.cle} data-noswipe="1" role="dialog" aria-modal="true" aria-label="Place du tampon"
-      className="vrm-tampon-voile" style={{ zIndex: Z_CONFIRMATION }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); fin(null); } }}>
-    <FermeAuRetour fermer={() => fin(null)}/>
-    <div className="vrm-tampon-feuille" style={{ background: C.card, color: C.text }}>
-      <div className="vrm-tampon-tete">
-        <b>{(q.forme && q.forme.nom) || 'Bordereau'}</b>
-        <Bouton variante="discret" icone="close" aria-label="Fermer" data-tampon-fermer="1" onClick={() => fin(null)}/>
-      </div>
-      <div className="vrm-tampon-zone">
-        <div ref={scene} className="vrm-tampon-scene" data-tampon-scene="1" data-ppt={ppt.toFixed(4)}
-             onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
-          <canvas ref={page} className="vrm-tampon-page" data-stream-image="bordereau" aria-hidden="true"/>
-          {etat === 'pret' && img && <div data-tampon-boite="1" data-libre={libre ? '1' : '0'} data-variante={boite.v}
-              data-x={boite.x.toFixed(2)} data-y={boite.y.toFixed(2)} data-w={boite.w.toFixed(2)} data-h={h.toFixed(2)}
-              tabIndex={0} role="slider" aria-label={`Tampon N° ${q.numero || ''}`} aria-valuetext={`${Math.round(boite.x)}, ${Math.round(boite.y)}`} onKeyDown={clavier}
-              className={'vrm-tampon-boite' + (fiche ? ' vrm-tampon-fantome' : '')}
-              style={{ left: boite.x * ppt, top: boite.y * ppt, width: boite.w * ppt, height: h * ppt }}>
-            <img src={img.url} alt="" draggable={false}/>
-            {!fiche && <span className="vrm-tampon-poignee" data-tampon-poignee="1" aria-hidden="true"><i/></span>}
-          </div>}
-        </div>
-      </div>
-      <div className="vrm-tampon-puces">
-        {surCode && <span className="vrm-tampon-puce" data-tampon-code="1" style={{ color: C.warn, background: C.warnSoft }}>Recouvre le code-barres</span>}
-        {fiche && etat === 'pret' && <span className="vrm-tampon-puce" data-tampon-fiche="1" style={{ color: C.muted, background: C.bg }}>Fiche colis</span>}
-        {etat === 'ko' && <span className="vrm-tampon-puce" data-tampon-ko="1" style={{ color: C.muted, background: C.bg }}>Aperçu indisponible</span>}
-      </div>
-      <div className="vrm-tampon-options">
-        <label className="vrm-tampon-case"><input type="checkbox" data-tampon-toujours="1" checked={toujours} onChange={(e) => setToujours(e.target.checked)}/>Toujours ici</label>
-        {libre && <Bouton variante="discret" data-tampon-auto="1" onClick={revenir}>Revenir au choix de VRM</Bouton>}
-      </div>
-      <div className="vrm-tampon-actions">
-        <Bouton variante="secondaire" data-tampon-annuler="1" onClick={() => fin(null)}>Annuler</Bouton>
-        <Bouton variante="primaire" icone="printer" data-imprime="1" data-tampon-imprimer="1" disabled={etat === 'charge'} onClick={imprimer}>Imprimer</Bouton>
-      </div>
-    </div>
-  </div>, document.body);
-}
+// ⟦→ ecrans/Feuilles.jsx #19⟧
 
 // Réponses rapides prêtes à l'emploi : un clic REMPLIT la zone de texte (tu peux
 // l'ajuster), puis TU envoies. Aucun envoi automatique → aucun risque de blocage.
@@ -31525,8 +28798,7 @@ function annonceLbcEnVente(ad, vendues) {
 //     ligne »). Pas su (pas de preuve, date illisible, aucun compte) ⇒ rien
 //     n'est sauté.
 const idCompteLbcApp = (x) => String(x || '').replace(/^lbc-account:/i, '');
-// (11 nov.) Le nom d'un compte Leboncoin dans l'en-tête de son groupe : la règle `nomCompteVente` (src/plateformes.js).
-const nomCompteLbcGroupe = (annuaire, id) => nomCompteVente('leboncoin', { account: id }, { leboncoin: annuaire && typeof annuaire === 'object' ? annuaire : {} });
+// ⟦→ ecrans/Plateformes.jsx #12⟧
 // (5 nov.) Le compte Leboncoin d'UNE vente, écrit sur sa ligne. Par IDENTITÉ
 // seulement (§5) : le compte que l'extension a joint à la vente (la session de
 // la liste « Mes transactions », `account`/`accountName`), sinon le compte de
@@ -31775,6 +29047,8 @@ async function lbcAnnoncesSession() {
 // (13 nov., intégration) Deux écrans qui la demandent EN MÊME TEMPS (Stock : annonces actuelles + notifications)
 // partagent la lecture en cours (budget-vitesse : lbc_listings lue deux fois à la 2ᵉ ouverture du Stock).
 let _lbcListingsEnCours = null;
+// (27 nov., budget-vitesse) « Relire » de Publier partout (src/ecrans/Feuilles.jsx, chargé à la demande) oublie le mémo par ce poseur.
+function oublierLbcSession() { _lbcAnnoncesSession = null; _lbcListingsEnCours = null; }
 function lbcListingsSession() {
   if (_lbcAnnoncesSession && Date.now() - _lbcAnnoncesSession.t < 10 * 60000) return Promise.resolve(_lbcAnnoncesSession);
   if (_lbcListingsEnCours) return _lbcListingsEnCours;
@@ -32873,7 +30147,21 @@ function lireProprietaire() {
 // `true` seulement si la base (ou, en panne, la dernière lecture de cet
 // appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
 // (23 nov.) La galerie des pop-ups : montée pour le PROPRIÉTAIRE de l'installation seulement (rien d'autre ne l'écoute).
-function GaleriePopsCoque() { const proprio = useEstProprietaire(); return <GaleriePops autorise={proprio === true} Icon={Icon}/>; }
+// (27 nov., budget-vitesse) « Voir tous les pop-ups » (propriétaire seulement) et ses exemples (src/galeriePops.js ←
+// api/_lib/notif-apercus.js, ≈ 60 Ko de source) ne partent plus au démarrage : la galerie est chargée au PREMIER
+// « vrm:galerie-pops » et s'ouvre aussitôt (`ouverteDes`), comme si elle l'avait entendu ; les suivants, elle les écoute.
+const GaleriePopsParesseuse = aLaDemandeDiscret(() => import('./natif/GaleriePops.jsx').then((m) => ({ default: m.GaleriePops })));
+function GaleriePopsCoque() {
+  const proprio = useEstProprietaire();
+  const [demandee, setDemandee] = React.useState(false);
+  React.useEffect(() => {
+    if (proprio !== true || demandee) return undefined;
+    const f = () => setDemandee(true);
+    window.addEventListener('vrm:galerie-pops', f);
+    return () => window.removeEventListener('vrm:galerie-pops', f);
+  }, [proprio, demandee]);
+  return demandee ? <GaleriePopsParesseuse autorise={proprio === true} Icon={Icon} ouverteDes/> : null;
+}
 function useEstProprietaire() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
@@ -33323,203 +30611,7 @@ function InvitationsEquipe({ invitations, uid, onPropre, onFait }) {
 const CE_QUE_VOIT_UN_MEMBRE = "Ton aide voit les colis à envoyer et imprime les bordereaux. Il voit les colis à retirer et leurs codes. Il ne voit aucun montant, ni réglage, ni message. Ni tes comptes Vinted. Il fait les missions que tu lui confies. Tu gardes la validation finale.";
 // Ce que l'aide lit quand la 016 manque : le fait, puis le geste — qui n'est pas le sien.
 const EQUIPE_NON_INSTALLE_GESTE_AIDE = "Le vendeur doit l'activer. Rien à faire de ton côté.";
-
-// ── L'ÉCRAN DU MEMBRE : les colis du vendeur, et rien d'autre ─────────────
-// Chaque lecture porte l'en-tête `x-vrm-equipe` (la base ne montre les lignes
-// du vendeur que dans une requête qui le DEMANDE) ET `owner=eq.<vendeur>` (ses
-// lignes à lui, même s'il est vendeur de son côté). Rien d'autre n'est lu :
-// ni `main`, ni les comptes Vinted, ni les transactions — la liste des ventes
-// vient de la projection SANS MONTANT `vrm_equipe_colis`.
-async function lireColisEquipe(vendeur) {
-  const h = sbAuth({ 'x-vrm-equipe': vendeur });
-  const own = `owner=eq.${encodeURIComponent(vendeur)}`;
-  const lit = async (chemin, init) => {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${chemin}`, { ...(init || {}), headers: { ...h, ...((init && init.headers) || {}) } });
-      const t = await r.text().catch(() => '');
-      if (r.status === 404 || /PGRST202/.test(t)) return { absent: true };
-      if (!r.ok) return null;
-      try { return { v: t === '' ? null : JSON.parse(t) }; } catch (_) { return null; }
-    } catch (_) { return null; }
-  };
-  const champsBord = ['uid','modele','numero','article','filename','dateLimite','receivedAt','transaction'].map(c => `${c}:meta->>${c}`).join(',');
-  const [p, bords, labels, relais, tracks] = await Promise.all([
-    lit('rpc/vrm_equipe_colis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_vendeur: vendeur }) }),
-    lit(`app_data?${own}&id=like.email_bord_*&select=id,${champsBord}`),
-    lit(`app_data?${own}&id=like.harvest_*_label_*&meta->>_pdf=eq.true&select=id,tx:meta->>tx,item:meta->>item`),
-    lit(`app_data?${own}&id=eq.panel_colis_relais&select=data`),
-    lit(`app_data?${own}&id=like.email_track_*&select=id,data`),
-  ]);
-  if (p && p.absent) return { nonInstalle: true };
-  if (!p) return null;
-  if (p.v === null) return { sansAcces: true };       // plus membre actif (ou accès du vendeur coupé)
-  const v = p.v || {};
-  const liste = (x) => (x && !x.absent && Array.isArray(x.v) ? x.v : null);
-  return {
-    ventes: Array.isArray(v.ventes) ? v.ventes : [], achats: Array.isArray(v.achats) ? v.achats : [],
-    comptes: (v.comptes && typeof v.comptes === 'object') ? v.comptes : {},
-    postes: new Set((Array.isArray(v.postes) ? v.postes : []).map(String)),
-    retires: new Set((Array.isArray(v.retires) ? v.retires : []).map(String)),
-    bords: liste(bords), labels: liste(labels),
-    relais: (() => { const l = liste(relais); return l === null ? null : ((l[0] && l[0].data) || {}); })(),
-    tracks: (() => { const l = liste(tracks); return l === null ? null : l.map((r) => avecSuiviDuSujet(reclassifyTrack(r && r.data))).filter(Boolean); })(),
-  };
-}
-// Imprimer un bordereau de l'équipe : les octets lus AVEC l'en-tête, tamponnés
-// du N° que porte la ligne de l'email (le vendeur, lui, l'a numérotée) — le
-// membre ne lit jamais `main`, il ne recalcule donc aucun numéro.
-async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
-  const lu = await lirePdfLigne(row, '', { 'x-vrm-equipe': vendeur });
-  if (!lu || !lu.octets) { libererOngletPdf(); return { ok: false, message: messagePdfManquant(lu) }; }
-  try {
-    const PL = await import('pdf-lib');
-    const pdf = await PL.PDFDocument.load(lu.octets);
-    // (16 nov.) Le réglage des tampons (`vrm_tampons`) vaut aussi pour l'aide : contenu, taille, places.
-    const tp = tamponPourPage(PL, pdf, {}), ct = texteDuCartouche(tp.contenu, { numero: numero || '', titre: titre || '' });
-    await tamponnerBordereau(PL, pdf, { numero: ct.numero, titre: ct.titre, choix: tp.choix, tampon: tp.tampon });
-    posePrefsImpression(PL, pdf);
-    const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
-    return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
-  } catch (_) { libererOngletPdf(); return { ok: false, message: "Ce PDF n'a pas pu être lu." }; }
-}
-function ColisEquipe({ vendeur, de, onPropre }) {
-  const [d, setD] = React.useState(undefined);
-  const [msg, setMsg] = React.useState({});
-  const [lien, setLien] = React.useState({});
-  const charger = React.useCallback(() => { setD(undefined); lireColisEquipe(vendeur).then(setD); }, [vendeur]);
-  React.useEffect(() => { charger(); }, [charger]);
-  const titreEcran = 'Colis à préparer';
-  const sous = de ? `Pour ${de}` : null;
-  const carte = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 10 };
-  const h3 = { fontSize: 13, fontWeight: 700, color: C.muted, textTransform:'none', letterSpacing:'normal', margin: '22px 0 10px' };
-  let corps;
-  if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
-  else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
-  else if (d.nonInstalle) corps = <div data-equipe-etat="non-installe" style={{ ...carte, fontSize: 15, color: C.text }}>{EQUIPE_NON_INSTALLE_AIDE}<div data-equipe-geste="aide" style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{EQUIPE_NON_INSTALLE_GESTE_AIDE}</div></div>;
-  else if (d.sansAcces) corps = <div data-equipe-etat="sans-acces" style={{ ...carte, fontSize: 15, color: C.text, lineHeight: 1.55 }}>Plus d'accès aux colis de cette équipe. Invitation retirée, ou abonnement du vendeur fini.</div>;
-  else {
-    const ventes = d.ventes.filter((o) => aExpedier(o) && !d.postes.has(String(o.transaction_id)));
-    // (5 nov.) `needs_action` sur un ACHAT veut dire « une action » : « Commande livrée ! »
-    // (confirmer « Tout est OK », le colis est déjà retiré) ou « non réclamée - retournée »
-    // le portent aussi (mesuré : 12 sur 21). Seul le statut « au point relais » compte.
-    const achats = d.achats.filter((o) => !d.retires.has(String(o.transaction_id)) && isAtRelayStatus(o.status));
-    const labelsTx = new Map(); (d.labels || []).forEach((l) => { const m = /_label_([A-Za-z0-9]+)$/.exec(l.id || ''); const tx = (m && m[1] !== 'latest' && m[1] === String(l.tx || m[1])) ? m[1] : ''; if (tx && !labelsTx.has(tx)) labelsTx.set(tx, l.id); });
-    const bordsTx = new Map(); (d.bords || []).forEach((b) => { if (b && b.filename && b.filename !== 'None' && b.transaction && !bordsTx.has(String(b.transaction))) bordsTx.set(String(b.transaction), b); });
-    const compte = (o) => d.comptes[String(o.uid || '')] || '';
-    const plusieurs = new Set([...ventes, ...achats].map(compte)).size > 1;
-    // (23 oct.) La règle de l'écran Achats (§11) : à retirer, pas « à vérifier ».
-    // (23 oct.) …et un colis RETIRÉ ou REPARTI selon un autre e-mail au même n°
-    // de suivi (autre transporteur, n° du sujet) n'y est plus — la règle de
-    // l'écran Achats (api/_lib/suivi-colis.js, §11).
-    const finsE = finsColis(d.tracks || [], null);
-    const sortiE = (t) => !!sortiParSuivi(t, finsE);
-    const tracks = (d.tracks || []).filter((t) => t.status === 'available' && etatColisEmail(t).etat === 'a_retirer' && !sortiE(t));
-    // ⚠️ (revue du 23 oct.) …ET LES « À VÉRIFIER » NE DISPARAISSENT PAS. Un colis
-    // dont la date limite est passée, ou gardé plus longtemps que ne le fait son
-    // transporteur, était simplement filtré : l'aide ne le voyait plus du tout,
-    // code compris — or il est peut-être encore au relais. Il a sa ligne, avec
-    // SA raison, et ne compte dans aucun « à retirer » (§11, écran Achats).
-    const tracksAVerifier = (d.tracks || []).filter((t) => t.status === 'available' && estAVerifier(etatColisEmail(t)) && !sortiE(t));
-    const imprimer = async (o, row, numero) => {
-      const k = String(o.transaction_id);
-      setMsg((m) => ({ ...m, [k]: 'Préparation…' }));
-      const r = await imprimerBordereauEquipe(vendeur, row, numero, o.title || '');
-      setMsg((m) => ({ ...m, [k]: r.ok ? '' : r.message }));
-      if (r.ok && !r.ouvert) setLien((l) => ({ ...l, [k]: r.url }));
-    };
-    corps = (<>
-      {(d.bords === null || d.labels === null || d.relais === null || d.tracks === null) && (
-        <div data-equipe-partiel="" style={{ marginBottom: 12 }}><LignePanne>Colis pas tous lus : ce qui manque n'est pas « vide ». <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Relire</button></LignePanne></div>
-      )}
-      <div style={h3}>À envoyer · {ventes.length}</div>
-      {!ventes.length && <div data-equipe-vide="ventes" style={{ fontSize: 15, color: C.muted }}>Aucun colis à expédier pour l'instant.</div>}
-      {ventes.map((o) => {
-        const k = String(o.transaction_id);
-        const lab = labelsTx.get(k); const b = bordsTx.get(k);
-        const row = lab || (b && b.id) || null;
-        const numero = b && b.numero && b.numero !== 'None' ? String(b.numero) : '';
-        return (
-          <div key={k} data-equipe-vente={k} style={{ ...carte, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* ⚠️ `o.photo` est un OBJET Vinted ({url, …}) : posé tel quel en
-                `src`, l'image était CASSÉE (revue visuelle du 17 oct.). La même
-                lecture que partout ailleurs (`orderPhoto`, §11). */}
-            {orderPhoto(o) ? <PhotoVinted src={orderPhoto(o)} alt="" loading="lazy" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 12, flexShrink: 0, background: C.bg }}/> : null}
-            <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{numero ? `N°${numero} · ` : ''}{o.title || 'Article'}</div>
-              <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', b && b.dateLimite ? `à poster avant le ${b.dateLimite}` : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
-              {msg[k] && <div data-equipe-msg={k} style={{ fontSize: 13, color: C.warn, marginTop: 4 }}>{msg[k]}</div>}
-              {lien[k] && <a href={lien[k]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accentTexte, fontWeight: 600 }}>Ouvrir le bordereau</a>}
-            </div>
-            {row
-              ? <button type="button" data-imprime="1" data-equipe-imprimer={k} onClick={() => imprimer(o, row, numero)} style={{ border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '10px 14px', fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flex: '0 1 auto', maxWidth: 260 }}>🖨 Imprimer le bordereau</button>
-              : <span data-equipe-sans-bordereau={k} style={{ fontSize: 13, color: C.muted }}>{d.bords === null || d.labels === null ? 'Bordereau pas encore vérifié' : 'Bordereau pas encore reçu'}</span>}
-          </div>
-        );
-      })}
-      <div style={h3}>À retirer · {achats.length}</div>
-      {!achats.length && <div data-equipe-vide="achats" style={{ fontSize: 15, color: C.muted }}>Aucun colis à retirer pour l'instant.</div>}
-      {achats.map((o) => {
-        const k = String(o.transaction_id);
-        const r = (d.relais && d.relais[k]) || null;
-        const code = r ? codeRetrait(r.code) : '';
-        const qr = r ? qrImage(r) : null;
-        return (
-          <div key={k} data-equipe-achat={k} style={carte}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{o.title || 'Article'}</div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{[plusieurs && compte(o) ? `compte ${compte(o)}` : '', r && r.lieu ? r.lieu : ''].filter(Boolean).join(' · ') || o.status || ''}</div>
-            {code
-              ? <div className="vrm-sensible" data-stream-type="code" data-equipe-code={k} style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div>
-              : <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{d.relais === null ? 'Code pas encore vérifié' : 'Code pas encore lu — il est dans la conversation Vinted de cet achat.'}</div>}
-            {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
-          </div>
-        );
-      })}
-      {tracks.length > 0 && (<>
-        <div style={h3}>Codes reçus par e-mail · {tracks.length}</div>
-        {tracks.map((t, i) => {
-          const code = codeRetrait(t.code); const qr = qrImage(t);
-          return (
-            <div key={(t.suivi || '') + i} data-equipe-track="" style={carte}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${t.lieu}` : ''}</div>
-              {/* « aaaa-mm-jj » s'écrivait tel quel (revue visuelle du 17 oct.) :
-                  la date se lit comme sur l'écran Achats ; illisible ⇒ rien. */}
-              {joursAvant(t.limite) != null && <div data-equipe-limite="" style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>à retirer avant le {new Date(String(t.limite) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>}
-              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
-              {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
-            </div>
-          );
-        })}
-      </>)}
-      {tracksAVerifier.length > 0 && (<>
-        <div style={h3}>À vérifier · {tracksAVerifier.length}</div>
-        <div data-equipe-a-verifier={tracksAVerifier.length} style={{ fontSize: 13, color: C.muted, marginBottom: 8, lineHeight: 1.45 }}>Sans doute {tracksAVerifier.length > 1 ? 'repartis' : 'reparti'} chez le vendeur, pas comptés. Avec un code : peut-être au relais.</div>
-        {tracksAVerifier.map((t, i) => {
-          const code = codeRetrait(t.code); const qr = qrImage(t); const e = etatColisEmail(t);
-          const raison = e.etat === 'delai_depasse'
-            ? `délai de retrait dépassé${t.limite ? ` le ${new Date(String(t.limite).slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : ''}`
-            : `au point relais depuis plus de ${Number.isFinite(e.garde) ? e.garde : GARDE_MAX_J} jours`;
-          return (
-            <div key={'v' + (t.suivi || '') + i} data-equipe-track-a-verifier={e.etat} style={carte}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{(CARRIERS[t.carrier] && CARRIERS[t.carrier].name) || 'Transporteur'}{t.lieu ? ` · ${cleanLieu(t.lieu).nom || t.lieu}` : ''}</div>
-              <div style={{ fontSize: 13, color: C.warn, marginTop: 3 }}>{raison}{t.suivi ? ` · n° ${t.suivi}` : ''}</div>
-              {code ? <div className="vrm-sensible" data-stream-type="code" style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: '.06em', marginTop: 8 }}>{code}</div> : null}
-              {qr && <PhotoVinted src={qr} alt="QR de retrait" style={{ width: 140, height: 140, objectFit: 'contain', marginTop: 8, background: '#fff', borderRadius: 8 }}/>}
-            </div>
-          );
-        })}
-      </>)}
-    </>);
-  }
-  return (
-    <div data-colis-equipe={vendeur} style={cadreEquipe()}>
-      <div style={boiteEquipe()}>
-        <TeteEquipe titre={titreEcran} sous={sous} onPropre={onPropre}/>
-        {corps}
-        <Suspense fallback={<p>Lecture des missions…</p>}><Operations sombre={C===THEMES.dark} key={vendeur} headers={enTeteSession} vendeur={vendeur}/></Suspense>
-      </div>
-    </div>
-  );
-}
+// ⟦→ ecrans/Equipe.jsx #1⟧
 // ⟦→ ecrans/Reglages.jsx #41⟧
 // Une icône de ligne de réglage : neutre, au trait (l'accent reste rare, §7).
 function IconeReglage({ name }) {
@@ -33734,103 +30826,7 @@ function EcranEmails({ comptes, ...props }) {
   return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}
     ranges={designV2 ? ranges : null} onRanger={designV2 ? ranger : null} quarantaine={quarantaine}/>;
 }
-// (10 nov.) `ComptesARelierColis` (le bandeau « N colis de X : ses e-mails n'arrivent pas ») est retiré :
-// une marque discrète sur la carte du colis (`data-colis-sans-email`), la ligne de fraîcheur dit le reste.
-
-// ── « ADRESSE SANS COMPTE » (6 nov., vague 2, point 5) ──────────────────────
-// En tête de E-mails → Relier ma boîte. La règle est dans src/adressesSansCompte.js :
-// SES e-mails rangés (`email_reception_*`, l'adresse de RÉCEPTION a décidé qu'ils
-// sont à lui) arrivés sur une adresse qu'aucun compte Vinted ne porte. Deux gestes,
-// sur SON clic : « Relier un compte » (le registre existant `vinted_account_emails`,
-// ligne `main` à son nom, une adresse = un compte) et « C'est un compte acheteur »
-// (`vrm_adresses_acheteur`, réversible). Le compte n'est JAMAIS deviné.
-// Lecture : deux scalaires par ligne (date, adresses), jamais `select=data` (§4.4),
-// toutes les pages (`lireTout`). Pas su ⇒ `EtatPanne`, jamais « aucune ».
-function AdressesSansCompte({ comptes }) {
-  const [lignes, setLignes] = useState(undefined);
-  const [declarees, setDeclarees] = useState(undefined);
-  const [comptesEmails, setComptesEmails] = useState(() => (isCloudReady() ? (load('vinted_account_emails', {}) || {}) : undefined));
-  const [acheteurs, setAcheteurs] = useState(() => load(CLE_ADRESSES_ACHETEUR, {}) || {});
-  const [choix, setChoix] = useState('');
-  const charger = React.useCallback(async () => {
-    setLignes(undefined); setDeclarees(undefined);
-    const [l, d] = await Promise.all([
-      lireTout('id=like.email_reception_*&select=at:data->>at,adresses:data->adresses', { strict: true }).catch(() => null),
-      lireReglage('vrm_email_owners'),
-    ]);
-    setLignes(Array.isArray(l) ? l : null);
-    setDeclarees(d === null ? null : ((d && d.adresses) || {}));
-  }, []);
-  useEffect(() => { charger(); }, [charger]);
-  useEffect(() => {
-    const relire = () => { setComptesEmails(load('vinted_account_emails', {}) || {}); setAcheteurs(load(CLE_ADRESSES_ACHETEUR, {}) || {}); };
-    const off = onCloudReady(relire);
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_account_emails' || k === CLE_ADRESSES_ACHETEUR) relire(); };
-    window.addEventListener('vrm:save', f);
-    return () => { off(); window.removeEventListener('vrm:save', f); };
-  }, []);
-  const liste = adressesSansCompte({ lignes, declarees, comptesEmails, acheteurs });
-  // (9 nov., lot AC) « À trancher » consomme CE nombre (lu en entier seulement).
-  const nSansCompte = Array.isArray(liste) ? liste.length : null;
-  useEffect(() => { if (nSansCompte != null) publierATrancher('adresses-sans-compte', nSansCompte); }, [nSansCompte]);
-  const libres = comptesSansAdresse(comptes, comptesEmails);
-  const nomCompte = (a) => (a && (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)]) || (a && a.login) || `#${a && a.vinted_user_id}`;
-  const relier = async (adresse, compte) => {
-    const u = relierAdresse(comptesEmails, compte.vinted_user_id, adresse);
-    if (!u) { toast('Cette adresse ou ce compte est déjà relié — change-le dans Comptes liés → Gérer.'); return; }
-    const ok = await askConfirm({ title: `Relier ${adresse} à ${nomCompte(compte)} ?`, desc: `Les e-mails qui arrivent sur cette adresse seront ceux du compte ${nomCompte(compte)} (ventes, bordereaux, messages). Tu peux le changer dans Comptes liés → Gérer.`, ok: 'Relier', cancel: 'Annuler' });
-    if (!ok) return;
-    save('vinted_account_emails', u); setComptesEmails(u); setChoix('');
-    toast(`${adresse} est reliée à ${nomCompte(compte)}.`);
-  };
-  const acheteur = async (adresse) => {
-    const ok = await askConfirm({ title: 'C’est un compte acheteur ?', desc: `${adresse} sert à acheter : aucun compte vendeur à relier. VRM ne la signalera plus ici. Ses e-mails restent rangés comme avant.`, ok: 'Oui, acheteur', cancel: 'Annuler' });
-    if (!ok) return;
-    const n = { ...(load(CLE_ADRESSES_ACHETEUR, {}) || {}), [normAdresse(adresse)]: { at: new Date().toISOString() } };
-    save(CLE_ADRESSES_ACHETEUR, n); setAcheteurs(n);
-  };
-  const annulerAcheteur = (adresse) => { const n = { ...(load(CLE_ADRESSES_ACHETEUR, {}) || {}) }; delete n[adresse]; save(CLE_ADRESSES_ACHETEUR, n); setAcheteurs(n); };
-  const marquees = Object.keys(acheteurs || {});
-  const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
-  if (liste === undefined) return null;   // en cours : rien ne s'affirme, rien ne clignote
-  if (liste === null) return <div className="vrm-sans-compte" data-adresses-sans-compte="pas-su"><EtatPanne compact quoi="Les adresses sans compte" raison="Tes e-mails ou tes adresses n’ont pas pu être lus. Rien n’est changé." onReessayer={charger}/></div>;
-  if (!liste.length && !marquees.length) return null;
-  return (
-    <section className="vrm-sans-compte" data-adresses-sans-compte={liste.length} aria-label="Adresses sans compte">
-      {liste.length ? <h3 className="vrm-sans-compte-entete">Adresses sans compte</h3> : null}
-      {liste.map((x) => (
-        <div key={x.adresse} className="vrm-sans-compte-ligne" data-adresse-sans-compte={x.adresse} data-adresse-sans-compte-n={x.n}>
-          {/* (10 nov., soir) Une ligne, deux boutons (DA6) : l'adresse, « N e-mails · date », Relier · Acheteur. */}
-          <span className="vrm-sans-compte-ic" aria-hidden="true">@</span>
-          <div className="vrm-sans-compte-tete">
-            <span className="vrm-sans-compte-adresse vrm-sensible" data-stream-type="adresse">{x.adresse}</span>
-            <span className="vrm-sans-compte-titre"><span className="vrm-boite-sr">Adresse sans compte : </span>{x.n} e-mail{x.n > 1 ? 's' : ''}{x.dernier ? ` · ${jour(x.dernier)}` : ''}</span>
-          </div>
-          <div className="vrm-sans-compte-gestes">
-            <Bouton variante="secondaire" data-relier-compte={x.adresse} aria-expanded={choix === x.adresse} onClick={() => setChoix((c) => (c === x.adresse ? '' : x.adresse))}>Relier</Bouton>
-            <Bouton variante="discret" data-compte-acheteur={x.adresse} aria-label="C’est un compte acheteur" onClick={() => acheteur(x.adresse)}>Acheteur</Bouton>
-          </div>
-          {choix === x.adresse && (
-            <div className="vrm-sans-compte-choix" data-relier-choix-liste={libres.length}>
-              {libres.length
-                ? <>
-                    <span className="vrm-sans-compte-aide">Quel compte ?</span>
-                    {libres.map((a) => <Bouton key={a.vinted_user_id} variante="secondaire" data-relier-choix={String(a.vinted_user_id)} onClick={() => relier(x.adresse, a)}>{nomCompte(a)}</Bouton>)}
-                  </>
-                : <span className="vrm-sans-compte-aide" data-relier-aucun="">Tous tes comptes Vinted ont déjà une adresse — change-la dans Comptes liés → Gérer.</span>}
-            </div>
-          )}
-        </div>
-      ))}
-      {marquees.length > 0 && (
-        <details className="vrm-sans-compte-acheteurs" data-adresses-acheteur={marquees.length}>
-          <summary>{marquees.length} adresse{marquees.length > 1 ? 's' : ''} marquée{marquees.length > 1 ? 's' : ''} « compte acheteur »</summary>
-          {marquees.map((a) => <div key={a} className="vrm-sans-compte-acheteur"><span className="vrm-sensible" data-stream-type="adresse">{a}</span><button type="button" className="vrm-lien-action" data-annuler-acheteur={a} onClick={() => annulerAcheteur(a)}>Annuler</button></div>)}
-        </details>
-      )}
-    </section>
-  );
-}
+// ⟦→ ecrans/Adresses.jsx #4⟧
 // ⟦→ ecrans/Masques.jsx #1⟧
 // ⟦→ ecrans/Reglages.jsx #47⟧
 
@@ -39696,7 +36692,7 @@ function AppCoeur() {
   );
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
-export { lecturesVentesVinted, useMailsVente, lireVentesEmail, CarteNumerosAEcrire, ACHATS_MASQUES, ACTIONS_REPUB, ARegler, AUTH, AchatsTableau, AideEcran, ApercuAvantImpression, Avancement, BENEF_CHAMPS, BarreHautSlot, BlocARetirerAilleurs, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BoutonToutGenerer, BulleConv, C, CARRIERS, CLES_PREPAREES, CLE_ACCT_OUBLIS, CLE_A_ECRIRE, CLE_INDEX_ARRIVEE, CLOISONNE, COLIS_DEJA_BOUGE, CYCLE_DECISIONS, CacheSiV2, CarteColisVc, CarteStatsApp, CompteVente, CoutAchatVente, DEFAULT_QUICK_REPLIES, DEMANDE_ACTION_ANNONCES, DEMANDE_DECLARATION, DEMANDE_EBAY_CIBLE, DEMANDE_EBAY_MSG, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_FICHE, DEMANDE_PERIODE_VENTES, DEMANDE_REPUB_MAIN, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DEMANDE_VC_PAIRE, DEMANDE_VUE, DEPS_FACTURE, ENLIGNE_FRAIS_MS, ENTREPRISE_VIDE, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FURN_TYPES, FermeAuRetour, FeuilleCreerVinted, FeuilleFusionLazy, FeuilleRecuAchat, FicheConvVolet, FilsTous, FraicheurAnnonces, GESTES_RAPPEL, GardeEcranAllume, GuideDemarrageApp, INV_STATUS, Icon, JOURNAL_REPUB, JourneePersoSetting, LBC_ORANGE, LBC_VC_COLIS_FAIT_RETIRE, LigneConv, LignePanne, LigneRelais, LigneSansDate, LigneVenteCompacte, LiveStatsCarte, MAG_FUSIONS, MP_PLACES, MULTI_USER, MicDictee, Montant, NAV, NOM_RECU_ACHAT, NUMEROS_PERIMES_IMPRESSION, NUM_A_VERIFIER_ANNULE, NUM_OK, NotePaireCoque, ONGLETS_DEPLACES, OUTILS_AUJOURDHUI, OngletManque, PROFIL_VENDEUR, PeriodePicker, PhotoArticleAgrandissable, PhotoVente, PhotoVinted, PhraseEcran, Pourquoi, PuceProposition, QrColis, RA, REGLES_CARTE, REGLES_JOURNAL, RELIER_VENTES, REPERE_MIN, RETOURS_ACHAT_CACHE, RepartitionsVentes, RetoursVentes, RetraitsPoints, RienARetirer, SB_CONFLICT, SEL_EBAY_COMMANDES, SERIE_DECLARATION, STUDIO_BASE, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, StudioPhoto, TXN_ETATS, TXN_ETATS_LU, TamponPose, TeteFil, VENTES_MASQUEES_AUCUNE, VENTES_NATIF, VUS_EN_LIGNE, VentesNatif, VuesVentes, Z_CONFIRMATION, _CACHE_TTL, __repubVivant, __vmrEtat, __vmrJobs, __vmrPlusieurs, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _ecrivainVrm, _genLectures, _gestes, _harvestSeen, _lecturesEcrit, _nnListener, _pdfEtiquettes, _pdfVus, _pendingBordPrint, _persistAcctCache, _persistAcctCacheBientot, _poserVisionneuse, _rowCache, _rtListener, _verNum, _visionneuse, aExpedier, aLaDemande, aLaDemandeDiscret, aLaDemandeFeuille, aPayerUrssaf, achatDuNumeroLu, achatsMasques, ajouterNumerosHorsEcran, alerteLocale, annonceDeclareePartie, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, archiveNumeros, articlesTeteRA, askChoix, askConfirm, askText, assurerVersionNumerotation, autresPresents, avecDatesLbc, avecNumerosVc, b64ToBytes, beneficeVide, bilanLignes, bilanThermique, bordereauFormatKey, buildFacturXBytes, caDeclarableParMois, cachedRow, cadrePhoto, carrierKey, carrierName, chargerPhotoBoite, chargerPublie, choisirTampon, classifyOrderStatus, clavierNum, cleComptesVinted, cleDeclarationPartie, cleJourLocal, cleNum, cleanLieu, codePerime, codeRetrait, colisKey, commandeEbayEngagee, composerBordereaux, compressImage, comptaChargesAnnee, compteCarte, compteEcarteChoix, compteEffectif, comptesLbcProuves, comptesLbcSession, confirmerNumerosAVerifier, conflitsDeNumeros, connexionExtensionVrm, corpsCompteEbay, coupureNumerotation, couvertureBenefice, dateCourteFr, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, defaireVc, deleteVintedAccount, demanderDeclaration, demanderVue, depuisFr, dessinerPdf, detailsAchatScan, doublesVenteLbc, doublonsAReattribuer, ecrireJournalRepub, ecrireLocalJson, ecrireReglageTampons, emettreClesRelues, enTeteSession, entForInvoice, entreePool, estIOS, estOctetsPdf, estTamponAnnule, etapeAchat, etapeVente, etatCibleRappel, etatColisEmail, etatRegleOffre, etatRelais, etatTxn, exemplesActuels, extEstEnRetard, extSait, extSaitLireCodes, extractBrand, extractColors, extractModel, extractSize, extrasImpression, familleArticle, fetchBillingRows, fetchEmailAchats, fetchEmailBordereaux, fetchEmailTracking, fetchHarvest, fetchMemo, fetchRetoursAchat, fetchTranspLignes, fetchTxnItemIds, fetchVersementsVinted, fetchVintedConversations, fetchVintedListings, fetchVintedOrders, fetchWalletEscrow, ficheAVerifier, ficheUniqueDuNumero, filtreInventaire, finsColis, fmt, generateAchatJustificatif, gesteMorceaux, gesteRA, gesteVrm, harvestTs, horsLigneMaintenant, iconeApp, idCompteLbcApp, imprMode, isAtRelayStatus, isCloudReady, isColisActive, isColisEnAttente, isColisRetirable, jourClef, joursAvant, joursAvantVc, lbcAnnoncesSession, lbcAnnulee, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcPostesEncoreEnVente, libelleRegime, libelleRelais, libelleSourceAchat, libererNumeroDuPlan, libererOngletPdf, lienItemEbay, ligneDeSaSession, limiteVcTexte, lireArriveesANumeroter, lireBaseRelue, lireBeneficeJours, lireDatesLbc, lireDeclarations, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEmpreintesPhotos, lireExtrasRepartition, lireFichesPage, lireFreinsVus, lireLbcDone, lireLbcEnVente, lireLocalJson, lireMisDeCote, lireMontantSaisi, lireNumeroEcrit, lireObjet, lirePdfLigne, lireReglageCarte, lireReglesEbay, lireReleveVentes, lireShipDone, lireSupprimeesTous, lireTout, lireVcDone, load, loadCollected, loadRoomPlan, majRA, marcheEbayDeRef, marquerVc, marqueurNumerotation, masqueesPresentes, messagePdfManquant, messagesRetires, modifierCle, moisDeclare, montantCommande, montantCommandeLu, montantRecuEbay, moyennesParModele, mpChoisi, needsBordereau, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, noterArrivees, numDeSkuEbay, numEbayLu, numLigneEbay, numeroEcritActif, numeroExterne, numeroLbcIdentite, numeroReprenable, numeroVcIdentite, numerosLbcSortis, numerosReserves, numerosServisLus, numerosVcEffectifs, numerotationPermise, onCleRelue, onCloudReady, onVersionNumerotation, onVmrExt, optsNumeroVerif, orderPhoto, ouDansMeubles, ouEstNumero, ouNumeroEcrit, ouStockNumero, oublierCommandesCompte, oublierDressing, ouvrirAtelier, ouvrirAtelierArrivee, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirPorteDressings, pairesAFinirIci, payeDe, pctFr, phaseAchat, photoKey, phraseNonComptees, phrasePersonne, placesAnnonces, posePrefsImpression, poserAchatsMasques, poserBordereau, poserCible, poserDureeProchainGeste, poserGroupesDeuxFois, poserPendingBordPrint, poserToastNumeros, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLigneExt, prochainLibre, profilFiscalLu, proposerFusion, publierATrancher, qrImage, rafraichirGestesHL, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, reattribueAEcrire, recusAchatDe, refusHorsLigne, regimeFiscal, reglageImpressionChoisi, reglageTamponsChoisi, regrouperSignaux, relaisVivant, relierBoiteDe, reserverOngletPdf, resultatReviseEbay, resumeBenefice, sansFonctions, save, saveRoomPlan, saveTout, sbAuth, sensColis, signalerBordereauImprime, sitesRA, sonderPonts, stockGestes, tailleEnFin, taillePicto, tamponPourPage, tamponnerBordereau, tauxUrssaf, telechargerFichier, texteSansBalises, toast, triNum, triPool, tsCommande, txRecuAchat, txnAnnuleeAvantEnvoi, urlPhotoVc, urssafConcerne, useBeneficeJournee, useComptesARelier, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useHorsLigne, useJourneePerso, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useOrdinateur, useProfilFiscal, useProfilVendeur, useRA, useSansSouris, useSourcesCarte, useStateCle, useVcLocal, useVentesEmailFraiches, useVentesVestiaireBrut, useVoixExt, useVueSession, vcCarte, vendActuel, venduEtat, venteFinalisee, ventesAilleursDe, ventesDeclarables, ventesFaites, ventesVcDeMemo, ventilationRecuAchat, verifierVersionNumerotation, versExtension, viaOrdinateur, viderCacheLignes, viderLecturesMemo, viderMemoLignes, vintedAgissant, vintedApiCall, vintedDeChrome, vmrCmd, vmrExec, vmrExtPresent, vmrExtVersion, vmrPdfLbc, voirAbonnement, withOwner, ymDeTs };
+export { ACHATS_MASQUES, ACTIONS_REPUB, ARegler, AUTH, AUTH_SETTINGS, AUTH_SETTINGS_ABONNES, AUTH_SETTINGS_ETAT, AchatsTableau, AideEcran, ApercuAvantImpression, Avancement, BENEF_CHAMPS, BarreHautSlot, BlocARetirerAilleurs, BlocBarrerVc, BlocCodesHorsLigne, BlocComptesMuets, BlocInventaireHorsLigne, Bouton, BoutonBordereau, BoutonImprimerVc, BoutonToutGenerer, BulleConv, C, CARRIERS, CARTOUCHES, CLES_PREPAREES, CLE_ACCT_OUBLIS, CLE_A_ECRIRE, CLE_INDEX_ARRIVEE, CLOISONNE, COLIS_DEJA_BOUGE, CYCLE_DECISIONS, CacheSiV2, CarteColisVc, CarteNumerosAEcrire, CarteStatsApp, CompteVente, CoutAchatVente, DEFAULT_QUICK_REPLIES, DEMANDE_ACTION_ANNONCES, DEMANDE_DECLARATION, DEMANDE_EBAY_CIBLE, DEMANDE_EBAY_MSG, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_FICHE, DEMANDE_PERIODE_VENTES, DEMANDE_REPUB_MAIN, DEMANDE_SAISIE_PRIX, DEMANDE_SEMAINE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, DEMANDE_VC_PAIRE, DEMANDE_VUE, DEPS_FACTURE, ENLIGNE_FRAIS_MS, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_AIDE, EQUIPE_NON_INSTALLE_GESTE_AIDE, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayAchats, EbayActionCompte, EbayMessages, FURN_TYPES, FermeAuRetour, FeuilleCreerVinted, FeuilleFusionLazy, FeuilleRecuAchat, FicheConvVolet, FilsTous, FraicheurAnnonces, GESTES_RAPPEL, GardeEcranAllume, GuideDemarrageApp, INV_STATUS, Icon, InfosPaireFeuilleP, JOURNAL_REPUB, JourneePersoSetting, LBC_ORANGE, LBC_VC_COLIS_FAIT_RETIRE, LigneConv, LignePanne, LigneRelais, LigneSansDate, LigneVenteCompacte, LiveStatsCarte, MAG_FUSIONS, MAIL_QUOTA, MP_PLACES, MULTI_USER, MicDictee, Montant, NAV, NOM_RECU_ACHAT, NUMEROS_PERIMES_IMPRESSION, NUM_A_VERIFIER_ANNULE, NUM_OK, NotePaireCoque, ONGLETS_COLIS_HL, ONGLETS_DEPLACES, OUTILS_AUJOURDHUI, OngletManque, Operations, PARRAIN_DU_LIEN, PARTENAIRE_DU_LIEN, PROFIL_VENDEUR, PeriodePicker, PhotoArticleAgrandissable, PhotoVente, PhotoVinted, PhraseEcran, Pourquoi, PuceProposition, QrColis, RA, RECOVERY_PENDING, REGLES_CARTE, REGLES_JOURNAL, RELIER_VENTES, REPERE_MIN, RETOURS_ACHAT_CACHE, RepartitionsVentes, RetoursVentes, RetraitsPoints, RienARetirer, SB_CONFLICT, SCHEMA_MESURE, SEL_EBAY_COMMANDES, SERIE_DECLARATION, STUDIO_BASE, SUPABASE_URL, ScreenHead, Segmente, SheetShell, SheetShellSurFiche, Skeleton, StatBox, StudioPhoto, THEMES, TXN_ETATS, TXN_ETATS_LU, TamponPose, TeteEquipe, TeteFil, VENTES_MASQUEES_AUCUNE, VENTES_NATIF, VUS_EN_LIGNE, VentesNatif, VrmLogo, VuesVentes, Z_CONFIRMATION, _CACHE_TTL, __lier, __lierConnexion, __lierRetourPerime, __prixSuivis, __relais, __repubVivant, __vmrEtat, __vmrJobs, __vmrPlusieurs, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _ecrivainVrm, _genLectures, _gestes, _gestesHL, _harvestSeen, _lecturesEcrit, _nnListener, _pdfEtiquettes, _pdfVus, _pendingBordPrint, _persistAcctCache, _persistAcctCacheBientot, _poserVisionneuse, _rowCache, _rtListener, _verNum, _visionneuse, aExpedier, aLaDemande, aLaDemandeDiscret, aLaDemandeFeuille, aPayerUrssaf, achatDuNumeroLu, achatsMasques, ajouterNumerosHorsEcran, alerteLocale, annonceDeclareePartie, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, archiveNumeros, articlesTeteRA, askChoix, askConfirm, askText, assurerVersionNumerotation, authCall, authRefresh, authValid, autresPresents, avecDatesLbc, avecNumerosVc, b64ToBytes, beneficeVide, bilanLignes, bilanThermique, boiteEquipe, bordereauFormatKey, boutonLierExt, buildFacturXBytes, caDeclarableParMois, cachedRow, cadreEquipe, cadrePhoto, carrierKey, carrierName, cartoucheLibre, chargerPhotoBoite, chargerPublie, chercherPlaceTampon, choisirTampon, choixTamponValide, classifyOrderStatus, clavierNum, cleComptesVinted, cleDeclarationPartie, cleJourLocal, cleNum, cleanLieu, cmpVersion, codePerime, codeRetrait, colisKey, commandeEbayEngagee, composerBordereaux, compressImage, comptaChargesAnnee, compteCarte, compteEcarteChoix, compteEffectif, compteVenteLbc, comptesLbcProuves, comptesLbcSession, confirmerNumerosAVerifier, conflitsDeNumeros, connexionExtensionVrm, corpsCompteEbay, coupureNumerotation, couvertureBenefice, dateCourteFr, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, deconnecterExtensionAncienne, defaireVc, deleteVintedAccount, demanderDeclaration, demanderVue, depPrixAttente, depuisFr, dessinerPdf, detailsAchatScan, doublesVenteLbc, doublonsAReattribuer, echelleMiniTampon, ecrireCartouche, ecrireInfosPaire, ecrireJournalRepub, ecrireLocalJson, ecrireReglageTampons, emettreClesRelues, enFile, enTeteSession, entForInvoice, entreePool, estIOS, estOctetsPdf, estTamponAnnule, etapeAchat, etapeVente, etatCibleRappel, etatColisEmail, etatMfa, etatRegleOffre, etatRelais, etatTxn, exemplesActuels, extEstEnRetard, extSait, extSaitLireCodes, extractBrand, extractColors, extractModel, extractSize, extrasImpression, familleArticle, fenetreAncienne, fetchBillingRows, fetchEmailAchats, fetchEmailBordereaux, fetchEmailTracking, fetchHarvest, fetchMemo, fetchRetoursAchat, fetchTranspLignes, fetchTxnItemIds, fetchVersementsVinted, fetchVintedConversations, fetchVintedListings, fetchVintedOrders, fetchWalletEscrow, ficheAVerifier, ficheUniqueDuNumero, filtreInventaire, finsColis, fmt, generateAchatJustificatif, gesteMorceaux, gesteRA, gesteVrm, groupesGestesHL, harvestTs, horsLigneMaintenant, iconeApp, idCompteLbcApp, imprMode, isAtRelayStatus, isCloudReady, isColisActive, isColisEnAttente, isColisRetirable, jourClef, joursAvant, joursAvantVc, lbcAnnoncesSession, lbcAnnulee, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcPostesEncoreEnVente, lecturePrixPro, lecturesVentesVinted, libelleRegime, libelleRelais, libelleSourceAchat, libererNumeroDuPlan, libererOngletPdf, lienItemEbay, ligneDeSaSession, limiteVcTexte, lireArriveesANumeroter, lireBaseRelue, lireBeneficeJours, lireDatesLbc, lireDeclarations, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEmpreintesPhotos, lireExtrasRepartition, lireFichesPage, lireFreinsVus, lireLbcDone, lireLbcEnVente, lireLocalJson, lireMisDeCote, lireMontantSaisi, lireNumeroEcrit, lireObjet, lirePairesDorment, lirePdfLigne, lireReglageCarte, lireReglesEbay, lireRelais, lireReleveVentes, lireShipDone, lireSupprimeesTous, lireTout, lireVcDone, lireVentesEmail, load, loadAuthSettings, loadCollected, loadRoomPlan, majRA, marcheEbayDeRef, marquerVc, marqueurNumerotation, masqueesPresentes, messagePdfManquant, messagesRetires, minutesAvantReessai, modifierCle, moisDeclare, montantCommande, montantCommandeLu, montantRecuEbay, moyennesParModele, mpChoisi, needsBordereau, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, noterArrivees, numDeSkuEbay, numEbayLu, numLigneEbay, numeroEcritActif, numeroExterne, numeroLbcIdentite, numeroReprenable, numeroVcIdentite, numerosLbcSortis, numerosReserves, numerosServisLus, numerosVcEffectifs, numerotationPermise, numsCase, onCleRelue, onCloudReady, onVersionNumerotation, onVmrExt, optsNumeroVerif, orderPhoto, ouDansMeubles, ouEstNumero, ouNumeroEcrit, ouStockNumero, oublierCommandesCompte, oublierDressing, oublierLbcSession, oublierLierConnexion, ouvrirAtelier, ouvrirAtelierArrivee, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirPorteDressings, paireIdentifiable, pairesAFinirIci, payeDe, pctFr, phaseAchat, photoKey, phraseNonComptees, phrasePersonne, placeLibreTampon, placesAnnonces, posePrefsImpression, poserAchatsMasques, poserBordereau, poserCible, poserDureeProchainGeste, poserGroupesDeuxFois, poserLocalHL, poserPendingBordPrint, poserToastNumeros, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLigneExt, prochainLibre, profilFiscalLu, proposerFusion, publierATrancher, qrImage, rafraichirGestesHL, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, reattribueAEcrire, reclassifyTrack, recusAchatDe, refusHorsLigne, regimeFiscal, reglageImpressionChoisi, reglageTamponsChoisi, regrouperSignaux, rejouerGestesBientot, relaisVivant, relierBoiteDe, rendrePremierePage, reserverOngletPdf, resultatReviseEbay, resumeBenefice, sansFonctions, save, saveRoomPlan, saveTout, sbAuth, sensColis, sessionFrom, signalerBordereauImprime, sitesPrixDe, sitesRA, sonderPonts, stockGestes, tailleAffichee, tailleEnFin, taillePicto, tamponPourPage, tamponnerBordereau, tauxUrssaf, telechargerFichier, texteDelaiEmail, texteSansBalises, toast, totpNoms, triNum, triPool, tsCommande, txRecuAchat, txnAnnuleeAvantEnvoi, urlPhotoVc, urssafConcerne, useAnnuaireLbc, useBeneficeJournee, useComptesARelier, useEstProprietaire, useEtapePont, useEtatEmailsComptes, useExcluAutre, useExtVivante, useHorsLigne, useInfosPaire, useJourneePerso, useLigneSynchro, useLigneUrssaf, useMailsVente, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useOrdinateur, useParcoursArrivee, useProfilFiscal, useProfilVendeur, useRA, useSansSouris, useSourcesCarte, useStateCle, useVcLocal, useVentesEmailFraiches, useVentesVestiaireBrut, useVoixExt, useVueSession, vcCarte, vcPoser, vendActuel, venduEtat, venteFinalisee, ventesAilleursDe, ventesDeclarables, ventesFaites, ventesVcDeMemo, ventilationRecuAchat, verifierVersionNumerotation, versExtension, viaOrdinateur, viderCacheLignes, viderLecturesMemo, viderMemoLignes, vintedAgissant, vintedApiCall, vintedDeChrome, vmrCmd, vmrExec, vmrExtPresent, vmrExtVersion, vmrPdfLbc, voieConnexionExt, voirAbonnement, withOwner, ymDeTs, zonesCodesTampon };
 // (21 nov., ext. 5.428 `endirect`) « En direct » : relire l'état de l'extension TOUT DE SUITE quand elle dit que son action a bougé
 // (au plus une fois par 1,5 s ; le battement de 20 s reste le filet).
 let __relireDirectAt = 0, __relireDirectMin = null;

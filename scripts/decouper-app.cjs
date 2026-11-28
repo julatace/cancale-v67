@@ -222,8 +222,10 @@ const marqueExp = '// ⟦démarrage léger⟧ emprunts des écrans à la demande
 const re = /\/\/ ⟦démarrage léger⟧ emprunts des écrans à la demande\nexport \{ ([^}]*) \};\n/;
 const m = out.match(re);
 const deja = m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
+// (27 nov.) Un nom déjà exporté par une AUTRE liste d'App (`export { X };` posé à la main) n'est pas réexporté : doublon = erreur de syntaxe.
+const autresListes = new Set(); for (const st of body) if (st.type === 'ExportNamedDeclaration' && !st.declaration && !st.source && !src.slice(Math.max(0, st.start - 80), st.start).includes('⟦démarrage léger⟧ emprunts')) for (const sp of st.specifiers) autresListes.add(sp.exported.name);
 const dejaDecl = new Set(); for (const st of body) if (st.type === 'ExportNamedDeclaration' && st.declaration) { const d = st.declaration; if (d.id) dejaDecl.add(d.id.name); else if (d.declarations) for (const x of d.declarations) if (x.id.name) dejaDecl.add(x.id.name); }
-const tous = [...new Set([...deja, ...besoinsApp])].filter((n) => !dejaDecl.has(n)).sort();
+const tous = [...new Set([...deja, ...besoinsApp])].filter((n) => !dejaDecl.has(n) && !autresListes.has(n)).sort();
 const bloc = `${marqueExp}\nexport { ${tous.join(', ')} };\n`;
 if (m) out = out.replace(re, bloc); else out = out.replace(/\n*$/, '\n') + bloc;
 fs.writeFileSync(appFile, out);
