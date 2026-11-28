@@ -324,7 +324,7 @@ import { fusionnerConversation } from "../conversations.js";
 import {etatCommandeEbay} from '../../api/_lib/ebay-etat-commande.js';
 // ⟦← App.jsx #54⟧
 import {ventesPartiesParPreuve, suiviDuBord} from '../../api/_lib/depart-vente.js';
-import { partiParPreuve } from '../etiquettesDepart.js';
+import { partiParPreuve, vuPartir } from '../etiquettesDepart.js';
 // ⟦← App.jsx #55⟧
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../../api/_lib/colis-sites.js';
 // ⟦← App.jsx #56⟧   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
@@ -9883,11 +9883,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       lignesEmail: Array.isArray(tracking) ? tracking : null, departs: vcLoc0.departs,
       ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])),
       entrants: Array.isArray(transp) ? new Set(transp.map((t) => t && t.suivi).filter(Boolean)) : null,
+      // (28 nov., « expédié sans l'extension ») + la vente FINALISÉE (la date de versement de CETTE transaction :
+      // le détail 450, le relevé, la conversation, l'e-mail « Transaction finalisée » qui porte son n°).
+      finalisees: versements && typeof versements === 'object' ? versements : null,
     });
     publierDepartsVinted(m);
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp, etiqLuesTic]);
+  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp, etiqLuesTic, versements]);
   // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
   const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
   // ── (10 nov., lot BE) LA FRISE D'UNE VENTE, ÉTAPE PAR ÉTAPE (src/friseProuvee.js) ──────
@@ -16655,7 +16658,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (8 nov.) Vu par le transporteur = la preuve d'e-mail ou de prise en charge de la règle
       // unique (api/_lib/depart-vente.js), par le n° EXACT de son bordereau, n° ambigu ⇒ non.
       const rv = partisVinted.get(k);
-      const vu = !!(rv && (rv.type === 'email' || rv.type === 'transporteur'));
+      const vu = vuPartir(rv);
       const r = posteSansDepart({ o, cocheLe: shipDone[k], captureAt: cap, joursLimite: lim.daysLeft, vuParTransporteur: vu });
       if (r) out.push({ o, ...r });
     }
@@ -21016,7 +21019,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // (8 nov., « à envoyer » prouvé) + l'e-mail du transporteur pour le n° de SON bordereau
           // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
           const rv = partisVinted.get(tx);
-          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
+          const dp = vuPartir(rv) ? rv : null; if (!dp) continue;
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
@@ -21065,7 +21068,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return out.sort((a, b) => a.rang - b.rang).map((x) => {
       const tx = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
       const rv = tx && x.site === 'vinted' ? partisVinted.get(tx) : null;
-      const depart = x.depart || (rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null);
+      const depart = x.depart || (vuPartir(rv) ? rv : null);
       const coche = x.type === 'coche' && tx ? (shipDone[tx] || null) : (rv && rv.type === 'colis-fait' ? rv.at : null);
       const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };

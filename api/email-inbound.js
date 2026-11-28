@@ -354,6 +354,19 @@ export function paireDuSujetMessage(sujet) {
 }
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
+// (28 nov., « expédié sans l'extension ») LE N° DE TRANSACTION ÉCRIT DANS UN E-MAIL DE COLIS : le lien
+// `/transactions/{tx}`, `transaction_id={tx}` ou « N° de transaction : {tx} ». UNIQUE : deux n° différents
+// dans le même e-mail ⇒ aucun (jamais choisi). C'est une IDENTITÉ de la vente (§5) ; la règle du départ
+// (api/_lib/depart-vente.js, `preuveTxDeLigne`) ne s'en sert que si le SUJET constate le départ.
+// Fonction PURE (scripts/audit-expedie-sans-extension.cjs).
+export function txDuTexteEmail(texte) {
+  const t = String(texte || '');
+  const vus = new Set();
+  for (const re of [/N[°ºo]?\s*de\s*(?:la\s+)?transaction\s*:?\s*#?\s*(\d{6,20})(?!\d)/gi, /\/transactions?\/(\d{6,20})(?!\d)/gi, /transaction_id=(\d{6,20})(?!\d)/gi]) {
+    for (const m of t.matchAll(re)) vus.add(m[1]);
+  }
+  return vus.size === 1 ? [...vus][0] : '';
+}
 // L'identité d'un e-mail de finalisation (versement) : `{ cle, transaction, via }`.
 // Fonction PURE (scripts/audit-robustesse-serveur.cjs).
 export function cleFinalisation({ texte, messageId, sujet, corps }) {
@@ -2769,7 +2782,11 @@ export async function traiterEmail(req, res) {
       // (11 nov., retraits fiables) Sans n°, deux e-mails au même sujet (« Votre colis est disponible »)
       // partageaient UNE ligne : le second effaçait le premier colis. Un colis sans n° mais avec son code
       // a sa ligne à lui (sujet + code) ; un rappel du même code retombe sur la même.
-      const rowId = `email_track_${carrier}_${track.suivi || shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject)}`;
+      // (28 nov.) Le n° de la TRANSACTION écrit dans l'e-mail (Vinted : le lien de la commande). Sans n° de
+      // suivi, il donne SA ligne à l'e-mail : deux ventes au même sujet (« Ton colis est en route ») ne
+      // partagent plus une ligne (la seconde effaçait la preuve de la première).
+      const txLu = txDuTexteEmail(`${mail.subject || ''}\n${texteUtile(mail)}\n${String(mail.html || '')}`);
+      const rowId = `email_track_${carrier}_${track.suivi || (txLu && !(track.sansSuivi && track.code) ? `tx${txLu}` : shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject))}`;
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
@@ -2839,9 +2856,17 @@ export async function traiterEmail(req, res) {
           if (retourLie) sensLigne = 'sortant';
         }
       }
+      // (28 nov.) Le n° de transaction est celui d'une de SES VENTES (son bordereau `email_bord_{tx}` existe) :
+      // le colis est SORTANT (jamais « à retirer » chez lui). Lecture ratée ⇒ pas su : rien ne change.
+      const txLigne = txLu || (prevLigne && /^\d{6,20}$/.test(String(prevLigne.transaction || '')) ? String(prevLigne.transaction) : '');
+      if (!sensLigne && txLigne) {
+        const bt = await lireLignes(`id=eq.email_bord_${txLigne}&select=id`);
+        if (Array.isArray(bt) && bt.length) sensLigne = 'sortant';
+      }
       if (sensLigne) track.sens = sensLigne;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
+        ...(txLigne ? { transaction: txLigne } : {}),
         statusLabel: track.label, subject: sujetGarde, receivedAt: now,
         ...(sensLigne ? { sens: sensLigne } : {}),
         ...(emailAtLigne ? { emailAt: emailAtLigne } : {}),
