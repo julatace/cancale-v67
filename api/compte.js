@@ -25,6 +25,10 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 chiffrée dans le coffre : statut (4 derniers
 //                                 caractères, date) · poser · verifier · retirer
 //                                 — voir api/_lib/photoroom-cle.js
+//   /api/compte?mode=ia-cle       (GET/POST, session) SA clé IA (Anthropic) pour
+//                                 l'assistant de rangement, chiffrée dans le
+//                                 coffre : statut · poser · retirer — voir
+//                                 api/_lib/ia-cle.js (28 nov.)
 //   /api/compte?mode=facture-pro  (GET/POST, session) LA FACTURE PRO : sa boîte
 //                                 d'envoi (chiffrée), émettre, envoyer, avoir —
 //                                 voir api/_lib/facture-pro.js
@@ -82,6 +86,7 @@ import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
 import { routePhotoroom } from './_lib/photoroom-cle.js';
+import { routeIaCle } from './_lib/ia-cle.js';   // (28 nov., agent-rangement) la clé IA du vendeur, dans le coffre
 import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeFactureAutre } from './_lib/facture-autres.js';
 import { routeEntreprise } from './_lib/entreprise.js';
@@ -2084,6 +2089,14 @@ async function photoroom(req, res) {
   return routePhotoroom(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
 }
 
+// ── (28 nov., agent-rangement) La clé IA (Anthropic) du vendeur : la session d'abord (api/_lib/ia-cle.js)
+async function iaCle(req, res) {
+  const vendeur = await vendeurExige(req, res);
+  if (!vendeur) return;
+  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
+  return routeIaCle(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
+}
+
 // ── La facture Pro : émettre, numéroter, envoyer depuis SA boîte (api/_lib/facture-pro.js)
 async function facturePro(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -2427,6 +2440,7 @@ export default async function handler(req, res) {
   if (mode === 'facture-autre') return m === 'POST' ? factureAutre(req, res) : repondre(res, 405, { erreur: 'POST' });
   if (mode === 'facture-pro') return (m === 'GET' || m === 'POST') ? facturePro(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
+  if (mode === 'ia-cle') return (m === 'GET' || m === 'POST') ? iaCle(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   // (10 nov., lot AR) La page PUBLIQUE d'un formateur (vrm.center/f/<adresse>) : SANS session,
