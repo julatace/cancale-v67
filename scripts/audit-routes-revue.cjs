@@ -275,16 +275,16 @@ const factures = () => [...base.entries()].filter(([k]) => k.includes('|email_in
       const r1 = faireRes();
       await ai.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT(B) }, body: { title: 'x' } }, r1);
       dit(!cles.includes('cle-de-julien'), 'un autre vendeur ne dépense pas la clé IA du serveur (§2.9)', `clés envoyées : ${JSON.stringify(cles)} · HTTP ${r1.code} ${JSON.stringify(r1.corps && r1.corps.reason)}`);
-      // Un autre vendeur AVEC sa clé : c'est la sienne qui part.
+      // (28 nov., ia-sans-cle) « ni pour moi ni pour les utilisateurs » : plus AUCUNE clé ne part, ni celle qu'un vendeur
+      // apporterait, ni celle du serveur pour le propriétaire — l'IA tourne dans le navigateur.
       cles.length = 0;
       const r2 = faireRes();
       await ai.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT(B) }, body: { title: 'x', key: 'cle-de-b' } }, r2);
-      dit(cles.length === 1 && cles[0] === 'cle-de-b', 'un vendeur qui apporte SA clé : c’est la sienne qui paie', JSON.stringify(cles));
-      // Le propriétaire : la clé du serveur.
+      dit(cles.length === 0 && r2.code === 410, 'un vendeur qui apporte une clé : elle n’est ni lue ni envoyée (IA du navigateur, aucune clé)', `${JSON.stringify(cles)} HTTP ${r2.code}`);
       cles.length = 0;
       const r3 = faireRes();
       await ai.default({ method: 'POST', query: {}, headers: { authorization: 'Bearer ' + JWT(A) }, body: { title: 'x' } }, r3);
-      dit(cles.length === 1 && cles[0] === 'cle-de-julien' && r3.corps && r3.corps.ok === true, 'le propriétaire garde la clé du serveur (l’autre sens)', JSON.stringify(cles));
+      dit(cles.length === 0 && r3.code === 410, 'le propriétaire non plus : la clé du serveur n’est plus dépensée (décision du 28 nov.)', `${JSON.stringify(cles)} HTTP ${r3.code}`);
     }
     if (SC === 'F') {
       const vieux = 'eyJ.' + Buffer.from(JSON.stringify({ exp: 1 })).toString('base64url') + '.s';

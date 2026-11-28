@@ -10,7 +10,7 @@
 //   P2 aucune valeur de variable d'environnement n'apparaît (secrets plantés) ;
 //   P3 ce dont la surveillance a besoin est là : `ok: true`, `etat.base` ;
 //   P4 la session d'un AUTRE compte, ou un jeton faux : comme sans session ;
-//   P5 la session du PROPRIÉTAIRE : `config` (5 oui/non) et JAMAIS le cache
+//   P5 la session du PROPRIÉTAIRE : `config` (4 oui/non — plus l'IA, retirée du serveur le 28 nov.) et JAMAIS le cache
 //      partagé (`private, no-store`).
 // `--prouve` : chaque mutation doit rendre l'audit ROUGE.
 'use strict';
@@ -91,8 +91,8 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
     dit(JSON.stringify(Object.keys(a.corps).sort()) === JSON.stringify(PUBLIQUES), `P4 ${j} : comme sans session (aucune configuration)`, Object.keys(a.corps));
   }
   const q = await sante('a.jeton-julien.b');
-  dit(q.corps.config && JSON.stringify(Object.keys(q.corps.config).sort()) === JSON.stringify(CONFIG) && CONFIG.every((k) => typeof q.corps.config[k] === 'boolean'), 'P5 le propriétaire connecté reçoit ses 5 oui/non de configuration', q.corps.config);
-  dit(q.corps.config && q.corps.config.ia === true && q.corps.config.stripeWebhook === true, 'P5 qui disent vrai (variables posées ⇒ oui)', q.corps.config);
+  dit(q.corps.config && JSON.stringify(Object.keys(q.corps.config).sort()) === JSON.stringify(CONFIG) && CONFIG.every((k) => typeof q.corps.config[k] === 'boolean'), 'P5 le propriétaire connecté reçoit ses 4 oui/non de configuration', q.corps.config);
+  dit(q.corps.config && q.corps.config.detourage === true && q.corps.config.stripeWebhook === true && !('ia' in q.corps.config), 'P5 qui disent vrai (variables posées ⇒ oui)', q.corps.config);
   dit(/private/.test(q.entetes['Cache-Control'] || '') && /no-store/.test(q.entetes['Cache-Control'] || ''), 'P5 jamais au cache partagé', q.entetes);
   const fq = Object.entries(SECRETS).filter(([, v]) => JSON.stringify(q.corps).includes(v)).map(([k]) => k);
   dit(!fq.length, 'P5 même au propriétaire : des oui/non, jamais une valeur', fq);
