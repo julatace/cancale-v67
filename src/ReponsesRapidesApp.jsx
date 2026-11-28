@@ -10,13 +10,17 @@ import React, { useMemo } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
 import { rrPropositions } from './reponsesRapides.js';
 import { risquesMessage } from './messageSur.js';
+import ReponseNavigateur from './ReponseNavigateur.jsx';   // (28 nov., ia-sans-cle) « ✦ Proposer » : l'IA du navigateur, sans clé
 
 // (24 nov., lot agir-si-connecte) `onChoisir(texte)` : une réponse touchée REMPLIT le champ « Répondre » de VRM (rien ne part).
 export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = false, reglage = null, site = 'vinted', bouton = null, onChoisir = null, puces = false }) {
   const r = useMemo(() => rrPropositions({ messages, reglage, vars, partie, langueUi: langueCourante(), sur: (t) => !risquesMessage(String(t || ''), site).length, hasard: () => 0 }),
     [messages, reglage, vars, partie, site]);
   const l = r.propositions || [];
-  if (!l.length) return null;
+  // (28 nov., ia-sans-cle) La puce de l'IA du navigateur (seulement si le modèle est prêt sur l'appareil) — même sans
+  // réponse rapide reconnue.
+  const iaNav = puces && onChoisir ? <ReponseNavigateur messages={messages} vars={vars} sur={(t) => !risquesMessage(String(t || ''), site).length} onChoisir={onChoisir}/> : null;
+  if (!l.length) return iaNav ? <div className="vrm-mp-puces" data-rr-app={0} data-rr-puces="" role="group" aria-label={tr('rr.app.titre')}>{iaNav}</div> : null;
   // (24 nov., lot messages-pro) `puces` : une rangée de puces qui défile au doigt, au-dessus du champ — la puce porte le
   // NOM de la réponse (« Taille »), le texte entier va dans le champ au toucher (rien ne part). Une réponse qu'il manque
   // une info pour remplir est une puce éteinte, sa raison en titre (jamais cachée).
@@ -25,6 +29,7 @@ export default function ReponsesRapidesApp({ messages = [], vars = {}, partie = 
       {l.map((p) => p.texte
         ? <button key={p.cat} type="button" className="vrm-mp-rr" data-rr-app-cat={p.cat} data-rr-app-remplir="" data-n-famille="second" title={p.texte} onClick={onChoisir ? () => onChoisir(p.texte) : undefined}>{tr('rr.app.cat.' + p.cat)}</button>
         : <button key={p.cat} type="button" className="vrm-mp-rr" data-rr-app-manque={p.manque || ''} aria-disabled="true" title={tr('rr.app.manque', { cat: tr('rr.app.cat.' + p.cat) })}>{tr('rr.app.cat.' + p.cat)}</button>)}
+      {iaNav}
     </div>
   );
   return (

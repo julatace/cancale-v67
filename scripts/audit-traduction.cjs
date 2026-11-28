@@ -37,6 +37,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/rangement/AssistantRangement.jsx', ['*']],   // (28 nov., agent-rangement) l'assistant de rangement
+  ['src/ReponseNavigateur.jsx', ['*']],   // (28 nov., ia-sans-cle) « ✦ Proposer », l'IA du navigateur
   ['src/natif/ecrans/PairesDorment.jsx', ['*']],   // (27 nov.) « Paires qui dorment », le plan
   ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
   ['src/BoiteEmails.jsx', ['Compris', 'Lecture', 'Ligne', 'Pile', 'ARelier', 'Quarantaine', 'MessageOrigine', 'PuceCode']],   // (19 nov., emails-mail) E-mails comme Mail

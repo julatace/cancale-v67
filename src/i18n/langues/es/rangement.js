@@ -148,4 +148,9 @@ export default {
   "rgt.modele.b": "Descargar",
   "rgt.modele.progres": "Descargando… {p} %",
   "rgt.modele.pied": "Funciona en este dispositivo: sin clave, nada sale de él. Mientras tanto responde el asistente guiado.",
+  "iaNav.rep.b": "✦ Proponer",
+  "iaNav.rep.titre": "La IA de tu navegador escribe una respuesta, en este dispositivo (sin clave): la relees antes de enviarla.",
+  "iaNav.rep.charge": "Escribiendo…",
+  "iaNav.rep.koCourt": "✦ Reintentar",
+  "iaNav.rep.ko": "La propuesta no era válida, la descarté: elige una respuesta rápida o reinténtalo.",
 };

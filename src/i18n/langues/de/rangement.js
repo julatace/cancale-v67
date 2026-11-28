@@ -148,4 +148,9 @@ export default {
   "rgt.modele.b": "Herunterladen",
   "rgt.modele.progres": "Download… {p} %",
   "rgt.modele.pied": "Sie läuft auf diesem Gerät: kein Schlüssel, nichts verlässt es. Bis dahin antwortet der geführte Assistent.",
+  "iaNav.rep.b": "✦ Vorschlagen",
+  "iaNav.rep.titre": "Die KI deines Browsers schreibt eine Antwort, auf diesem Gerät (kein Schlüssel): Du liest sie vor dem Senden.",
+  "iaNav.rep.charge": "Schreibe…",
+  "iaNav.rep.koCourt": "✦ Nochmal",
+  "iaNav.rep.ko": "Der Vorschlag war ungültig, ich habe ihn verworfen: Nimm eine Schnellantwort oder versuch es nochmal.",
 };

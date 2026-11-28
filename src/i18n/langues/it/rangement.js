@@ -148,4 +148,9 @@ export default {
   "rgt.modele.b": "Scarica",
   "rgt.modele.progres": "Download… {p} %",
   "rgt.modele.pied": "Funziona su questo dispositivo: nessuna chiave, nulla esce. Intanto risponde l’assistente guidato.",
+  "iaNav.rep.b": "✦ Proponi",
+  "iaNav.rep.titre": "L’IA del tuo browser scrive una risposta, su questo dispositivo (nessuna chiave): la rileggi prima di inviarla.",
+  "iaNav.rep.charge": "Scrivo…",
+  "iaNav.rep.koCourt": "✦ Riprova",
+  "iaNav.rep.ko": "La proposta non era valida, l’ho scartata: scegli una risposta rapida o riprova.",
 };

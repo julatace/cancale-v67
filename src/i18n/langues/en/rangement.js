@@ -148,4 +148,9 @@ export default {
   "rgt.modele.b": "Download",
   "rgt.modele.progres": "Downloading… {p}%",
   "rgt.modele.pied": "It runs on this device: no key, nothing leaves it. Meanwhile, the guided assistant answers.",
+  "iaNav.rep.b": "✦ Suggest",
+  "iaNav.rep.titre": "Your browser’s AI writes a reply, on this device (no key): you read it before sending.",
+  "iaNav.rep.charge": "Writing…",
+  "iaNav.rep.koCourt": "✦ Try again",
+  "iaNav.rep.ko": "The suggestion was not valid, I set it aside: pick a quick reply or try again.",
 };

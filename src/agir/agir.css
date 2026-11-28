@@ -104,3 +104,6 @@
 /* L'heure dans SA bulle : une couche d'avant la force en blanc (!important en couche) ⇒ invisible sur la bulle blanche du
    mode sombre. La couleur PEINTE suit l'encre de la bulle pleine, quel que soit le thème. */
 .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle-h { -webkit-text-fill-color: var(--n-sur-plein); opacity: .72; }
+
+/* (28 nov., ia-sans-cle) la rangée de puces sans réponse rapide ni IA du navigateur prête : rien ne se dessine */
+.vrm-mp-puces:empty { display: none; }

@@ -148,4 +148,9 @@ export default {
   "rgt.modele.b": "Télécharger",
   "rgt.modele.progres": "Téléchargement… {p} %",
   "rgt.modele.pied": "Elle tourne sur cet appareil : aucune clé, rien ne part ailleurs. En attendant, l’assistant guidé répond.",
+  "iaNav.rep.b": "✦ Proposer",
+  "iaNav.rep.titre": "L’IA de ton navigateur écrit une réponse, sur cet appareil (aucune clé) : tu la relis avant d’envoyer.",
+  "iaNav.rep.charge": "J’écris…",
+  "iaNav.rep.koCourt": "✦ Réessayer",
+  "iaNav.rep.ko": "La proposition n’était pas valable, je l’ai écartée : prends une réponse rapide ou réessaie.",
 };
