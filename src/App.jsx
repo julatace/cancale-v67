@@ -18831,7 +18831,6 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
       ordi ? null : notifs,
       tuile('extension'),
       tuile('adistance'),
-      tuile('serveur'),
       // (21 nov.) « État des actions » (MULTI_USER) : son panneau (EtatActions, monté muet dans la coque) s'ouvrait par la photo du
       // compte et « Plus », retirés : sa tuile est ici (et dans la barre latérale), un point ambre quand un geste est à faire.
       MULTI_USER ? { cle: 'etat-actions', libelle: tr('menu.etat'), icone: <Icon name="shield" size={taille}/>, point: ETAT_ACTIONS_VU && ETAT_ACTIONS_VU.ton === 'ambre' ? true : undefined,

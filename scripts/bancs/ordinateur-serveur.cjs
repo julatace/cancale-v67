@@ -113,7 +113,7 @@ async function app(nav, o) {
     await pg.evaluate(() => { for (const d of document.querySelectorAll('[data-srv-geste="deconnecte"], [data-srv-pourquoi="regles"]')) d.open = true; });
     await attendre(300);
     const ouvert = await pg.evaluate(() => (document.querySelector('[data-srv-geste="deconnecte"]') || {}).innerText || '').catch(() => '');
-    dit(/reconnecte-toi/.test(ouvert), `${o.nom} · le geste du déconnecté : ouvrir le profil Chrome, se reconnecter`, ouvert);
+    dit(/reconnecte-toi/.test(ouvert), `${o.nom} · le geste du déconnecté : ouvrir le profil du navigateur, se reconnecter`, ouvert);
     await capture(pg, o.nom + '-gestes');
   } finally { await ctx.close().catch(() => {}); }
 }
@@ -165,7 +165,7 @@ async function panneau(nav, o) {
   await pg.evaluate(() => { const d = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-os-guide]'); if (d) d.open = true; });
   await attendre(300); await capture(pg, `panneau-${o.nom}-guide`);
   v = await voir();
-  dit(!!v && v.etapes === 6 && /1\. Un profil Chrome par compte/.test(v.texte) && /Jamais deux comptes en même temps/.test(v.texte), `${o.nom} · l’installation guidée : 6 étapes, la règle « jamais deux comptes »`, v && v.texte.slice(0, 200));
+  dit(!!v && v.etapes === 6 && /1\. Un profil de navigateur par compte/.test(v.texte) && /Jamais deux comptes en même temps/.test(v.texte), `${o.nom} · l’installation guidée : 6 étapes, la règle « jamais deux comptes »`, v && v.texte.slice(0, 200));
   await clic('[data-os-basculer]'); await attendre(400);
   v = await voir();
   const env = await pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'serveur').map((m) => m.quoi));
