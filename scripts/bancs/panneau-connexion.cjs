@@ -39,9 +39,7 @@ const BADGE = arg('--badge') ? fs.readFileSync(arg('--badge'), 'utf8') : lireExt
 const UI = lireExt('vrm-ui.js'), MOTS = lireExt('vrm-mots.js');
 const SRC = arg('--src') || path.join(EXT, 'background.js');
 const LOGO = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'logo-vrm-96.png'));
-const pub = (n) => { try { return fs.readFileSync(path.join(RACINE, 'public', n), 'utf8'); } catch (_) { return null; } };
-const VERIF_HTML = pub('verif-extension.html');
-const VERIF_JS = (pub('verif-extension.js') || '').replace('var PARENT_PERMIS = /^(?:', 'var PARENT_PERMIS = /^(?:https:\\/\\/ext\\.test|');
+const { servirVerif } = require('./_faux-turnstile.cjs');   // la vraie page de vérification + un faux Turnstile
 const VERSION = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8')).version;
 const SORTIE = process.env.BANC_CAPTURES || path.join(__dirname, 'captures');
 const URL_VINTED = 'https://www.vinted.fr/items/1';
@@ -66,12 +64,6 @@ function fond({ orion = false } = {}) {
 }
 
 const PAGE_VINTED = '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 20px"><b style="color:#007782;font-size:22px">Vinted</b></header><main style="padding:20px"><h1>Baskets — vinted.fr (banc)</h1><p>Une page du site, pour le fond.</p></main></body></html>';
-// Le faux Turnstile : un cadre visible « ✓ », un jeton neuf à chaque rendu / reset (usage unique).
-const FAUX_TURNSTILE = `(function(){var n=0;function jet(){n++;return 'jeton-banc-'+n+'-'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);}
-window.turnstile={render:function(sel,o){var el=typeof sel==='string'?document.querySelector(sel):sel;var b=document.createElement('div');b.setAttribute('data-faux-turnstile','');b.style.cssText='box-sizing:border-box;height:65px;width:100%;border:1px solid #ccc;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 14px;font:14px system-ui;background:'+(o.theme==='dark'?'#232323;color:#eee':'#fafafa;color:#222');b.textContent='Vérification…';el.appendChild(b);window.__o=o;setTimeout(function(){b.textContent='✓ Réussi';o.callback(jet());},250);return 'w1';},
-reset:function(){var b=document.querySelector('[data-faux-turnstile]');if(b)b.textContent='Vérification…';setTimeout(function(){if(b)b.textContent='✓ Réussi';window.__o.callback(jet());},200);},remove:function(){}};
-var m=/onload=([\\w$]+)/.exec((document.currentScript&&document.currentScript.src)||'');if(m&&window[m[1]])setTimeout(window[m[1]],0);})();`;
-
 const EXT_FICHIERS = { 'popup.html': 'text/html', 'popup.js': 'text/javascript', 'vrm-badge.js': 'text/javascript', 'vrm-ui.js': 'text/javascript', 'parcours-popup.js': 'text/javascript', 'logo-vrm-96.png': 'image/png', 'inter-vrm.woff2': 'font/woff2' };
 async function onglet(nav, f, { scheme = 'light', mobile = true, orionPage = false } = {}) {
   const ctx = await nav.newContext(mobile
@@ -90,9 +82,7 @@ async function onglet(nav, f, { scheme = 'light', mobile = true, orionPage = fal
       if (EXT_FICHIERS[nom]) { const p = path.join(EXT, nom); if (fs.existsSync(p)) return r.fulfill({ status: 200, contentType: EXT_FICHIERS[nom], body: fs.readFileSync(p) }); }
       return r.fulfill({ status: 404, body: '' });
     }
-    if (/^https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js/.test(u)) return r.fulfill({ status: 200, contentType: 'text/javascript', body: FAUX_TURNSTILE });
-    if (/^https:\/\/vrm\.center\/verif-extension\.html/.test(u)) return VERIF_HTML ? r.fulfill({ status: 200, contentType: 'text/html', body: VERIF_HTML }) : r.fulfill({ status: 404, body: 'introuvable' });
-    if (/^https:\/\/vrm\.center\/verif-extension\.js/.test(u)) return VERIF_JS ? r.fulfill({ status: 200, contentType: 'text/javascript', body: VERIF_JS }) : r.fulfill({ status: 404, body: '' });
+    if (servirVerif(r)) return;
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
     if (/^https:\/\/vrm\.center\//.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><p>app VRM (banc)</p>' });
     return r.fulfill({ status: 200, contentType: 'text/html', body: PAGE_VINTED });
