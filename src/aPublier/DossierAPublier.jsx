@@ -16,6 +16,8 @@ import { lireFichiersPhotos } from './fichiers.js';
 import { etatAchat } from '../publier/avantPublier.js';
 import { BlocAvantPublier, RelierAchatFeuille, texteAchat } from '../publier/AvantPublier.jsx';
 import '../depot/preparer.css';
+import PublierAussiDossier, { texteTache } from './PublierAussiDossier.jsx';   // (28 nov., ext. 5.458.0) une file par site
+import { FA_SITES, faCle } from './fileAussi.js';
 
 const eurC = (c) => (Number.isSafeInteger(c) ? `${(c / 100).toFixed(c % 100 ? 2 : 0).replace('.', ',')} €` : '—');
 const miniC = (f) => { const n = Number(String((f && f.min) == null ? '' : f.min).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
@@ -57,16 +59,18 @@ function Regrouper({ photos, coupures, propose, onCouper, onUneParSelection, onP
 }
 
 export default function DossierAPublier({ neuves, nouvelles = [], ambigus = {}, outils = null, reglages = null, vignettes = {}, lecture = false,
-  ecrirePhotos, creer, modifier, donnerNumeros, imprimer, lier, confirmer, ouvrirPreparer = null, poserMiniNum = null, ouvrirAnnonce = null, dire = null, Icon = null, annonceTitre = null }) {
+  ecrirePhotos, creer, modifier, donnerNumeros, imprimer, lier, confirmer, ouvrirPreparer = null, poserMiniNum = null, ouvrirAnnonce = null, dire = null, Icon = null, annonceTitre = null, taches = {}, mettreEnFile = null, cleNum = (x) => String(x || ''), initial = null }) {
   const ouverts = brouillonsOuverts(neuves);
   const publies = brouillonsPublies(neuves).slice(0, 30);
   const doubles = fichiersEnDouble(ouverts);
   const [sel, setSel] = React.useState(() => new Set());
-  const [ouvert, setOuvert] = React.useState('');
-  const [regroupe, setRegroupe] = React.useState(null);     // { photos, coupures:Set, propose:Set|null }
+  const I0 = initial || {};   // (le banc : une feuille ouverte d'emblée)
+  const [ouvert, setOuvert] = React.useState(I0.ouvert || '');
+  const [regroupe, setRegroupe] = React.useState(I0.regroupe || null);     // { photos, coupures:Set, propose:Set|null }
   const [lit, setLit] = React.useState('');
-  const [relier, setRelier] = React.useState('');
-  const [choix, setChoix] = React.useState('');
+  const [relier, setRelier] = React.useState(I0.relier || '');
+  const [aussi, setAussi] = React.useState(I0.aussi || '');
+  const [choix, setChoix] = React.useState(I0.choix || '');
   const [champs, setChamps] = React.useState({ titre: '', taille: '', prix: '' });
   const refFichier = React.useRef(null), refDossier = React.useRef(null);
   const T = neuves || {};
@@ -155,7 +159,7 @@ export default function DossierAPublier({ neuves, nouvelles = [], ambigus = {}, 
         {!ouverts.length ? <Rangee titre={tr('dap.vide')} attrs={{ 'data-dap-vide': '' }}/> : ouverts.map((f) => {
           const id = String(f.id); const amb = Array.isArray(ambigus[id]) && ambigus[id].length;
           const v = vignettes[(f.dossier || {}).cle];
-          return <Rangee key={id} titre={f.titre || tr('dap.sansTitre')} sousTitre={sous(f)} note={amb ? tr('dap.publieeRelie') : enDouble(f) ? tr('dap.memeFichier') : ''}
+          return <Rangee key={id} titre={f.titre || tr('dap.sansTitre')} sousTitre={sous(f)} note={amb ? tr('dap.publieeRelie') : enDouble(f) ? tr('dap.memeFichier') : f.numero ? FA_SITES.map((st) => taches[faCle(st, f.numero, cleNum)]).filter(Boolean).map(texteTache).join(' · ') : ''}
             vignette={v ? <img className="dap-vig" src={v} alt=""/> : null} fin="chevron" onClick={() => setOuvert(id)}
             selection={{ cochee: sel.has(id), onChange: () => basculer(id), libelle: tr('dap.cocher', { t: f.titre || (f.numero ? 'N°' + f.numero : tr('dap.sansTitre')) }) }}
             attrs={{ 'data-dap-brouillon': id, 'data-dap-num': f.numero || '', 'data-dap-ambigu': amb ? String(ambigus[id].length) : undefined, 'data-dap-double': enDouble(f) ? '' : undefined }}/>;
@@ -192,6 +196,7 @@ export default function DossierAPublier({ neuves, nouvelles = [], ambigus = {}, 
           <div className="dap-actions"><Actions elements={[
             !b.numero ? { cle: 'numero', icone: ic('tag'), libelle: tr('dap.donner'), onClick: () => donner([String(b.id)]), attrs: { 'data-dap-donner-un': String(b.id) } } : null,
             b.numero ? { cle: 'imprimer', icone: ic('printer'), libelle: tr('dap.imprimerUn'), onClick: () => imprimerChoisis([b]), attrs: { 'data-dap-imprimer-un': String(b.id) } } : null,
+            b.numero && mettreEnFile ? { cle: 'aussi', icone: ic('shop'), libelle: tr('dap.aussi'), onClick: () => setAussi(String(b.id)), attrs: { 'data-dap-aussi': String(b.id) } } : null,
             b.numero && ouvrirPreparer ? { cle: 'preparer', icone: ic('pencil'), libelle: tr('dap.preparer'), onClick: () => ouvrirPreparer(b), attrs: { 'data-dap-preparer': String(b.id) } } : null,
             (nouvelles || []).length ? { cle: 'relie', icone: ic('link'), libelle: tr('dap.relieLa'), onClick: () => setChoix(String(b.id)), attrs: { 'data-dap-relie-la': String(b.id) } } : null,
             { cle: 'retirer', icone: ic('trash'), libelle: tr('dap.retirer'), onClick: () => retirer(b), attrs: { 'data-dap-retirer': String(b.id) } },
@@ -199,6 +204,8 @@ export default function DossierAPublier({ neuves, nouvelles = [], ambigus = {}, 
         </Groupe>
       </Feuille> : null}
 
+      {aussi && T[aussi] && mettreEnFile ? <PublierAussiDossier brouillon={T[aussi]} photosN={((T[aussi].dossier || {}).photos || []).length} taches={taches} cleNum={cleNum}
+        onMettre={mettreEnFile} onFermer={() => setAussi('')}/> : null}
       {relier && T[relier] ? <RelierAchatFeuille outils={outils} cible={{ titre: T[relier].titre || '', taille: T[relier].taille || '', dateRef: new Date().toISOString() }}
         onFermer={() => setRelier('')} onRelier={(lien) => modifier(relier, { buyFromId: lien.buyFromId, buyFrom: lien.buyFrom, ...(lien.buyPrice != null && !(T[relier].buyPrice != null && String(T[relier].buyPrice).trim() !== '') ? { buyPrice: lien.buyPrice, buyPriceSource: lien.buyPriceSource } : {}) }, tr('ap.achat.relie'))}/> : null}
 

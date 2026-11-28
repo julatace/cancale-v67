@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.455.7';
+const CODE_VERSION = '5.458.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12750,7 +12750,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === OBS_ALARME) lance('observation', () => arreterObservation('delai'));   // 5.440.3 : « Observer Vinted », 10 min passées
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('aussifile', () => aussiFileTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -18157,6 +18157,8 @@ async function marquerOngletTravail(tabId, raison) {
   } catch (_) {}
 }
 // Le voile reposé à CHAQUE page chargée dans l'onglet de travail (une navigation efface la page, donc le voile).
+// 5.458.0 (`aussifile`) : un onglet Leboncoin ou Vestiaire qui finit de charger ⇒ une tâche de la file de CE site part peut-être (hors onglet de travail).
+try { chrome.tabs.onUpdated.addListener((tabId, info, tab) => { if (!info || info.status !== 'complete' || AUSSI_ONGLETS.has(tabId)) return; const u = String((tab && tab.url) || ''); if (!/^https:\/\/(?:[a-z0-9-]+\.)*(leboncoin\.fr|vestiairecollective\.com)\//i.test(u)) return; setTimeout(() => { aussiFileTick('onglet').catch(() => {}); }, 4000); }); } catch (_) {}
 try { chrome.tabs.onUpdated.addListener((tabId, info) => { if (!info || info.status !== 'complete') return; (async () => { const m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; if (m && m.tabId === tabId && !(Number(m.fermeAt) > 0)) await marquerOngletTravail(tabId, m.raison || ''); })().catch(() => {}); }); } catch (_) {}
 async function ongletTravailVinted(acc, uid, opts = {}) {
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
@@ -24798,6 +24800,186 @@ async function publierAussiEtat(msg) {
   if (!j) return { ok: true, job: null };
   return { ok: true, job: { etat: j.etat, sites: j.sites, at: j.at, articles: j.articles.map((a) => ({ id: a.id, numero: a.numero, titre: a.titre,
     sites: Object.fromEntries(Object.entries(a.sites).map(([st, x]) => [st, { etat: x.etat, raison: x.raison || '', code: x.code || '', ecarts: x.ecarts || null, id: x.id || '', lien: x.lien || '', frise: GARDES_APP.friseAussi(x.etapes) }])) })) } };
+}
+// ══ 5.458.0 (`aussifile`) — « PUBLIER PARTOUT » DEPUIS LE DOSSIER « À PUBLIER » : UNE FILE PAR SITE ══════════════════════
+// Julien (28 nov.) : « imagine que les onglets Vinted et Vestiaire ne sont pas allumés en même temps ». L'app écrit, sur SON
+// toucher, une tâche par site dans la ligne `vrm_aussi_file` (src/aPublier/fileAussi.js, bloc recopié ci-dessous). Ici :
+// dès qu'un onglet du site est ouvert, connecté (le compte voulu s'il l'a choisi), la plus ancienne tâche de CE site part
+// par le chemin de « Publier aussi sur… » (`publierUnAussi` : gardes, plafond, formulaire par la page, relu avant
+// « Publier », jamais deux). Aucune limite de temps ; une tâche « faite » seulement sur l'identifiant rendu par le site ;
+// vendue entre-temps (preuve) ⇒ annulée, et c'est dit. Une tâche à la fois, un site à la fois.
+// <file-aussi-regle>
+const FA_ID = 'vrm_aussi_file';
+const FA_SITES = ['leboncoin', 'vestiaire'];
+const FA_MAX = 200;
+const FA_ETATS = ['attente', 'a-choisir', 'en-cours', 'fait', 'pas-su', 'arrete', 'annule'];
+// Les refus PASSAGERS : la tâche reste en attente (elle repartira à la prochaine ouverture du site).
+const FA_PASSAGERS = /^(onglet|autre-compte|plafond|en-cours|lbc-pause|stockage|lecture|session|canal|tout-arrete|lbc-absent|vc-absent|deux-comptes|secu-[\w-]+|file|pause)$/;
+const faCle = (site, numero, cleNumF) => String(site) + ':' + cleNumF(numero);
+// La ligne, toujours complète (forme fausse ⇒ ignorée).
+function faLigne(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const src = o.jobs && typeof o.jobs === 'object' && !Array.isArray(o.jobs) ? o.jobs : {};
+  const jobs = {};
+  for (const [k, j] of Object.entries(src).slice(0, FA_MAX)) {
+    if (!j || typeof j !== 'object' || !FA_SITES.includes(j.site) || !FA_ETATS.includes(j.etat)) continue;
+    jobs[k] = j;
+  }
+  return { v: 1, jobs };
+}
+// SA demande (l'app) : { site, brouillon, numero, compte?, reponses?, pct? } ⇒ { ok, cle, job } | { ok: false, code }.
+// Une tâche ACTIVE (attente, à choisir, en cours, faite, pas su) pour ce site et ce N° ⇒ refus (jamais deux).
+function faDemande(d, actuelle, maintenant, cleNumF) {
+  const x = d && typeof d === 'object' ? d : {};
+  if (!FA_SITES.includes(x.site)) return { ok: false, code: 'site' };
+  if (!/^d[a-z0-9]{4,40}$/i.test(String(x.brouillon || ''))) return { ok: false, code: 'brouillon' };
+  const n = cleNumF(x.numero);
+  if (!/^[A-Z]{0,3}\d{1,7}$/.test(n)) return { ok: false, code: 'numero' };
+  const L = faLigne(actuelle);
+  const cle = faCle(x.site, n, cleNumF);
+  const p = L.jobs[cle];
+  if (p && !['arrete', 'annule'].includes(p.etat)) return { ok: false, code: 'deja', etat: p.etat };
+  const rep = x.reponses && typeof x.reponses === 'object' && !Array.isArray(x.reponses) ? x.reponses : {};
+  const pct = Number(x.pct);
+  const job = { site: x.site, brouillon: String(x.brouillon), numero: n, compte: typeof x.compte === 'string' ? x.compte.slice(0, 64) : '', reponses: Object.fromEntries(Object.entries(rep).slice(0, 30).map(([k, v]) => [String(k).slice(0, 60), String(v == null ? '' : v).slice(0, 200)])),
+    pct: [0, 5, 10, 15, 20].includes(pct) ? pct : 0, etat: 'attente', at: Number(maintenant) || 0, maj: Number(maintenant) || 0 };
+  return { ok: true, cle, job };
+}
+// La prochaine tâche d'un site (la plus ancienne en attente). `null` : rien à faire.
+function faProchaine(ligne, site) {
+  const L = faLigne(ligne);
+  const l = Object.entries(L.jobs).filter(([, j]) => j.site === site && j.etat === 'attente').sort((a, b) => Number(a[1].at) - Number(b[1].at));
+  return l.length ? { cle: l[0][0], job: l[0][1] } : null;
+}
+// VENDUE AILLEURS ? (preuves seulement) `vendusVinted` : Set des annonces Vinted vendues (prouvées) ; `fiches` :
+// vinted_annonce_numeros ; `rp` : la liste « à retirer partout » de l'app (vrm_retirer_partout). Rend la raison, ou ''.
+function faVendue(job, { vendusVinted = null, fiches = null, rp = null } = {}, cleNumF) {
+  const n = cleNumF(job && job.numero);
+  if (!n) return '';
+  if (vendusVinted && typeof vendusVinted.has === 'function' && fiches && typeof fiches === 'object') {
+    for (const [id, f] of Object.entries(fiches)) if (f && cleNumF(f.numero) === n && vendusVinted.has(String(id))) return 'vinted';
+  }
+  if (rp && Array.isArray(rp.items)) for (const e of rp.items) if (e && cleNumF(e.num) === n && String(e.venduSur || '').trim()) return String(e.venduSur).slice(0, 20);
+  return '';
+}
+// L'issue d'un dépôt (`publierUnAussi`) ⇒ l'état de la tâche. `r` : { etat, id, lien, code, raison }.
+function faApres(job, r, maintenant) {
+  const j = Object.assign({}, job, { maj: Number(maintenant) || 0 });
+  const e = r && typeof r === 'object' ? r : {};
+  if (e.etat === 'publiee' && /^[\w-]{1,40}$/.test(String(e.id || ''))) return Object.assign(j, { etat: 'fait', id: String(e.id), lien: String(e.lien || '').slice(0, 300), raison: '' });
+  if (e.etat === 'pas-su') return Object.assign(j, { etat: 'pas-su', raison: String(e.raison || '').slice(0, 240) });
+  if (e.code === 'deja') return Object.assign(j, { etat: 'pas-su', raison: String(e.raison || '').slice(0, 240) });
+  if (FA_PASSAGERS.test(String(e.code || ''))) return Object.assign(j, { etat: 'attente', raison: String(e.raison || '').slice(0, 240), essais: (Number(job.essais) || 0) + 1 });
+  return Object.assign(j, { etat: 'arrete', code: String(e.code || '').slice(0, 40), raison: String(e.raison || '').slice(0, 240) });
+}
+// L'article tel que « Publier aussi » l'attend, depuis le BROUILLON (son identité : `brouillon`, son N°) et ses photos.
+function faEntree(fiche, photos) {
+  const f = fiche && typeof fiche === 'object' ? fiche : {};
+  const p = Number(String(f.prix == null ? '' : f.prix).replace(',', '.'));
+  const m = Number(String(f.min == null ? '' : f.min).replace(',', '.'));
+  const a = Number(String(f.buyPrice == null ? '' : f.buyPrice).replace(',', '.'));
+  return { brouillon: String(f.id || ''), id: '', numero: String(f.numero || ''), titre: String(f.titre || ''), description: String(f.description || ''), marque: String(f.marque || ''), taille: String(f.taille || ''),
+    etat: String(f.etat || ''), couleur: String((Array.isArray(f.couleurs) && f.couleurs[0]) || f.couleur || ''), catalogId: '', prix: Number.isFinite(p) && p > 0 ? p : null,
+    prixMini: Number.isFinite(m) && m > 0 ? m : null, achat: Number.isFinite(a) && a > 0 ? a : null,
+    photos: (Array.isArray(photos) ? photos : []).map((x) => (typeof x === 'string' ? x : x && x.img)).filter((u) => typeof u === 'string' && /^(https:\/\/|data:image\/(jpeg|png|webp);base64,)/.test(u)).slice(0, 20) };
+}
+// </file-aussi-regle>
+let _faEnVol = null;
+function aussiFileTick(source) {
+  if (_faEnVol) return _faEnVol;
+  _faEnVol = aussiFileTickUn(source).catch(() => ({ erreur: true })).finally(() => { _faEnVol = null; });
+  return _faEnVol;
+}
+// Une tâche réécrite par comparer-et-échanger (ligne relue ; une lecture ratée n'écrit rien). `fn` rend la tâche, ou null.
+async function faEcrire(cle, fn) {
+  return modifierLigneCas(FA_ID, (d) => { const L = faLigne(d); const j = L.jobs[cle]; if (!j) return undefined; const n = fn(Object.assign({}, j)); if (!n) return undefined; L.jobs[cle] = n; return Object.assign({}, d || {}, { v: 1, jobs: L.jobs, at: Date.now() }); });
+}
+async function aussiFileTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  if (_aussiEnVol) return { saute: 'en-vol' };
+  const rows = await sbGet(`app_data?id=eq.${FA_ID}&select=jobs:data->jobs`);
+  if (rows === null) return { lu: false };
+  const ligne = { jobs: rows[0] && rows[0].jobs };
+  const attente = Object.values(faLigne(ligne).jobs).filter((j) => j.etat === 'attente');
+  if (!attente.length) return { rien: true };
+  await aussiInterrompus();
+  const jobs0 = await aussiLire(AUSSI_JOBS);
+  if (jobs0 === null) return { saute: 'stockage' };
+  if (Object.values(jobs0).some((j) => j && j.etat === 'en-cours' && Date.now() - Number(j.maj || j.at || 0) < 15 * 60000)) return { saute: 'en-cours' };
+  // VENDUE ENTRE-TEMPS ? (preuves seulement : une lecture ratée ⇒ rien ne part, rien n'est annulé)
+  const pr = await lireVentesProuvees();
+  if (pr.echec) return { saute: 'preuve' };
+  const main = await lireMain(['vrm_fiches_neuves', 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_agent_publier', 'vrm_correspondances', RP_LISTE_CLE]);
+  if (main === null) return { lu: false };
+  let annulees = 0;
+  for (const j of attente) {
+    const v = faVendue(j, { vendusVinted: pr.vendus, fiches: main.vinted_annonce_numeros || {}, rp: main[RP_LISTE_CLE] }, cleNum);
+    if (!v) continue;
+    const ok = await faEcrire(faCle(j.site, j.numero, cleNum), (x) => (x.etat === 'attente' ? Object.assign(x, { etat: 'annule', raison: 'vendue-' + v, maj: Date.now() }) : null));
+    if (ok === true) { annulees++; try { logActivity(`File « publier aussi » : N°${j.numero} vendue (${v}) — la publication sur ${GARDES_APP.NOM_SITE_AUSSI[j.site]} est annulée`); } catch (_) {} }
+  }
+  if (annulees) { try { notifierApp({ type: 'maj', quoi: 'aussifile' }); } catch (_) {} return { annulees }; }
+  // LA PROCHAINE TÂCHE d'un site dont un onglet est ouvert, connecté (sinon elle attend, sans limite).
+  for (const site of FA_SITES) {
+    const p = faProchaine(ligne, site);
+    if (!p) continue;
+    const c = await compteUniqueOnglets(site);
+    if (!c.ok) continue;
+    if (p.job.compte && String(p.job.compte) !== String(c.compte)) continue;
+    const fiche = (main.vrm_fiches_neuves || {})[p.job.brouillon];
+    if (!fiche || fiche.retireeAt || cleNum(fiche.numero) !== cleNum(p.job.numero)) {
+      await faEcrire(p.cle, (x) => Object.assign(x, { etat: 'arrete', code: 'brouillon', raison: 'l’article n’est plus dans le dossier (ou son N° a changé) — rien n’est parti', maj: Date.now() }));
+      continue;
+    }
+    let st; try { st = await sbGet(`app_data?id=eq.${encodeURIComponent('studio_photos_' + cleNum(fiche.numero))}&select=photos:data->photos`); } catch (_) { st = null; }
+    if (!Array.isArray(st)) return { lu: false };
+    const ph = GARDES_APP.photosDepot(fiche, st[0] && Array.isArray(st[0].photos) ? st[0].photos : []);
+    const entree = faEntree(fiche, ph.erreur ? [] : ph.photos);
+    const formulairesLbc = site === 'leboncoin' ? await lireFormulairesLbc().catch(() => null) : null;
+    if (site === 'vestiaire') { try { await chargerCataloguesPlateformes(); } catch (_) {} }
+    const marques = site === 'vestiaire' ? await lireMarquesVc().catch(() => null) : null;
+    const L = await lecturesDejaAussi();
+    const pl = plancherBaisse({ min: fiche.min, buyPrice: fiche.buyPrice, numero: fiche.numero }, main.vinted_buyprice_by_num);
+    const ctx = { memoire: main.vrm_agent_publier || null, corr: main.vrm_correspondances || null, formulairesLbc, reponses: p.job.reponses || {}, pct: { [site]: p.job.pct || 0 }, sites: [site],
+      deja: GARDES_APP.dejaAussi(entree.numero, L), plancher: pl ? { valeur: pl.c / 100, de: pl.de } : null, marqueVc: site === 'vestiaire' ? marqueVcListee(entree.marque, marques) : null };
+    const f = GARDES_APP.feuilleAussi(entree, ctx);
+    const S = f.ok && f.sites ? f.sites[site] : null;
+    if (!S || S.etat === 'deja') {
+      await faEcrire(p.cle, (x) => Object.assign(x, S && S.etat === 'deja' ? { etat: 'fait', id: String((S.refus && S.refus.id) || ''), lien: String((S.refus && S.refus.lien) || ''), raison: 'deja' } : { etat: 'arrete', code: (f && f.code) || 'fiche', raison: 'fiche incomplète pour ce site — rien n’est parti' }, { maj: Date.now() }));
+      continue;
+    }
+    if (S.etat !== 'pret') {
+      await faEcrire(p.cle, (x) => Object.assign(x, { etat: S.etat === 'refus' ? 'arrete' : 'a-choisir', code: S.etat === 'refus' ? String((S.refus && S.refus.code) || 'refus') : 'a-choisir', questions: (S.questions || []).slice(0, 10), raison: S.etat === 'refus' ? 'ce site refuse cet article — rien n’est parti' : 'il reste un champ à choisir — rien n’est parti', maj: Date.now() }));
+      continue;
+    }
+    // EN COURS (noté AVANT le dépôt : un autre Chrome ne la relance pas), puis le chemin de « Publier aussi sur… ».
+    const pris = await faEcrire(p.cle, (x) => (x.etat === 'attente' ? Object.assign(x, { etat: 'en-cours', maj: Date.now() }) : null));
+    if (pris !== true) continue;
+    _aussiEnVol = true;
+    let r = null;
+    try {
+      const jobId = 'aussi-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+      const jobs = await aussiLire(AUSSI_JOBS);
+      if (jobs === null) r = { etat: 'arrete', code: 'stockage', raison: RAISON_STOCKAGE };
+      else {
+        jobs[jobId] = { uid: String(moi), at: Date.now(), maj: Date.now(), etat: 'en-cours', sites: [site], file: p.cle, articles: [{ id: entree.brouillon, numero: f.source.numero, titre: f.source.titre,
+          sites: { [site]: { etat: 'attente', envoi: S.envoi, attendu: S.attendu, chemin: S.chemin || [], compte: c.compte, etapes: {} } } }], stop: false };
+        if (!(await aussiPoser(AUSSI_JOBS, jobs))) r = { etat: 'arrete', code: 'stockage', raison: RAISON_STOCKAGE };
+        else {
+          _aussiIci.add(jobId);
+          try { await deroulerAussi(jobId); } finally { _aussiIci.delete(jobId); }
+          const fin = await aussiLire(AUSSI_JOBS);
+          const a = fin && fin[jobId] && fin[jobId].articles[0];
+          r = a ? a.sites[site] : { etat: 'pas-su', raison: 'l’issue du dépôt n’a pas pu être relue — regarde tes annonces sur le site' };
+        }
+      }
+    } finally { _aussiEnVol = false; }
+    await faEcrire(p.cle, (x) => faApres(x, r, Date.now()));
+    try { notifierApp({ type: 'maj', quoi: 'aussifile' }); } catch (_) {}
+    return { site, etat: r && r.etat };
+  }
+  return { attente: attente.length };
 }
 async function publierAussiStop() {
   const jobs = await aussiLire(AUSSI_JOBS);
@@ -37693,7 +37875,7 @@ ${lettre[1]}`;
           if (noms.every(Boolean)) lu.couleurs.push({ v: noms, de: s });
         }
         if (d && str5(d.description)) lu.description.push({ v: str5(d.description), de: s });
-        if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => typeof p === "string" ? p : p && p.url).filter((u) => /^https:\/\//.test(str5(u))), de: s });
+        if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => typeof p === "string" ? p : p && p.url).filter((u) => /^https:\/\//.test(str5(u)) || /^brouillon:/.test(str5(article && article.cle)) && /^data:image\/(jpeg|png|webp);base64,/.test(str5(u))), de: s });
       }
       if (s === "ebay" && d) {
         const r = depuisEbay(d.categoryName);
@@ -38147,13 +38329,15 @@ ${lettre[1]}`;
   function sourceAussi(entree) {
     const e = obj2(entree) || {};
     const id = str6(e.id);
-    if (!/^\d{4,15}$/.test(id)) return { ok: false, code: "annonce" };
+    const brouillon = /^d[a-z0-9]{4,40}$/i.test(str6(e.brouillon)) ? str6(e.brouillon) : "";
+    if (!brouillon && !/^\d{4,15}$/.test(id)) return { ok: false, code: "annonce" };
     const numero = cleNumero3(e.numero);
     if (!NUM_OK3.test(numero)) return { ok: false, code: "sans-numero" };
-    const photos = [...new Set(arr2(e.photos).map(str6).filter((u) => /^https:\/\//.test(u)))];
+    const photos = [...new Set(arr2(e.photos).map(str6).filter((u) => /^https:\/\//.test(u) || brouillon && /^data:image\/(jpeg|png|webp);base64,/.test(u)))];
     const prix = Number(e.prix);
     return { ok: true, source: {
-      id,
+      id: brouillon || id,
+      brouillon,
       numero,
       titre: str6(e.titre).replace(/\s+/g, " "),
       description: String(e.description == null ? "" : e.description).replace(/\r\n?/g, "\n").trim(),
@@ -38172,7 +38356,7 @@ ${lettre[1]}`;
   function articleDe(s) {
     return {
       article: {
-        cle: "vinted:" + s.id,
+        cle: (s.brouillon ? "brouillon:" : "vinted:") + s.id,
         numero: s.numero,
         prix: s.prix,
         prixMini: s.prixMini,

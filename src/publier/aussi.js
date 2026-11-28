@@ -81,19 +81,22 @@ export function prixAussi(prix, pct, plancher) {
 export function sourceAussi(entree) {
   const e = obj(entree) || {};
   const id = str(e.id);
-  if (!/^\d{4,15}$/.test(id)) return { ok: false, code: 'annonce' };
+  // (28 nov., ext. 5.458.0 `aussifile`) Un BROUILLON du dossier « À publier » (src/aPublier/fileAussi.js) : son identité est
+  // le brouillon (`brouillon`) et son N° — pas d'annonce Vinted ; ses photos sont celles du studio (data:image, rangées par VRM).
+  const brouillon = /^d[a-z0-9]{4,40}$/i.test(str(e.brouillon)) ? str(e.brouillon) : '';
+  if (!brouillon && !/^\d{4,15}$/.test(id)) return { ok: false, code: 'annonce' };
   const numero = cleNumero(e.numero);
   if (!NUM_OK.test(numero)) return { ok: false, code: 'sans-numero' };
-  const photos = [...new Set(arr(e.photos).map(str).filter((u) => /^https:\/\//.test(u)))];
+  const photos = [...new Set(arr(e.photos).map(str).filter((u) => /^https:\/\//.test(u) || (brouillon && /^data:image\/(jpeg|png|webp);base64,/.test(u))))];
   const prix = Number(e.prix);
-  return { ok: true, source: { id, numero, titre: str(e.titre).replace(/\s+/g, ' '), description: String(e.description == null ? '' : e.description).replace(/\r\n?/g, '\n').trim(),
+  return { ok: true, source: { id: brouillon || id, brouillon, numero, titre: str(e.titre).replace(/\s+/g, ' '), description: String(e.description == null ? '' : e.description).replace(/\r\n?/g, '\n').trim(),
     marque: str(e.marque), taille: str(e.taille), pointure: pointureExacte(e.taille), etat: str(e.etat), couleur: str(e.couleur), catalogId: /^\d{1,7}$/.test(str(e.catalogId)) ? str(e.catalogId) : '',
     prix: Number.isFinite(prix) && prix > 0 ? Math.round(prix * 100) / 100 : null, photos, prixMini: Number(e.prixMini) > 0 ? Number(e.prixMini) : null, achat: Number(e.achat) > 0 ? Number(e.achat) : null } };
 }
 // L'article et la lecture que l'agent attend (une annonce Vinted, par SON identifiant).
 function articleDe(s) {
   return {
-    article: { cle: 'vinted:' + s.id, numero: s.numero, prix: s.prix, prixMini: s.prixMini,
+    article: { cle: (s.brouillon ? 'brouillon:' : 'vinted:') + s.id, numero: s.numero, prix: s.prix, prixMini: s.prixMini,
       annonces: [{ site: 'vinted', id: s.id, etat: 'enligne', titre: s.titre, photo: '', marque: s.marque, taille: s.pointure || s.taille, condition: s.etat }] },
     lectures: { vinted: { [s.id]: { codes: s.catalogId ? { catalog_id: s.catalogId } : {}, description: s.description, photos: s.photos.slice(), couleur: s.couleur } } },
   };

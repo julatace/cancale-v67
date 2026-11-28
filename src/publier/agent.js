@@ -131,7 +131,8 @@ export function ficheArticle(article, lectures = {}, memoire = null) {
         if (noms.every(Boolean)) lu.couleurs.push({ v: noms, de: s });
       }
       if (d && str(d.description)) lu.description.push({ v: str(d.description), de: s });
-      if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => (typeof p === 'string' ? p : p && p.url)).filter((u) => /^https:\/\//.test(str(u))), de: s });
+      // (28 nov., ext. 5.458.0) un brouillon du dossier « À publier » (clé « brouillon: ») : ses photos du studio, rangées par VRM (data:image).
+      if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => (typeof p === 'string' ? p : p && p.url)).filter((u) => /^https:\/\//.test(str(u)) || (/^brouillon:/.test(str(article && article.cle)) && /^data:image\/(jpeg|png|webp);base64,/.test(str(u)))), de: s });
     }
     if (s === 'ebay' && d) {
       const r = depuisEbay(d.categoryName); if (r && r.cle) lu.categorie.push({ v: r.cle, de: s }); else if (r && r.horsTable) inconnues.push('ebay:' + r.horsTable.slice(0, 60));

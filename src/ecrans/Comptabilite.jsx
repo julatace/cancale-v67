@@ -607,7 +607,7 @@ import { imprimerEtiquettes as imprimerEtiquettesDossier } from '../etiquetage/i
 import { methodeDe as methodeEtiquetageDe, CLE_ETIQUETAGE as CLE_ETIQUETAGE_DOSSIER } from '../etiquetage/methode.js';
 const APP_DOSSIER = { load, save, gesteVrm, askConfirm, emettreClesRelues, toast, cleNum, donnerNumerosBrouillons, poserPrixMiniLigne, confirmerNumerosAVerifier,
   imprimer: (etq) => { const m = methodeEtiquetageDe({ etiquetage: load(CLE_ETIQUETAGE_DOSSIER, null) }); return imprimerEtiquettesDossier(etq, { format: m.format, titre: m.titre }); },
-  STUDIO_BASE, SUPABASE_URL, sbAuth, bleamDe: bleamDeAuto, Icon, PreparerFiche, lireModelesRanges };
+  STUDIO_BASE, SUPABASE_URL, sbAuth, withOwner, bleamDe: bleamDeAuto, Icon, PreparerFiche, lireModelesRanges };
 // ⟦← App.jsx #39⟧
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('../OffresAuto.jsx'));

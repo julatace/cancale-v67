@@ -13,6 +13,7 @@ import DossierAPublier from './DossierAPublier.jsx';
 import { brouillonsOuverts, correspondance, patchChoix } from './dossier.js';
 import { empreintesDe } from '../republieTelephone.js';
 import { useOutilsAchat, reglagesOffres } from '../publier/AvantPublier.jsx';
+import { FA_ID, faLigne, faDemande } from './fileAussi.js';
 
 const RECENTE_MS = 14 * 86400e3;
 const urlPhoto = (p) => (typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '');
@@ -46,6 +47,26 @@ export default function HoteDossier({ app, annonces = null, empreintes = null, d
     } catch (_) { return {}; }
   }, [ouverts.map((f) => f.id + (f.numero || '')).join(','), items, empreintes]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prep, setPrep] = React.useState(null);
+  // (28 nov., ext. 5.458.0) LA FILE « Publier aussi » (ligne `vrm_aussi_file`, projetée) : relue à l'ouverture, au retour sur
+  // l'onglet et quand l'extension dit qu'une tâche a bougé.
+  const [taches, setTaches] = React.useState({});
+  const relireFile = React.useCallback(() => { fetch(`${app.SUPABASE_URL}/rest/v1/app_data?id=eq.${FA_ID}&select=jobs:data->jobs`, { headers: app.sbAuth(), cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null)).then((j) => { if (Array.isArray(j)) setTaches(faLigne({ jobs: j[0] && j[0].jobs }).jobs); }).catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { relireFile(); const v = () => { if (document.visibilityState === 'visible') relireFile(); }; const e = (ev) => { const x = ev && ev.detail; if (x && x.quoi === 'aussifile') relireFile(); };
+    document.addEventListener('visibilitychange', v); window.addEventListener('vrm:ext', e); return () => { document.removeEventListener('visibilitychange', v); window.removeEventListener('vrm:ext', e); }; }, [relireFile]);
+  // SON « Mettre en file » : une tâche par site, par comparer-et-échanger (une lecture ratée n'écrit rien ; jamais deux).
+  const mettreEnFile = async (demandes) => {
+    const { modifierLigneCas } = await import('../ligneCas.js');
+    let refus = '';
+    const r = await modifierLigneCas({ base: app.SUPABASE_URL, id: FA_ID, entetes: (x) => app.sbAuth(x), estampille: (o) => app.withOwner(o), modifier: (actuel) => {
+      const L = faLigne(actuel); refus = '';
+      for (const d of demandes) { const x = faDemande(d, L, Date.now(), app.cleNum); if (!x.ok) { refus = x.code; return undefined; } L.jobs[x.cle] = x.job; }
+      return { ...(actuel || {}), v: 1, jobs: L.jobs, at: Date.now() };
+    } });
+    if (!r || !r.ok || refus) return { ok: false, raison: refus || (r && r.raison) || 'ecriture' };
+    relireFile(); app.toast(tr('fa.enFile', { n: String(demandes.length) }));
+    return { ok: true };
+  };
   const geste = (texte, ops) => { app.gesteVrm(texte, ops, {}, () => setTimeout(() => { try { app.emettreClesRelues(['vrm_fiches_neuves', 'vinted_annonce_numeros']); } catch (_) {} maj(); }, 700)); return true; };
   const modifier = (id, patch, texte) => {
     const T = app.load('vrm_fiches_neuves', {}) || {}; const f = T[id]; if (!f) return false;
@@ -79,7 +100,7 @@ export default function HoteDossier({ app, annonces = null, empreintes = null, d
         confirmer={({ titre, desc, ok }) => app.askConfirm({ title: titre, desc, ok })} dire={(t) => app.toast(t)} Icon={app.Icon}
         poserMiniNum={(n, c) => app.poserPrixMiniLigne({ num: n, min: c == null ? null : String(c / 100) })}
         ouvrirPreparer={Prep ? (b) => setPrep(b) : null} ouvrirAnnonce={(id) => { try { window.open(`https://www.vinted.fr/items/${encodeURIComponent(id)}`, '_blank', 'noopener'); } catch (_) {} }}
-        annonceTitre={(id) => (toutes.find((x) => x.id === String(id)) || {}).titre || ''}/>
+        annonceTitre={(id) => (toutes.find((x) => x.id === String(id)) || {}).titre || ''} taches={taches} mettreEnFile={mettreEnFile} cleNum={app.cleNum}/>
       {prep && Prep ? <Prep fiche={prep} modeles={app.lireModelesRanges ? app.lireModelesRanges() : []} onFermer={() => setPrep(null)}
         lireStudio={() => import('../studioPhoto.js').then((m) => m.lireStudio(app.STUDIO_BASE, app.cleNum(prep.numero)))}
         onEnregistrer={(fiche) => { const T = app.load('vrm_fiches_neuves', {}) || {}; if (!T[fiche.id]) return false; app.save('vrm_fiches_neuves', { ...T, [fiche.id]: { ...T[fiche.id], ...fiche } }); app.emettreClesRelues(['vrm_fiches_neuves']); maj(); app.toast(tr('depot.enregistre')); return true; }}/> : null}
