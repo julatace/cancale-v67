@@ -1,5 +1,6 @@
 // fr · le CRM eBay (28 nov., lot ebay-crm) : fiche acheteur, automatismes, réponses, exclusions, avis et litiges
 export default {
+  "nav.sous.ebay.clients": "Clients",
   "crm.section": "Clients",
   "crm.vue.acheteurs": "Acheteurs",
   "crm.vue.auto": "Automatismes",

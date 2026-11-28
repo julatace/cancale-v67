@@ -31,6 +31,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
+  { id: 'ebay-crm', date: '2026-11-28', titre: 'eBay : fiche acheteur et messages automatiques', phrase: 'Ses achats, ses messages, ses litiges ; merci et évaluation, éteints par défaut.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
   { id: 'assistant-rangement', date: '2026-11-28', titre: 'Un assistant qui organise ton rangement', phrase: 'Il pose des questions, propose pièces, meubles et étages, puis tu valides.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
   { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },

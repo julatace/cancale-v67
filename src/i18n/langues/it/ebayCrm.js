@@ -1,5 +1,6 @@
 // it · CRM di eBay (28 nov., ebay-crm)
 export default {
+  "nav.sous.ebay.clients": "Clienti",
   "crm.section": "Clienti",
   "crm.vue.acheteurs": "Acquirenti",
   "crm.vue.auto": "Automatismi",
