@@ -50,7 +50,7 @@ const MUTATIONS = {
   'bail-local-sans-borne': [BG, "BAIL_LOCAL_RENOUVELLEMENT_MS = 100000,", "BAIL_LOCAL_RENOUVELLEMENT_MS = 3600000,"],
   'refus-mort-pour-toujours': ['api/_lib/favoris-file.js', "&&!(x.etat==='refuse'&&x.aucunEnvoi===true)&&(x.etat!=='refuse'||", "&&(x.etat!=='refuse'||"],
   'refus-sans-aucun-envoi': [BG, "if(!repriseMoitie)x.json.aucunEnvoi=true;return x;", "return x;"],
-  'acheteur-buyer-seul': [BG, "  return p(tr.buyer_id) || p(tr.buyer) || p(tr.buyer_user_id) || (vendeur ? p(tr.opposite_user) : '')", "  return p(tr.buyer_id) || p(tr.buyer) || ('' && vendeur)"],
+  'acheteur-buyer-seul': [BG, "  const direct = p(tr.buyer_id) || p(tr.buyer) || p(tr.buyer_user_id) || (vendeur ? p(tr.opposite_user) : '');", "  const direct = p(tr.buyer_id) || p(tr.buyer) || ('' && vendeur);"],
   'reprise-ignore-acheteur': [BG, "      if(acheteurAEcritFavori(cv.messages,body.recipientId)===true)", "      if(false)"],
   'auteur-user-id-seul': [BG, "  for (const v of [m.user_id, m.sender_id, m.author_id, e.user_id, e.sender_id, e.author_id,", "  for (const v of [m.user_id, e.user_id,"],
   'reprise-prix-affiche': [BG, "prix:op?Number(op.prix):repriseMoitie?pxFait:prixAnnonce};", "prix:op?Number(op.prix):prixAnnonce};"],

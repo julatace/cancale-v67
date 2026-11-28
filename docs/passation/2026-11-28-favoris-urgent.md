@@ -116,3 +116,19 @@ Toutes les mutations de `--prouve` rendent l'audit rouge.
    - Une offre ou un message réellement partis ne repartent jamais. Un favori automatique n'en profite pas (aucune boucle).
 
 Les « routes retenues » (`vrmFavorisRoutes`) sont retirées : ni écrites, ni lues.
+
+## Troisième relecture (sur ac9f704f9) : 1 défaut et 2 durcissements, corrigés
+
+Repros : `scripts/_revue/s9.cjs` et `s10.mjs`. `s10` ne fait que lire les constantes, il ne modélise pas le bail : la vraie conduite est prouvée par V12. Contrôles : `audit-favoris-revue` V12–V14.
+- Lancé sur ac9f704f9 : 7 contrôles rouges. Le seul vert est le témoin « bail vivant ⇒ le message part une fois ».
+- Les 27 mutations de `--prouve` rendent l'audit rouge.
+
+1. **Reprise après un redémarrage.** `reprendreMessagesFavoris` reprend d'abord le bail de SA tentative chez VRM (`prolonger` avec son jeton).
+   - Refusé ⇒ rien n'est écrit, le message reste « à vérifier ».
+   - Accepté ⇒ le bail est tenu (`avecBailFavori`) jusqu'au bout, et revérifié au moment de l'écriture, après le temps de frappe.
+   - Un bail perdu pendant la frappe ⇒ rien ne part, et le registre du message est effacé.
+   - Le commentaire faux sur la borne de 3 min est corrigé.
+2. **Le bail revérifié DANS la file des requêtes**, au moment où l'écriture part (`vintedPageFavori`). Plusieurs tentatives tenues par ce worker : une seule perdue arrête toute écriture de favori.
+3. **Jamais une 2ᵉ offre.** `montantMessageOffre` lit `entity.offer.price`, `offer_request.price` et `data.offer.price`. Une offre de NOUS (auteur lu dans toutes ses formes) compte comme « déjà offert », quel que soit son montant.
+   - Avec `F=400forme`, `s9` donne maintenant 1 offre et 0 message.
+   - L'auteur d'une offre ou d'une demande d'offre n'est jamais pris pour l'acheteur s'il est le vendeur.
