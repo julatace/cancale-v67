@@ -130,8 +130,8 @@ export default {
   "rgt.appliquer": "Plan übernehmen",
   "rgt.place": "{nom} · R{r} S{c}",
   "rgt.resume": {
-    "one": "{pieces} Raum · {meubles} Möbel · {places} Fächer",
-    "other": "{pieces} Räume · {meubles} Möbel · {places} Fächer"
+    "one": "{n} Raum · {meubles} Möbel · {places} Fächer",
+    "other": "{n} Räume · {meubles} Möbel · {places} Fächer"
   },
   "rgt.resumeArticles": {
     "one": "für {n} Artikel.",

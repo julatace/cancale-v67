@@ -32,6 +32,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (28 nov., messages-parfaits) src/ecrans/FilsTous.jsx, src/messages/ : photo de profil, filtre Site + Compte, statut daté.
   { id: 'messages-parfaits', date: '2026-11-28', titre: 'Messages : photos de profil, statut vrai', phrase: 'Filtre Site et Compte, fil tout de suite, contre-offre à ton prix.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.
+  { id: 'ebay-livraison', date: '2026-11-28', titre: 'eBay : colis, étiquette et suivi dans Ventes', phrase: 'Date limite eBay, étiquette prépayée par l’acheteur, En route puis Livrée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
   { id: 'assistant-rangement', date: '2026-11-28', titre: 'Un assistant qui organise ton rangement', phrase: 'Il pose des questions, propose pièces, meubles et étages, puis tu valides.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx

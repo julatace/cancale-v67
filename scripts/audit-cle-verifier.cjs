@@ -40,6 +40,12 @@ const EXEMPTS = {
   _vcMem: 'copie en mémoire des clés Vestiaire : chaque changement passe par `signalerVc` ⇒ versionMemoire',
   TXN_ETATS: 'états des transactions : remplis par `noterEtatsTxn` ⇒ versionMemoire',
   _departsCarte: 'lu par `departsCarte()` : `vcLoc0.departs` est cette même carte',
+  // (28 nov., ebay-livraison) Atteints par `numLigneEbay` (App.jsx, le N° d'une commande eBay par son SKU) : des noms du MODULE
+  // App.jsx, hors de portée de Comptabilite.jsx (les poser dans la clé fait tomber l'écran : audit-variables). Les N° eBay
+  // changent avec `ebayCmd` et la numérotation, déjà dans la clé.
+  PANNE_NUMEROS: 'table constante d\'App.jsx (les dates de la panne de `main`, jamais modifiée)',
+  _fichesEbayMemo: 'mémoire interne de `numLigneEbay` (App.jsx), hors de portée de l\'écran ; `ebayCmd` est dans la clé',
+  _depuisEbay: 'mémoire interne de `numLigneEbay` (App.jsx), hors de portée de l\'écran ; `ebayCmd` est dans la clé',
 };
 // Ce que la clé porte en plus des noms (vérifié présent).
 // Les fichiers IMPORTÉS que le calcul atteint : un état de module (`let`, table vide remplie en place, `new …`)
