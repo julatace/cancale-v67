@@ -100,7 +100,8 @@ async function verifier(S) {
 
 (async () => {
   const S = { regle: lire('src/bienDemarrer/regle.js'), acc: lire('src/bienDemarrer/accompagnement.js'), jsx: lire('src/bienDemarrer/Accompagnement.jsx'),
-    css: lire('src/bienDemarrer/accompagnement.css'), app: lire('src/App.jsx'), bd: lire('src/bienDemarrer/BienDemarrer.jsx') };
+    css: lire('src/bienDemarrer/accompagnement.css'), app: require('./_source-app.cjs').sourceAppCode(R),   // (27 nov.) recollée : le guide vit aussi dans src/ecrans/Guide.jsx
+    bd: lire('src/bienDemarrer/BienDemarrer.jsx') };
   const ko = await verifier(S);
   if (!PROUVE) { console.log(ko ? `❌ audit-demarrage-guide : ${ko} contrôle(s) rouge(s)` : '✅ audit-demarrage-guide : vert'); process.exit(ko ? 1 : 0); }
   if (ko) { console.log(`❌ --prouve : le code actuel n'est pas vert (${ko})`); process.exit(1); }
