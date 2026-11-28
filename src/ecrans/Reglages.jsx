@@ -2224,7 +2224,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
       // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
       // (28 nov., lot ebay-automatismes) eBay › Automatismes : chacun éteint par défaut, réglé par compte eBay.
-      ebayCompte && { id:'ebay-automatismes', type:'nav', ic:'spark', lib:tr('eauto.titre'), desc:tr('eauto.reglages.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-automatismes')); } catch (_) {} }, data:{ 'data-reglage-ebay-automatismes':'' } },
+      ebayCompte && { id:'ebay-automatismes', type:'nav', ic:'eclair', lib:tr('eauto.titre'), desc:tr('eauto.reglages.desc'), onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-automatismes')); } catch (_) {} }, data:{ 'data-reglage-ebay-automatismes':'' } },
       ebayCompte && { id:'ebay-recherches', type:'nav', ic:'jumelles', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[

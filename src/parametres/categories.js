@@ -34,7 +34,7 @@ export const CATEGORIES = [
     { id: 'supprimer', items: ['fermer'] },
   ] },
   { id: 'plateformes', ic: 'grid', groupes: [
-    { id: 'comptes', items: ['adistance', 'connexionsext', 'liens', 'connexions', 'verifier', 'ebay', 'ebay-recherches'] },
+    { id: 'comptes', items: ['adistance', 'connexionsext', 'liens', 'connexions', 'verifier', 'ebay', 'ebay-automatismes', 'ebay-recherches'] },
     { id: 'onglets', titre: 'parametres.g.onglets', items: ['mes-plateformes', 'historique'] },
     { id: 'emails', titre: 'reglages.groupe.emails-reglages', items: ['adresses', 'adresse-vrm', 'import'] },
   ] },

@@ -16331,6 +16331,8 @@ const ICON_PATHS = {
   pencil: <><path d="M4 20.2h4l10-10a2.8 2.8 0 0 0-4-4l-10 10v4Z"/><path d="m14.5 5.5 4 4"/></>,
   // Atelier de republication (« ✨ ») : une étincelle + une petite touche.
   spark:  <><path d="M12 3.2 13.7 9l5.8 1.7L13.7 12.4 12 18.2l-1.7-5.8L4.5 10.7 10.3 9 12 3.2Z"/><path d="M18.5 4v3M20 5.5h-3"/></>,
+  // (28 nov., main-vert) eBay › Automatismes (Paramètres) : un éclair — chaque icône de Paramètres est unique sur la page (« spark » est aux aides d'accueil).
+  eclair: <><path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6l1-8Z"/></>,
   // (5 nov., chantier H — revue 2.31/2.32) Une icône par chose : Achats n'est plus
   // le sac des Ventes, l'état des connexions n'est plus la flèche de Republier, la
   // sécurité n'est plus la clé du mot de passe.
