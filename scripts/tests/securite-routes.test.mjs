@@ -46,18 +46,18 @@ function fauxReseau({ vinted = () => new Response('{}', { status: 401 }) } = {})
 process.env.SUPABASE_SERVICE_KEY = 'cle-service-fictive';
 process.env.CRON_SECRET = 'secret-du-cron-fictif';
 
-test('/api/ai : une clé dans le corps sans session ne part PAS chez Anthropic (relais ouvert)', async () => {
+test('/api/ai : une clé dans le corps ne part JAMAIS chez Anthropic — l’IA serveur est retirée (28 nov., ia-sans-cle)', async () => {
   const { default: ai } = await import('../../api/ai.js');
   const net = fauxReseau();
   try {
     const r = reponse();
     await ai({ method: 'POST', query: {}, headers: {}, body: { title: 'x', key: 'sk-ant-volee' } }, r);
-    assert.equal(r.statusCode, 401);
-    assert.equal(net.appels.filter((x) => x.url.includes('anthropic.com')).length, 0, 'Anthropic appelé sans session');
-    // Avec la session, la clé du vendeur sert (rien de cassé pour l'app).
+    assert.equal(r.statusCode, 410);
+    // Avec la session non plus : aucune clé, aucun appel (l'IA tourne dans le navigateur).
     const r2 = reponse();
     await ai({ method: 'POST', query: {}, headers: { authorization: `Bearer ${SESSION_A}` }, body: { title: 'x', key: 'sk-ant-du-vendeur' } }, r2);
-    assert.equal(net.appels.filter((x) => x.url.includes('anthropic.com')).length, 1);
+    assert.equal(r2.statusCode, 410);
+    assert.equal(net.appels.filter((x) => x.url.includes('anthropic.com')).length, 0, 'Anthropic appelé');
   } finally { net.rendre(); }
 });
 
