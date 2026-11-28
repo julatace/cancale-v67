@@ -118,9 +118,9 @@ export function normaliserExclus(d) {
   }
   return { version: 1, liste: liste.slice(0, 5000) };
 }
-// `exclus` : la liste lue. `undefined` (pas su) ⇒ `null` : l'appelant ne fait RIEN.
+// `exclus` : la ligne lue. `undefined` (pas su) ⇒ `null` : l'appelant ne fait RIEN ; `null` (ligne absente) = liste vide.
 export function estExclu(exclus, site, id) {
-  if (exclus === undefined || exclus === null) return null;
+  if (exclus === undefined) return null;
   const c = cleExclusion(site, id);
   if (!c) return null;   // un identifiant illisible : on ne sait pas ⇒ l'appelant s'abstient
   return normaliserExclus(exclus).liste.some((e) => e.site === site && e.id === c);
