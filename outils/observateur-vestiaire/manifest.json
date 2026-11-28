@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "VRM Observateur Vestiaire",
+  "version": "1.0.0",
+  "description": "Note, sans rien bloquer ni modifier, ce qui se passe sur Vestiaire Collective dans TON navigateur (likes, notifications, messages, offres). Rien ne sort de ton ordinateur.",
+  "minimum_chrome_version": "125",
+  "permissions": ["webRequest", "storage", "unlimitedStorage", "management", "debugger"],
+  "host_permissions": [
+    "https://*.vestiairecollective.com/*", "wss://*.vestiairecollective.com/*",
+    "https://*.stream-io-api.com/*", "wss://*.stream-io-api.com/*",
+    "https://*.stream-chat.com/*", "wss://*.stream-chat.com/*",
+    "https://*.getstream.io/*", "wss://*.getstream.io/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://*.vestiairecollective.com/*"], "js": ["capteur-page.js"], "world": "MAIN", "run_at": "document_start", "all_frames": true },
+    { "matches": ["https://*.vestiairecollective.com/*"], "js": ["regles.js", "relais.js"], "run_at": "document_start", "all_frames": true }
+  ],
+  "action": { "default_title": "VRM Observateur Vestiaire", "default_popup": "popup.html" },
+  "options_page": "page.html",
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'" }
+}

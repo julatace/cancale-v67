@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>VRM Observateur Vestiaire</title>
+<link rel="stylesheet" href="page.css">
+</head>
+<body class="popup">
+  <h1>Observateur Vestiaire</h1>
+  <div class="ligne-voyant"><span class="voyant" id="voyant" data-on="0" aria-hidden="true"></span><b id="on-txt">Arrêté</b></div>
+  <p id="etat" class="doux">…</p>
+  <button id="basculer" class="plein">Allumer l'enregistrement</button>
+  <ol>
+    <li>Clique <b>« Allumer l'enregistrement »</b> (le voyant devient rouge, « REC » sur l'icône).</li>
+    <li>Sur <b>vestiairecollective.com</b>, connecté à TON compte :
+      <ul>
+        <li>ouvre tes <b>notifications</b> ;</li>
+        <li>ouvre la <b>liste des personnes qui ont aimé</b> un de tes articles ;</li>
+        <li>ouvre une <b>conversation</b> ;</li>
+        <li>envoie <b>UN</b> message à quelqu'un qui a aimé ;</li>
+        <li>fais une <b>offre</b> si le site le propose.</li>
+      </ul></li>
+    <li>Reviens ici : <b>Arrêter</b>, puis <b>Exporter</b> : deux fichiers (JSON + CSV) arrivent dans Téléchargements. Envoie-les.</li>
+  </ol>
+  <button id="exporter">Exporter</button>
+  <div class="barre">
+    <button id="ouvrir">Voir le détail</button>
+    <button id="effacer" class="danger">Effacer</button>
+  </div>
+  <p class="doux">Rien ne sort de ton ordinateur. Rien n'est bloqué ni modifié. Jetons, cookies, mots de passe, cartes, e-mails et téléphones sont masqués avant d'être notés.</p>
+  <script src="idb.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
