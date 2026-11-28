@@ -23,12 +23,24 @@ const str = (v) => String(v == null ? '' : v);
 //            prix ou un numéro de suivi suivi d'un nombre n'est jamais pris pour une référence)
 //   adidas   deux lettres + 4 chiffres, ou une lettre + 5 chiffres, seuls (sans « -000 » derrière)   « GZ1234 », « B37571 »
 //   nb       New Balance : M/U/W/ML/MR/WL + 3 ou 4 chiffres + 2 ou 3 lettres (+ un chiffre)   « M990GL6 », « U9060BLK »
+// (28 nov., main-vert) SANS lookbehind `(?<!…)` : Safari < 16.4 refuse de lire TOUT le fichier qui en contient un
+// (audit-safari). `avant` est le caractère interdit juste avant la référence ; `chercher` rend la même correspondance
+// que l'ancien `(?<![…])re` : une position refusée est réessayée au caractère suivant, comme le moteur le faisait.
 const FORMES = [
-  { sorte: 'nike', re: /(?<![A-Z0-9])([A-Z]{2}\d{4})[-\s]?(\d{3})(?![0-9])/g, canon: (m) => `${m[1]}-${m[2]}` },
-  { sorte: 'jordan', re: /(?<![A-Z0-9-])(\d{6})-(\d{3})(?![0-9])/g, canon: (m) => `${m[1]}-${m[2]}` },
-  { sorte: 'nb', re: /(?<![A-Z0-9])((?:ML|MR|WL|[MUW])\d{3,4}[A-Z]{2,3}\d?)(?![A-Z0-9])/g, canon: (m) => m[1] },
-  { sorte: 'adidas', re: /(?<![A-Z0-9])([A-Z]{2}\d{4}|[A-Z]\d{5})(?![A-Z0-9]|[-\s]\d{3}(?!\d))/g, canon: (m) => m[1] },
+  { sorte: 'nike', avant: /[A-Z0-9]/, re: /([A-Z]{2}\d{4})[-\s]?(\d{3})(?![0-9])/g, canon: (m) => `${m[1]}-${m[2]}` },
+  { sorte: 'jordan', avant: /[A-Z0-9-]/, re: /(\d{6})-(\d{3})(?![0-9])/g, canon: (m) => `${m[1]}-${m[2]}` },
+  { sorte: 'nb', avant: /[A-Z0-9]/, re: /((?:ML|MR|WL|[MUW])\d{3,4}[A-Z]{2,3}\d?)(?![A-Z0-9])/g, canon: (m) => m[1] },
+  { sorte: 'adidas', avant: /[A-Z0-9]/, re: /([A-Z]{2}\d{4}|[A-Z]\d{5})(?![A-Z0-9]|[-\s]\d{3}(?!\d))/g, canon: (m) => m[1] },
 ];
+// La prochaine correspondance de la forme `f` dans `s` (à partir de `f.re.lastIndex`), ou null.
+const chercher = (f, s) => {
+  for (;;) {
+    const m = f.re.exec(s);
+    if (!m) return null;
+    if (m.index > 0 && f.avant.test(s[m.index - 1])) { f.re.lastIndex = m.index + 1; continue; }
+    return m;
+  }
+};
 
 // Une référence tapée ou lue, sous sa forme canonique, ou '' (illisible : rien n'est posé).
 export function normaliserRef(v) {
@@ -37,7 +49,7 @@ export function normaliserRef(v) {
   s = s.replace(/^(\d{6})\s+(\d{3})$/, '$1-$2');   // tapé à la main « 555088 134 » : la forme Jordan
   for (const f of FORMES) {
     f.re.lastIndex = 0;
-    const m = f.re.exec(s);
+    const m = chercher(f, s);
     if (m && m.index === 0 && m[0].length === s.replace(/\s+$/, '').length) return f.canon(m);
   }
   // Une autre marque (Asics « 1201A789-020 », Salomon « L47452600 ») : lettres, chiffres, un tiret, 5 à 16 signes,
@@ -53,7 +65,7 @@ export function refsDuTexte(texte) {
   for (const f of FORMES) {
     f.re.lastIndex = 0;
     let m;
-    while ((m = f.re.exec(s))) {
+    while ((m = chercher(f, s))) {
       const a = m.index, b = m.index + m[0].length;
       if (couverts.some(([x, y]) => a < y && b > x)) continue;   // déjà pris par une forme plus sûre
       couverts.push([a, b]);
