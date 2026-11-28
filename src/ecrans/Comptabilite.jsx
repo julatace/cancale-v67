@@ -99,7 +99,7 @@ import { MINERAL } from '../themeMineral.js';
 import { motsInsecables } from '../motsInsecables.jsx';
 import { colisEbay } from '../../api/_lib/ebay-a-expedier.js';
 import { stockVestiaire, retraitsVestiaire, etapeMotVc, vcVenteAnnulee, numVcVente, montantRecuVc, dateVenteVc, colisVcAPoster, colisVcPartisLus, aExpedierVc, expeditionVc } from '../../api/_lib/vestiaire-regle.js';
-import { txVintedParties, mrSansCodePostal } from '../../api/_lib/depart-colis.js';
+import { txVintedParties, mrSansCodePostal, jourCourtParis as jourCourtParisDepart } from '../../api/_lib/depart-colis.js';
 import { publierDepartsVinted } from '../departVente.js';
 import { quandRelu } from '../fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from '../fraicheur.js';
@@ -324,7 +324,7 @@ import { fusionnerConversation } from "../conversations.js";
 import {etatCommandeEbay} from '../../api/_lib/ebay-etat-commande.js';
 // ⟦← App.jsx #54⟧
 import {ventesPartiesParPreuve, suiviDuBord} from '../../api/_lib/depart-vente.js';
-import { partiParPreuve } from '../etiquettesDepart.js';
+import { partiParPreuve, vuPartir } from '../etiquettesDepart.js';
 // ⟦← App.jsx #55⟧
 import {colisLbcAPoster,lbcColisAPoster,totalColis,colisLbcVendeur} from '../../api/_lib/colis-sites.js';
 // ⟦← App.jsx #56⟧   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
@@ -9883,11 +9883,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       lignesEmail: Array.isArray(tracking) ? tracking : null, departs: vcLoc0.departs,
       ventesMs: Object.fromEntries((sales.items || []).filter((o) => o && o.transaction_id != null && tsCommande(o)).map((o) => [String(o.transaction_id), tsCommande(o)])),
       entrants: Array.isArray(transp) ? new Set(transp.map((t) => t && t.suivi).filter(Boolean)) : null,
+      // (28 nov., « expédié sans l'extension ») + la vente FINALISÉE (la date de versement de CETTE transaction :
+      // le détail 450, le relevé, la conversation, l'e-mail « Transaction finalisée » qui porte son n°).
+      finalisees: versements && typeof versements === 'object' ? versements : null,
     });
     publierDepartsVinted(m);
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp, etiqLuesTic]);
+  }, [emailBords, bordsHidden, shipDone, bordsShipped, panelBordsDone, tracking, vcLoc0.departsCle, sales.items, transp, etiqLuesTic, versements]);
   // Parti par UNE preuve sûre (Colis fait compris) : ce que chaque liste « à envoyer » de l'écran écarte.
   const estParti = (o) => isShipDone(o) || !!(o && o.transaction_id != null && partisVinted.has(String(o.transaction_id)));
   // ── (10 nov., lot BE) LA FRISE D'UNE VENTE, ÉTAPE PAR ÉTAPE (src/friseProuvee.js) ──────
@@ -16655,7 +16658,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (8 nov.) Vu par le transporteur = la preuve d'e-mail ou de prise en charge de la règle
       // unique (api/_lib/depart-vente.js), par le n° EXACT de son bordereau, n° ambigu ⇒ non.
       const rv = partisVinted.get(k);
-      const vu = !!(rv && (rv.type === 'email' || rv.type === 'transporteur'));
+      const vu = vuPartir(rv);
       const r = posteSansDepart({ o, cocheLe: shipDone[k], captureAt: cap, joursLimite: lim.daysLeft, vuParTransporteur: vu });
       if (r) out.push({ o, ...r });
     }
@@ -19086,8 +19089,22 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Imprimer le bordereau d'UNE vente : le PDF capté par l'extension d'abord
   // (rattaché par la transaction), l'email en secours ; un compte pro joint sa
   // facture. Même chemin que la carte de l'écran Colis (§11).
+  // ── (28 nov., « expédié sans l'extension ») RÉIMPRIMER UN COLIS DÉJÀ PARTI DEMANDE D'ABORD ──────────
+  // Julien : « j'ai failli me tromper et envoyer une paire que je ne devais pas ». Une vente dont le départ
+  // est PROUVÉ par identité (la règle unique `partisVinted` : e-mail du n° de SON bordereau ou de SA
+  // transaction, prise en charge lue, vente finalisée, Colis fait, panneau, expédié à la main) ne s'imprime
+  // plus en silence : « Ce colis est déjà parti le … » et la raison, SON « Imprimer quand même ».
+  const confirmerSiDejaParti = async (tx) => {
+    const r = tx ? partisVinted.get(String(tx)) : null;
+    if (!r) return true;
+    const jour = Number.isFinite(r.at) ? jourCourtParisDepart(r.at) : '';
+    const ok = await askConfirm({ title: tr('envois.dejaParti.titre') + (jour ? ` · ${jour}` : ''), desc: tr('envois.dejaParti.desc', { raison: r.phrase || '' }), ok: tr('envois.dejaParti.ok') });
+    if (!ok) libererOngletPdf();
+    return !!ok;
+  };
   const imprimerBordereauVente = async (o) => {
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    if (!(await confirmerSiDejaParti(tx))) return;
     const capte = tx ? labelsCaptes[tx] : null;
     const b = tx ? bordParTx[tx] : null;
     // (11 nov., lot ventes-lot) Un LOT : un colis, un bordereau, le tampon liste les N° de SES
@@ -19592,6 +19609,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // scripts/audit-calcul-par-version.cjs), et au plus toutes les 60 s (elle lit l'heure). Mesuré à la 1re visite d'Achats :
   // 13 à 18 calculs par écran, un à chaque rendu. `reglesNumeros()` : les règles de numérotation (lues hors de l'état).
   const cartesColis = useCalculParVersion(() => cartesColisCalc(), () => [accounts, bordLinks, bordsHidden, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, colisDans, colisEb, colisEmailSources, colisRelais, ecranCalcul, emailBords, evsTransp, hiddenSales, imgMortes, indexSuivisAchats, labelsCaptes, labelsPrets, lbcVentes, nArticlesTx, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, panelBordsDone, partisVinted, pickupUnion, retoursSuivis, saleOv, sales, shipDone, shippedSuivis, soldByTxn, tracking, trackingRetrait, transpMap, txnItem, txnLink, vcBrut, vcEtat, vcLoc0, venteMailItem, ventesEmailParTx, reglesNumeros()], 'cartesColis', ecranCalcul);
+  // (28 nov.) La fraîcheur de la liste des ventes du compte d'une vente « à envoyer » : null (fraîche, ou compte pas su —
+  // rien à dire) · { compte, heures } (plus de 24 h, ou `heures: null` jamais lue sur cet appareil).
+  const fraicheurVentesColis = (o) => {
+    const acc = o && o._acc;
+    if (!acc || acc.vinted_user_id == null) return null;
+    const cap = Number.isFinite(o._lectureVentes) ? o._lectureVentes : _harvestSeen[`${acc.vinted_user_id}_orders_sold`];
+    if (Number.isFinite(cap) && Date.now() - cap <= ENLIGNE_FRAIS_MS) return null;
+    return { compte: accNameOf(acc), heures: Number.isFinite(cap) ? Math.floor((Date.now() - cap) / 3600000) : null };
+  };
   const cartesColisCalc = () => { compterCalcul('cartesColis', ecranCalcul);
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
@@ -19605,8 +19631,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const etat = groupe === 'fait' ? 'Coché posté · Vinted ne l’a pas encore vu partir'
         : groupe === 'pret' ? (lim || 'bordereau prêt')
         : [lectureFinie ? 'bordereau pas encore là' : 'bordereau pas encore lu', lim].filter(Boolean).join(' · ');
+      // (28 nov., « expédié sans l'extension ») « À ENVOYER » N'EST SÛR QUE SUR UNE LECTURE FRAÎCHE. Sa liste des ventes
+      // (`_harvestSeen[{uid}_orders_sold]`, ou la lecture de la vente vue par e-mail) a plus de 24 h (`ENLIGNE_FRAIS_MS`,
+      // la règle « en ligne ») ou n'a jamais été lue, et aucune preuve de départ n'a été trouvée : la carte le DIT
+      // (« À confirmer · Vinted pas relu sur X depuis N h ») avec le geste. Rien n'est retiré, rien n'est deviné.
+      const fr0 = groupe === 'fait' ? null : fraicheurVentesColis(o);
+      const etatF = fr0 ? `${tr('envois.aConfirmer', { compte: fr0.compte, heures: fr0.heures == null ? '—' : fr0.heures })} · ${tr('envois.aConfirmerGeste', { compte: fr0.compte })}` : '';
       L.push({ cle: 'v:' + (e.txn || e.key), groupe, site: 'vinted', nom: nomAvecTaille(o ? o.title : (b && (b.modele || b.article)) || 'Bordereau', o), photo: o ? orderPhoto(o) : bordPhoto(b),
-        num, etat, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b, e.txn) });
+        num, etat: etatF ? `${etatF} · ${etat}` : etat, aConfirmer: !!fr0, ambre: groupe !== 'fait' && e.dl != null && e.dl <= 1, ouvrir: groupe !== 'fait', tx: e.txn || '', transp: transporteurVente(b, e.txn) });
     }
     if (colisEb) {
       const numEb = (x) => x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
@@ -20289,7 +20321,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const titre = o ? o.title : ((b && (b.modele || b.article)) || 'Bordereau');
     const inv = b ? invForBord(b) : null;
     const capte = e.txn ? labelsCaptes[e.txn] : null;
-    if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
+    if (!(await confirmerSiDejaParti(e && e.txn))) return; if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
     const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
     if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
     if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
@@ -21021,7 +21053,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // (8 nov., « à envoyer » prouvé) + l'e-mail du transporteur pour le n° de SON bordereau
           // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
           const rv = partisVinted.get(tx);
-          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
+          const dp = vuPartir(rv) ? rv : null; if (!dp) continue;
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
@@ -21070,7 +21102,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return out.sort((a, b) => a.rang - b.rang).map((x) => {
       const tx = x.o && x.o.transaction_id != null ? String(x.o.transaction_id) : '';
       const rv = tx && x.site === 'vinted' ? partisVinted.get(tx) : null;
-      const depart = x.depart || (rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null);
+      const depart = x.depart || (vuPartir(rv) ? rv : null);
       const coche = x.type === 'coche' && tx ? (shipDone[tx] || null) : (rv && rv.type === 'colis-fait' ? rv.at : null);
       const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
@@ -21258,7 +21290,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
-        notes: [lit ? { cle: 'litige', texte: tr('sc.litigeNum', { txn: lit.txn, mail: lit.mail }) }   /* (22 nov., style-clarte) le N° retenu d'abord, le geste à la fin */ : null,
+        notes: [(() => { const f = posted ? null : fraicheurVentesColis(o); return f ? { cle: 'a-confirmer', texte: `${tr('envois.aConfirmer', { compte: f.compte, heures: f.heures == null ? '—' : f.heures })} · ${tr('envois.aConfirmerGeste', { compte: f.compte })}` } : null; })(),
+          lit ? { cle: 'litige', texte: tr('sc.litigeNum', { txn: lit.txn, mail: lit.mail }) }   /* (22 nov., style-clarte) le N° retenu d'abord, le geste à la fin */ : null,
           sansNumC ? { cle: 'sans-num', texte: sansNumC } : (e.venteEmail && !num ? { cle: 'sans-num', texte: MENTION_SANS_NUM } : null)].filter(Boolean),
         fiche: attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre: typeof titre === 'string' ? titre : '', sous: '' }),
         detail: o ? { vendu: prix, pourToi: prix, sansFrais: !!prix, etapes: pv && Array.isArray(pv.etapes) ? etapesFicheVente(pv.etapes) : null,
@@ -21267,7 +21300,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // Imprimer CE bordereau : le PDF capté par l'extension d'abord (l'étiquette prise chez Vinted, rattachée à la vente par
           // son n° de transaction), l'e-mail en secours ; compte pro : bordereau + facture. Le geste de la carte d'avant, tel quel.
           imprimer: pdf ? (ev) => occuperPendant(ev && ev.currentTarget, async () => {
-            if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
+            if (!(await confirmerSiDejaParti(e && e.txn))) return; if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
             const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
             if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
             if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
@@ -30659,6 +30692,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         <div className="vv-titre" style={{display:'flex',alignItems:'flex-start',gap:10}}>
                           <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{motsInsecables(titre)}</span>
                         </div>
+                        {/* (28 nov., « expédié sans l'extension ») Sa liste des ventes a plus de 24 h : « à envoyer » n'est pas sûr. */}
+                        {(() => { const f = posted ? null : fraicheurVentesColis(o); return f ? <div className="vrm-colis-a-confirmer" data-colis-a-confirmer={f.heures == null ? 'jamais' : String(f.heures)} role="note" style={{fontSize:12,fontWeight:600,color:C.text,marginTop:6}}>{tr('envois.aConfirmer', { compte: f.compte, heures: f.heures == null ? '—' : f.heures })} · {tr('envois.aConfirmerGeste', { compte: f.compte })}</div> : null; })()}
                         <div className="vv-l3" style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
                           {/* La taille LUE sur la vente (`size_title`), jamais tirée du titre ; puis l'ÉCHÉANCE de la même limite
                               (`e.lim`, lue ou estimée), ambre seulement « avant demain » (`avantDemainColis`) ; une estimée dépassée
@@ -30772,7 +30807,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {pdf ? (
                         <button type="button" data-imprime="1" onClick={(ev)=>occuperPendant(ev.currentTarget, async ()=>{
-                          if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
+                          if (!(await confirmerSiDejaParti(e && e.txn))) return; if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
                           // Le PDF vient de l'email s'il y en a un, sinon de la
                           // capture faite par l'extension au moment de générer.
                           // ⚠️ LE PDF CAPTÉ PAR L'EXTENSION PASSE EN PREMIER.

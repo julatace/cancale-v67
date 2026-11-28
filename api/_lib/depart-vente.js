@@ -81,6 +81,59 @@ export function preuveDeLigne(l) {
   const at = msDe(champ(l, 'emailAt', 'ea')) ?? msDe(champ(l, 'receivedAt', 'r'));
   return { suivi, status, sujet, depot: SUJET_DEPOT.test(sujet), carrier: String(champ(l, 'carrier', 'c') || ''), at };
 }
+// ── (28 nov.) LA PREUVE PAR LE N° DE TRANSACTION D'UN E-MAIL ────────────────
+// Julien (28 nov.) : « l'extension n'était pas chargée sur un compte ; une paire VENDUE ET DÉJÀ
+// EXPÉDIÉE, VRM me proposait encore d'imprimer le bordereau […] tout doit se mettre à jour
+// automatiquement SANS l'extension. » Un e-mail de Vinted sur une VENTE porte souvent le n° de
+// CETTE transaction (le lien `/transactions/{tx}`, « N° de transaction : … ») et pas le n° de suivi.
+// Ce n° est une IDENTITÉ (§5) : il ne désigne qu'une vente. Mais il ne prouve un DÉPART que si le
+// SUJET le CONSTATE (« a été expédié », « est en route », « déposé », « livré », « reçu »…) — jamais
+// un rappel (« Expédie-le », « N'oublie pas », « avant le… », « bordereau », « étiquette ») : le
+// même e-mail qui demande d'envoyer porte aussi le n° de la transaction.
+const SUJET_CONSTATE_TX = /entre de bonnes mains|preuve de d[ée]p[ôo]t|confirmation du d[ée]p[ôo]t|(?:a\s+[ée]t[ée]|est\s+(?:bien\s+)?)\s*(?:d[ée]pos[ée]e?|exp[ée]di[ée]e?|envoy[ée]e?|livr[ée]e?|re[çc]ue?|retir[ée]e?|arriv[ée]e?|pris\s+en\s+charge)(?![a-zà-ÿ])|est\s+en\s+(?:route|chemin|transit|cours\s+de\s+livraison)|(?:a|ont)\s+(?:bien\s+)?re[çc]u/i;
+const SUJET_PAS_ENCORE_TX = /n['’]oublie|pense\s+[àa]|exp[ée]diez|exp[ée]die[\s-]+(?:le|la|ton|ta|votre)\b|[àa]\s+exp[ée]dier|avant\s+le|rappel|bordereau|[ée]tiquette|dernier\s+jour|il\s+(?:te|vous)\s+reste|d[ée]lai|bient[ôo]t|va\s+[êe]tre|sera\b|annul|rembours|pas\s+(?:encore|été|ete)|n['’](?:a|est)\s+pas|\?/i;
+export const txDeLigne = (l) => { const t = String((l && (l.transaction != null ? l.transaction : l.tx)) || '').trim(); return /^\d{6,20}$/.test(t) ? t : ''; };
+export const sujetConstateDepart = (sujet) => { const s = String(sujet || ''); return !!s && SUJET_CONSTATE_TX.test(s) && !SUJET_PAS_ENCORE_TX.test(s); };
+// Une ligne d'e-mail ⇒ { tx, status, sujet, carrier, at } ou null : son n° de transaction, un état
+// qui dit le colis DANS le réseau, un sujet qui le constate, jamais un e-mail marqué entrant.
+export function preuveTxDeLigne(l) {
+  if (!l || typeof l !== 'object') return null;
+  const tx = txDeLigne(l);
+  if (!tx) return null;
+  const status = String(champ(l, 'status', 's') || '');
+  if (!ETATS_PARTI.has(status)) return null;
+  if (champ(l, 'sens', 'se') === 'entrant') return null;
+  const sujet = String(champ(l, 'subject', 'sj') || '');
+  if (!sujetConstateDepart(sujet)) return null;
+  const at = msDe(champ(l, 'emailAt', 'ea')) ?? msDe(champ(l, 'receivedAt', 'r'));
+  return { tx, status, sujet, carrier: String(champ(l, 'carrier', 'c') || ''), at };
+}
+// tx → la PREMIÈRE preuve. `lignes` null ⇒ null (pas su).
+export function preuvesEmailParTx(lignes) {
+  if (!Array.isArray(lignes)) return null;
+  const m = new Map();
+  for (const l of lignes) {
+    const p = preuveTxDeLigne(l);
+    if (!p) continue;
+    const a = m.get(p.tx);
+    if (!a || (p.at != null && (a.at == null || p.at < a.at))) m.set(p.tx, p);
+  }
+  return m;
+}
+// (28 nov.) LA VENTE FINALISÉE : l'e-mail « Transaction finalisée » qui porte le n° de CETTE
+// transaction (`email_final_*`, `transaction`), ou la date de versement de l'app (le détail 450) —
+// l'acheteur a reçu la paire : elle est partie. `src` : [{ tx, at }], Map ou objet { tx → date } ;
+// null ⇒ null (pas su).
+export function finaliseesParTx(src) {
+  if (src == null || typeof src !== 'object') return null;
+  const m = new Map();
+  const poser = (tx, at) => { const t = String(tx == null ? '' : tx).trim(); if (!/^\d{6,20}$/.test(t)) return; const ms = msDe(at); const a = m.get(t); if (!a || (ms != null && (a.at == null || ms < a.at))) m.set(t, { at: ms }); };
+  if (src instanceof Map) for (const [tx, v] of src) poser(tx, v && typeof v === 'object' ? v.at : v);
+  else if (Array.isArray(src)) for (const r of src) poser(r && (r.tx != null ? r.tx : r.transaction), r && (r.at != null ? r.at : r.receivedAt));
+  else for (const [tx, v] of Object.entries(src)) poser(tx, v && typeof v === 'object' ? v.at : v);
+  return m;
+}
+
 // n° → la PREMIÈRE preuve (la plus ancienne) : le jour où le colis a été vu
 // partir. `lignes` null ⇒ null (pas su).
 export function preuvesEmailParSuivi(lignes) {
@@ -107,6 +160,9 @@ export function phraseRaison(r) {
   if (r.type === 'expedie-main') return 'Marqué expédié à la main';
   if (r.type === 'panneau') return 'Traité depuis le panneau de l’extension';
   if (r.type === 'transporteur') return r.phrase || `Pris en charge${le}`;
+  // (28 nov.) Par le n° de transaction de l'e-mail, et la vente finalisée.
+  if (r.type === 'email-tx') return `E-mail Vinted « ${MOT_ETAT[r.status] || 'en route'} »${du}`;
+  if (r.type === 'finalisee') return `Vente finalisée${le}`;
   if (r.type === 'email') {
     const nom = NOM_EMAIL[String(r.carrier || '').toLowerCase()] || '';
     if (r.depot) return `E-mail de dépôt${nom ? ' ' + nom : ''}${du}`;
@@ -132,18 +188,26 @@ export function raisonDepartVente(tx, bord, ctx = {}) {
   if (kb && bordsShipped[kb]) return out({ type: 'expedie-main', at: null });
   if (t && panel[t]) return out({ type: 'panneau', at: msDe(panel[t]) });
   if (kb && panel[kb]) return out({ type: 'panneau', at: msDe(panel[kb]) });
+  const v = msDe(ctx.venteMs) ?? msDe(bord && bord.receivedAt);
+  const avantVente = (at) => v != null && at != null && at < v - TOLERANCE_AVANT_VENTE_MS;
   // Les preuves par n° de suivi : le n° EXACT du bordereau de CETTE transaction.
   const k = normaliserSuivi(suiviDuBord(bord));
-  if (!k) return null;
   const amb = ctx.ambigus;
-  if (amb && (amb instanceof Set ? amb.has(k) : Array.isArray(amb) && amb.includes(k))) return null;
-  const v = msDe(ctx.venteMs) ?? msDe(bord && bord.receivedAt);
-  const pe = ctx.preuvesEmail instanceof Map ? ctx.preuvesEmail.get(k) : null;
-  if (pe && !(v != null && pe.at != null && pe.at < v - TOLERANCE_AVANT_VENTE_MS)) {
-    return out({ type: 'email', at: pe.at, suivi: k, carrier: pe.carrier, status: pe.status, depot: pe.depot });
+  const ambigu = !!k && !!amb && (amb instanceof Set ? amb.has(k) : Array.isArray(amb) && amb.includes(k));
+  if (k && !ambigu) {
+    const pe = ctx.preuvesEmail instanceof Map ? ctx.preuvesEmail.get(k) : null;
+    if (pe && !avantVente(pe.at)) return out({ type: 'email', at: pe.at, suivi: k, carrier: pe.carrier, status: pe.status, depot: pe.depot });
+    const dp = ctx.departs ? departProuve(k, ctx.departs, { venteMs: v, ambigus: amb || null }) : null;
+    if (dp) return out({ type: 'transporteur', at: dp.at, suivi: k, carrier: dp.carrier, phrase: dp.phrase });
   }
-  const dp = ctx.departs ? departProuve(k, ctx.departs, { venteMs: v, ambigus: amb || null }) : null;
-  if (dp) return out({ type: 'transporteur', at: dp.at, suivi: k, carrier: dp.carrier, phrase: dp.phrase });
+  // (28 nov.) Par le n° de TRANSACTION (l'identité de la vente elle-même) : un e-mail qui constate le
+  // départ, ou la vente finalisée. Daté plus d'un jour avant la vente, il contredit l'identité ⇒ rien.
+  if (t) {
+    const px = ctx.preuvesEmailTx instanceof Map ? ctx.preuvesEmailTx.get(t) : null;
+    if (px && !avantVente(px.at)) return out({ type: 'email-tx', at: px.at, carrier: px.carrier, status: px.status });
+    const fz = ctx.finalisees instanceof Map ? ctx.finalisees.get(t) : null;
+    if (fz && !avantVente(fz.at)) return out({ type: 'finalisee', at: fz.at });
+  }
   return null;
 }
 
@@ -171,14 +235,18 @@ export function bordsAvecEtiquettes(bordsParTx, etiquettes) {
   }
   return out || bp;
 }
-export function ventesPartiesParPreuve({ txs = null, bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, ventesMs = null, entrants = null, etiquettes = null } = {}) {
+export function ventesPartiesParPreuve({ txs = null, bordsParTx = {}, shipDone = {}, bordsShipped = {}, panelBordsDone = {}, lignesEmail = null, departs = null, ventesMs = null, entrants = null, etiquettes = null, finalisees = null } = {}) {
   const bp = bordsAvecEtiquettes(bordsParTx, etiquettes);
   // (11 nov., lot DJ3) Le n° de SON bordereau : celui de l'e-mail, sinon celui lu sur SON étiquette (PDF).
   const liste = Object.entries(bp).map(([tx, b]) => ({ cle: tx, suivi: suiviDuBord(b) }));
   const ambigus = suivisAmbigus(liste, entrants instanceof Set ? new Set([...entrants].map(normaliserSuivi).filter(Boolean)) : null);
   const preuvesEmail = preuvesEmailParSuivi(lignesEmail);
-  const ctx = { shipDone, bordsShipped, panelBordsDone, preuvesEmail, departs, ambigus };
-  const tous = txs == null ? new Set([...Object.keys(objet(shipDone)), ...Object.keys(objet(bordsShipped)), ...Object.keys(objet(panelBordsDone)), ...Object.keys(bp)]) : new Set([...txs].map(String));
+  const preuvesEmailTx = preuvesEmailParTx(lignesEmail);
+  const fin = finaliseesParTx(finalisees);
+  const ctx = { shipDone, bordsShipped, panelBordsDone, preuvesEmail, departs, ambigus, preuvesEmailTx, finalisees: fin };
+  // (28 nov.) `txs` absent : les transactions qui ont un bordereau, une marque, ou une date de vente connue —
+  // un n° de transaction lu dans un e-mail ne fabrique jamais une vente (il ne sert qu'à celle qu'on a déjà).
+  const tous = txs == null ? new Set([...Object.keys(objet(shipDone)), ...Object.keys(objet(bordsShipped)), ...Object.keys(objet(panelBordsDone)), ...Object.keys(bp), ...Object.keys(objet(ventesMs))]) : new Set([...txs].map(String));
   const out = new Map();
   for (const tx of tous) {
     const r = raisonDepartVente(tx, bp[tx] || null, { ...ctx, venteMs: ventesMs && ventesMs[tx] != null ? ventesMs[tx] : null });
@@ -194,23 +262,26 @@ export const attendEnvoi = (aExpedierVinted, raison) => aExpedierVinted === true
 // Les lignes d'e-mail qui peuvent prouver un départ (jamais `select=data`), la
 // ligne du panneau de l'extension, et les n° d'ACHATS (les lignes `transp_`
 // n'existent que pour des achats : `suivisAInterroger`) — par leur id seul.
-export const SELECT_PREUVE_EMAIL = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier';
+export const SELECT_PREUVE_EMAIL = 'id,s:meta->>status,r:meta->>receivedAt,ea:meta->>emailAt,su:meta->>suivi,sj:meta->>subject,se:meta->>sens,c:meta->>carrier,tx:meta->>transaction';
 export const REQ_PREUVES_EMAIL = `app_data?id=like.email_track_*&meta->>status=in.(transit,available,delivered,retour,info)&select=${SELECT_PREUVE_EMAIL}`;
 export const REQ_PANNEAU = 'app_data?id=eq.panel_bords_done&select=data';
 export const REQ_ENTRANTS = 'app_data?id=like.transp_*&select=id';
 // (11 nov., lot DJ3) Les n° lus sur les étiquettes (ligne légère : { tx: { t, s } }, aucun PDF).
 export const REQ_ETIQUETTES = 'app_data?id=eq.vrm_bord_transporteurs&select=pdf:data->pdf';
+// (28 nov.) Les e-mails « Transaction finalisée » qui portent le n° de leur transaction (scalaires).
+export const REQ_FINALISEES = 'app_data?id=like.email_final_*&meta->>transaction=not.is.null&select=tx:meta->>transaction,at:meta->>receivedAt';
 // `lireToutes(chemin)` : la lecture paginée du serveur (null = ratée) ;
 // `relire(ligne)` : la relecture d'une ligne d'e-mail par la règle de l'app (le
 // n° lu dans le sujet, api/_lib/suivi-colis.js `relireLigneMeta`).
-// Rend { lignesEmail, panelBordsDone, entrants } — chaque source `null` si sa
+// Rend { lignesEmail, panelBordsDone, entrants, etiquettes, finalisees } — chaque source `null` si sa
 // lecture a raté : la preuve correspondante manque, le colis RESTE à envoyer.
 export async function lirePreuvesDepart(lireToutes, relire = (x) => x) {
   const sur = async (p) => { try { const r = await lireToutes(p); return Array.isArray(r) ? r : null; } catch (_) { return null; } };
-  const [em, pa, en, et] = await Promise.all([sur(REQ_PREUVES_EMAIL), sur(REQ_PANNEAU), sur(REQ_ENTRANTS), sur(REQ_ETIQUETTES)]);
+  const [em, pa, en, et, fi] = await Promise.all([sur(REQ_PREUVES_EMAIL), sur(REQ_PANNEAU), sur(REQ_ENTRANTS), sur(REQ_ETIQUETTES), sur(REQ_FINALISEES)]);
   const lignesEmail = em ? em.map((x) => { try { return relire(x) || x; } catch (_) { return x; } }).filter(Boolean) : null;
   const panelBordsDone = pa ? objet(pa[0] && pa[0].data) : null;
   const entrants = en ? new Set(en.map((r) => { const m = /^transp_[a-z]+_([A-Z0-9]+)$/.exec(String((r && r.id) || '')); return m ? m[1] : ''; }).filter(Boolean)) : null;
   const etiquettes = et ? objet(et[0] && et[0].pdf) : null;
-  return { lignesEmail, panelBordsDone, entrants, etiquettes };
+  const finalisees = fi ? fi.map((r) => ({ tx: r && r.tx, at: r && r.at })) : null;
+  return { lignesEmail, panelBordsDone, entrants, etiquettes, finalisees };
 }
