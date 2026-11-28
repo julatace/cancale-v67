@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »
+  { id: 'vrai-benefice', date: '2026-11-27', titre: 'Ton vrai bénéfice, mois par mois', phrase: 'Et le compte qui vend le mieux : le même chiffre que l’export.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (27 nov., tout-va-bien) src/SondesToutVaBien.jsx, src/toutVaBienSondes.js : une rangée par morceau.
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
   { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },

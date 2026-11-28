@@ -182,7 +182,7 @@ export const classementRapporte = (lignes, axe = 'modele') => {
 // (centimes), achat (centimes|null), item]] (src/venteLot.js) — rangés en [10] de SA ligne, la vente
 // reste UNE ligne (CA, frais, compte inchangés) ; `eclaterReleveLots` en fait une ligne par article
 // pour les marges par modèle / marque / taille.
-export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0, articles = () => null, fraisDetail = () => null }) => {
+export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalisee = () => false, montant, achat, frais, compte, numero = () => '', versement = () => '', autres = [], titreDe = {}, an0, articles = () => null, fraisDetail = () => null, drapeaux = () => '' }) => {
   const out = [];
   for (const o of (Array.isArray(vinted) ? vinted : [])) {
     if (!o || estMasquee(o) || !estFinalisee(o)) continue;
@@ -197,11 +197,17 @@ export const releveVentes = ({ vinted = [], estMasquee = () => false, estFinalis
     // seulement quand la fiche note des frais ([10] vaut alors `null` s'il n'y a pas de lot).
     const det = fraisDetail(o);
     if (Array.isArray(det) && det.length === 4) { if (ligne.length === 10) ligne.push(null); ligne.push(det); }
+    // (27 nov., lot vrai-benefice) [12] les drapeaux de la fiche (src/vraiBenefice.js `drapeauxFiche`) : 'c' frais confirmés,
+    // 'r' prix d'achat posé depuis le reçu (port de l'achat compris) ; seulement quand il y en a ([10], [11] valent alors null).
+    const dr = drapeaux(o);
+    if (dr) { while (ligne.length < 12) ligne.push(null); ligne.push(String(dr)); }
     out.push(ligne);
   }
   for (const x of (Array.isArray(autres) ? autres : [])) {
     if (!x || !isFinite(x.ts) || new Date(x.ts).getFullYear() < an0) continue;
-    out.push([x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()]);
+    const l = [x.plateforme, '', x.id, x.ts, x.eur, x.achat, x.frais, String(titreDe[x.id] || '').slice(0, 90), String(x.num || ''), new Date(x.ts).toISOString()];
+    if (x.dr) l.push(null, null, String(x.dr));   // (27 nov.) [12] les drapeaux de SA fiche (frais confirmés, reçu)
+    out.push(l);
   }
   return out;
 };

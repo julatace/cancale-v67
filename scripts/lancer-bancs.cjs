@@ -48,6 +48,7 @@ const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
   'compta-export',   // (27 nov.) export comptable et URSSAF = l'écran, comptes exclus absents, « à dater » jamais comptée
+  'vrai-benefice',   // (27 nov.) le vrai bénéfice : Gains « Par mois » = l'export comptable, jamais 0 pour pas su, compte exclu absent
   'paires-dorment',   // (27 nov.) « Paires qui dorment » : le plan, l'argent qui dort, les gestes par la porte, lecture seule dite
   'ecran-pret-une-fois',   // (26 nov.) l'écran arrive UNE fois, jamais sous 95 % d'opacité (fondu d'entrée sous AA)
   'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
@@ -73,6 +74,7 @@ const DUREES_CI = {
   'barre-depuis-journee': 15,
   'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
   'compta-export': 240,   // (27 nov.) mesuré ici, seul : ~4 min (4 tailles × thèmes)
+  'vrai-benefice': 240,   // (27 nov., lot vrai-benefice) 4 tailles × thèmes, export + écran + fiche
   'tout-va-bien-sondes': 80,   // (27 nov.) mesuré ici : 77 s (la règle, ses 4 mutations, 8 contextes)
   'paires-dorment': 100,   // (27 nov.) mesuré ici, seul : ~1 min 30 (2 tailles × 2 thèmes × 3 scènes)
   // (27 nov., bancs-compta) Dix bancs compta remis au vert et ajoutés : durées ESTIMÉES ici (seuls, conteneur de session).
