@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., ext. 5.457, « Mode ordinateur allumé ») docs/passation/2026-11-28-ordinateur-serveur.md
+  { id: 'ordinateur-serveur', date: '2026-11-28', titre: 'Ordinateur allumé : chaque message, tout de suite', phrase: 'Sa vraie question et le compte, en quelques minutes.', tab: 'serveur', pour: 'tous', mode: 'tous' },
   // (27 nov., paires-qui-dorment — choix de Julien) src/pairesDorment.js, src/natif/ecrans/PairesDorment.jsx
   { id: 'paires-qui-dorment', date: '2026-11-27', titre: 'Paires qui dorment : l’argent immobilisé', phrase: 'Plus de 21 jours en ligne, par prix d’achat, un geste chacune.', tab: 'annonces', pour: 'tous', mode: 'tous',
     titreArt: 'Articles qui dorment : l’argent immobilisé' },
