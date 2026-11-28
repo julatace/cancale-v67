@@ -61,6 +61,7 @@ const entree = (o) => ({
   at: instantFil(o.at), apercu: txt(o.apercu), deMoi: o.deMoi === true ? true : o.deMoi === false ? false : null,
   nonLu: o.nonLu === true ? true : o.nonLu === false ? false : null,
   titre: txt(o.titre), photo: o.photo || null, nom: txt(o.nom),
+  avatar: avatarPersonne(o.avatar),
   aRepondre: o.aRepondre === true,
 });
 // Vinted : la conversation de la boîte (`opposite_user.id`) et sa paire PAR IDENTITÉ
@@ -69,6 +70,16 @@ const entree = (o) => ({
 // ({ texte, deMoi: true | false }, `extraitConversation` source « fil ») : il remplace l'aperçu de
 // la boîte (auteur pas su). Absent, ou auteur pas su ⇒ l'aperçu de la boîte, `deMoi: null` (jamais lu
 // par l'anti-arnaque, jamais compté).
+// (28 nov., messages-parfaits — Julien : « la photo de profil de la personne ») La PHOTO DE PROFIL de l'interlocuteur,
+// telle que Vinted la donne dans la boîte (`opposite_user.photo.url`, mesuré le 28 nov. : 2 253 sur 2 548 conversations
+// captées). L'image « pas de photo » de Vinted (`static.vinted.com/assets/no-photo/…`) n'est PAS une photo : rien ⇒ l'initiale.
+// Une adresse https seulement (jamais `data:`, jamais un autre schéma) ; c'est une image à montrer, jamais une identité.
+export function avatarPersonne(v) {
+  const u = txt(v && typeof v === 'object' ? v.url : v);
+  if (!/^https:\/\/[^\s"'<>]{8,600}$/.test(u)) return null;
+  if (/\/assets\/no-photo\//i.test(u) || /\/no[-_]?photo/i.test(u)) return null;
+  return u;
+}
 export function convVinted(c, paire, compte, dernier) {
   if (!c || c.id == null) return null;
   const u = c.opposite_user || {};
@@ -76,7 +87,7 @@ export function convVinted(c, paire, compte, dernier) {
   return entree({ plateforme: 'vinted', compte: compte != null ? compte : (c._acc && c._acc.vinted_user_id), conv: c.id,
     interlocuteur: u.id, annonce: paire && paire.item, tx: paire && paire.tx, num: paire && paire.num,
     at: c.updated_at, apercu: prouve ? dernier.texte : c.description, deMoi: prouve ? dernier.deMoi : null, nonLu: c.unread === true ? true : c.unread === false ? false : null,
-    titre: (paire && paire.titre) || '', photo: (paire && paire.photo) || null, nom: u.login || '' });
+    titre: (paire && paire.titre) || '', photo: (paire && paire.photo) || null, nom: u.login || '', avatar: u.photo });
 }
 // Leboncoin (`lbc_fil_{conv}`, en scalaires) : ni l'acheteur, ni l'annonce — la
 // conversation est sa seule identité.

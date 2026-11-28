@@ -1,0 +1,57 @@
+/* ── src/messages/messages-parfaits.css — Messages (28 nov., messages-parfaits) ─────────────────────────────────────────────
+   La photo de profil de la personne (ronde, taille fixe, l'initiale sur un disque neutre), la paire sur son coin ; le statut
+   de l'extension (une ligne, son point) ; le filtre Site + Compte ; l'aperçu du fil pendant sa lecture ; « Autre prix ».
+   Jetons --n-* seulement ; ambre = un geste à faire ; aucun orange calculé, aucun violet. */
+
+/* L'avatar : 52 px dans la rangée, 36 px dans l'en-tête du fil — jamais une autre taille, rien ne bouge quand l'image arrive. */
+:root:root:root:root:root:root body .vrm-av { position: relative; flex: none; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden;
+  background: var(--n-gris-fond, rgb(118 118 128 / .12)); color: var(--n-encre-2, #3C3C43); }
+:root:root:root:root:root:root body .vrm-av img, :root:root:root:root:root:root body .vrm-av [data-photo-vinted] { width: 100% !important; height: 100% !important; border-radius: 50% !important; object-fit: cover; }
+:root:root:root:root:root:root body .vrm-av-ini { font: 600 calc(var(--av, 52px) * .4)/1 var(--n-police, system-ui); letter-spacing: 0; }
+:root:root:root:root:root:root body .vg-fil-avatar .vrm-av { --av: 52px; width: 52px; height: 52px; }
+:root:root:root:root:root:root body .vg-fil-avatar .vrm-av-ini { font-size: 21px; }
+:root:root:root:root:root:root body .vg-fil-paire-coin { position: absolute; right: -4px; bottom: -4px; z-index: 3; width: 24px; height: 24px; border-radius: 7px; overflow: hidden;
+  box-shadow: 0 0 0 2px var(--n-carte, #FFFFFF); background: var(--n-gris-fond, rgb(118 118 128 / .12)); }
+:root:root:root:root:root:root body .vg-fil-paire-coin img { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-av { width: 36px !important; height: 36px !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-head .vrm-chat-head-av img { width: 36px !important; height: 36px !important; border-radius: 50% !important; }
+:root:root:root:root:root:root body .vrm-chat-head-av .vrm-av-ini { font-size: 15px; }
+
+/* Le statut de l'extension : une ligne calme ; le point dit l'état (accent rare = à jour ; ambre = un geste à faire). */
+:root:root:root:root:root:root body .n-msg-statut { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 8px 6px 8px 12px; border-radius: 12px;
+  background: var(--n-carte, #FFFFFF); color: var(--n-encre, #1D1D1F); font: 400 13px/1.4 var(--n-police, system-ui); min-height: 44px; box-sizing: border-box; }
+:root:root:root:root:root:root body .n-msg-statut-point { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--n-encre-3, #8E8E93); }
+:root:root:root:root:root:root body .n-msg-statut[data-msg-statut="ok"] .n-msg-statut-point { background: var(--n-accent, currentColor); }
+/* (le jeton ambre est l'ardoise depuis le 23 nov. : la FORME du point dit l'état, la phrase en gras le nomme) */
+:root:root:root:root:root:root body .n-msg-statut[data-msg-statut="ecart"] .n-msg-statut-point { background: transparent; box-shadow: inset 0 0 0 2px var(--n-ambre, currentColor); }
+:root:root:root:root:root:root body .n-msg-statut[data-msg-statut="injoignable"] .n-msg-statut-point { background: transparent; box-shadow: inset 0 0 0 2px var(--n-encre-2, #3C3C43); }
+:root:root:root:root:root:root body .n-msg-statut-t { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; column-gap: 6px; row-gap: 1px; align-items: baseline; }
+:root:root:root:root:root:root body .n-msg-statut-t b { font-weight: 600; }
+:root:root:root:root:root:root body .n-msg-statut-phrase { color: var(--n-encre-2, #3C3C43); }
+:root:root:root:root:root:root body .n-msg-statut-quand { color: var(--n-encre-2, #3C3C43); font-size: 12px; font-variant-numeric: tabular-nums; }
+:root:root:root:root:root:root body .n-msg-statut .n-bouton { flex: none; min-height: 44px; }
+
+/* Le filtre Site + Compte : la rangée de puces des autres onglets, le bouton « Compte » et « Relire eBay » dessous. */
+:root:root:root:root:root:root body .n-msg-filtres { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; min-width: 0; }
+:root:root:root:root:root:root body .n-msg-filtres-l { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* L'aperçu du fil pendant sa lecture : la forme des bulles, puis l'offre et le dernier message connus. */
+:root:root:root:root:root:root body .vrm-fil-apercu { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+:root:root:root:root:root:root body .vrm-fil-apercu-offre { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--n-accent, currentColor) 10%, transparent); color: var(--n-encre, #1D1D1F); font: 600 13px/1 var(--n-police, system-ui); font-variant-numeric: tabular-nums; }
+:root:root:root:root:root:root body .vrm-fil-apercu-dernier { align-self: flex-start; max-width: min(78%, 420px); padding: 9px 12px; border-radius: 18px; background: var(--n-carte, #FFFFFF);
+  color: var(--n-encre, #1D1D1F); font: 400 15px/1.4 var(--n-police, system-ui); display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+:root:root:root:root:root:root body .vrm-fil-apercu-dernier small { color: var(--n-encre-2, #3C3C43); font-size: 12px; }
+
+/* « Autre prix » d'une contre-offre. */
+:root:root:root:root:root:root body .vrm-mp-contre-autre { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+:root:root:root:root:root:root body .vrm-mp-contre-champ { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 12px; box-sizing: border-box;
+  background: var(--n-gris-fond, rgb(118 118 128 / .12)); color: var(--n-encre, #1D1D1F); max-width: 220px; }
+:root:root:root:root:root:root body .vrm-mp-contre-champ input { flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; font: 500 16px/1.2 var(--n-police, system-ui); outline: none; font-variant-numeric: tabular-nums; }
+:root:root:root:root:root:root body .vrm-mp-contre-regle { color: var(--n-encre-2, #3C3C43); font-size: 13px; line-height: 1.4; }
+:root:root:root:root:root:root body .vrm-mp-contre-autre[data-agir-contre-autre="sousPlancher"] .vrm-mp-contre-regle,
+:root:root:root:root:root:root body .vrm-mp-contre-autre[data-agir-contre-autre="sansPlancher"] .vrm-mp-contre-regle { color: var(--n-ambre, currentColor); }
+:root:root:root:root:root:root body .vrm-mp-contre-forcer { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--n-encre, #1D1D1F); }
+:root:root:root:root:root:root body .vrm-mp-contre-forcer input { width: 20px; height: 20px; flex: none; }
+:root:root:root:root:root:root body .vrm-mp-contre-l { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+:root:root:root:root:root:root body .vrm-mp-panneau { display: inline-flex; flex-direction: column; gap: 4px; margin-top: 6px; }

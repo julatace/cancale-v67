@@ -35,6 +35,7 @@ import {formaterMontantEbay} from '../montantsEbay.js';
 // ⟦← App.jsx #5⟧
 import { relanceProposable, numeroSorti } from '../ebayRelance.js';
 import { FeuilleOffresEbay, FeuilleRelanceEbay, lignesOffres } from '../ebay/SeriesEbay.jsx';   // (23 nov.) eBay en série, sur SON clic
+import { majorationDe, prixMajore, MAJORATION_CLE } from '../ebay/automatismes.js';   // (28 nov., lot ebay-automatismes) « +x % sur eBay »
 // ⟦← App.jsx #6⟧
 import { GroupeIos, RangeeIos } from "../composants/Ios.jsx";
 // (11 nov., lot ebay-complet) Tous les réglages de publication, les questions, les fenêtres guidées.
@@ -780,6 +781,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const racine = React.useRef(null);
   const [titre, setTitre] = React.useState('');
   const [prix, setPrix] = React.useState('');
+  const [baseMajoree, setBaseMajoree] = React.useState(null);   // (28 nov.) { prix, pct, propose } : le prix proposé « +x % » et sa base
   const [qty, setQty] = React.useState('1');
   const [cond, setCond] = React.useState('3000');
   const [desc, setDesc] = React.useState('');
@@ -935,7 +937,10 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
     setTitre(ebayTitre(p.title || '', p.taille || ''));   // « taille 36 », pas « T36 »
     setPhotos((old) => avecPhotosAjoutees(p.photos || [], autrePaire ? [] : old.split(/\s+/).filter(Boolean)).join('\n'));   // (5 nov.) ses photos ajoutées restent — pas d'un article à l'autre
     setDesc(p.desc || descriptionDeFaits(p));              // sa description Vinted ; à défaut, ses FAITS captés (jamais inventés)
-    if (p.prix != null && !String(prix).trim()) setPrix(String(p.prix).replace('.', ','));
+    // (28 nov., lot ebay-automatismes) Le prix ajusté pour eBay (« +x % », SON réglage par compte, eBay › Automatismes) :
+    // proposé dans le champ, la base dite dessous ; c'est le prix du champ qui part (le prix vu), il le change à volonté.
+    if (p.prix != null && !String(prix).trim()) { const k = majorationDe(load(MAJORATION_CLE, null), comptePub); const pm = k ? prixMajore(p.prix, k) : null;
+      setPrix(String(pm != null ? pm : p.prix).replace('.', ',')); setBaseMajoree(pm != null ? { prix: Number(String(p.prix).replace(',', '.')), pct: k, propose: pm } : null); }
     { const ce = etatEbayDeVinted(p.etat, null); if (ce) setCond(ce); }   // l'état Vinted de la paire (vérifié contre la liste d'eBay à l'analyse)
     setCat(null); setCheck(null);
     setAutoAnalyse((n) => n + 1);   // la catégorie et ses caractéristiques (marque, pointure, état) se cherchent tout de suite
@@ -1379,7 +1384,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   };
   const reessayerPhoto = (e) => { setEnvois((l) => l.map((x) => (x.id === e.id ? { ...x, etat: 'envoi', raison: '' } : x))); enfilerPhoto(e); };
   const retirerEnvoi = (e) => { setEnvois((l) => l.filter((x) => x.id !== e.id)); try { URL.revokeObjectURL(e.apercu); } catch (_) {} };
-  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); setReglagesA({}); };
+  const reset = () => { genEnvois.current++; pairCourante.current = null; setEnvois((l) => { l.forEach((x) => { try { URL.revokeObjectURL(x.apercu); } catch (_) {} }); return []; }); setPhotosMsg(''); setOuvert(false); setRes(null); setCheck(null); setTitre(''); setPrix(''); setCat(null); setAsp({}); setPhotos(''); setDesc(''); setPairId(null); setBrouillonId(null); setNumeroBrouillon(''); setBrouillonMsg(''); setOffreA(''); setOffreR(''); setOffreBasOk(false); setReglagesA({}); setBaseMajoree(null); };
   // (17 oct.) Une paire n'est proposée qu'UNE fois, même sous deux N° (même
   // photo exacte, `jumellesParPhoto`) : on garde celle déjà sur eBay, sinon
   // l'annonce la plus récente ; l'autre numéro est dit sur la ligne.
@@ -1589,7 +1594,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 confirme qu'il est accepté avant toute publication. */}
             <BlocEbay n="4" titre="Prix & livraison">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 10 }}>
-                <div><label style={lab} data-ebay-prix-devise={symboleEbayDeRef(comptePub)}>Prix ({symboleEbayDeRef(comptePub)})</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} /></div>
+                <div><label style={lab} data-ebay-prix-devise={symboleEbayDeRef(comptePub)}>Prix ({symboleEbayDeRef(comptePub)})</label><input value={prix} onChange={e => { setPrix(e.target.value); setCheck(null); setOffreBasOk(false); }} inputMode="decimal" placeholder="ex. 74" style={inp} />
+                  {baseMajoree && String(prix).replace(',', '.') === String(baseMajoree.propose) ? <div data-ebay-prix-majore={baseMajoree.pct} style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{tr('eauto.maj.publier', { base: montant(baseMajoree.prix), pct: String(baseMajoree.pct) })}</div> : null}</div>
                 <div><label style={lab}>Quantité</label><input value={qty} onChange={e => setQty(e.target.value)} inputMode="numeric" style={inp} /></div>
               </div>
               {/* (9 octobre) LA RÈGLE D'OFFRE, facultative : c'est eBay qui

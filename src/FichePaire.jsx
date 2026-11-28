@@ -20,7 +20,8 @@ import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDe
 import { articleFiche, RARES } from './ficheProduit.js';
 import Fiche from './natif/ecrans/Fiche.jsx';
 import CourbeAnnonce from './natif/CourbeAnnonce.jsx';   // (21 nov., ext. 5.428) la courbe de son annonce
-import { lireTout } from './App.jsx';
+import { lireTout, load as chargerCle, save as ecrireCle } from './App.jsx';
+import BlocFicheSneakers from './sneakers/BlocFiche.jsx';   // (28 nov., lot sneakers-cote) référence fabricant, pointure, étiquettes du N°
 const lireCourbe = (q) => lireTout(q, { strict: true });   // (19 nov.) la vue « VRM natif » de la fiche
 import { Herite, Bouton, Vignette, Rangee, Glyphe, poserIcone, iconePosee } from './natif/index.js';
 // (19 nov.) « Vendu ailleurs » sur la fiche : son bouton d'ouverture est une RANGÉE de la grille des gestes (icône + libellé,
@@ -327,6 +328,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         vendueAilleurs: p && plus && plus.gestes ? (React.isValidElement(plus.gestes) ? React.cloneElement(plus.gestes, { Bouton: BoutonRangeeGeste }) : plus.gestes) : null,
         toutVoir,
         // (21 nov., ext. 5.428, choix 58) son annonce Vinted EN LIGNE (identité : l'id de l'annonce), une lecture projetée.
+        // (28 nov., lot sneakers-cote) « Modèle » : la référence (proposée depuis le titre, posée par SON toucher), la pointure,
+        // les étiquettes. Jamais une identité (§5) ; pas de cote ici (§3 : la fiche montre une annonce en ligne).
+        modele: p && !double && p.num ? <BlocFicheSneakers num={p.num} titre={titre} taille={taille} load={chargerCle} save={ecrireCle}/> : null,
         courbe: (() => { const v = lignesSites.find((x) => x && x.site === 'vinted' && x.etat === 'en-ligne' && /^\d{4,15}$/.test(String(x.id || ''))); return v ? <CourbeAnnonce id={String(v.id)} lire={lireCourbe}/> : null; })(),
         lecture: p && lecture ? <Herite nu attrs={{ 'data-fiche-lecture': '' }}>Lecture en cours…</Herite> : null,
       }}/>
