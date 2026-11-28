@@ -60,13 +60,87 @@ identiques à un formateur neuf ; `MUTATION=1` (formateur gardé sans ses option
 `avant` = `origin/main` 9f083ef71 ; `après` = cette branche avant la fusion de main (même base). 390 × 844 @3 tactile,
 CPU ×4, 4G, service worker, base de volume. INP = Event Timing (du geste à l'image suivante, durée la plus longue).
 
-RESULTATS_390
+**390 (iPhone)**, passe du 28 nov. 14 h 48 – 15 h 18 (charge 12 → 32) :
 
-RESULTATS_1512
+| mesure | avant | après |
+|---|---|---|
+| froid · coque · écran utile | 8 011 · 10 744 ms | 7 607 · 10 938 ms |
+| chaud 2 · coque · écran utile | 6 036 · 19 235 ms | 5 326 · 20 253 ms |
+| 1re visite · Annonces (INP · CPU) | 2 904 · 3 233 ms | 3 696 · 3 515 ms |
+| 1re visite · Ventes | 4 376 · 3 803 | 4 560 · 3 902 |
+| 1re visite · Achats | 4 232 · 4 419 | 3 160 · 4 230 |
+| 1re visite · Argent | 736 · 5 342 | 2 472 · 6 425 |
+| 1re visite · Aujourd'hui | 3 328 · 4 171 | 3 160 · 2 373 |
+| une fiche · ouvrir (INP · CPU) | 1 112 · 9 383 | 1 848 · 3 529 |
+| **taper « nike » · Annonces (INP médian · pire)** | **336 · 1 240 ms** | **136 · 512 ms** |
+| effacer · Annonces | 240 · 1 048 | 152 · 968 |
+| défilement Annonces · Ventes · Achats (images/s · plus longue tâche) | 18 · 710 / 15 · 1 414 / 18 · 1 597 | 18 · 1 022 / 18 · 966 / 20 · 2 360 |
+
+2e passe des gestes (banc corrigé : le champ de l'écran MONTRÉ), 16 h 40 – 17 h, charge ~20 — médiane · pire (ms) :
+
+| geste | avant | après |
+|---|---|---|
+| taper « nike » · Annonces · Ventes · Achats | 368 · 1 272 / 232 · 632 / 208 · 616 | 440 · 560 / 328 · 728 / 360 · 488 |
+| effacer · Annonces · Ventes · Achats | 128 · 672 / 200 · 664 / 144 · 736 | 72 · 632 / 104 · 688 / 96 · 880 |
+
+Lecture : dans le bruit. Pour Achats, la transition n'aide que si le calcul est réparti sur plusieurs composants : le
+corps de `Comptabilite` est UN composant (non interruptible) — c'est lui qui reste le coût (§5).
+
+Lecture : à cette charge, seuls les écarts nets comptent — la frappe dans Annonces (médiane −60 %). Le reste est dans le
+bruit (le MÊME code donne ±50 % d'une passe à l'autre). Le défilement du banc est synthétisé à la molette (`GESTE=mouse`) :
+le gain de `onWheel` (§2, 2 à 6 s de CPU en moins) ne se voit pas dans les images/s quand la machine est à 25–30.
+(Cette passe tapait la recherche de Ventes et d'Achats dans le champ d'Annonces gardé caché : leurs lignes sont retirées ;
+corrigé dans le banc, §1.)
+
+**1512 (ordinateur, souris)**, passe du 28 nov. 16 h 07 – 16 h 33 (charge 25 → 31) :
+
+| mesure | avant | après |
+|---|---|---|
+| froid · coque · écran utile | — · 16 185 ms | 7 933 · 14 243 ms |
+| chaud 2 · coque · écran utile | 3 064 · 23 433 | 2 339 · 22 501 |
+| 1re visite · Annonces (INP · CPU) | 3 376 · 5 377 | 2 176 · 2 030 |
+| 1re visite · Ventes | 8 064 · 13 336 | 6 640 · 8 463 |
+| 1re visite · Achats | 6 792 · 4 893 | 5 072 · 6 704 |
+| 1re visite · Argent | 1 848 · 3 858 | 3 272 · 4 574 |
+| 1re visite · Aujourd'hui | 2 576 · 3 774 | 4 504 · 5 555 |
+| taper « nike » · Annonces (le tableau de travail, `src/natif/TableauTravail.jsx`, code INCHANGÉ) | 344 · 744 | 1 568 · 2 056 |
+| cocher une case · Annonces · Ventes (INP) | 1 416 · 1 080 | 2 088 · 776 |
+| défilement Annonces · Ventes · Achats (images/s) | 10 · 10 · 9 | 5 · 3 · 4 |
+
+Lecture : à 25–31 de charge, l'ordinateur ne se mesure pas à l'horloge. Preuve du bruit : la frappe dans le tableau
+d'Annonces suit un chemin que ce lot ne touche PAS (l'état local du tableau natif) et passe de 344 à 1 568 ms de médiane
+d'une passe à l'autre. À refaire sur une machine calme (`LARGEUR=1512 ETAPES=demarrage,onglets,gestes,defilement`,
+passes alternées).
 
 ## 4. Preuves que rien ne change à l'écran ni dans les chiffres
 
-PREUVES
+Bancs (un build de la branche après fusion de main, `dist-final`, sauf `styles-identiques` qui compare avant / après sur
+la MÊME base 9f083ef71) :
+
+| contrôle | résultat | sur `main` (le même banc, le build d'avant) |
+|---|---|---|
+| `styles-identiques` 390 clair + sombre, 8 écrans | 14 verts ; Annonces et Achats clair rouges au 1er passage : « 0 propriété différente » sur les 400 éléments détaillés (empreintes toutes changées = instabilité) → **relancés seuls : verts** (Annonces 1 315 éléments, Achats 1 729) ; A/A avant/avant des deux : vert | — |
+| `styles-identiques` 1512 | 12 verts ; 4 rouges qui ne sont PAS des règles : hauteur de contenu (2 224 / 2 160 px : une donnée arrivée plus tard), couleur en pleine transition (`color(srgb …)`), variables `--mb-*` d'une feuille chargée à la demande pas encore posée, marge d'un élément en cours de mise en page. Ce lot n'ajoute ni ne change AUCUNE règle CSS (diff : 0 fichier .css). | — |
+| `natif-ventes` | **58 verts, 0 rouge** | |
+| `drapeaux-justes` | **66 vérifications, 0 drapeau faux** | |
+| `natif-coque` | 127 verts, 15 rouges (K4, K6 : « Plus » au téléphone ; K7 : « santé » dans la barre latérale ; K8b au téléphone, connu depuis le 20 nov.) | **les MÊMES 15 rouges** sur `main` 9f083ef71 : pas ce lot |
+| `ouverture-instantanee` (« instantané ») | 15 verts, 5 rouges (coquille rangée à la 1re ouverture, 2e ouverture < 1 s, date de l'instantané, hors ligne) | **les MÊMES 5 rouges** sur `main` |
+| `iphone-rapide` | rapporte (§3) | |
+
+Audits verts (après la fusion de main) : `audit-tdz`, `audit-variables`, `audit-traduction` (45), `audit-coherence`,
+`audit-quoi-de-neuf`, `audit-identite`, `audit-urssaf`, `audit-sections-differees` (35), `audit-composants`,
+`audit-parler-loupe`, `audit-poids-demarrage` (1 487 Ko ≤ 2 008). Tests : `saisie-differee-interface` (9, mutation rouge),
+`formats-i18n-gardes` (2 220, mutation rouge), `recherche-interactions` (24), `espace-emails-interface` (57 — il lit la
+liste filtrée JUSTE après la frappe : c'est pourquoi un écran LÉGER reçoit toujours la lettre de façon synchrone).
+Build : `NODE_OPTIONS=--max-old-space-size=8192 npm run build` vert.
+
+Aucune règle de calcul n'est touchée : la molette rend la même décision (sans lecture), les formateurs rendent le même
+texte (2 220 comparaisons), Annonces calcule les mêmes listes avec la même fonction (seulement moins souvent ; l'heure
+de la règle « Dorment » à la minute), la recherche donne la même valeur au bout (test).
+
+⚠️ Mesurés sur le build d'avant le dernier ajustement : la saisie différée est devenue ADAPTATIVE en fin de lot (un écran
+léger, rendu ≤ 50 ms, reçoit la lettre de façon synchrone, comme avant — pour `espace-emails-interface`). Les écrans
+lourds gardent la transition ; seule la 1re lettre d'un champ, qui mesure l'écran, reste synchrone.
 
 ## 5. Ce qui reste (le plus gros d'abord)
 
@@ -82,7 +156,10 @@ PREUVES
 3. **La 1re visite d'un onglet** (2 à 6 s de CPU au ×4) : le montage d'un écran de 3 000 à 13 000 éléments et les calculs
    de `Comptabilite` ; voir `2026-11-24-vitesse.md` §5 et `-vitesse-ecran-montre.md` §5 (pré-rendre au repos demande un
    rendu sans effets publieurs).
-4. **`src/rangeesDefilantes.js`** : un `MutationObserver` sur tout `<body>` relit `scrollWidth` des rangées défilantes
+4. **Achats : la lettre tapée.** `InputDiffere` y passe la lettre en transition, mais le corps de `Comptabilite` est UN
+   composant (non interruptible) : la lettre suivante attend la fin de son calcul. Gain non mesurable au banc chargé ; le
+   vrai remède est de sortir la recherche d'Achats et sa liste filtrée de `Comptabilite` (un composant à part).
+5. **`src/rangeesDefilantes.js`** : un `MutationObserver` sur tout `<body>` relit `scrollWidth` des rangées défilantes
    toutes les 300 ms pendant un défilement qui pose des rangées (0,3 s sur Annonces au profil) — à n'observer que les
    rangées elles-mêmes (`ResizeObserver`).
 
