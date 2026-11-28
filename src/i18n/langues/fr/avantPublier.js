@@ -65,7 +65,7 @@ export default {
   "dap.par.numero": "par son N°",
   "dap.par.photo": "par ses photos",
   "dap.par.choix": "relié par toi",
-  "dap.num.donnes": "{l} donné(s) : écris-le(s) sur le carton.",
+  "dap.num.donnes": "{l} donné(s) : imprime ou écris l’étiquette.",
   "dap.num.pasDonne": "Aucun N° donné : tes N° ne sont pas encore lus, réessaie.",
   "dap.num.moi": "Tu écris tes N° toi-même (Réglages) : VRM n’en donne pas.",
   "dap.imprime": "{n} étiquette(s) envoyée(s) à l’imprimante",

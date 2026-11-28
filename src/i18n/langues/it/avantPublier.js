@@ -65,7 +65,7 @@ export default {
   "dap.par.numero": "dal suo N°",
   "dap.par.photo": "dalle sue foto",
   "dap.par.choix": "collegato da te",
-  "dap.num.donnes": "{l} dato/i: scrivilo sulla scatola.",
+  "dap.num.donnes": "{l} dato/i: stampa o scrivi l’etichetta.",
   "dap.num.pasDonne": "Nessun N° dato: i tuoi N° non sono ancora letti, riprova.",
   "dap.num.moi": "Scrivi i tuoi N° da solo (Impostazioni): VRM non ne dà.",
   "dap.imprime": "{n} etichetta/e inviata/e alla stampante",

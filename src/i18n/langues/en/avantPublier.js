@@ -65,7 +65,7 @@ export default {
   "dap.par.numero": "by its number",
   "dap.par.photo": "by its photos",
   "dap.par.choix": "linked by you",
-  "dap.num.donnes": "{l} given: write it on the box.",
+  "dap.num.donnes": "{l} given: print or write the label.",
   "dap.num.pasDonne": "No number given: your numbers are not read yet, try again.",
   "dap.num.moi": "You write your numbers yourself (Settings): VRM gives none.",
   "dap.imprime": "{n} label(s) sent to the printer",

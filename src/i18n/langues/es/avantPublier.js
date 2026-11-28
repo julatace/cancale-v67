@@ -65,7 +65,7 @@ export default {
   "dap.par.numero": "por su N.º",
   "dap.par.photo": "por sus fotos",
   "dap.par.choix": "vinculado por ti",
-  "dap.num.donnes": "{l} dado(s): escríbelo(s) en la caja.",
+  "dap.num.donnes": "{l} dado(s): imprime o escribe la etiqueta.",
   "dap.num.pasDonne": "Ningún N.º dado: tus N.º aún no se han leído, inténtalo de nuevo.",
   "dap.num.moi": "Escribes tus N.º tú mismo (Ajustes): VRM no da ninguno.",
   "dap.imprime": "{n} etiqueta(s) enviada(s) a la impresora",

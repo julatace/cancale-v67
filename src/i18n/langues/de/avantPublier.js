@@ -65,7 +65,7 @@ export default {
   "dap.par.numero": "über die Nr.",
   "dap.par.photo": "über die Fotos",
   "dap.par.choix": "von dir verknüpft",
-  "dap.num.donnes": "{l} vergeben: schreib sie auf den Karton.",
+  "dap.num.donnes": "{l} vergeben: Etikett drucken oder schreiben.",
   "dap.num.pasDonne": "Keine Nr. vergeben: deine Nr. sind noch nicht gelesen, versuche es erneut.",
   "dap.num.moi": "Du schreibst deine Nr. selbst (Einstellungen): VRM vergibt keine.",
   "dap.imprime": "{n} Etikett(en) an den Drucker gesendet",
