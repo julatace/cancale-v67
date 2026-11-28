@@ -29,7 +29,8 @@
     --n-laterale: #F5F5F5;            /* la barre latérale (25 nov.) : un cran plus CLAIR que la page grise (secondaire 5,9:1, entrée active 4,9:1) */
     --n-carte: #F3F3F3;
     --n-carte-2: #E9E9E9;             /* bande de groupe, champ dans une feuille */
-    --n-bord: #D6D6D6;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-bord: #D6D6D6;                /* filet de structure, contour d'une carte (décoratif) */
+    --n-bord-controle: #8A8A8A;       /* (28 nov., boutons-donnees) la SEULE limite d'un contrôle (champ, interrupteur « non », choix d'un segmenté) : ≥ 3:1 (WCAG 1.4.11) — 3,45:1 sur le blanc */
     --n-trait: #E2E2E2;               /* filet entre deux rangées */
     --n-encre: #000000;
     --n-texte: #111111;               /* le corps d'une rangée (un cran sous l'encre) */
@@ -122,6 +123,7 @@
     --n-carte: #2E3339;   /* un cran plus clair que le fond */
     --n-carte-2: #383E45;
     --n-bord: #474E56;
+    --n-bord-controle: #8C958F;       /* ≥ 3:1 sur la carte #2E3339 (4,13:1) et le fond #22262B */
     --n-trait: #3B4148;
     --n-encre: #F1F4F2;
     --n-texte: #E9EDEA;

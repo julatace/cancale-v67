@@ -170,6 +170,7 @@ import { ligneEmailsCompte } from "../emailsCompteLie.js";
 // dans une base de production sans le relire.
 // (11 nov., lot traduction) Les textes de Paramètres passent par `tr()` (src/i18n/index.js).
 import { tr, monnaie, LANGUES, NOMS_LANGUES, langueCourante, choisirLangue, date as dateI18n } from '../i18n/index.js';
+import { ModaleAccessible } from '../natif/modaleAccessible.js';   // (28 nov., audit a11y O1) les fenêtres faites main
 import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
@@ -1353,7 +1354,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
         );
         const tout = delScopes.annonces && delScopes.ventes && delScopes.bordereaux && delScopes.releves && delScopes.achats && delScopes.messages && delScopes.compte;
         return (
-        <div onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
+        <ModaleAccessible onFermer={()=>!delBusy&&setDelCible(null)} onClick={()=>!delBusy&&setDelCible(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:'0'}}>
           <FermeAuRetour fermer={()=>!delBusy&&setDelCible(null)}/>
           <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',paddingBottom:'env(safe-area-inset-bottom)',}}>
             <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
@@ -1362,7 +1363,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
                 <div style={{fontSize:15,fontWeight:700,color:C.text}}>Supprimer les données de « {accountName(acc)} »</div>
                 <div style={{fontSize:12,color:C.muted}}>Choisis ce que tu effaces. Rien ne part tant que tu n'as pas confirmé.</div>
               </div>
-              <button type="button" onClick={()=>!delBusy&&setDelCible(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+              <button type="button" onClick={()=>!delBusy&&setDelCible(null)} aria-label={tr('bd.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1,minWidth:44,minHeight:44}}>×</button>
             </div>
             <div style={{flex:1,overflow:'auto',padding:'14px 16px'}}>
               {/* Tout sélectionner / désélectionner */}
@@ -1411,7 +1412,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
               <button type="button" onClick={bloquerDefinitif} disabled={delBusy} style={{border:'none',background:'transparent',color:C.muted,borderRadius:12,padding:'4px',fontSize:12,fontWeight:400,cursor:delBusy?'default':'pointer',fontFamily:'inherit',textDecoration:'underline'}}>Compte fermé par Vinted ? Le bloquer définitivement</button>
             </div>
           </div>
-        </div>
+        </ModaleAccessible>
       ); })()}
     </div>
   );
@@ -2676,7 +2677,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         <h2 className="vrm-set-h1 vrm-set-sous-h vrm-pm-cat-titre ux-pm-titre" data-ux-pm-titre="">{titreCat(catOuverte.id)}</h2></>
       ) : (<>
         {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
-        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
+        <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}} aria-hidden="true" data-titre-visuel="">{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
         <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={designV2 ? tr('v2.pm.chercher') : tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
         <ReglagesPasLus/>
       </>)}

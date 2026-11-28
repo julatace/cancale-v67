@@ -106,7 +106,7 @@ function Tableau({ entetes, fetcher }) {
   React.useEffect(() => { lire(); }, [lire]);
   if (x === undefined) return <p className="nc-note" data-nc-tableau="lecture">{tr('nc.chargement')}</p>;
   if (x.refuse) return <p className="nc-note" data-nc-tableau="refuse">{tr('nc.refuse')}</p>;
-  if (x.erreur) return <p className="nc-note" data-nc-tableau="pas-su">{tr('nc.pasSu', { raison: raisonTexte(x.erreur) })} <button type="button" className="nc-lien" onClick={lire}>↻</button></p>;
+  if (x.erreur) return <p className="nc-note" data-nc-tableau="pas-su">{tr('nc.pasSu', { raison: raisonTexte(x.erreur) })} <button type="button" className="nc-lien" onClick={lire} aria-label={tr('bd.reessayer')} title={tr('bd.reessayer')}>↻</button></p>;
   if (x.total == null) return <p className="nc-note" data-nc-tableau="pas-su">{tr('nc.pasSu', { raison: raisonTexte((x.raisons || {}).comptes) })}</p>;
   if (x.total === 0) return <p className="nc-note" data-nc-tableau="0">{tr('nc.aucun')}</p>;
   const e = x.entonnoir || {};

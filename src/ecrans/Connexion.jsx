@@ -316,8 +316,9 @@ function PorteMfa({ session }) {
                 : <>Ouvre ton app d'authentification et tape le code à 6 chiffres affiché pour VRM.</>}
             </div>
             <input data-mfa-code="" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus placeholder="000000"
-              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}/>
-            {err && <div data-mfa-erreur="" style={{fontSize:13,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
+              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={field}
+              aria-label={tr('bd.mfa.code')} aria-invalid={err ? 'true' : undefined} aria-describedby={err ? 'vrm-mfa-erreur' : undefined}/>
+            {err && <div data-mfa-erreur="" id="vrm-mfa-erreur" role="alert" style={{fontSize:13,color:C.danger,marginTop:10,lineHeight:1.45}}>{err}</div>}
             {passu && <div data-mfa-injoignable="" style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginTop:10,lineHeight:1.45}}>Code pas vérifié (service muet). Tu restes connecté : réessaie.</div>}
             <button type="submit" data-mfa-valider="" disabled={busy || code.length !== 6}
               style={{marginTop:12,width:'100%',minHeight:46,border:'none',borderRadius:12,background:C.accent,color:C.onAccent||'#fff',fontSize:15,fontWeight:600,cursor:busy||code.length!==6?'default':'pointer',opacity:busy||code.length!==6?0.55:1,fontFamily:'inherit'}}>
@@ -740,6 +741,7 @@ function AuthScreen() {
           {mode!=='newpw' && (
             <label className="vrm-cx-champ"><span>{tr('auth.champ.email')}</span>
               <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={tr('auth.champ.emailPlaceholder')} required
+                aria-invalid={err ? 'true' : undefined} aria-describedby={err ? 'vrm-cx-erreur' : undefined}
                 disabled={busy} value={email} onChange={e=>{setEmail(e.target.value);setNeedConfirm(false);setConfirmLink('');setInfo('');setErr('');setFinAttente(0);setResetEnvoye('');}} style={field}/>
             </label>
           )}
@@ -750,7 +752,8 @@ function AuthScreen() {
               </div>
               <span className="vrm-cx-secret">
                 <input id="vrm-cx-password" type={motDePasseVisible?'text':'password'} autoComplete={(mode==='up'||mode==='newpw')?'new-password':'current-password'} required
-                  aria-describedby={(mode==='up'||mode==='newpw')?'vrm-cx-regles':undefined}
+                  aria-describedby={[(mode==='up'||mode==='newpw')?'vrm-cx-regles':'', err?'vrm-cx-erreur':''].filter(Boolean).join(' ')||undefined}
+                  aria-invalid={err ? 'true' : undefined}
                   placeholder={mode==='newpw'?tr('auth.champ.nouveauMdpPlaceholder'):tr('auth.champ.mdp')}
                   disabled={busy} value={pw} onChange={e=>{setPw(e.target.value);setErr('');}} style={{...field,paddingRight:88}}/>
                 <button type="button" disabled={busy} aria-label={motDePasseVisible?tr('auth.mdp.masquerLabel'):tr('auth.mdp.afficherLabel')} aria-pressed={motDePasseVisible} onClick={()=>setMotDePasseVisible(v=>!v)}>{motDePasseVisible?tr('commun.masquer'):tr('commun.afficher')}</button>
@@ -763,7 +766,7 @@ function AuthScreen() {
           </ul>}
 
           {mode!=='newpw' && <CaptchaConnexion etat={captcha}/>}
-          {err  && <div role="alert" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
+          {err  && <div role="alert" id="vrm-cx-erreur" style={{fontSize:13,color:C.danger,background:`${C.danger}12`,border:`1px solid ${C.danger}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{err}</div>}
           {/* Le décompte vit sur le bouton qui envoie (inscription, mot de passe
               oublié, « Renvoyer » d'un compte pas confirmé) ; sinon dans la phrase. */}
           {enAttenteEmail && !(mode==='reset'&&resetEnvoye) && <div role="status" aria-live="polite" data-auth-attente={resteAttente} style={{fontSize:13,color:C.text,background:`${C.warn}12`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:'9px 11px',marginBottom:10,lineHeight:1.4}}>{(mode==='up'||mode==='reset'||(mode==='in'&&needConfirm)) ? tr('auth.delai.bouton') : tr('auth.delai.secondes', { n: resteAttente })}</div>}

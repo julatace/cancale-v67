@@ -18812,7 +18812,7 @@ function BandeauConfirmationAdresse({ onVoir }) {
     <div data-confirmation-adresse={c.etat} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 12,
       background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon ? C.accent : (c.etat === 'attente' || c.etat === 'encours') ? C.border : C.warn}`, fontSize: 13, lineHeight: 1.45, color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
-      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserConfAdr(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserConfAdr(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '0 2px', minHeight: 44, minWidth: 44, margin: '-12px -10px -12px 0' }}>×</button>}
     </div>
     </div>
   );
@@ -19025,7 +19025,7 @@ function BandeauLiaison() {
     <div data-liaison={l.etat} data-liaison-bloque={encours && l.bloque ? l.bloque : undefined} data-liaison-reste={reste ? reste.code : undefined} role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '0 0 12px', padding: '10px 12px', borderRadius: 12,
       background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${bon && !reste ? C.accent : (encours && !l.bloque) ? C.border : C.warn}`, fontSize: 13, lineHeight: 1.45, color: C.text }}>
       <span style={{ flex: 1, minWidth: 0 }}>{texte}</span>
-      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '0 2px', minHeight: 0 }}>×</button>}
+      {fermable && <button type="button" aria-label="Fermer" onClick={() => poserLier(null)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 17, lineHeight: 1, padding: '0 2px', minHeight: 44, minWidth: 44, margin: '-12px -10px -12px 0' }}>×</button>}
     </div>
     </div>
   );

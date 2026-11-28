@@ -34,6 +34,8 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 /* (22 nov., bugs-totale) Le champ est posé sur un fond gris arrondi (design) : sans marge intérieure, « Facultatif » et le texte
    tapé collaient à son bord droit, coupés par l'arrondi. */
 html body .vrm-set .vrm-set-champ { padding-left: 12px !important; padding-right: 12px !important; box-sizing: border-box; }
+/* (28 nov., boutons-donnees) le champ (« Ton prénom ») se voit à sa limite : filet ≥ 3:1 (WCAG 1.4.11). */
+html body .vrm-set .vrm-set-champ:not([type="checkbox"]) { box-shadow: inset 0 0 0 1px var(--n-bord-controle, #8A8A8A) !important; border-radius: 10px; }
 .vrm-set-profil { display:flex; align-items:center; gap:14px; padding:16px; border-radius:12px; margin:0 0 32px; }
 .vrm-set-profil > span:last-child { flex:1; min-width:0; }
 .vrm-set-avatar { width:52px; height:52px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:600; }
@@ -43,6 +45,8 @@ html body .vrm-set .vrm-set-champ { padding-left: 12px !important; padding-right
 .vrm-switch::before { content:''; position:absolute; left:0; top:6.5px; width:51px; height:31px; border-radius:999px; background:var(--vrm-sw, rgba(0,0,0,.3)); transition:background-color .2s ease; }
 .vrm-switch::after { content:''; position:absolute; top:8.5px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.05); transition:transform .22s cubic-bezier(.3,.7,.4,1); }
 .vrm-switch[aria-checked="true"]::after { transform:translateX(20px); }
+/* (28 nov., boutons-donnees) « non » : le rail seul (15 % d'encre) faisait 2,1:1 — un contour ≥ 3:1 (WCAG 1.4.11). */
+.vrm-switch:not([aria-checked="true"])::before { box-shadow: inset 0 0 0 1.5px var(--n-bord-controle, #8A8A8A); }
 .vrm-switch:disabled { opacity:.45; cursor:default; }
 .vrm-switch:focus-visible { outline:2px solid var(--vrm-focus,#16181D); outline-offset:2px; border-radius:999px !important; }
 /* Sous-écran (téléphone) : une barre de retour, un titre, puis le panneau. */

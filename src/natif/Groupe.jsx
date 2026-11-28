@@ -17,10 +17,13 @@ import React from 'react';
 import { cx } from './outils.js';
 import { Glyphe } from './icones.jsx';
 
-export function Groupe({ titre = '', grand = false, action = null, pied = '', nu = false, repli = null, className = '', attrs = null, children }) {
+// (28 nov., boutons-donnees — audit a11y P7) `niveau` : le niveau du titre (2 par défaut, sous le h1 de l'écran ; 3 pour un
+// groupe posé DANS une section titrée). Avant : h3 par défaut, posé directement sous le h1 (un niveau sauté).
+export function Groupe({ titre = '', grand = false, niveau = 2, action = null, pied = '', nu = false, repli = null, className = '', attrs = null, children }) {
   const id = React.useId();
   const ouvert = repli ? !!repli.ouvert : true;
-  const Titre = grand ? 'h2' : 'h3';
+  // `niveau={0}` : l'en-tête dit un ÉTAT (« 8 cochés · 15 sans bordereau »), pas le nom d'une section ⇒ un paragraphe.
+  const Titre = grand ? 'h2' : niveau === 0 ? 'p' : `h${Math.min(6, Math.max(2, Number(niveau) || 2))}`;
   let tete = null;
   if (titre || action) {
     const libelle = (

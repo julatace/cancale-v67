@@ -66,7 +66,7 @@ import { lireTableFamilles, lireCategoriesFiches, fabriqueFamDe } from '../categ
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
-import { tr } from '../i18n/index.js';
+import { tr, nombre as nombreI18n } from '../i18n/index.js';
 import { useLectureBornee } from '../attenteBornee.js';
 import { trj } from '../i18n/react.js';
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
@@ -79,8 +79,9 @@ import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « T
 // un minorant présenté comme un total.
 const texteEnLigne = (liveStats) => {
   if (!liveStats || liveStats.online == null) return '—';
-  if ((liveStats.annAConfirmer || []).length) return liveStats.online > 0 ? `≥ ${liveStats.online}` : '—';
-  return String(liveStats.online);
+  // (28 nov., boutons-donnees) Le nombre s'écrit avec ses milliers (« 1 025 », pas « 1025 ») ; le même nombre, la même règle.
+  if ((liveStats.annAConfirmer || []).length) return liveStats.online > 0 ? `≥ ${nombreI18n(liveStats.online)}` : '—';
+  return nombreI18n(liveStats.online);
 };
 // ⟦← App.jsx #7⟧
 // (6 nov., vague 3) LE PRÉDICAT « COMPTE VINTED ÉCARTÉ » D'UN ÉCRAN QUI VIT LONGTEMPS — UNE source :
@@ -1650,7 +1651,9 @@ function MesRecords({ vendu, releve, partiel, onGo }) {
   const R = React.useMemo(() => recordsDe({ vendu, releve, partiel }), [vendu, releve, partiel]);
   const [ouvert, setOuvert] = React.useState(null);
   const ligne = (k, lib, x, val, sous, attrs) => {
-    const vide = x === undefined ? 'je lis…' : x === null ? 'pas pu être lu' : null;
+    // (28 nov., boutons-donnees) Le relevé absent (vente, rapide) est « pas encore calculé » — la MÊME raison que « Tes 10
+    // meilleures ventes », qui lit le même relevé ; « pas pu être lu » reste pour les ventes (mois, semaine).
+    const vide = x === undefined ? 'je lis…' : x === null ? (k === 'vente' || k === 'rapide' ? tr('bd.records.pasCalcule') : 'pas pu être lu') : null;
     const corps = (
       <>
         <span className="vrm-sp-rec-lib">{lib}</span>
@@ -2101,7 +2104,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const enLigneTxt = texteEnLigne(liveStats);
   const dort = stock && stock.dort && stock.dort.seuils ? (stock.dort.seuils[30] || { n: 0 }).n : null;
   const tEnLigne = tuile('enligne', tr('stock.ligne'),
-    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> {tr('annonces.annonce')}{enLigneTxt === '1' ? '' : 's'}</>}</span>,
+    <span data-dash-stat="online">{enLigneTxt === '—' ? '—' : <><b style={{ fontWeight: 'inherit' }}>{enLigneTxt}</b> {tr('annonces.annonce')}{liveStats && liveStats.online === 1 && !(liveStats.annAConfirmer || []).length ? '' : 's'}</>}</span>,
     dort == null ? 'aujourd’hui' : dort === 0 ? 'aucune depuis 30 jours ou plus' : `dont ${dort} depuis 30 jours ou plus`,
     { 'data-sv-etat': enLigneTxt === '—' ? 'passu' : 'lu', 'data-sv-dort': dort == null ? '' : dort }, tr('stats.aujourdHuiQuelle'));
 
@@ -2210,7 +2213,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       {/* (10 nov., lot BM) « Vitesse d'envoi » : lu dans `vrm_vitesse_envoi` (src/vitesseEnvoi.js), 30 jours. */}
       <VitesseEnvoi owner={(AUTH.user && AUTH.user.id) || ''}/>
       {/* (11 nov., lot sante-comptes) « Santé des comptes » : chaque compte Vinted, en forme ou à surveiller (src/SanteComptes.jsx). */}
-      <SanteComptes variante="stats"/>
+      <SanteComptes variante="stats" sansCompte={sansCompteStats}/>
       {/* (10 nov., lot I) « Marge par plateforme » : vendu de `venduLignes`, bénéfice du relevé de Ventes (src/margePlateforme.js). */}
       <MargePlateforme liveStats={liveStats} releve={lp} de={b.de} a={b.a} onSaisirPrix={onSaisirPrix} lireLignesSites={lireLignesSitesMarge} sansCompte={sansCompteStats}/>
       {/* (11 nov., lot stats-categories) « Par catégorie » : seulement si DEUX familles sont connues (src/statsCategories.js). */}

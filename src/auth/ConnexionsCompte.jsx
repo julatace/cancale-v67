@@ -1,5 +1,6 @@
 import React,{useState,useEffect} from 'react';
-import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
+import { BoutonBase } from '../composants/Bouton.jsx';
+import { tr } from '../i18n/index.js';   // (28 nov., boutons-donnees) « Bientôt » ne dit plus « pas su » : rien n'est à lire   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 // (5 nov., chantier H) `nu` : posée dans une liste de Réglages — une LIGNE par compte,
 // sans sa propre carte (plus de carte dans la carte).
 // (11 nov., lot DJ6) Google ET Discord : « Relier » rattache l'identité au compte
@@ -14,7 +15,7 @@ export default function ConnexionsCompte({theme:C,providers,enabled,relier,lire,
  return <section aria-label="Connexions à VRM">{providers.map(pr=>{const actif=enabled(pr.id),ident=Array.isArray(associes)?associes.find(a=>a.fournisseur===pr.id):null,lie=!!ident;
   const delierIci=async()=>{setBusy(pr.id);setMessage('');try{const r=await delier(pr.id,ident.id,autres);if(r&&r.ok){setMessage(`${pr.label} n’est plus relié à ton compte VRM.`);setTour(t=>t+1);}else if(r&&r.error)setMessage(r.error);}catch(_){setMessage('Le retrait n’a pas pu être confirmé. Réessaie.');}finally{setBusy('');}};
   return <div key={pr.id} data-connexion-compte={pr.id} data-connexion-etat={associes===undefined?'lecture':associes===null?'pas-su':lie?'relie':'aucun'} style={nu?{padding:'10px 14px 10px 16px',minHeight:56,boxSizing:'border-box',color:C.text,display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',alignItems:'center',gap:10}:{padding:14,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,marginBottom:8,display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',alignItems:'center',gap:10}}>
-   <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:C.bg}}>{icone?.(pr.id)}</span><span><b style={{fontSize:nu?15:13,fontWeight:nu?600:700}}>{pr.label}</b><span style={{display:'block',fontSize:nu?13:11,color:C.muted,marginTop:2}}>{associes===null?'— pas su (réessaie plus tard)':lie?'Relié : connexion et photo de profil':'Pour te connecter et ta photo de profil'}</span></span></div>
+   <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:C.bg}}>{icone?.(pr.id)}</span><span><b style={{fontSize:nu?15:13,fontWeight:nu?600:700}}>{pr.label}</b><span style={{display:'block',fontSize:nu?13:11,color:C.muted,marginTop:2}}>{!actif&&!lie?tr('bd.connexion.bientot'):associes===null?'— pas su (réessaie plus tard)':lie?'Relié : connexion et photo de profil':'Pour te connecter et ta photo de profil'}</span></span></div>
    {lie?(delier?<BoutonBase variante="discret"  data-connexion-delier={pr.id} disabled={!!busy} onClick={delierIci}>{busy===pr.id?'…':'Délier'}</BoutonBase>:<span style={{fontSize:12,color:C.muted}}>Relié</span>)
     :!actif?<span data-connexion-indispo={pr.id} style={{fontSize:12,color:C.muted,fontWeight:600}}>Bientôt</span>
     :associes===null?null

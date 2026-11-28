@@ -122,6 +122,8 @@
 }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form h2 { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form input { background: var(--sb-creux) !important; border: 0 !important; box-shadow: none !important; border-radius: var(--sb-r-champ) !important; color: var(--sb-encre) !important; }
+/* (28 nov., boutons-donnees) un champ de connexion se voit à sa limite, pas seulement à son texte d'exemple : filet ≥ 3:1 (WCAG 1.4.11). */
+:root:root:root:root:root:root body .vrm-cx .vrm-cx-form input:not([type="checkbox"]):not([type="radio"]) { box-shadow: inset 0 0 0 1px var(--n-bord-controle, #8A8A8A) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-form input::placeholder { color: var(--sb-encre-2) !important; opacity: 1 !important; }
 :root:root:root:root:root:root body .vrm-cx [data-auth-valider] {
   min-height: 52px !important; height: 52px !important; border: 0 !important; border-radius: 26px !important; background: var(--sb-plein-fond, var(--sb-encre)) !important; color: var(--sb-plein-encre, var(--sb-sur-encre)) !important;

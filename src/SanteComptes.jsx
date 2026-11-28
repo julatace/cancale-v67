@@ -220,10 +220,13 @@ function Compte({ c }) {
 }
 
 // La carte (Statistiques) ou le panneau (Paramètres → Mes comptes).
-export default function SanteComptes({ variante = 'stats', comptes = null }) {
+// (28 nov., boutons-donnees) `sansCompte` : l'absence de tout compte PROUVÉE par la coque. Sans cette preuve, une liste
+// vide est « pas su » (base injoignable, comptes pas encore lus), jamais « Aucun compte relié » (§5 : « rien lu » ≠ « rien »).
+export default function SanteComptes({ variante = 'stats', comptes = null, sansCompte = undefined }) {
   useLangue();
   const S = useSanteComptes({ comptes });
   const corps = S.etat === 'encours' && !S.comptes.length ? <p className="vrm-sc-vide" data-sc-vide="encours">{tr('sante.encours')}</p>
+    : !S.comptes.length && sansCompte === false ? <p className="vrm-sc-vide" data-sc-vide="passu">{tr('bd.sante.pasSu')}</p>
     : !S.comptes.length ? <p className="vrm-sc-vide" data-sc-vide="aucun">{tr('sante.aucun')}</p>
       : S.comptes.map((c) => <Compte key={c.uid} c={c}/>);
   const n = S.aSurveiller.length;

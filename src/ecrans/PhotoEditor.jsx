@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { C, FermeAuRetour, PhotoVinted } from '../App.jsx';
+import { tr } from '../i18n/index.js';
+import { ModaleAccessible } from '../natif/modaleAccessible.js';   // (28 nov., audit a11y O1)
 
 
 // ⟦← App.jsx #1⟧
@@ -101,7 +103,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
   );
 
   return createPortal(
-    <div data-noswipe onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <ModaleAccessible onFermer={onClose} data-noswipe onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'92vh',borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <div style={{display:'flex',gap:12,alignItems:'center',padding:'14px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -109,7 +111,7 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
             <div style={{fontSize:15,fontWeight:700,color:C.text}}>✂️ Retoucher la photo</div>
             <div style={{fontSize:12,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{refTitle || 'Recadre, zoome, redresse'}</div>
           </div>
-          <button type="button" onClick={onClose} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
+          <button type="button" onClick={onClose} aria-label={tr('bd.fermer')} style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1,minWidth:44,minHeight:44}}>×</button>
         </div>
 
         <div style={{flex:1,minHeight:0,overflow:'auto',WebkitOverflowScrolling:'touch',overscrollBehavior:'contain',padding:'14px 16px'}}>
@@ -165,6 +167,6 @@ function PhotoEditor({ refPhoto, refTitle, onClose, toast }) {
           </div>
         )}
       </div>
-    </div>, document.body);
+    </ModaleAccessible>, document.body);
 }
 export { PhotoEditor };

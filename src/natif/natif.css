@@ -189,7 +189,7 @@
   }
   .n-segmente-curseur {
     position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n-seg-n, 2));
-    border-radius: var(--n-r-plaque); background: var(--n-curseur); box-shadow: var(--n-ombre-xs), inset 0 0 0 1px var(--n-bord);
+    border-radius: var(--n-r-plaque); background: var(--n-curseur); box-shadow: var(--n-ombre-xs), inset 0 0 0 1px var(--n-bord-controle, var(--n-bord));   /* (28 nov.) le choix se voit à son filet ≥ 3:1, pas seulement au gras (WCAG 1.4.11) */
     transform: translate3d(calc(100% * var(--n-seg-i, 0)), 0, 0);
     transition: transform var(--n-duree) var(--n-courbe);
   }
@@ -372,7 +372,7 @@
     box-sizing: border-box; display: flex; align-items: center; height: var(--n-cible); margin: 0; padding: 0 0 0 10px;
     border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
     border-radius: var(--n-r-bouton) / calc(var(--n-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
-    background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); color: var(--n-encre-2);
+    background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord-controle, var(--n-bord)); color: var(--n-encre-2);
     font: var(--n-t-corps);
   }
   .n-recherche:focus-within { outline: 2px solid var(--n-accent); outline-offset: -6px; }

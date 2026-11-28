@@ -36,8 +36,10 @@ export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir
       </div> : null}
       <div className="n-laterale-liste">
         {groupes.map((g, i) => (
-          <div className="n-laterale-groupe" key={g.titre || i}>
-            {g.titre ? <h2 className="n-laterale-titre">{g.titre}</h2> : null}
+          // (28 nov., boutons-donnees — audit a11y P8) Le nom d'un groupe de la barre n'est PAS un titre de la page (il passait
+          // avant le h1 de l'écran) : un libellé qui nomme son groupe (role=group + aria-labelledby).
+          <div className="n-laterale-groupe" key={g.titre || i} role={g.titre ? 'group' : undefined} aria-labelledby={g.titre ? `n-lat-g-${i}` : undefined}>
+            {g.titre ? <p className="n-laterale-titre" id={`n-lat-g-${i}`}>{g.titre}</p> : null}
             {g.entrees.map((o) => (
               <button
                 key={o.cle}

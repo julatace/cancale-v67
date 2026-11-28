@@ -29,6 +29,7 @@ import { completerRecettes, completerAchats, facturesParVente, SELECT_FACTURES_R
 import RegistresVue from '../RegistresVue.jsx';
 import { xlsxClasseur } from '../xlsxSimple.js';
 import { tr, localeCourante } from '../i18n/index.js';
+import { useModaleAccessible } from '../natif/modaleAccessible.js';
 import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part « à venir », la règle de la coque
 import { resumeEtapes, ouvrirArgentAVenir, Groupe as GroupeAVenir } from '../ArgentAVenirEcran.jsx';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
@@ -1289,6 +1290,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
 
 // Formulaire de création d'une facture
 function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
+  const refModale = useModaleAccessible(onClose);   // (28 nov., audit a11y O1) role=dialog, focus dedans, Tab piégé, Échap
   const [data,setData]=useState({
     productId:'',itemName:'',sellPrice:'',saleDate:tod(),
     buyerName:'',buyerEmail:'',buyerAddress:'',
@@ -1305,13 +1307,13 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
   };
   
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
+    <div ref={refModale} role="dialog" aria-modal="true" aria-label={tr('compta.nouvelleFacture2')} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={onClose}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.nouvelleFacture2')}</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} aria-label={tr('bd.fermer')} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0,minWidth:44,minHeight:44}}>×</button>
         </div>
         <div style={{fontSize:11,color:C.muted,marginBottom:14}}>{tr('compta.numeroAuto')} <b style={{color:C.accentTexte}}>{nextNumber}</b></div>
         
@@ -1365,6 +1367,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
 // seule entité, c'est exactement comme avant. `setSettings` continue de refléter
 // l'entité ACTIVE dans `vinted_invoice_settings` (pour tout code hérité qui le lit).
 function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,onClose}) {
+  const refModale = useModaleAccessible(onClose);   // (28 nov., audit a11y O1) role=dialog, focus dedans, Tab piégé, Échap
   const list = (Array.isArray(entreprises)&&entreprises.length) ? entreprises : [{id:'ent_1',...settings}];
   const [sel,setSel]=useState(()=>{ const a=list.find(e=>e.id===activeEnt); return (a&&a.id)||list[0].id; });
   const cur = list.find(e=>e.id===sel)||list[0];
@@ -1378,12 +1381,12 @@ function InvoiceSettings({settings,setSettings,entreprises,setEntreprises,active
   const delEnt=()=>{ if(list.length<=1) return; const next=list.filter(e=>e.id!==sel); const newActive=(activeEnt===sel)?next[0].id:activeEnt; persist(next,newActive); const nsel=next[0].id; setSel(nsel); setData(next[0]); };
   const makeActive=()=>{ const next=list.map(e=>e.id===sel?{...e,...data,id:sel}:e); persist(next,sel); };
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
+    <div ref={refModale} role="dialog" aria-modal="true" aria-label={tr('compta.reglagesFactures2')} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}} onClick={onClose}>
       <FermeAuRetour fermer={onClose}/>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:20,maxWidth:480,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <h3 style={{margin:0,color:C.accentTexte}}>{tr('compta.reglagesFactures2')}</h3>
-          <button type="button" onClick={onClose} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0}}>×</button>
+          <button type="button" onClick={onClose} aria-label={tr('bd.fermer')} style={{background:'none',border:'none',color:C.muted,fontSize:20,cursor:'pointer',padding:0,minWidth:44,minHeight:44}}>×</button>
         </div>
         {/* Sélecteur de micro-entreprise */}
         <div style={{marginBottom:12}}>
@@ -1723,11 +1726,12 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
           </div>
           {/* (16 oct.) Le contrôle segmenté PARTAGÉ (`.vrm-seg`, celui des
               sous-onglets de plateforme) : plus de segment rempli d'accent. */}
-          <nav role="group" aria-label={tr('stats.periodeChiffreAffaires')} className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, flex: '1 1 260px', maxWidth: 360, margin: 0 }}>
+          {/* (28 nov., boutons-donnees — audit a11y R1) un groupe de choix, pas un repère de navigation : <div role=group>. */}
+          <div role="group" aria-label={tr('stats.periodeChiffreAffaires')} className="vrm-seg" data-segment="" style={{ '--seg-ink': C.text, '--seg-muted': C.muted, '--seg-point': C.accent, flex: '1 1 260px', maxWidth: 360, margin: 0 }}>
             {PERIODES_CA.map(([k, l]) => (
               <button key={k} type="button" onClick={() => choisir(k)} aria-pressed={periode === k} aria-current={periode === k ? 'page' : undefined} data-ca-choix={k} className="vrm-seg-btn">{l}</button>
             ))}
-          </nav>
+          </div>
         </div>
         {calc.etat !== 'lu' ? (
           <div style={{ padding: '16px', fontSize: 13, color: C.muted, lineHeight: 1.55 }}>

@@ -20,7 +20,9 @@
 //    T8 message d'erreur technique à l'écran (TypeError, Failed to fetch, SyntaxError, « Unexpected token ») ;
 //    T9 montant mal formé : « € » orphelin, « NaN € », « 12,5 € » (un seul décimal), « €12 » ;
 //    T10 (base PANNE seulement) un « 0 € » ou « 0 vente(s)/annonce(s)/achat(s) » : un zéro qui veut dire « pas su » ;
-//    T11 erreur de page (pageerror) — un écran qui casse sur une base vide ou en panne.
+//    T11 erreur de page (pageerror) — un écran qui casse sur une base vide ou en panne ;
+//    T12 grand nombre sans séparateur de milliers (« 1025 annonces » ; hors N°, années, identifiants) ;
+//    T14 (base PANNE seulement) « aucun compte … relié » : la lecture a échoué, l'absence n'est pas prouvée.
 //  Juge le texte rendu (innerText visible), jamais un libellé précis ; chaque défaut sort avec sa phrase en contexte.
 //
 //  `BASES=volume,vide,panne` `ECRANS=a,b` `LARGEURS=390,1512` `THEMES=clair` `SORTIE=dossier` (défaut
@@ -78,9 +80,11 @@ function lire({ mut }) {
       if (!el.getClientRects().length) continue;
       vus.add(el);
       // La phrase du bloc (le texte de l'élément le plus proche qui ressemble à une ligne : rangée, paragraphe, bouton).
-      const bloc = el.closest('li, p, button, [role="button"], .n-rangee, tr, h1, h2, h3, label, dd, dt, td, th') || el;
+      const bloc0 = el.closest('li, p, button, [role="button"], .n-rangee, tr, h1, h2, h3, label, dd, dt, td, th');
+      const bloc = bloc0 && r.contains(bloc0) && (bloc0.innerText || '').length < 240 ? bloc0 : el;
       const t = (bloc.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-      if (t) lignes.push(t.slice(0, 220));
+      // Un bloc qui porte un champ (« Je veux toucher [   ] € ») : le chiffre est dans le champ, pas dans le texte.
+      if (t) lignes.push((bloc.querySelector && bloc.querySelector('input, select') ? '[saisie] ' : '') + t.slice(0, 220));
     }
     // Les champs remplis (une valeur « undefined » dans un champ se voit aussi).
     for (const i of r.querySelectorAll('input:not([type=hidden]):not([type=password]), select')) {
@@ -103,7 +107,7 @@ const REGLES = [
     const m = t.match(new RegExp(`(?<![\\d,.])(?<!\\d[\\s\\u202f\\u00a0])\\b1[\\s\\u202f\\u00a0](${NOMS.join('|')})s\\b`, 'i')); return m ? m[0] : null; } },
   { d: 'T3', re: null, test: (t) => {
     // « 3 vente » : un nombre ≥ 2 suivi du nom au singulier (« 2 ventes » est juste ; « 0 vente » se lit au singulier en français).
-    const m = t.match(new RegExp(`(?<![\\d,.])\\b([2-9]|[1-9]\\d+)[\\s\\u202f\\u00a0](${NOMS.join('|')})(?![s\\wàâçéèêëîïôûùüÿœ-])`, 'i'));
+    const m = t.match(new RegExp(`(?<![\\w,.-])([2-9]|[1-9]\\d+)[\\s\\u202f\\u00a0](${NOMS.join('|')})(?![s\\wàâçéèêëîïôûùüÿœ-])`));   // casse exacte : « XT-6 Offre » est un titre
     if (!m) return null;
     // « 3 jour(s) », « 2 lot de » : les formes lues comme une unité (« 2 lot de 3 ») restent jugées ; un « N° 2 vente » non.
     if (/N°\s?$/.test(t.slice(0, m.index + 1))) return null;
@@ -113,13 +117,26 @@ const REGLES = [
   { d: 'T6', re: /(^|\s)n\/d(\s|$)/i },
   { d: 'T7', re: /(^|\s)(ecran|ecrans|commun|natif|reglages|parametres|ventes|annonces|achats|argent|fiche|stock|messages|emails|aujourdhui|compta|bouton|erreur)\.[a-z][\w]*\.[a-z][\w.]*(\s|$)/i },
   { d: 'T8', re: /TypeError|ReferenceError|SyntaxError|Failed to fetch|NetworkError|Unexpected token|is not a function|Cannot read propert/ },
-  { d: 'T9', re: /NaN[\s  ]?€|(^|[^\d\s  ])[\s  ]€(?!\w)|\d,\d[\s  ]?€|€\d/ },
+  // T12 grand nombre sans séparateur de milliers (« 1025 annonces ») : hors N°, années, versions, heures, identifiants.
+  { d: 'T12', re: null, test: (t) => {
+    const re = /(?<![\w°#.,\/:\u202f\u00a0-])(\d{4,})(?![\w.,\/:%-])/g; let m;
+    while ((m = re.exec(t))) {
+      const avant = t.slice(Math.max(0, m.index - 4), m.index);
+      if (/N°\s?$|n°\s?$|#\s?$/i.test(avant)) continue;
+      if (/^(19|20)\d\d$/.test(m[1])) continue;   // une année
+      if (m[1].length > 6) continue;                // un identifiant (transaction, suivi)
+      if (/^\[champ\]/.test(t)) continue;
+      return m[0];
+    }
+    return null; } },
+  { d: 'T9', re: /NaN[\s\u202f\u00a0]?€|(?<![\d\s\u202f\u00a0])[\s\u202f\u00a0]€(?!\w)|\d,\d[\s\u202f\u00a0]?€|€\d/ },
 ];
 const ZERO_PANNE = /(^|[^\d,.\s  ])[\s  ]?\b0([,.]0+)?[\s  ]?(€|ventes?\b|annonces?\b|achats?\b|colis\b|paires?\b)/i;
 
 // Exceptions DITES (chacune avec sa raison) : un texte qui ressemble à un défaut sans en être un.
 const EXCEPTIONS = [
   { d: 'T5', re: /recettes encaissées.*URSSAF|URSSAF.*encaiss/i, pourquoi: 'la phrase cite le vocabulaire de l\'URSSAF (audit-urssaf l\'admet)' },
+  { d: 'T9', re: /^\[saisie\]/, pourquoi: 'le montant est dans le champ de saisie, à côté du « € »' },
   { d: 'T1', re: /\[champ\]/, pourquoi: 'jamais : un champ qui affiche undefined est un défaut', jamais: true },
 ];
 
@@ -133,6 +150,8 @@ function juger(lignes, base) {
       out.push({ d: r.d, extrait: String(m).trim(), phrase: t, admis: ex ? ex.pourquoi : '' });
     }
     if (base === 'panne') { const m = t.match(ZERO_PANNE); if (m) out.push({ d: 'T10', extrait: m[0].trim(), phrase: t, admis: '' }); }
+    // T14 (base PANNE) « aucun compte » : une lecture ratée n'est pas une absence prouvée (§5 « rien lu » ≠ « rien »).
+    if (base === 'panne') { const m = t.match(/aucun compte[^.]*reli[ée]/i); if (m) out.push({ d: 'T14', extrait: m[0].trim(), phrase: t, admis: '' }); }
   }
   // Un même défaut sur la même phrase une fois.
   const vu = new Set(); return out.filter((x) => { const k = x.d + '|' + x.phrase; if (vu.has(k)) return false; vu.add(k); return true; });
@@ -170,7 +189,7 @@ async function ouvrirEcran(nav, W, sombre, ec, base) {
         const defauts = juger(m.lignes, base);
         for (const e of o.erreurs) defauts.push({ d: 'T11', extrait: e.slice(0, 120), phrase: '(erreur de page)', admis: '' });
         if (o.manque) defauts.push({ d: 'T11', extrait: o.manque, phrase: '(écran non atteint)', admis: '' });
-        const r = { base, ecran: ec.cle, W, theme: th, lignes: m.lignes.length, defauts };
+        const r = { base, ecran: ec.cle, W, theme: th, lignes: m.lignes.length, defauts, texte: m.lignes };
         resultats.push(r);
         const vrais = defauts.filter((x) => !x.admis);
         if (vrais.length) await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `${base}-${ec.cle}-${W}-${th}.png`) }).catch(() => {});

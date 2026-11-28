@@ -28,6 +28,7 @@ import { chaineRepub, planRepub, resumeRepub, dureeCourte, gesteProbleme } from 
 import { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from '../repubVerif.js';
 import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
+import { useModaleAccessible } from '../natif/modaleAccessible.js';
 import '../republier-guide.css';
 import '../republication.css';   // (17 nov., 5.408) chaîne, plan, bilan
 import '../republier-feuille.css';   // (23 nov.) Republier / Publier à la main refaits : une étape à la fois, curseurs propres
@@ -37,8 +38,11 @@ import { annoncerFicheAPublier, ACTIONS_REPUB, AUTH, Avancement, Bouton, C, Chip
 // (9 nov., direction artistique 4) LE VOILE DES ATELIERS : un PORTAIL sur <body> (§7 :
 // une feuille posée dans un conteneur qui crée un contexte d'empilement passe SOUS la
 // barre du bas sur iPhone), la même forme que la feuille unique (styles-premium.css §12).
+// (28 nov., boutons-donnees — audit a11y O1) Une vraie fenêtre : role=dialog, aria-modal, nommée par son titre, focus dedans,
+// Tab piégé, Échap = toucher le voile, le focus rendu à la fermeture (src/natif/modaleAccessible.js).
 const VoileAtelier = ({ onClick, children }) => {
-  const voile = <div className="vrm-atelier-voile" onClick={onClick} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>{children}</div>;
+  const ref = useModaleAccessible(onClick);
+  const voile = <div ref={ref} role="dialog" aria-modal="true" className="vrm-atelier-voile" onClick={onClick} data-noswipe="1" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>{children}</div>;
   return typeof document !== 'undefined' && document.body ? createPortal(voile, document.body) : voile;
 };
 
@@ -137,7 +141,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Préparer l'annonce</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Même N°.</div>
           </div>
-          <button type="button" onClick={fermer} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={fermer} aria-label={tr('bd.fermer')} style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: C.muted }}>
@@ -274,7 +278,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ Lots — titres &amp; prix</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Gardé en brouillon : <b>rien n'est envoyé à Vinted</b>. Mêmes N°.</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label={tr('bd.fermer')} style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* ── sélection ─────────────────────────────────────────── */}
@@ -470,7 +474,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>✨ File de publication</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Ordonne et cadence tes brouillons. {reel ? <><b style={{ color: C.warn }}>Publication réelle</b> — chaque annonce sera modifiée sur Vinted (prix baissé), une par une, à l'espacement choisi.</> : <><b>Essai à blanc</b> — rien n'est publié tant que tu n'actives pas la publication réelle, plus bas.</>}</div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label={tr('bd.fermer')} style={{ border: 'none', background: 'transparent', fontSize: 20, color: C.muted, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* ── à ajouter ─────────────────────────────── */}

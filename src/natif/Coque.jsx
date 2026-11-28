@@ -144,6 +144,24 @@ export function Coque({ onglets = [], plus = [], actif = '', onChoisir, titre = 
   const poserPlus = (v) => { if (onPlus) onPlus(v); if (plusOuvert == null) setPlusLocal(v); };
   const trois = ordinateur && volets === 'trois';
 
+  // (28 nov., boutons-donnees — audit d'accessibilité O3, WCAG 2.4.2) Le titre du document dit l'écran (« Ventes · VRM ») :
+  // le lecteur d'écran, l'historique et l'onglet du navigateur le nomment. Le nom vient de l'entrée de navigation de
+  // l'écran (le même mot que la barre), sinon du grand titre rendu ; le titre d'origine revient au démontage.
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const origine = document.title;
+    const entree = [...onglets, ...plus.flatMap((g) => g.entrees || [])].find((o) => o && o.cle === actif);
+    const poser = () => {
+      const h1 = ref.current && ref.current.querySelector('h1');
+      const nom = (typeof titre === 'string' && titre) || (entree && typeof entree.libelle === 'string' && entree.libelle) || (h1 && h1.textContent.trim()) || '';
+      if (nom) document.title = `${nom} · VRM`;
+    };
+    poser();
+    const t = setTimeout(poser, 400);
+    return () => { clearTimeout(t); document.title = origine; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actif, titre]);
+
   // ⌘K / Ctrl+K / « / » : la recherche.
   React.useEffect(() => {
     const touche = (e) => {

@@ -197,7 +197,7 @@
   /* Champ : libellé 13 gris, saisie 17 (l'iPhone ne zoome pas), 44 de haut, sur la carte-2. */
   .n-champ { display: flex; flex-direction: column; gap: 6px; margin: 0 var(--n-marge) 16px; }
   .n-champ-libelle { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
-  .n-champ-ligne { display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0 12px; border: 0; border-radius: var(--n-r-bouton); background: var(--n-carte-2); }
+  .n-champ-ligne { display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0 12px; border: 0; border-radius: var(--n-r-bouton); background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-bord-controle, transparent); }
   .n-champ-saisie { flex: 1 1 auto; min-width: 0; height: var(--n-cible); margin: 0; padding: 0; border: 0; background: transparent; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; outline: none; }
   .n-champ-suffixe { font: var(--n-t-corps); color: var(--n-encre-2); }
   .n-champ-ligne:focus-within { border-color: var(--n-accent); }

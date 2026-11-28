@@ -212,11 +212,29 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   const ouverte = rangChoisi(rangs, choisie);
   // La fraîcheur : l'heure où la liste montrée a été lue ici (« pas su » si la lecture a échoué) ; ⟳ relance la lecture EXISTANTE.
   React.useEffect(() => { if (erreur) setMajLe(null); else if (lu) setMajLe(Date.now()); }, [lu, erreur, rangs]);
+  // (28 nov., boutons-donnees — audit a11y O2, WCAG 2.4.3) Le focus ENTRE dans le volet à son ouverture (son titre), Échap le
+  // ferme — même pris dans le tableau, qui retenait la touche — et rend le focus à la ligne d'où il venait.
+  const refVolet = React.useRef(null);
+  const retourFocus = React.useRef(null);
+  const fermerVolet = React.useCallback(() => {
+    setChoisie(null);
+    const r = retourFocus.current; retourFocus.current = null;
+    if (r && r.isConnected) setTimeout(() => { try { r.focus({ preventScroll: true }); } catch (_) {} }, 0);
+  }, []);
+  const cleOuverte = ouverte ? ouverte.cle : '';
   React.useEffect(() => {
-    if (!ouverte) return undefined;
-    const f = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) setChoisie(null); };
-    window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
-  }, [ouverte]);
+    if (!cleOuverte) return undefined;
+    const a = refVolet.current;
+    if (a && !a.contains(document.activeElement)) {
+      if (!retourFocus.current) retourFocus.current = document.activeElement;
+      const t = a.querySelector('.n-vt-volet-titre'); if (t) try { t.focus({ preventScroll: true }); } catch (_) {}
+    }
+    // (audit a11y P9) Un texte coupé (« Bordereau… ») se lit en entier au survol et au lecteur : son `title`.
+    const titres = () => { if (!a) return; for (const x of a.querySelectorAll('*')) { if (x.children.length || x.title || x.scrollWidth <= x.clientWidth + 1) continue; const cs = getComputedStyle(x); if (cs.textOverflow === 'ellipsis' || cs.overflow === 'hidden') x.title = (x.textContent || '').trim(); } };
+    const tt = setTimeout(titres, 250);
+    const f = (e) => { if (e.key === 'Escape' && (!e.defaultPrevented || (a && a.contains(e.target)))) fermerVolet(); };
+    window.addEventListener('keydown', f, true); return () => { clearTimeout(tt); window.removeEventListener('keydown', f, true); };
+  }, [cleOuverte, fermerVolet]);
   // UNE vérité : une lecture ratée sans rien de lu ⇒ « pas su » (jamais « Mis à jour à l'instant » + « Rien à envoyer »).
   const rangsVus = filtrerPlateforme(rangs, siteF);
   const filtresSite = [filtreTableau(fp.options, siteF, setSiteF)].filter(Boolean);
@@ -298,10 +316,10 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
           feuille : avant, le retour quittait Ventes pour l'écran d'avant, volet ouvert. Une entrée pour tout le temps où un détail
           est montré (passer d'une vente à l'autre n'en ajoute pas). */}
       {ouverte ? <FermeAuRetourUi fermer={() => setChoisie(null)}/> : null}
-      {ouverte ? <aside className="n-vt-volet" data-vn-detail={ouverte.cle} aria-label={ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}>
+      {ouverte ? <aside ref={refVolet} className="n-vt-volet" data-vn-detail={ouverte.cle} aria-label={ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}>
         <div className="n-vt-volet-tete">
-          <span className="n-vt-volet-titre">{ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}</span>
-          <BoutonIcone libelle={tr('vt.fermer')} icone={<Icon name="close" size={20}/>} onClick={() => setChoisie(null)} attrs={{ 'data-vt-fermer': '' }}/>
+          <span className="n-vt-volet-titre" tabIndex={-1}>{ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}</span>
+          <BoutonIcone libelle={tr('vt.fermer')} icone={<Icon name="close" size={20}/>} onClick={fermerVolet} attrs={{ 'data-vt-fermer': '' }}/>
         </div>
         <div className="n-vt-volet-corps"><DetailVente r={ouverte} g={g} Icon={Icon} Logo={Logo} Photo={Photo} Generer={Generer}/></div>
       </aside> : null}
@@ -449,7 +467,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
                 <Rangee icone={<Icon name="printer" size={22}/>} ton="ambre" titre={seulSans ? tr('vt.sansTout') : tr('vt.sansAFaire', { n: nSansP })} fin="chevron"
                   onClick={() => setSeulSans(!seulSans)} attrs={{ 'data-vn-sans-filtre': seulSans ? '1' : '0', 'aria-pressed': seulSans ? 'true' : 'false' }}/>
               </Groupe> : null}
-              <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(eRangsP.length), 'data-vn-affiche': nEnvP == null ? '' : String(nEnvP), 'data-fp-filtre': filtreP ? effP : undefined }}>
+              <Groupe titre={teteListe} niveau={teteListe === tr('vv.seg.expedier') ? 2 : 0} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(eRangsP.length), 'data-vn-affiche': nEnvP == null ? '' : String(nEnvP), 'data-fp-filtre': filtreP ? effP : undefined }}>
                 <ParPaquets items={seulSans ? rangs.filter(sansBordereau) : rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
                 {retoursTel}

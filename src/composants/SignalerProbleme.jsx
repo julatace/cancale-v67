@@ -309,7 +309,7 @@ export function MesSignalements({ entetes, fetcher = (typeof fetch === 'function
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { lire(); }, [lire]);
   if (liste === undefined) return <p style={S.muet} data-mes-signalements="lecture">…</p>;
-  if (liste === null) return <p style={S.muet} data-mes-signalements="pas-su">{tr('sg.suivi.pasSu')} <button type="button" className="vrm-lien-action" onClick={lire} style={{ minHeight: 44 }}>↻</button></p>;
+  if (liste === null) return <p style={S.muet} data-mes-signalements="pas-su">{tr('sg.suivi.pasSu')} <button type="button" className="vrm-lien-action" onClick={lire} style={{ minHeight: 44 }} aria-label={tr('bd.reessayer')} title={tr('bd.reessayer')}>↻</button></p>;
   if (!liste.length) return <p style={S.muet} data-mes-signalements="0">{tr('sg.suivi.aucun')}</p>;
   const quand = (iso) => (iso ? dateI18n(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
   return (
