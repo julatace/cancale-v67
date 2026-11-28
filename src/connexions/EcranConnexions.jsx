@@ -210,6 +210,7 @@ export default function EcranConnexions({ comptesVinted, ecarte = () => false, f
 }
 
 // ── La ligne d'Aujourd'hui ─────────────────────────────────────────────────
+const allerToutVaBien = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=toutvabien' })); } catch (_) {} };
 // Rien tant qu'on lit, rien sur « pas su », rien quand tout va bien : une ligne et UN bouton seulement quand un geste attend.
 export function LigneConnexionsJournee({ comptesVinted, ecarte = () => false, onOuvrir, faits: faitsForces = null, maintenant: maintenantForce = null }) {
   const lus = useFaitsConnexions({ suivre: false, autresSites: false });
@@ -224,7 +225,9 @@ export function LigneConnexionsJournee({ comptesVinted, ecarte = () => false, on
     <div className="cnx-journee" role="status" data-cnx-journee={a.code}>
       <span className="cnx-journee-point" aria-hidden="true"/>
       <span className="cnx-journee-texte">{tr(a.cle, vars)}</span>
-      <Actions elements={[{ cle: 'voir', icone: <Icon name="link" size={18}/>, libelle: tr('cnx.geste.voir'), onClick: onOuvrir }]}/>
+      {/* (27 nov., lot tout-va-bien) Un compte pas relu : « Voir » mène à « Tout va bien ? », qui dit chaque morceau (le site,
+          sa dernière lecture complète, l'extension, la dernière capture) et LE geste. Les autres alertes : la page Connexions. */}
+      <Actions elements={[{ cle: 'voir', icone: <Icon name="link" size={18}/>, libelle: tr('cnx.geste.voir'), onClick: a.code === 'relu' ? allerToutVaBien : onOuvrir, attrs: a.code === 'relu' ? { 'data-cnx-toutvabien': '' } : undefined }]}/>
     </div>
   );
 }
