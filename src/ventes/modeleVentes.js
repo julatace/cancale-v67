@@ -93,6 +93,8 @@ export function rangeeEnvoyer(f = {}) {
     place: placeDeRangee(f.place || null),
     vendueIlYa: Number.isFinite(f.attente) ? f.attente : null,
     depose: !!f.depose,
+    // (28 nov., « expédié sans l'extension ») la liste des ventes de SON compte a plus de 24 h : « à envoyer » n'est pas sûr.
+    aConfirmer: !!(f.notes || []).some((n) => n && n.cle === 'a-confirmer'),
     notes: (f.notes || []).filter((n) => n && n.cle && str(n.texte)),   // ambre : N° de l'e-mail ≠ N° de la vente, imprimé sans N°…
     fiche: f.fiche || null,     // les `data-fl-*` de la rangée (src/ficheLigne.js) : l'identité qui ouvre SA fiche
     detail: f.detail || null,   // ce que le détail montre (vendu, pour toi, étapes…) — rempli par l'écran

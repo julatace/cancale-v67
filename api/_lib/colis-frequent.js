@@ -29,7 +29,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import crypto from 'crypto';
 import { RYTHME_MS, CADENCE_COLIS_MS, MARGE_RYTHME_MS } from './transporteurs.js';
-import { RYTHME_DANGER_MS, RYTHME_SUIVI_MS, FENETRE_DEPART_J } from './depart-colis.js';
+import { RYTHME_DANGER_MS, RYTHME_SUIVI_MS, RYTHME_DEPART_MS, FENETRE_DEPART_J } from './depart-colis.js';
+// (28 nov., « expédié sans l'extension ») Un bordereau de VENTE reçu depuis moins de ce délai fait visiter
+// son vendeur : la PREMIÈRE lecture de son départ chez le transporteur n'attend plus le cron du matin.
+export const PREMIER_DEPART_MS = 3 * 86400000;
 export { CADENCE_COLIS_MS, MARGE_RYTHME_MS };
 
 export const PREMIERE_LECTURE_MS = 24 * 3600000;   // un e-mail « disponible » de moins d'un jour
@@ -64,6 +67,16 @@ export function requetesColisDus(maintenant = Date.now()) {
     // savent dans l'heure. Seulement les 21 jours de la fenêtre du départ (`FENETRE_DEPART_J`) : un vieux colis
     // jamais clos ne fait plus visiter son vendeur.
     `app_data?id=like.depart_*&meta->>etat=in.(en_route,disponible)&meta->>priseAt=gte.${encodeURIComponent(iso(maintenant - FENETRE_DEPART_J * 86400000))}&or=(meta->>clos.is.null,meta->>clos.eq.false)&meta->>essai=lt.${avant(RYTHME_SUIVI_MS)}&select=owner`,
+    // (28 nov., Julien : « une paire vendue et déjà expédiée, VRM me proposait encore d'imprimer le bordereau […]
+    // tout doit se mettre à jour automatiquement sans l'extension ») MESURÉ dans le code : un colis VENDU pas
+    // encore PRIS EN CHARGE ne faisait visiter personne ici — sa preuve de départ n'était lue qu'au cron du matin
+    // (6 h) ou app ouverte. App fermée, le widget, la cloche et le rappel le disaient « à expédier » toute la
+    // journée. Désormais : (a) une ligne `depart_` pas encore prise en charge, pas morte, dont l'essai a passé
+    // son rythme (2 h), dans la fenêtre du départ ; (b) un bordereau de vente qui porte un n°, reçu depuis moins
+    // de 3 jours (sa première lecture). La visite ne FORCE aucune lecture : le passage garde son rythme et ses
+    // reculs (`prochainEssaiDepart`), et un transporteur sans lecture serveur n'est jamais interrogé.
+    `app_data?id=like.depart_*&meta->>priseAt=is.null&or=(meta->>fini.is.null,meta->>fini.eq.false)&meta->>essaiRes=not.in.(cp-inconnu,expire)&meta->>essai=lt.${avant(RYTHME_DEPART_MS)}&meta->>essai=gte.${encodeURIComponent(iso(maintenant - FENETRE_DEPART_J * 86400000))}&select=owner`,
+    `app_data?id=like.email_bord_*&meta->>suivi=not.is.null&meta->>suivi=neq.&meta->>receivedAt=gte.${encodeURIComponent(iso(maintenant - PREMIER_DEPART_MS))}&select=owner`,
   ];
 }
 // Les vendeurs à visiter : l'union des réponses ; `null` si UNE requête n'a pas répondu.

@@ -33,4 +33,11 @@ export default {
   "envois.sansNumero": "n° de suivi pas encore lu",
   "envois.ouvrirSuivi": "Ouvrir le suivi du colis {n}",
   "envois.vide": "Aucun colis dans ce groupe.",
+  // (28 nov., « expédié sans l’extension ») réimprimer un colis parti ; « à expédier » sur une lecture ancienne.
+  "envois.dejaParti.titre": "Ce colis est déjà parti",
+  "envois.dejaParti.desc": "{raison}. Imprimer encore son bordereau ?",
+  "envois.dejaParti.ok": "Imprimer quand même",
+  "envois.aConfirmer": "À confirmer · Vinted pas relu sur {compte} depuis {heures} h",
+  "envois.aConfirmerCourt": "À confirmer : Vinted pas relu",
+  "envois.aConfirmerGeste": "Ouvre Vinted sur {compte}",
 };

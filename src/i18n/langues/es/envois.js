@@ -33,4 +33,11 @@ export default {
   "envois.sansNumero": "número de seguimiento aún no leído",
   "envois.ouvrirSuivi": "Abrir el seguimiento del paquete {n}",
   "envois.vide": "Ningún paquete en este grupo.",
+  // (28 nov., « expédié sans l’extension ») réimprimer un colis parti ; « à expédier » sur une lecture ancienne.
+  "envois.dejaParti.titre": "Este paquete ya ha salido",
+  "envois.dejaParti.desc": "{raison}. ¿Imprimir otra vez su etiqueta?",
+  "envois.dejaParti.ok": "Imprimir de todos modos",
+  "envois.aConfirmer": "Por confirmar · Vinted sin releer en {compte} desde hace {heures} h",
+  "envois.aConfirmerCourt": "Por confirmar: Vinted sin releer",
+  "envois.aConfirmerGeste": "Abre Vinted en {compte}",
 };
