@@ -21,6 +21,10 @@
 //   V10 un envoi qui dépasse son bail (refusé, ou sans renouvellement réussi depuis 100 s) s'arrête AVANT sa prochaine écriture ; la grâce part du refus ;
 //   V11 ni offre ni message partis ⇒ le favori reste envoyable (« Pas envoyé · la raison ») ; un message parti, jamais deux fois ;
 //      l'acheteur lu dans toutes ses formes (buyer_user_id, opposite_user côté vendeur, offer_request.user_id).
+//  Revue 3 (sur ac9f704f9) :
+//   V12 la reprise d'un message après un redémarrage reprend le BAIL chez VRM avant d'écrire, le tient, le revérifie à l'écriture ;
+//   V13 le bail se revérifie DANS la file des requêtes, au moment où l'écriture part ;
+//   V14 jamais une 2ᵉ offre : notre offre reconnue sous toutes ses formes (et sans montant lisible) ; l'acheteur n'est jamais le vendeur.
 //  `--prouve` : chaque mutation rend l'audit rouge. Données inventées.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -36,7 +40,13 @@ const MUTATIONS = {
   'reserve-malgre-pause': ['api/_lib/favoris-file.js', "  if(j.auto&&g.auto?.pauseAgent)return {valeur:", "  if(false)return {valeur:"],
   'consomme-malgre-pause': ['api/_lib/favoris-file.js', "  if(j.auto&&g.auto?.pauseAgent)throw new RefusFavoris(", "  if(false)throw new RefusFavoris("],
   'grace-sans-refus': ['api/_lib/favoris-file.js', "const finBail=e=>Math.max(depuisBail(e),Number(e.refuseLe)||0);", "const finBail=e=>depuisBail(e);"],
-  'ecrit-sur-bail-perdu': [BG, "  if (!bailFavoriVivant()) { noterDiag('favori_bail_perdu_ecriture');", "  if (false) { noterDiag('favori_bail_perdu_ecriture');"],
+  'ecrit-sur-bail-perdu': [BG, "    if (!bailFavoriVivant()) { noterDiag('favori_bail_perdu_file');", "    if (false) { noterDiag('favori_bail_perdu_file');"],
+  // Revue 3 (sur ac9f704f9)
+  'reprise-sans-bail': [BG, "        if (!repris || !repris.ok) { noterDiag('favori_reprise_bail_refuse');", "        if (false) { noterDiag('favori_reprise_bail_refuse');"],
+  'reprise-bail-pas-tenu': [BG, "        await avecBailFavori(e.uid, jeton, suite);", "        await suite();"],
+  'offre-forme-entity-offer': [BG, "en.offer && en.offer.price, en.offer && en.offer.amount,", ""],
+  'offre-de-nous-sans-montant': [BG, " || (moi && auteurMessageFavori(m) === String(moi))) n++; continue; }", ") n++; continue; }"],
+  'acheteur-vendeur-pris': [BG, "  const pasVendeur = (v) => (v && v !== String(moi || '') && v !== p(tr.seller_id) && v !== p(tr.seller) ? v : '');", "  const pasVendeur = (v) => v;"],
   'bail-local-sans-borne': [BG, "BAIL_LOCAL_RENOUVELLEMENT_MS = 100000,", "BAIL_LOCAL_RENOUVELLEMENT_MS = 3600000,"],
   'refus-mort-pour-toujours': ['api/_lib/favoris-file.js', "&&!(x.etat==='refuse'&&x.aucunEnvoi===true)&&(x.etat!=='refuse'||", "&&(x.etat!=='refuse'||"],
   'refus-sans-aucun-envoi': [BG, "if(!repriseMoitie)x.json.aucunEnvoi=true;return x;", "return x;"],
@@ -301,6 +311,66 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       const r = await envoyer(m, 'jn0'); const w = W(m).map((x) => x.c);
       dit(r && r.resultat === 'envoye' && w.includes('/api/v2/transactions/6000/offers'), `V11 l’acheteur lu par \`${nom}\` ⇒ transaction prouvée, l’offre part`, JSON.stringify({ r, w })); m.fin();
     }
+
+    // ═══ Revue 3 (sur ac9f704f9) ═══
+    console.log('\nV12. La reprise d’un message après un redémarrage reprend le BAIL chez VRM avant d’écrire');
+    for (const cas of ['vivant', 'expire', 'perdu_pendant']) {
+      try { const m = await monde(racine, { n: 2, avant: async ({ b }) => reglagesPrix(b) });
+        m.h.t += 15 * 60000;
+        const ap = await m.call('apercu'); await m.call('lancer', { selection: ['jn0', 'jn1'], reglages: ap.body.apercu.reglages });
+        const s1 = await m.call('suivant'); const tr = s1.body.travail;
+        await m.call('consommer', { jeton: tr.jeton, version: '5.455.8' });
+        // L'offre partie, le worker meurt : son attente « offre → message » reste dans le stockage (la vraie forme posée par attendreOffreMessage).
+        m.f.store.vrmFavoriAttente = { [tr.jeton]: { uid: '123', convId: m.UUIDS[0], texte: 'Bonjour, je te propose 49,50 € !', variante: 1, itemId: m.ITEMS[0], recipientId: m.ACH[0], requetes: true, jusqua: m.h.t + 5000, s: 5, v: '5.455.8' } };
+        m.f.store.vrmFavorisFaits = { 123: { [m.ITEMS[0] + ':' + m.ACH[0]]: { o: m.h.t } } };
+        if (cas === 'expire') { m.h.t += 150000; await m.call('suivant'); }   // VRM a constaté l'abandon (120 s sans renouvellement)
+        let n409 = 0; const f0 = m.f.ctx.fetch;
+        if (cas === 'perdu_pendant') m.f.ctx.fetch = async (url, op = {}) => { if (/vrm\.center\/api\/compte/.test(String(url)) && op.body && JSON.parse(op.body).action === 'prolonger' && n409++ > 0) return { ok: false, status: 409, json: async () => ({ message: 'La tentative n’est plus en cours.' }) }; return f0(url, op); };
+        m.f.ctx.__vrmBailFavoriMs = 1;
+        await m.f.ctx.reprendreMessagesFavoris();
+        const rep = m.f.j.vinted.filter((v) => v.methode === 'POST' && /replies$/.test(v.chemin)).length;
+        const reg = ((m.f.store.vrmFavorisFaits || {})['123'] || {})[m.ITEMS[0] + ':' + m.ACH[0]] || {};
+        const s2 = await m.call('suivant');
+        const prol = m.vrmAppels.filter((x) => /^prolonger:/.test(x)).length;
+        if (cas === 'expire') dit(prol === 1, 'V12 bail expiré : refusé dès la reprise (un seul « prolonger »), rien n’est tenu ni attendu', JSON.stringify(m.vrmAppels.filter((x) => /^prolonger:/.test(x))));
+        if (cas === 'vivant') dit(rep === 1 && reg.m, 'V12 bail encore vivant : la reprise le reprend (renouvelé), le message part une fois', JSON.stringify({ rep, reg }));
+        else dit(rep === 0 && !reg.m, `V12 ${cas === 'expire' ? 'bail déjà expiré chez VRM' : 'bail perdu PENDANT le temps d’écriture'} ⇒ rien n’est écrit, le message reste « à vérifier »`, JSON.stringify({ rep, reg, suivant: !!(s2.body && s2.body.travail) }));
+        m.fin(); } catch (x) { dit(false, 'V12 ' + cas + ' a levé', String(x && x.stack || x)); }
+    }
+
+    console.log('\nV13. Le bail se revérifie DANS la file des requêtes, au moment où l’écriture part');
+    try { const m = await monde(racine, { n: 1 });
+      let n409 = 0; const f0 = m.f.ctx.fetch;
+      m.f.ctx.fetch = async (url, op = {}) => { if (/vrm\.center\/api\/compte/.test(String(url)) && op.body && JSON.parse(op.body).action === 'prolonger') { n409++; return { ok: false, status: 409, json: async () => ({}) }; } return f0(url, op); };
+      m.f.ctx.__vrmBailFavoriMs = 1;
+      let libere; const bouchon = m.f.ctx.requeteVinted('api', () => new Promise((ok) => { libere = ok; }));
+      const r = await m.f.ctx.avecBailFavori('123', '00000000-0000-4000-8000-0000000000c1', async () => {
+        const p = m.f.ctx.vintedPageFavori({ vinted_user_id: '123', domain: 'www.vinted.fr' }, m.f.ctx.adresseMessagerieApi('www.vinted.fr', 'inquiries'), { item_ids: ['7000000180'], receiver_id: '3000000001' });
+        // L'écriture est ENTRÉE dans la file (le bail était bon) ; le refus de VRM tombe pendant qu'elle attend son tour.
+        for (let k = 0; k < 50 && !n409; k++) await new Promise((ok) => setTimeout(ok, 2));
+        libere(); return p; });
+      await bouchon;
+      const post = m.f.j.vinted.filter((v) => v.methode === 'POST').length;
+      dit(n409 > 0 && r && r.bailPerdu === true && post === 0, 'V13 une écriture tenue dans la file ne part pas si le bail est perdu pendant l’attente', JSON.stringify({ n409, r, post }));
+      m.fin(); } catch (x) { dit(false, 'V13 a levé', String(x && x.stack || x)); }
+
+    console.log('\nV14. Jamais une 2ᵉ offre : NOTRE offre se reconnaît sous toutes ses formes ; l’acheteur n’est jamais le vendeur');
+    for (const [nom, forme] of [['entity.offer.price (sans auteur)', { entity_type: 'offer_message', entity: { offer: { price: { amount: '49.5' } } } }], ['offer_request.price (sans auteur)', { entity_type: 'offer_request_message', entity: { offer_request: { price: { amount: '49.5' } } } }], ['sans montant lisible (de nous)', { entity_type: 'offer_message', entity: { user_id: 123, statut: 'en_attente' } }]]) {
+      let faite = false; const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b), vinted: (e) => {
+        if (e.methode === 'POST' && /\/offers$/.test(e.chemin)) { faite = true; return { status: 400, body: { code: 1, message: 'Erreur' } }; }   // Vinted a FAIT l'offre mais répond 400
+        if (e.methode === 'GET' && e.chemin.split('?')[0] === '/messaging/main/conversations/' + UU) return { status: 200, body: { conversation: { id: UU, allow_reply: true, opposite_users: [{ id: 3000000001 }], data: {}, messages: faite ? [forme] : [] } } };
+        if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return { status: 201, body: { inquiry_id: 'q0', transaction_id: 6000, conversation_id: UU } };
+        return null; } });
+      await envoyer(m, 'jn0'); m.h.t += 3600000; const r2 = await envoyer(m, 'jn0');
+      const off = m.f.j.vinted.filter((v) => v.methode === 'POST' && /offers$/.test(v.chemin)).length, msg = m.f.j.vinted.filter((v) => v.methode === 'POST' && /replies$/.test(v.chemin)).length;
+      dit(off === 1 && msg === 0, `V14 notre offre lue par ${nom} ⇒ relancé, aucune 2ᵉ offre (ni message par-dessus)`, JSON.stringify({ off, msg, r2 }));
+      m.fin();
+    }
+    { const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b), vinted: (e) => {
+        if (e.methode === 'GET' && e.chemin === '/api/v2/transactions/6000') return { status: 200, body: { transaction: { id: 6000, item_id: 7000000180, seller_id: 123, item_title: 'salomon XT-6', item: { id: 7000000180, price: { amount: '55.0', currency_code: 'EUR' } }, offer: { user_id: 123, price: { amount: '50.0' } } } } };
+        return null; } });
+      const r = await envoyer(m, 'jn0');
+      dit(r && r.resultat === 'envoye' && r.raison !== 'destinataire_different', 'V14 `offer.user_id` = le VENDEUR (nous) n’est jamais pris pour l’acheteur (pas de refus « autre personne » à tort)', JSON.stringify(r)); m.fin(); }
   } catch (e) { ko++; console.log('  ❌ V0 a levé : ' + (e && e.stack || e)); }
   console.log(ko ? `❌ revue des favoris : ${ko} rouge(s), ${ok} vert(s)` : `✅ revue des favoris : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);

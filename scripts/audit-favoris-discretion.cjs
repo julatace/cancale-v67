@@ -61,13 +61,13 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
   const carte = src.slice(src.indexOf('async function tickFavorisCarte'), src.indexOf('async function favorisPourCarte'));
   dit(r403 === 'vinted_frein' && r429 === 'pause_vinted' && rcap === 'vinted_robot' && r200 === '' && /raison === 'vinted_robot'[\s\S]{0,1200}st2\.robot = \{ at: Date\.now\(\) \}/.test(carte),
     'D4 403 ⇒ pause, 429 ⇒ pause, vérification ⇒ arrêt et la file en pause jusqu’à SON « Reprendre » ; une réponse normale n’est jamais un frein', JSON.stringify({ r403, r429, rcap, r200 }));
-  // D5 : une requête à la fois, le compte de l'onglet, la garde avant chaque écriture. 5.455.8 (reprise) : 4 appels, toujours les 3
+  // D5 : une requête à la fois, le compte de l'onglet, la garde avant chaque écriture (revue 3 : le bail revérifié dans la file, avant la page). 5.455.8 (reprise) : 4 appels, toujours les 3
   //    mêmes écritures — la demande refaite UNE fois après la page ramenée (rien n'était parti) ; tous par `vintedPageFavori`,
   //    aucun autre chemin d'écriture (le « message d'abord » a été retiré après la revue du 28 nov.).
   const vpf = src.slice(src.indexOf('async function vintedPageFavori('), src.indexOf('async function telephoneAVerifierVinted('));
   const chemin = src.slice(src.indexOf("if((await cheminFavoris())==='requetes'){"), src.indexOf("// 5.410.8 (export de l'Observateur, 21 nov. : « Bleam appuie sur la cloche »)"));
   const ecritures = (chemin.match(/vintedPageFavori\(/g) || []).length, autres = (chemin.match(/vintedPage\(acc,'(POST|PUT|DELETE)'/g) || []).length;
-  dit(/return requeteVinted\('api', async \(\) => \{\s*const pg = await pageVintedPour\(acc\);/.test(vpf) && ecritures === 4 && autres === 0 && (chemin.match(/await garde\(\)/g) || []).length >= 3 && /if \(!ecritureFavoriPermise\(adresse\)\)/.test(vpf),
+  dit(/return requeteVinted\('api', async \(\) => \{\s*(?:\/\/[^\n]*\s*)*(?:if \(!bailFavoriVivant\(\)\)[^\n]*\s*)?const pg = await pageVintedPour\(acc\);/.test(vpf) && ecritures === 4 && autres === 0 && (chemin.match(/await garde\(\)/g) || []).length >= 3 && /if \(!ecritureFavoriPermise\(adresse\)\)/.test(vpf),
     `D5 les 3 écritures (demande, offre, message) passent par la file Vinted (une requête à la fois) depuis l’onglet du compte, la garde de l’onglet relue avant chacune, liste blanche`, JSON.stringify({ ecritures, autres }));
   // D6 : un compte à la fois (une seule file menée par ce navigateur)
   const lancer = src.slice(src.indexOf("if (quoi === 'lancer') {"), src.indexOf("if (quoi === 'arreter') {"));
