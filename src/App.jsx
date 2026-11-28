@@ -755,6 +755,8 @@ const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) =>
 const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
 const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
 const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
+// (28 nov., lot ebay-automatismes) eBay › Automatismes : baisse, offres, paliers, remise en vente, prix ajusté, masse, similaire.
+const AutomatismesEbay = aLaDemande(() => import('./ebay/AutomatismesEbay.jsx'));
 // (25 nov., régressions — captures iPhone de Julien : trois cartes grises sous « Personnaliser », pour toujours) Ce bloc
 // n'existe que s'il y a un versement à dire (le plus souvent : rien). En `aLaDemande`, son attente était le squelette de
 // trois rangées (`MorceauAttente`) : il paraissait puis s'en allait (un saut), et restait pour de bon quand le morceau
@@ -1780,6 +1782,7 @@ import { poserForfaitEmballage } from './beneficePaire.js';   // (22 nov., inté
 import ForfaitEmballage from "./ForfaitEmballage.jsx";   // (21 nov., lot rentabilite ; 22 nov., intégration finale) le forfait de la fiche
 import RetraitsFiche from './RetraitsFiche.jsx';   // (21 nov., ext. 5.426) une paire vendue est retirée partout
 import { BoutonTraduire } from './TraduireLocal.jsx';   // (22 nov., intégration finale)
+import { planchersAPublier, memesPlanchers, PLANCHERS_CLE as PLANCHERS_EBAY_CLE } from './ebay/automatismes.js';   // (28 nov., lot ebay-automatismes)
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3748,6 +3751,10 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (28 nov., lot ebay-automatismes) Les automatismes eBay : LE PLANCHER de chaque N° (prix mini, achat) et les paires en
+  // vente, PUBLIÉS par l'app pour le serveur (src/ebay/automatismes.js `planchersAPublier`, §11) ; la majoration eBay par
+  // compte (« +x % sur eBay », SON choix) ; et « un automatisme est allumé » (alors seulement l'app publie le plancher).
+  'vrm_planchers_ebay','vrm_ebay_majoration','vrm_ebay_auto_actif',
   // (28 nov., lot sneakers-cote) La référence fabricant, la pointure, la marque et les étiquettes de SES N° (src/sneakers/stockage.js) — SON geste seulement.
   'vrm_sneakers',
   // (22 nov., choix n° 35) « Ce n'est pas un doublon » (Annonces · Photo en double) : { [ids du groupe]: at } — SON toucher, sur tous ses appareils (src/photoEnDouble.js).
@@ -5849,6 +5856,23 @@ const purgerCorbeille = () => {
   return _purgeCorbeilleEnVol;
 };
 onCloudReady(() => { setTimeout(() => { purgerCorbeille().catch(() => {}); }, 5000); });
+// (28 nov., lot ebay-automatismes) LE PLANCHER DE CHAQUE N° POUR LES AUTOMATISMES eBAY : publié (`vrm_planchers_ebay`)
+// quand un automatisme eBay est allumé (`vrm_ebay_auto_actif`), au chargement puis toutes les 6 h ; republié seulement
+// s'il a changé, ou après 12 h (le serveur n'agit plus sur une publication de plus de 72 h). Aucune fiche lue ⇒ rien
+// (« rien lu » ne vaut pas « rien » : une publication vide ne remplace jamais la précédente).
+const publierPlanchersEbay = () => {
+  try {
+    if (load('vrm_ebay_auto_actif', false) !== true || !AUTH.user?.id) return;
+    const fiches = load('vinted_annonce_numeros', null);
+    if (!fiches || typeof fiches !== 'object' || !Object.keys(fiches).length) return;
+    const neuf = planchersAPublier(fiches, load('vinted_buyprice_by_num', {}) || {}, load('vinted_nums_physiques', null));
+    const avant = load(PLANCHERS_EBAY_CLE, null);
+    if (avant && memesPlanchers(avant, neuf) && Date.now() - Number(avant.at || 0) < 12 * 3600000) return;
+    save(PLANCHERS_EBAY_CLE, neuf);
+  } catch (_) { /* une publication ratée : le serveur dit « plancher pas relu », rien ne bouge */ }
+};
+onCloudReady(() => { setTimeout(publierPlanchersEbay, 20000); try { setInterval(publierPlanchersEbay, 6 * 3600000); } catch (_) {} });
+try { window.addEventListener('vrm:planchers-ebay', publierPlanchersEbay); } catch (_) {}
 const lireListeCorbeille = () => listeCorbeille(load(CLE_CORBEILLE, {}));
 const dateCorbeille = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 // Paramètres → Corbeille : la plus récente en haut, la date, « Restaurer ».
@@ -33026,6 +33050,8 @@ function AppCoeur() {
   SITES_RELIES_COQUE.v = sitesRelies;   // les plateformes de « Plus » (une rangée par site relié)
   // (20 nov.) « Plus › eBay » : ce qu'eBay a en propre — ses comptes et réglages, ses recherches et alertes (sorties d'Achats).
   const [ebayRecherches, setEbayRecherches] = useState(false);
+  const [ebayAuto, setEbayAuto] = useState(false);   // (28 nov., lot ebay-automatismes) la page eBay › Automatismes
+  React.useEffect(() => { const f = () => setEbayAuto(true); window.addEventListener('vrm:ebay-automatismes', f); return () => window.removeEventListener('vrm:ebay-automatismes', f); }, []);
   React.useEffect(() => { const f = () => setEbayRecherches(true); window.addEventListener('vrm:ebay-recherches', f); return () => window.removeEventListener('vrm:ebay-recherches', f); }, []);
   React.useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.tache !== tab || !d.site) return; setPlatSub(d.site); retenirFiltre(d.tache, d.site, true); };
     window.addEventListener('vrm:site-tache', f); return () => window.removeEventListener('vrm:site-tache', f); }, [tab]);
@@ -35359,6 +35385,7 @@ function AppCoeur() {
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onReconnecter={allerComptesEbay}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onReconnecter={allerComptesEbay} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='auto'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><AutomatismesEbay key={'ea-'+ref} compte={ref} headers={enTeteSession} confirm={askConfirm} load={load} save={save}/>}</EbayActionCompte></div>}
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {/* (20 nov., « même squelette ») Achats · eBay : les achats gagnés sous « En route » (la disposition de Vinted) ; les
               recherches et alertes eBay vivent dans « Plus › eBay » (`vrm:ebay-recherches`). */}
@@ -36633,6 +36660,10 @@ function AppCoeur() {
             </>}</GardeEcran>}
         {tab==='messages'&&<GardeEcran nom="messages">{rendreTache('messages')}</GardeEcran>}
         {tab==='achats'&&<GardeEcran nom="achats">{rendreTache('achats')}</GardeEcran>}
+        {ebayAuto ? <GardeEcran nom="ebay-automatismes"><Natif.PagePoussee ouverte titre={tr('eauto.titre')} onRetour={() => setEbayAuto(false)} attrs={{ 'data-ebay-automatismes': '' }}>
+          <EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{(ref) => <AutomatismesEbay key={'ea-' + ref} compte={ref} headers={enTeteSession} confirm={askConfirm} load={load} save={save}
+            onBrouillons={() => { setEbayAuto(false); setTab('annonces'); setPlatSub(subDeTache('ebay', 'annonces')); }}/>}</EbayActionCompte>
+        </Natif.PagePoussee></GardeEcran> : null}
         {ebayRecherches ? <GardeEcran nom="ebay-recherches"><Natif.PagePoussee ouverte titre={tr('ebay.recherches.titre')} onRetour={() => setEbayRecherches(false)} attrs={{ 'data-ebay-recherches': '' }}>
           <Natif.Groupe><Natif.Rangee icone={<Icon name="gear" size={22}/>} titre={tr('ebay.recherches.compte')} fin="chevron" onClick={() => { setEbayRecherches(false); DEMANDE_REGLAGE_SOUS.id = 'ebay'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); }}/></Natif.Groupe>
           <EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette} sansGagnes/>

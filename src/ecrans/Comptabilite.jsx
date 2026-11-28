@@ -11760,6 +11760,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (numsRemisCle === null) return;   // (13 nov.) les retours en stock pas encore sus : on attend
     const vivants = new Set();
     for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    // (28 nov., lot ebay-automatismes) Les N° EN VENTE quelque part (une annonce présente, ou en vente sur eBay / Leboncoin) —
+    // sans les ventes à poster ni les retours : la preuve qu'une paire est chez lui ET pas vendue (remise en vente eBay auto).
+    const enVente = new Set(); for (const it of presentes) { const k0 = cleNum((numeros[it.id] || {}).numero); if (k0) enVente.add(k0); }
     for (const o of (sales.items || [])) {
       if (!needsBordereau(o.status)) continue;
       const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
@@ -11776,14 +11779,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     for (const o of (sales.items || [])) { if (classifyOrderStatus(o.status) === 'cancelled') continue; const l = lotDeVente(o); if (l && l.lu) for (const a of l.articles) if (a.num && a.par === 'main') { const k = cleNum(a.num); if (k && !clesVivants.has(k)) vendusPartis.add(k); } }
     const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
     const autres = [];
+    for (const a of articles) enVente.add(a.cle);
     for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
     const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
     try {
       const avant = load('vinted_nums_physiques', null);
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
         && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero)
-        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter;
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, at: Date.now() });
+        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter
+        && JSON.stringify(avant.enVente || null) === JSON.stringify([...enVente].sort());
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, enVente: [...enVente].sort(), at: Date.now() });
     } catch (_) {}
   }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle, lotsTx, lotLiens]);
   const articlesVendusFavoris=useMemo(()=>{

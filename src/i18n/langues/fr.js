@@ -59,6 +59,7 @@ import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './fr/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './fr/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './fr/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './fr/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './fr/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -2437,6 +2438,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
