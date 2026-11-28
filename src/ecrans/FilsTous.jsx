@@ -184,6 +184,11 @@ function useEbayTous() {
   })(); return () => { stop = true; }; }, [tick]);
   return [d, () => setTick((t) => t + 1)];
 }
+// (28 nov., lot ebay-crm) La fiche de l'acheteur (par son identifiant eBay) et les modèles de réponse du CRM.
+// Importés ICI, au plus près de FilEbay (les imports du haut sont retouchés par d'autres lots).
+import { enTeteSession } from '../App.jsx';
+import { ouvrirFicheAcheteur } from '../crm/api.js';
+import ModelesReponse from '../crm/ModelesReponse.jsx';
 // Le fil d'un échange eBay : la question, ses réponses, et « Envoyer » sur SON clic
 // (confirmé) seulement pour une question d'acheteur sur une annonce — la route relit
 // la question chez eBay juste avant (`repondre`, AddMemberMessageRTQ).
@@ -210,10 +215,12 @@ function FilEbay({ x, onFerme, onEnvoye }) {
         <BoutonIcone libelle={tr('ebay.fil.fermer')} icone={<Glyphe nom="chevron" className="vrm-fil-retour-glyphe"/>} onClick={onFerme}/>
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.titre || m.subject || 'eBay'}</div><div style={{ fontSize: 12, color: C.muted }}>eBay</div></div>
       </div>
+      {m.sender && !String(m.sender).includes('*') ? <div><button type="button" data-crm-fiche-message="" onClick={() => ouvrirFicheAcheteur({ acheteur: m.sender, compte: x.compte || 'principal', ...(question ? {} : { ecrire: { itemId: String(m.itemId || ''), article: m.titre || '' } }) })} style={{ minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 22, background: C.card, color: C.text, fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>{question ? tr('crm.fiche.ouvrir') : tr('crm.fiche.ecrire', { acheteur: m.sender })}</button></div> : null}
       <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
       {rep.map((r, i) => <div key={i} data-fil-ebay-reponse style={{ alignSelf: 'flex-end', maxWidth: '85%', background: `${C.accent}14`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{r}</div>)}
       {question ? (<>
         {risquesMessage(t, 'ebay').length > 0 && <p role="status" data-message-risque={risquesMessage(t, 'ebay').map((r) => r.code).join(' ')} style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.warn }}>{risquesMessage(t, 'ebay')[0].texte} · {phraseRisqueMessage('ebay')}</p>}
+        <ModelesReponse headers={enTeteSession} compte={x.compte || 'principal'} vars={{ acheteur: m.sender || '', article: m.titre || '', suivi: null }} onChoisir={(v) => setT(String(v).slice(0, 2000))}/>
         <textarea data-fil-ebay-saisie value={t} onChange={(e) => setT(e.target.value.slice(0, 2000))} rows={3} aria-label={tr('ebay.fil.repondre')} placeholder={tr('ebay.fil.repondre')} style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, fontSize: 17, fontFamily: 'inherit', background: C.card, color: C.text }}/>
         <div><Bouton variante="primaire" occupe={occupe} disabled={!t.trim()} data-fil-ebay-envoyer="" onClick={envoyer}>{tr('ebay.fil.envoyer')}</Bouton></div>
       </>) : <p data-fil-ebay-sans-reponse style={{ fontSize: 13, color: C.muted }}>{tr('ebay.fil.surEbay')}{/^\d{1,19}$/.test(String(m.itemId || '')) ? <>{' '}<a data-pied-ouvrir="" href={`https://www.ebay.fr/itm/${m.itemId}`} target="_blank" rel="noreferrer" style={{ color: C.text, fontWeight: 600, display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>{tr('alertesEbay.voir')}</a></> : null}</p>}

@@ -62,6 +62,19 @@ const srv = http.createServer((q, r) => {
 });
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance avec BANC_PORT'); process.exit(1); });
 
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
+    out[alias] = v == null ? null : (/->>/.test(src) && typeof v !== 'string' ? String(v) : v);
+  }
+  return out;
+};
 async function ouvrir(b, tel, sombre) {
   const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, locale: 'fr-FR', timezoneId: 'Europe/Paris', colorScheme: sombre ? 'dark' : 'light', ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), serviceWorkers: 'block' });
   const pg = await ctx.newPage();
@@ -78,8 +91,14 @@ async function ouvrir(b, tel, sombre) {
     if (route.request().method() !== 'GET') return j([]);
     if (/select=owner/.test(u)) return j({ m: 1 }, 400);
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+    const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: iso(MAINTENANT), cap: r.data && r.data.capturedAt });
     const eq = /id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => ({ ...r, updated_at: iso(MAINTENANT) })));
+    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map(forme)); }
+    const lk = /id=like\.([^&]*)/.exec(u);
+    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
@@ -110,7 +129,7 @@ const aller = async (pg, q) => { try { await pg.goto(`http://localhost:${PORT}/?
 const regles = (pg, racine = '[data-crm-ebay]') => pg.evaluate((racine) => {
   const vis = (e) => { const r = e.getBoundingClientRect(); return e.getClientRects().length && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight; };
   const zones = [...document.querySelectorAll(racine + ', [data-n-feuille-couche][data-n-etat="ouverte"]')];
-  const petits = zones.flatMap((z) => [...z.querySelectorAll('button, a, [role="switch"], .n-rangee[data-n-touche="1"]')]).filter(vis).filter((b) => b.getBoundingClientRect().height < 43.5 && !b.closest('.n-segmente')).map((b) => (b.textContent || b.getAttribute('aria-label') || b.className || '').trim().slice(0, 24) + ':' + Math.round(b.getBoundingClientRect().height));
+  const petits = zones.flatMap((z) => [...z.querySelectorAll('button, a, [role="switch"], .n-rangee[data-n-touche="1"]')]).filter(vis).filter((b) => b.getBoundingClientRect().height < 43.5 && !b.closest('.n-segmente') && !(b.matches('[role="switch"]') && b.closest('label') && b.closest('label').getBoundingClientRect().height >= 43.5)).map((b) => (b.textContent || b.getAttribute('aria-label') || b.className || '').trim().slice(0, 24) + ':' + Math.round(b.getBoundingClientRect().height));
   const pleins = [...document.querySelectorAll('[data-n-variante="plein"]')].filter(vis).length;
   return { sw: document.documentElement.scrollWidth, iw: innerWidth, petits, pleins };
 }, racine);
@@ -133,7 +152,7 @@ async function rendu(b, { tel, sombre, nom }) {
     await shot(pg, nom + '-fiche'); await verifQ(pg, t, 'la fiche');
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(500);
     // C3 — automatismes
-    await toucher(pg, tel, '.n-segmente [role="radio"]:nth-child(2), .n-segmente button:nth-child(2)');
+    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=1');
     await pg.waitForSelector('[data-crm-auto]', { timeout: 10000 }).catch(() => {});
     const actifs = await pg.$$eval('[data-crm-auto]', (x) => x.map((e) => e.getAttribute('data-crm-actif')));
     dit(actifs.length === 5 && actifs.every((v) => v === '0'), `${t} C3 — 5 automatismes, tous ÉTEINTS par défaut`, actifs.join());
@@ -157,7 +176,7 @@ async function rendu(b, { tel, sombre, nom }) {
     dit(jl === '1', `${t} C3 — le journal « Ce que VRM a fait » se lit`, jl);
     await shot(pg, nom + '-auto'); await verifQ(pg, t, 'les automatismes');
     // C6 — exclus
-    await toucher(pg, tel, '.n-segmente [role="radio"]:nth-child(4), .n-segmente button:nth-child(4)');
+    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=3');
     await pg.waitForSelector('[data-crm-exclus]', { timeout: 10000 }).catch(() => {});
     await toucher(pg, tel, '[data-crm-exclure-ouvrir]');
     await pg.fill('[data-n-feuille-couche][data-n-etat="ouverte"] .n-champ-saisie >> nth=0', 'Jean Martin').catch(() => {});
@@ -167,7 +186,7 @@ async function rendu(b, { tel, sombre, nom }) {
     await shot(pg, nom + '-exclus'); await verifQ(pg, t, 'l\'exclusion');
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
     // C5 / C7
-    await toucher(pg, tel, '.n-segmente [role="radio"]:nth-child(5), .n-segmente button:nth-child(5)');
+    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=4');
     await pg.waitForSelector('[data-crm-litiges]', { timeout: 10000 }).catch(() => {});
     const s = await pg.evaluate(() => ({ avis: [...document.querySelectorAll('[data-crm-avis-ligne]')].map((e) => e.getAttribute('data-crm-avis-ligne') + ':' + e.getAttribute('data-crm-repondu')), lit: [...document.querySelectorAll('[data-crm-litige]')].map((e) => e.getAttribute('data-crm-litige')) }));
     dit(s.avis.join() === '9002:0,9001:1' && s.lit.join() === 'paiement:PD-1,retour:5001', `${t} C5/C7 — l'avis négatif sans réponse à traiter, les litiges par échéance`, JSON.stringify(s));
@@ -180,12 +199,16 @@ async function rendu(b, { tel, sombre, nom }) {
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
     // C2 — Messages · eBay
     await aller(pg, 'tab=messages&site=ebay');
-    await pg.waitForSelector('[data-ebay-question-annonce], [data-ebay-message]', { timeout: 30000 }).catch(() => {});
-    await toucher(pg, tel, '[data-ebay-question-annonce], [data-ebay-message]').catch(() => {});
+    // Messages · Tous (le fil unifié, FilsTous) : la conversation eBay, puis « Répondre sur eBay » ouvre son fil.
+    await pg.waitForSelector('text=Bonjour, vous envoyez', { timeout: 30000 }).catch(() => {});
+    await toucher(pg, tel, 'text=Bonjour, vous envoyez').catch(() => {});
+    if (await pg.$('[data-fil-repondre="ebay"]')) await toucher(pg, tel, '[data-fil-repondre="ebay"]').catch(() => {});
+    await pg.waitForSelector('[data-fil-ebay]', { timeout: 8000 }).catch(() => {});
     await pg.waitForSelector('[data-crm-fiche-message]', { timeout: 8000 }).catch(() => {});
     const m = await pg.evaluate(() => ({ fiche: !!document.querySelector('[data-crm-fiche-message]'), modeles: [...document.querySelectorAll('[data-crm-modele]')].map((e) => e.getAttribute('data-crm-modele') + ':' + (e.disabled ? 'gris' : 'ok')) }));
     dit(m.fiche && m.modeles.join() === 'm-dispo:ok,m-suivi:gris', `${t} C2 — la conversation : « Fiche de l'acheteur », les modèles (celui au {suivi} grisé : pas su ici)`, JSON.stringify(m));
     if (m.modeles.length) { await toucher(pg, tel, '[data-crm-modele="m-dispo"]'); }
+    await pg.waitForTimeout(300);
     const saisie = await pg.evaluate(() => { const z = [...document.querySelectorAll('textarea')].find((e) => e.value); return z ? z.value : ''; });
     dit(saisie === 'Bonjour jean_martin_02, oui « Nike Air Max 90 blanche » est encore disponible !', `${t} C2 — un toucher remplit {acheteur} et {article}`, saisie);
     await shot(pg, nom + '-messages');
