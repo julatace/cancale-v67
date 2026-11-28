@@ -18726,12 +18726,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // menait à Ventes sans rien ouvrir (bancs declare-urssaf, suivi-urssaf). Le rapport s'ouvre ici.
     const hoteVentes = curSub === 'ventes' || (curSub === 'bordereaux' && colisDans === 'ventes');
     if (!hoteVentes || !DEMANDE_DECLARATION.ym) return;
-    const ym = DEMANDE_DECLARATION.ym, frais = Date.now() - DEMANDE_DECLARATION.at < 30000;
-    DEMANDE_DECLARATION.ym = null;
+    const ym = DEMANDE_DECLARATION.ym, frais = Date.now() - DEMANDE_DECLARATION.at < 30000, rapportSeul = !!DEMANDE_DECLARATION.rapport;
+    DEMANDE_DECLARATION.ym = null; DEMANDE_DECLARATION.rapport = false;
     if (!frais) return;
     moisChoisiMain.current = true;
     setReportMonth(ym); setReportAnnee(Number(ym.slice(0, 4)));
-    declVoulue.current = { ym, arme: false };
+    // (28 nov., compta-finitions) « Rapport comptable » (Argent → Déclarer) : le rapport seul, sans le formulaire.
+    declVoulue.current = rapportSeul ? null : { ym, arme: false };
     openReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curSub]);

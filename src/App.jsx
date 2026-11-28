@@ -15710,10 +15710,13 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // Aucune copie du geste ailleurs (§11) : le registre retient l'IDENTITÉ des
 // ventes du mois, et seul le rapport les a. Le drapeau vieillit (30 s) : un
 // clic oublié ne rouvre pas le rapport à la prochaine visite de Ventes.
-const DEMANDE_DECLARATION = { ym: null, at: 0 };
-const demanderDeclaration = (ym, onNav) => {
+// (28 nov., compta-finitions, point 4) `{ rapport: true }` : le MÊME chemin ouvre le rapport comptable sur ce mois, SANS
+// le formulaire « Qu'as-tu déclaré ? » — « Rapport comptable » d'Argent → Déclarer (le menu « Outils » de l'ancien
+// Ventes, qui le portait, n'est plus rendu depuis Ventes natif).
+const DEMANDE_DECLARATION = { ym: null, at: 0, rapport: false };
+const demanderDeclaration = (ym, onNav, { rapport = false } = {}) => {
   if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) return;
-  DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now();
+  DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now(); DEMANDE_DECLARATION.rapport = !!rapport;
   if (onNav) onNav('cat_ventes');
 };
 // ── RATTRAPAGE EN SÉRIE (29 octobre) ── Julien a beaucoup de mois « Pas

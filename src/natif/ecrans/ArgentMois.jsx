@@ -88,7 +88,8 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
   const maxC = Math.max(0, vV || 0, bV || 0);
   const partDe = (x) => (x == null ? null : maxC > 0 && x > 0 ? x / maxC : 0);
   const kn = C && typeof C.cents === 'string' && /^\d+\/\d+$/.test(C.cents) ? C.cents.split('/').map(Number) : null;
-  const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : '';
+  // (28 nov., compta-finitions) `avantDepenses` : aucune dépense jamais notée ⇒ « avant tes dépenses » (règle du 22 oct.).
+  const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : B && B.avantDepenses ? tr('v2.stats.netAvantDepenses') : '';
   const lignesV = versements.etat === 'lu' ? (tout ? versements.lignes : versements.lignes.slice(0, MONTRES)) : [];
   // (23 nov., revue UX P2) À l'ordinateur, une colonne vide à 100 % (N°, Achat, Marge) n'est pas dessinée ; la couverture des prix
   // d'achat est dite au-dessus du tableau (« Prix d'achat connus : 0/27 · Saisir »), le chiffre faux étant la porte (§5).
@@ -158,7 +159,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             // de la barre ; sinon la barre du bénéfice, à l'échelle du vendu.
             visuel={geste && kn ? <CouvertureBarre k={kn[0]} n={kn[1]}/>
               : <BarreChiffre part={partDe(bV)} partiel={!!(B.auMoins || B.connu || B.brut)} ton="vert" neuf={neufL} rang={1} attrs={{ 'data-agv-barre': 'benefice' }}/>}
-            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
+            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-avant-depenses': B.avantDepenses ? '' : undefined, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
               'data-v2-argent-geste': geste ? String(geste.n) : undefined, 'data-v2-principal': geste ? geste.id : undefined }}/> : null}
           {fait(F.attente, tr('arn.aVenir'))}
           {fait(F.dispo)}
