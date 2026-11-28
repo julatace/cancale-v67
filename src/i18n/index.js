@@ -187,14 +187,26 @@ export function choisirPluriel(entree, n, l = langue) {
 }
 
 // ── Les formats ──────────────────────────────────────────────────────────────
-export const nombre = (n, opts) => { try { return new Intl.NumberFormat(localeCourante(), opts).format(n); } catch (_) { return String(n); } };
+// (28 nov., vitesse-fluide) Un formateur Intl se construit en ~70 µs (×1) ; `nombre` en refaisait un à CHAQUE appel (profil
+// d'une frappe dans Annonces, banc iphone-rapide ×4 : 70 ms dans `nombre`). Gardé par (constructeur, langue, options) — le
+// même formateur rend le même texte (comme src/formatsRapides.js pour toLocaleString). Une construction qui échoue n'est
+// pas gardée (l'appelant garde son repli).
+const _formateurs = new Map();
+const formateur = (Ctor, loc, opts) => {
+  let k;
+  try { k = (Ctor === Intl.NumberFormat ? 'n|' : Ctor === Intl.DateTimeFormat ? 'd|' : 'r|') + loc + '|' + (opts ? JSON.stringify(opts) : ''); } catch (_) { return new Ctor(loc, opts); }
+  let f = _formateurs.get(k);
+  if (!f) { f = new Ctor(loc, opts); if (_formateurs.size > 400) _formateurs.clear(); _formateurs.set(k, f); }
+  return f;
+};
+export const nombre = (n, opts) => { try { return formateur(Intl.NumberFormat, localeCourante(), opts).format(n); } catch (_) { return String(n); } };
 // L'euro par défaut ; `null`/`undefined` ⇒ « — » (pas su ne vaut pas 0, §5).
 export const monnaie = (n, devise = 'EUR', opts) => (n == null || Number.isNaN(Number(n)) ? '—'
   : nombre(Number(n), { style: 'currency', currency: devise, ...opts }));
 const enDate = (d) => (d instanceof Date ? d : new Date(d));
-export const date = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) => { try { return new Intl.DateTimeFormat(localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
-export const heure = (d, opts = { hour: '2-digit', minute: '2-digit' }) => { try { return new Intl.DateTimeFormat(localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
-export const dateRelative = (valeur, unite) => { try { return new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'auto' }).format(valeur, unite); } catch (_) { return ''; } };
+export const date = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) => { try { return formateur(Intl.DateTimeFormat, localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
+export const heure = (d, opts = { hour: '2-digit', minute: '2-digit' }) => { try { return formateur(Intl.DateTimeFormat, localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
+export const dateRelative = (valeur, unite) => { try { return formateur(Intl.RelativeTimeFormat, localeCourante(), { numeric: 'auto' }).format(valeur, unite); } catch (_) { return ''; } };
 
 // Une liste de noms jointe dans la langue (« A, B or C »), les noms eux-mêmes jamais traduits.
 export const listeDansLaLangue = (noms, l = langue) => { try { return new Intl.ListFormat(LOCALES[l] || l, { style: 'long', type: 'disjunction' }).format(noms); } catch (_) { return noms.join(', '); } };

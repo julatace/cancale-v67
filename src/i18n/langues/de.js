@@ -1,6 +1,7 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_textes_restes from './de/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
-import ecran_rangement from './de/rangement.js';   // (28 nov.) l'assistant de rangement
+import ecran_rangement from './de/rangement.js';
+import ecran_ebay_crm from './de/ebayCrm.js';   // (28 nov.) le CRM eBay   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './de/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './de/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './de/suiviVente.js';
@@ -24,6 +25,7 @@ import ecran_gains from './de/gains.js';   // (24 nov.) ce que tu gagnes vraimen
 import ecran_export_compta from './de/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './de/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
 import ecran_essouffle from './de/essouffle.js';   // (28 nov.) « S’essouffle »
+import ecran_sneakers from './de/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './de/aDistance.js';
@@ -54,6 +56,7 @@ import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './de/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './de/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './de/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -135,6 +138,7 @@ import ecran_ebay_series from './de/ebaySeries.js';   // (23 nov.) eBay en séri
 import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_ameliorations27 from './de/ameliorations27.js';
 import ecran_compta_finitions from './de/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_messages_parfaits from './de/messagesParfaits.js';   // (28 nov.) Messages : photo de profil, statut de l'extension, contre-offre
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './de/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './de/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -144,6 +148,7 @@ export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_rangement,
+  ...ecran_ebay_crm,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -2432,6 +2437,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
@@ -2491,7 +2497,9 @@ export default {
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
   ...ecran_compta_finitions,
+  ...ecran_messages_parfaits,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
   ...ecran_essouffle,
+  ...ecran_sneakers,
 };

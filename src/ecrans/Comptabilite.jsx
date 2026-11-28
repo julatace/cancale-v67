@@ -3,6 +3,7 @@
 import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+import { avatarPersonne } from '../filUnique.js';   // (28 nov., messages-parfaits) la photo de profil de l'en-tête du fil (jamais la photo de l'article)
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
 import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
@@ -25,7 +26,7 @@ async function republierAgir(annonces, panneau) {
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
 import { fusionPlan, aReprendre, alerteCouverte } from '../aRetirerAilleurs.js';
-import { MASQUER_CLE, listeMasquerAilleurs } from '../reglesAuto.js';
+import { MASQUER_CLE, listeMasquerAilleurs, plancherBaisse } from '../reglesAuto.js';
 import { publierSiNeuf as publierSiNeufPur } from '../publierSiNeuf.js';
 import { montantSeuil } from '../offresSures.js';
 import { jugerBrouillon } from '../brouillonsProposables.js';
@@ -557,7 +558,8 @@ import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration f
 import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
 import { etatChezMoi, publierChezMoi, etatAchatChezMoi } from '../achatChezMoi.js';   // (22 nov., intégration finale)
 import { avecRemboursements, coutAchatNet, enAttenteDe, publierRemboursements, coutFicheNet } from '../coutAchatNet.js';   // (22 nov., intégration finale)
-import { publierAchatsSite } from '../achats/nombresAchatsSites.js';   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
+import { publierAchatsSite } from '../achats/nombresAchatsSites.js';
+import { InputDiffere } from '../composants/saisieDifferee.jsx';   // (28 nov., vitesse-fluide) la lettre d'abord, l'écran ensuite   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -11760,6 +11762,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (numsRemisCle === null) return;   // (13 nov.) les retours en stock pas encore sus : on attend
     const vivants = new Set();
     for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    // (28 nov., lot ebay-automatismes) Les N° EN VENTE quelque part (une annonce présente, ou en vente sur eBay / Leboncoin) —
+    // sans les ventes à poster ni les retours : la preuve qu'une paire est chez lui ET pas vendue (remise en vente eBay auto).
+    const enVente = new Set(); for (const it of presentes) { const k0 = cleNum((numeros[it.id] || {}).numero); if (k0) enVente.add(k0); }
     for (const o of (sales.items || [])) {
       if (!needsBordereau(o.status)) continue;
       const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
@@ -11776,14 +11781,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     for (const o of (sales.items || [])) { if (classifyOrderStatus(o.status) === 'cancelled') continue; const l = lotDeVente(o); if (l && l.lu) for (const a of l.articles) if (a.num && a.par === 'main') { const k = cleNum(a.num); if (k && !clesVivants.has(k)) vendusPartis.add(k); } }
     const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
     const autres = [];
+    for (const a of articles) enVente.add(a.cle);
     for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
     const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
     try {
       const avant = load('vinted_nums_physiques', null);
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
         && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero)
-        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter;
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, at: Date.now() });
+        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter
+        && JSON.stringify(avant.enVente || null) === JSON.stringify([...enVente].sort());
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, enVente: [...enVente].sort(), at: Date.now() });
     } catch (_) {}
   }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle, lotsTx, lotLiens]);
   const articlesVendusFavoris=useMemo(()=>{
@@ -15611,10 +15618,28 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const request=++conversationRequest.current,lecture=++lectureConversationRequest.current;
     const owner=AUTH.user?.id||'',brouillon=brouillonsReponse.current.lire(owner,conv._acc.vinted_user_id,conv.id);
     setReplyText(brouillon);setReplyErr(null);setEnvoiReponse(null);setReplyNotice(brouillon?'Brouillon restauré pour cette conversation. Conservation temporaire, sans sauvegarde sur le serveur.':'');setPrixOffre('');setContreOffreOuverte(false);setOffreMsg(null);if(!verrouOffre.current)setOffreBusy(false);
-    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,extraitBoite:String(conv.description||'').trim(),loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:conv.opposite_user?.photo?.url || photoArticle({photos:conv.item_photos})}});
-    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:extSait('messagerie')==='ok'});
+    const offreConnue=(()=>{ try{ const o=offresConv instanceof Map?offresConv.get(`${String(conv._acc.vinted_user_id)}_${conv.id}`):null; const p=o&&Number(o.prix); return Number.isFinite(p)&&p>0?p:null; }catch(_){ return null; } })();
+    setOpenConv({request,owner,inboxUpdatedAt:conv.updated_at,extraitBoite:String(conv.description||'').trim(),offreConnue,loading:true,error:null,conversation:null,messages:[],acc:conv._acc,convId:conv.id,header:{login:conv.opposite_user?.login,title:conv.item_title||conv.item?.title||'',photo:avatarPersonne(conv.opposite_user?.photo)}});
+    // (28 nov., messages-parfaits — Julien : « Ouverture de la conversation… » qui traîne) DEUX TEMPS. Avant, l'ouverture
+    // attendait la relecture PAR L'EXTENSION (`force`, un aller-retour à vinted.fr, plusieurs secondes) avant de montrer quoi
+    // que ce soit. Maintenant : (1) la copie CAPTÉE en base (une ligne, la même lecture qu'avant) s'affiche dès qu'elle arrive
+    // — et, avant même elle, le dernier message connu de la boîte et l'offre de la liste (`apercuFil`) ; (2) l'extension
+    // relit ensuite en arrière-plan (« Actualisation… », les gestes gardent leurs gardes) et remplace le fil s'il a changé.
+    // Rien n'est inventé : une lecture ratée garde ce qui est montré et le dit (`refreshError`), comme « Actualiser ».
+    const ext=extSait('messagerie')==='ok';
+    const t0=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
+    const marquer=(quoi)=>{ try{ const t=((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now())-t0; window.__vrmMesuresFil=Object.assign(window.__vrmMesuresFil||{},{[quoi]:Math.round(t)}); }catch(_){} };
+    const poser=(res,suite)=>setOpenConv(o=>o?.request===request?({...o,loading:false,refreshing:!!suite,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
+    const res0=await fetchVintedConversationDetail(conv._acc,conv.id,{force:false});
     if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
-    setOpenConv(o=>o?.request===request?({...o,loading:false,error:res.ok?null:res.error,refreshError:res.actualisationNonConfirmee?'Actualisation non confirmée. Le fil enregistré reste affiché ; réessaie ou ouvre-le sur Vinted.':null,source:res.source,conversation:filAvecOffres(res.conversation,conv._acc),messages:normalizeConversationMessages(filAvecOffres(res.conversation,conv._acc))}):o);
+    const enBase=res0.ok&&res0.source==='harvest';
+    if(res0.ok){ poser(res0,ext&&enBase); marquer('fil'); }
+    if(!ext||!enBase){ if(!res0.ok) poser(res0,false); return; }
+    const res=await fetchVintedConversationDetail(conv._acc,conv.id,{force:true});
+    if(owner!==(AUTH.user?.id||'')||lecture!==lectureConversationRequest.current)return;
+    marquer('actualise');
+    if(res.ok) poser(res,false);
+    else setOpenConv(o=>o?.request===request?({...o,refreshing:false}):o);
   };
   const actualiserConversation=async()=>{
     const oc=openConv;if(!oc||oc.loading||!oc.owner||oc.owner!==(AUTH.user?.id||''))return;
@@ -20862,7 +20887,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {/* (2 nov., 22 h) La recherche et la période ne sont plus sur l'écran (maquette FusionVentes) :
                 elles sont ici, à un geste — les mêmes états (`ordSearch`, `periode`). */}
             {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
-              <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
+              <div className="vrm-list-search"><Icon name="search" size={17}/><InputDiffere aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onValeur={setOrdSearch} placeholder="Rechercher"
                 style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></div>
               <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>
             </div>}
@@ -21854,7 +21879,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       <div className="vrm-chat-offre-traiter vrm-mp-offre-fil" data-cible="offre" data-offre="attente" data-offre-au-dessus-mini={auDessusMini?String(Math.round(mini)):undefined} data-offre-mini={mini!=null?String(mini):undefined} data-offre-contre={contreMini!=null?String(contreMini):undefined}>
         <CarteOffre qui={openConv.header?.login||''} offre={off.prix} affiche={afficheCompare} mini={mini} fmt={fmtE} quand={evt&&evt.ts||null}
           plancher={<LignePlancher plancher={plancherDeItem(itemF,pc?.devise)} puce offre={off.prix} mini={mini} ambre={C.warn} onSaisir={annonceParId.get(String(itemF))?()=>saisirPrixAnnonce(annonceParId.get(String(itemF))):null}/>}
-          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit}/></div>}/>
+          gestes={<div className="vrm-chat-offre-actions" data-offre-app={String(openConv.convId||'')}><GestesOffreVinted compte={String(openConv.acc?.vinted_user_id||'')} tx={off.tx} oid={off.oid} conv={openConv.convId} prix={off.prix} contre={contreMini!=null&&contreMini>=1?contreMini:null} decrit={decrit} plancher={itemF!=null&&(pc?.devise||'EUR')==='EUR'?plancherBaisse(numeros[String(itemF)]||null,null):null} affiche={afficheCompare!=null?afficheCompare:(pc&&pc.prix!=null&&(pc.devise||'EUR')==='EUR'?pc.prix:null)}/></div>}/>
         {offreMsg && (offreMsg.err ? <AccEchec geste="offre.vinted" erreur={offreMsg.err}/> : <AccApres geste="offre.vinted" texte={offreMsg.ok} ensuite={null}/>)}
       </div>) };
   };
@@ -21922,7 +21947,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {/* (11 nov., anti-arnaque) Les messages PROUVÉS de l'autre personne (`autre`) seulement : jamais les siens, jamais l'équipe Vinted. Aucune action. */}
             {!openConv.loading && !openConv.error && <AlerteArnaque site="vinted" style={{margin:'8px 16px 0'}} lien={openConv.convId?`https://www.vinted.fr/inbox/${openConv.convId}`:''} messages={messagesPourArnaque(openConv.messages)}/>}
             <div ref={chatScroll} className="vrm-chat-history" style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:8}}>
-              {openConv.loading && <div role="status" style={{fontSize:13,color:C.muted,textAlign:'center',padding:'20px 0'}}>Ouverture de la conversation…</div>}
+              {/* (28 nov., messages-parfaits) Pendant la lecture : CE QUI EST DÉJÀ CONNU tout de suite — le dernier message de la
+                  boîte (son auteur n'y est pas dit : bulle neutre) et l'offre de la liste —, puis la forme des bulles à venir.
+                  Plus jamais « Ouverture de la conversation… » seul au milieu d'un volet vide. */}
+              {openConv.loading && <div className="vrm-fil-apercu" role="status" aria-busy="true" aria-label={tr('mparf.fil.lecture')} data-fil-apercu={openConv.extraitBoite?'dernier':'vide'}>
+                <Skeleton variant="row" count={2}/>
+                {openConv.offreConnue!=null && <div className="vrm-fil-apercu-offre" data-fil-apercu-offre={String(openConv.offreConnue)}><Icon name="tag" size={14}/><span>{tr('verre2.msg.offreDe',{m:fmtE(openConv.offreConnue)})}</span></div>}
+                {openConv.extraitBoite && <div className="vrm-fil-apercu-dernier" data-fil-apercu-dernier=""><span className="vrm-fil-apercu-texte">{openConv.extraitBoite}</span><small>{tr('mparf.fil.dernierConnu')}</small></div>}
+              </div>}
               {/* (5 nov., chantier G) Plus jamais « Erreur : <code> » : la panne dite, son geste (relire ce fil). */}
               {openConv.error && <EtatPanne compact quoi="Ce fil" raison="La conversation n’a pas pu être lue. Rien n’est perdu." onReessayer={actualiserConversation} data-fil-panne=""/>}
               {/* Bandeau BORDEREAU : lien d'étiquette détecté dans la conversation. */}
@@ -25987,7 +26019,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             qui dépassait de sa colonne : la calculette va à côté de « Relier achats et ventes », avec son nom. */}
         {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && (
-          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
+          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><InputDiffere type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onValeur={setOrdSearch} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
         {/* (23 nov., revue UX #9) Au téléphone, UN bouton nommé « Filtres » (la période des achats) ; la calculette passe dans « ⋯ ». */}

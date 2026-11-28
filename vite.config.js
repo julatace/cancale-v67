@@ -182,6 +182,8 @@ const nomsCourts = () => ({
   name: 'vrm-noms-courts',
   apply: 'build',
   async generateBundle(o, bundle) {
+    // (28 nov., vitesse-fluide) `VRM_SANS_NOMS=1` (avec `--minify false`) : un build lisible pour les profils des bancs.
+    if (process.env.VRM_SANS_NOMS === '1') return;
     const { minify } = exiger('terser');
     for (const c of Object.values(bundle)) {
       if (c.type !== 'chunk' || c.code.length < 20000) continue;
