@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., vitesse-fluide) src/composants/saisieDifferee.jsx, molette sous <main>, Annonces : nombres et liste gardés.
+  { id: 'vitesse-fluide', date: '2026-11-28', titre: 'Recherche et défilement plus fluides', phrase: 'La lettre tapée s’affiche tout de suite, la molette ne fige plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.
   { id: 'expedie-sans-extension', date: '2026-11-28', titre: 'Colis parti : vu même sans l’extension', phrase: 'E-mail ou transporteur : il sort d’« à envoyer », réimprimer demande.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »
