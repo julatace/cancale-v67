@@ -186,7 +186,8 @@ export function peutAgir(f, { site, compte, geste, par = '' } = {}) {
     if (file && (!g.dist || cmpVersion(ver, exigeDist) < 0)) return non(g.dist ? 'retard' : 'ici-seulement', { ...base, version: ver, attendue: exigeDist, ou: '' }, 'mettre-a-jour');
     const e = empechement5448(F, appareilIci, s);
     if (e) return non(e, base, e === 'depassee' ? 'mettre-a-jour' : 'ouvrir-site');
-    return { ok: true, voie: 'ici', par: { id: appareilIci, ici: true } };
+    const pIci = Array.isArray(presences) ? presences.find((x) => x && x.id === appareilIci) : null;
+    return Object.assign({ ok: true, voie: 'ici', par: { id: appareilIci, ici: true } }, serveurPret(pIci, s, id, base.compte));
   }
 
   // 2b. À DISTANCE : un autre navigateur du vendeur, allumé, a CE compte dans son onglet.
@@ -208,7 +209,7 @@ export function peutAgir(f, { site, compte, geste, par = '' } = {}) {
     if (!p) return non('retard', { ...base, version: versionOk(avec[0].ver) ? avec[0].ver : '?', attendue: [exige, exigeDist].sort(cmpVersion).pop() }, 'mettre-a-jour');
     const e = empechement5448(F, p.id, s);
     if (e) return non(e, base, e === 'depassee' ? 'mettre-a-jour' : 'ouvrir-site');
-    return { ok: true, voie: 'distance', par: { id: p.id, nav: p.nav, sys: p.sys, ici: false } };
+    return Object.assign({ ok: true, voie: 'distance', par: { id: p.id, nav: p.nav, sys: p.sys, ici: false } }, serveurPret(p, s, id, base.compte));
   }
   // 3. Personne n'a ce compte ouvert : on dit pourquoi, et le geste.
   if (!nav.agit && (!allumees.length || ext.present)) {
@@ -221,6 +222,13 @@ export function peutAgir(f, { site, compte, geste, par = '' } = {}) {
   return non('pas-ouvert', base, 'ouvrir-site');
 }
 
+// 5.457 (« Mode ordinateur allumé », 28 nov.) : le profil qui porte ce compte Vinted a sa veille allumée et PRÊTE (ni
+// déconnecté, ni en pause, ni en vérification) ⇒ « ordinateur allumé · compte X prêt » (`agir.serveur.pret`).
+function serveurPret(p, site, id, nom) {
+  const s = p && p.serveur;
+  if (site !== 'vinted' || !s || s.on !== true || s.uid !== String(id) || s.deconnecte || !['pret', 'budget', ''].includes(String(s.code || ''))) return {};
+  return { serveur: true, cle: 'agir.serveur.pret', vars: { nom } };
+}
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion', brave: 'Brave', arc: 'Arc' };
 const NOMS_SYS = { mac: 'Mac', windows: 'Windows', linux: 'Linux', chromeos: 'Chromebook' };
 export function nomOrdi(p) { return [NOMS_NAV[str(p && p.nav).toLowerCase()] || '', NOMS_SYS[str(p && p.sys).toLowerCase()] || ''].filter(Boolean).join(' · ') || 'Chrome'; }
@@ -231,6 +239,6 @@ export function etatCompteAgir(f, site, compte) {
   if (site === 'ebay') { const r = peutAgir(f, { site, compte, geste: 'x' }); return r.ok ? { lecture: false } : { lecture: true, raison: r }; }
   const gestes = Object.keys(GESTES_AGIR[site] || {});
   let premier = null;
-  for (const g of gestes) { const r = peutAgir(f, { site, compte, geste: g }); if (r.ok) return { lecture: false, voie: r.voie }; if (!premier) premier = r; }
+  for (const g of gestes) { const r = peutAgir(f, { site, compte, geste: g }); if (r.ok) return Object.assign({ lecture: false, voie: r.voie }, r.serveur ? { serveur: true, cle: r.cle, vars: r.vars } : {}); if (!premier) premier = r; }
   return { lecture: true, raison: premier };
 }

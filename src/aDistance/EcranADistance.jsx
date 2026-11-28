@@ -506,6 +506,8 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
           : ordis.niveau === 'aucun' ? <Rangee titre={tr('adist.ordi.aucun')} sousTitre={tr('adist.ordi.aucunSous')} sousLignes={2} ton="ambre" attrs={{ 'data-adist-ordi': 'aucun' }}/>
           : [...ordis.allumes, ...ordis.eteints].slice(0, 6).map(ligneOrdi)}
         {ordis.niveau === 'allume' ? <Rangee titre={rt === 'joint' ? tr('adist.rt.joint') : tr('adist.rt.sondage')} lignes={2} attrs={{ 'data-adist-temps-reel': rt === 'joint' ? 'joint' : 'sondage' }}/> : null}
+        {/* (28 nov., ext. 5.457) « Ordinateur serveur » : un compte par profil de navigateur, la veille des messages, l'état de chacun. */}
+        {onNav ? <Rangee icone={<Icon name="ordi" size={22}/>} titre={tr('nav.serveur')} fin="chevron" onClick={() => { try { onNav('serveur'); } catch (_) {} }} attrs={{ 'data-adist-serveur': '' }}/> : null}
         <Rangee titre={tr('adist.guide.titre')} fin={guide ? null : 'chevron'} onClick={() => setGuide((x) => !x)} attrs={{ 'data-adist-guide': guide ? '1' : '0', 'aria-expanded': guide ? 'true' : 'false' }}/>
         {guide ? ['chrome', 'windows', 'mac', 'veille', 'comptes'].map((k) => <Rangee key={k} titre={tr('adist.guide.' + k)} lignes={2} attrs={{ 'data-adist-guide-ligne': k }}/>) : null}
       </Groupe>

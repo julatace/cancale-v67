@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.455.7';
+const CODE_VERSION = '5.457.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4284,6 +4284,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.435 (`sauvegardereglages`) : sauvegarder ses réglages dans un fichier ; restaurer = aperçu, puis SON « Oui ».
+    // 5.457 (« Mode ordinateur allumé ») : l'état, l'interrupteur (SON toucher).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'serveur') {
+      serveurCarte(msg).then(sendResponse, () => sendResponse({ ok: false, raison: 'Rien n’a changé.' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'sauvegardeReglages') {
       sauvegardeReglagesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rien n’a changé.' }));
       return true;
@@ -12750,7 +12755,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === OBS_ALARME) lance('observation', () => arreterObservation('delai'));   // 5.440.3 : « Observer Vinted », 10 min passées
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('serveur', () => serveurTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -20756,7 +20761,14 @@ async function cadenceCompte(uid) {
   const brut = c && c.v && c.v.comptes && typeof c.v.comptes === 'object' ? c.v.comptes[u] : null;
   return Object.assign(cadenceDe(c && c.v, u), { poses: brut && typeof brut === 'object' ? Object.keys(brut).filter((k) => k !== 'at') : [] });
 }
-function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai)); }
+// 5.457 (« Mode ordinateur allumé ») : avant de compter un geste, le TOUR d'écriture des profils de l'ordinateur (un seul compte
+//    agit à la fois). Mode éteint ⇒ rien ne change. Un autre profil a le tour, ou pas su ⇒ rien n'est compté, rien ne part.
+function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) {
+  if (essai) return unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai));
+  return tourAvantEcriture(String(uid), 'action').then((tr) => (tr && tr.refus
+    ? { ok: false, code: 'tour', n: 0, resteMs: Number(tr.resteMs) || 60000, tour: tr }
+    : unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai))), () => ({ ok: false, code: 'tour', n: 0, resteMs: 60000 }));
+}
 // (5.406) `essai` : la MÊME règle, sans rien prendre ni écrire — « une place est-elle libre, et sinon dans combien ? »
 async function compterActionUn(uid, plafond, n = 1, essai = false) {
   try {
@@ -21335,7 +21347,11 @@ async function compterLectureUn(uid, plafond) {
     const vinted = /^\d{1,20}$/.test(String(uid));
     const autres = vinted ? await actionsAutresNavigateurs(uid) : { lectures: [] };
     if (autres === null) noterDiag('lectures_partagees_pas_lues');
-    const maxL = Math.min(LECTURES_MAX_HEURE, plafond, autres === null ? LECTURES_SANS_AUTRES : LECTURES_MAX_HEURE);
+    // 5.457 (28 nov., décision de Julien « vas-y veille rapide ») : 40/h pour CE compte en veille rapide du mode ordinateur
+    //    allumé (`srvLecturesHeure`), 20/h partout ailleurs ; autres Chrome illisibles ⇒ la moitié, comme avant.
+    let maxCompte = LECTURES_MAX_HEURE;
+    try { const rg = (await chrome.storage.local.get([SRV_REGLAGE, SRV_ETAT])); maxCompte = srvLecturesHeure(rg[SRV_REGLAGE], rg[SRV_ETAT] && rg[SRV_ETAT].uid, uid); } catch (_) { maxCompte = LECTURES_MAX_HEURE; }
+    const maxL = Math.min(maxCompte, plafond, autres === null ? Math.floor(maxCompte / 2) : maxCompte);
     const n0 = list.length + ((autres && autres.lectures) || []).length;
     if (n0 >= maxL) return { ok: false, n: n0 };
     list.push(t); cur[uid] = list;
@@ -21566,6 +21582,7 @@ async function gardeStricte(uid, acc, opts = {}) {
   if (c.ok && opts.recu && typeof opts.recu === 'object') opts.recu.at = c.at || null;
   if (c.ok && opts.sorte) await noterGesteAuto(uid, opts.sorte);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
+  if (!c.ok && c.code === 'tour') return { ok: false, code: 'tour', rienParti: true, attendreMs: Number(c.resteMs) || 60000, error: phraseTour(c.tour) };   // 5.457
   if (!c.ok) {
     const min = Math.max(1, Math.ceil(Number(c.resteMs || 0) / 60000));
     const refusDiscretion = phraseRefusDiscretion(c);
@@ -27585,6 +27602,8 @@ function pousserCapte(plateforme, compte, sorte, ids, maintenant = Date.now()) {
   const s = PUSH_CAPTE_SORTES[sorte];
   if (!s || !CAPTE_PLATEFORMES.includes(plateforme)) return Promise.resolve(null);
   return pushCapteEnchaine(async () => {
+    // 5.457 : « Mode ordinateur allumé » — les messages Vinted sont annoncés par la veille (avec leur texte) : pas deux fois.
+    if (s === 'message' && plateforme === 'vinted' && await serveurAllume()) return { etat: 'serveur' };
     const st = await pushCapteLu();
     if (!st) return null;                                   // stockage muet : rien n'est dit (pas su)
     const c = String(compte == null ? '' : compte);
@@ -29729,7 +29748,8 @@ const ADIST_CONFIRMER = ['accepter', 'republier', 'favoris', 'supprimer'];   // 
 // ouvert, une place dans l'heure, la fin d'une pause, la vérification faite) : il ATTEND.
 const ADIST_ATTENDRE = ['absent', 'autre-compte', 'deux-comptes', 'onglet', 'pause', 'verification', 'plafond', 'plafond-jour', 'quota-jour',
   'discretion', 'prudence', 'frein-refus', 'stockage', 'en-cours', 'vinted-absent', 'vinted-autre', 'vinted-pause', 'onglet-vinted', 'lbc-absent', 'lbc-pause',
-  'vc-absent', 'vc-pause', 'session', 'lecture', 'coffre-lecture', 'modele-lecture', 'plafond-bordereaux'];
+  'vc-absent', 'vc-pause', 'session', 'lecture', 'coffre-lecture', 'modele-lecture', 'plafond-bordereaux',
+  'tour'];   // 5.457 (« Mode ordinateur allumé ») : un AUTRE profil de l'ordinateur a le tour d'écriture — rien n'est parti, il attend
 // (« Tout arrêter » n'est JAMAIS une attente : un arrêt est un arrêt, la commande est refusée et dite.)
 function adistAttend(code) { const c = String(code || ''); return ADIST_ATTENDRE.includes(c) || /^secu-/.test(c); }
 function adistCompteOk(site, c) {
@@ -29864,7 +29884,10 @@ function adistPresence(row, maintenant) {
   const retenues = (Array.isArray(row.retenues) ? row.retenues : []).filter((x) => x && ADIST_RE_ID.test(String(x.id || ''))).slice(0, 20).map((x) => ({ id: String(x.id), code: String(x.code || '').slice(0, 30) }));
   return { id: String(row.id).slice(9), atMs, allume: atMs > 0 && maintenant - atMs < ADIST_ALLUME_MS && atMs <= maintenant + 120000, ver: String(row.ver || ''),
     nav: String(app.nav || ''), sys: String(app.systeme || ''), comptes, retenues, enCours: ADIST_RE_ID.test(String(row.enCours || '')) ? String(row.enCours) : '',
-    rt: String(row.rt || '') };
+    rt: String(row.rt || ''),
+    // 5.457 (« Mode ordinateur allumé ») : la veille de CE profil — allumée, sur quel compte, prête ou arrêtée (et pourquoi).
+    serveur: row.serveur && typeof row.serveur === 'object' && row.serveur.on === true
+      ? { on: true, uid: /^\d{1,20}$/.test(String(row.serveur.uid || '')) ? String(row.serveur.uid) : '', code: String(row.serveur.code || '').slice(0, 20), deconnecte: row.serveur.deconnecte === true } : null };
 }
 // </a-distance-regle>
 const DIST_VUS = 'vrmDistVus';                  // { [id]: { at, d?, cond?, ecrit? } }
@@ -30158,6 +30181,14 @@ async function distanceTickUn(source) {
   await noterRetenues(retenues);
   if (!partie) { await publierPresence(moi, false, ouverts).catch(() => {}); return { lu: true, n: rows.length, issues, retenues }; }
   const x = partie;
+  // 5.457 (« Mode ordinateur allumé ») : LE TOUR d'écriture avant la prise — un autre profil (un autre compte) agit ⇒ la
+  //    commande n'est pas prise d'ici, elle attend (retenue « tour ») ; jamais deux comptes au même moment.
+  const tourPris = await tourAvantEcriture(x.c.compte, x.c.geste).catch(() => ({ refus: 'passu' }));
+  if (tourPris && tourPris.refus) {
+    retenues.push({ id: x.id, code: 'tour' }); await noterRetenues(retenues);
+    await publierPresence(moi, false, ouverts).catch(() => {});
+    issues.push('tour'); return { lu: true, n: rows.length, issues, retenues };
+  }
   // LA PRISE : conditionnelle — annulée ou prise par un autre de SES ordinateurs entre-temps ⇒ elle ne part pas d'ici.
   let appareil = ''; try { appareil = (await idAppareil()) || ''; } catch (_) {}
   const dPris = Object.assign({}, x.d, { etat: 'pris', prisLe: Date.now(), appareil });
@@ -30181,6 +30212,7 @@ async function distanceTickUn(source) {
     issues.push(etat + (i.code ? ':' + i.code : ''));
   }
   try { await chrome.storage.local.set({ [DIST_SUIVANT]: Date.now() + tirerEntre(8000, 25000) }); } catch (_) {}
+  await tourRendre().catch(() => false);   // 5.457 : le tour rendu dès le geste fini (un autre compte peut agir)
   await publierPresence(moi, true, ouverts).catch(() => {});
   return { lu: true, n: rows.length, issues, retenues };
 }
@@ -30192,14 +30224,447 @@ async function publierPresence(moi, force, ouvertsDeja) {
   const pres = local[DIST_PRES] || {}, t = Date.now();
   const comptes = ouvertsDeja || await distComptesOuverts().catch(() => []);
   const retenues = Array.isArray(local[DIST_RETENUES]) ? local[DIST_RETENUES] : [];
-  const sig = JSON.stringify([comptes, retenues, _distEnCours, _distCanal.etat]);
+  const serveur = await serveurPourPresence().catch(() => ({ on: false }));   // 5.457 : « Mode ordinateur allumé »
+  const sig = JSON.stringify([comptes, retenues, _distEnCours, _distCanal.etat, serveur]);
   const age = t - Number(pres.at || 0);
   if (pres.owner === moi && age < DIST_PRES_MS && (sig === pres.sig || age < (force ? 1500 : DIST_PRES_MIN_MS))) return false;
   let ver = ''; try { ver = String(chrome.runtime.getManifest().version || ''); } catch (_) {}
-  const data = { v: 1, at: new Date(t).toISOString(), atMs: t, ver, code: CODE_VERSION, appareil: decrireAppareil(), comptes, retenues, enCours: _distEnCours, rt: _distCanal.etat, lus: local[COMPTES_VUS_STORE] || {} };
+  const data = { v: 1, at: new Date(t).toISOString(), atMs: t, ver, code: CODE_VERSION, appareil: decrireAppareil(), comptes, retenues, enCours: _distEnCours, rt: _distCanal.etat, lus: local[COMPTES_VUS_STORE] || {}, serveur };
   const ok = await supabaseUpsert('app_data', [{ id: `presence_${id}`, data }], 'id');
   if (ok) { try { await chrome.storage.local.set({ [DIST_PRES]: { at: t, sig, owner: moi } }); } catch (_) {} }
   return ok;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ORDINATEUR SERVEUR — « MODE ORDINATEUR ALLUMÉ » (28 nov., 5.457.0, capacité `serveur`)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien (28 nov.) : « Je vais laisser un ordinateur allumé toute la journée, comme un serveur […] une notification dès
+// qu'il y a vraiment un nouveau message, avec la vraie question de la personne et le nom du compte Vinted ». Ici, CE
+// profil Chrome (UN compte Vinted : son cookie) — un autre compte vit dans un autre profil, avec SA copie de l'extension,
+// connectée au même compte VRM. Rien de ce qui suit n'affaiblit un garde-fou (§3) :
+//   · LA VEILLE (`serveurTick`, réveil `vrm-relais` de 30 s) : éteinte par défaut (SON interrupteur, Paramètres du
+//     panneau). Allumée : la boîte du compte de CET onglet relue à un intervalle tiré au hasard (4 à 7 min, jamais deux
+//     fois le même), sur le budget de LECTURE du compte (`compterLecture`, jusqu'à SRV_PLAFOND_LECTURES des 20/h : le
+//     reste à l'argent, aux colis, aux photos), par la file Vinted (`vintedGetCookie` → `requeteVinted` : une requête à
+//     la fois, pause posée sur 429/403). Rien pendant une pause, une vérification (captcha), la prudence, ni sans session.
+//   · CE QUI EST NEUF (`srvChangees`, `srvNeufsDuFil`) : conversation + n° du message / de l'offre ; la 1re lecture d'un
+//     compte est le point de départ, en silence. Le fil d'une conversation neuve est RANGÉ (`storeHarvest`), relu dans
+//     la base, PUIS annoncé : `POST /api/push { action:'serveur' }` avec des identités seulement — le serveur relit le
+//     texte, le compte, l'article (api/_lib/push-serveur.js) et réserve la clé (jamais deux fois). 503 / réseau : la file
+//     attend (24 h au plus, `vrmServeurFile`), un 400 la vide.
+//   · L'ONGLET ÉPINGLÉ (`serveurOnglet`) : un onglet vinted.fr épinglé est gardé ouvert (rouvert s'il est fermé,
+//     rechargé s'il a été déchargé ou après 3 lectures ratées, jamais jeté par Chrome : `autoDiscardable: false`).
+//   · DÉCONNECTÉ : le cookie ne donne plus de compte alors qu'il y en avait un ⇒ UNE notification « Compte X déconnecté »
+//     avec le geste (une fois par déconnexion), et la veille s'arrête jusqu'à la reconnexion.
+//   · LE TOUR D'ÉCRITURE (`tourAvantEcriture`) : allumé, CE profil demande le tour au serveur (`action:'tour'`) avant
+//     toute écriture chez une plateforme (`compterAction`, et la prise d'une commande « À distance ») ; un autre profil
+//     l'a ⇒ rien ne part (code `tour` : une commande à distance ATTEND). Pas su ⇒ rien ne part (jamais « oui »).
+// <serveur-regle> — COPIE de src/ordinateurServeur.js (scripts/audit-ordinateur-serveur.cjs --recopie). Ne pas modifier ici.
+const SRV_INTERVALLE_MIN_MS = 4 * 60000;      // la veille relit la boîte entre 4 et 7 min, au hasard (moyenne 5 min 30 s)
+const SRV_INTERVALLE_MAX_MS = 7 * 60000;
+const SRV_ECART_MIN_MS = 7000;                // deux intervalles de suite diffèrent d'au moins 7 s (« jamais deux fois le même temps »)
+const SRV_PLAFOND_LECTURES = 14;              // la veille s'arrête à 14 des 20 lectures/h du compte (6 restent à l'argent, aux colis, aux photos)
+// « VEILLE RAPIDE » (décision de Julien du 28 nov. : « vas-y veille rapide ») : 1 min 30 à 3 min au hasard ; le budget de
+// LECTURE de CE compte monte à 40/h, SEULEMENT en mode ordinateur allumé avec la veille rapide (ailleurs : 20/h) ; la veille
+// s'arrête à 34 des 40 (6 restent aux autres lectures). Allumée par défaut avec le mode ; éteinte ⇒ 4–7 min et 20/h.
+const SRV_RAPIDE_MIN_MS = 90000;
+const SRV_RAPIDE_MAX_MS = 3 * 60000;
+const SRV_RAPIDE_LECTURES_HEURE = 40;
+const SRV_RAPIDE_PLAFOND = 34;
+const SRV_FILS_PAR_TOUR = 3;                  // au plus 3 conversations neuves ouvertes par relecture (chacune = 1 lecture)
+const SRV_CONVS_LUES = 20;                    // la 1re page de la boîte (20 conversations)
+const SRV_VUS_MAX = 3000;
+const SRV_DECALAGE_MS = 20000;               // deux profils de l'ordinateur ne lisent jamais à moins de 20 s l'un de l'autre
+const SRV_TOUR_MS = 60000;                    // le tour d'écriture dure 60 s, prolongé pendant le travail
+const SRV_TOUR_MARGE_MS = 15000;              // on le prolonge quand il reste moins de 15 s
+const SRV_TEXTE_MAX = 140;                    // le texte du message dans la notification
+const SRV_EMAIL_FENETRE_MS = 45 * 60000;      // l'e-mail de Vinted arrive ~15 min après : 45 min de fenêtre par conversation
+const SRV_ALLUME_MS = 3 * 60000;              // même seuil que la présence « À distance »
+const SRV_RE_UID = /^\d{1,20}$/;
+const SRV_RE_APPAREIL = /^[a-f0-9]{16}$/;
+
+// L'intervalle suivant, tiré au hasard dans [4 ; 7] min ([1 min 30 ; 3 min] en veille rapide), jamais à moins de 7 s du
+// précédent. `alea` : un nombre [0 ; 1[.
+function srvBornes(rapide) { return rapide === true ? [SRV_RAPIDE_MIN_MS, SRV_RAPIDE_MAX_MS] : [SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS]; }
+function srvIntervalle(alea, precedent, rapide) {
+  const [MIN, MAX] = srvBornes(rapide);
+  const a = Number(alea), span = MAX - MIN;
+  let ms = MIN + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
+  const p = Number(precedent);
+  if (Number.isFinite(p) && p >= MIN && p <= MAX && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
+    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (90 s au moins) laisse toujours l'un des deux
+    ms = haut <= MAX && (ms >= p || bas < MIN) ? haut : bas >= MIN ? bas : haut;
+  }
+  return ms;
+}
+// Le budget de LECTURE d'un compte par heure : 40 en veille rapide du mode ordinateur allumé (CE compte), sinon 20.
+function srvLecturesHeure(reglage, uidVeille, uid) {
+  return reglage && reglage.on === true && reglage.rapide !== false && String(uidVeille || '') !== '' && String(uidVeille) === String(uid) ? SRV_RAPIDE_LECTURES_HEURE : 20;
+}
+// Une date Vinted (secondes, millisecondes, ISO) en millisecondes ; illisible ⇒ 0 (« pas su » : rien ne sonne).
+function srvMs(v) {
+  if (v == null || v === '') return 0;
+  const n = Number(v);
+  if (Number.isFinite(n)) return n > 0 ? (n < 1e12 ? n * 1000 : n) : 0;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) && t > 0 ? t : 0;
+}
+// LA BOÎTE relue : quelles conversations ont bougé depuis la dernière lecture ? `base` = { depuis, convs: { id: updated_at } }
+// ou null (jamais lue sur CE profil). Rend { base, changees, premiere }. La 1re lecture ne rend RIEN à ouvrir.
+// Une conversation « a bougé » si son `updated_at` a changé ET qu'elle est NON LUE (un message de moi la rend lue).
+function srvChangees(base, conversations, maintenant) {
+  const l = (Array.isArray(conversations) ? conversations : []).slice(0, SRV_CONVS_LUES)
+    .filter((c) => c && SRV_RE_UID.test(String(c.id == null ? '' : c.id)));
+  const convs = {};
+  for (const c of l) convs[String(c.id)] = String(c.updated_at == null ? '' : c.updated_at);
+  const b = base && typeof base === 'object' && Number(base.depuis) > 0 && base.convs && typeof base.convs === 'object' ? base : null;
+  if (!b) return { base: { depuis: Number(maintenant) || 0, convs }, changees: [], premiere: true };
+  const changees = l.filter((c) => c.unread === true && String(b.convs[String(c.id)] == null ? '' : b.convs[String(c.id)]) !== convs[String(c.id)]).map((c) => String(c.id));
+  // La mémoire garde aussi les conversations sorties de la 1re page (une conversation qui revient n'est pas « neuve » par erreur).
+  const garde = Object.assign({}, b.convs, convs);
+  const cles = Object.keys(garde);
+  if (cles.length > 200) for (const k of cles.slice(0, cles.length - 200)) delete garde[k];
+  return { base: { depuis: Number(b.depuis), convs: garde }, changees, premiere: false };
+}
+// La clé d'identité d'un événement (la même dans l'extension et le serveur).
+function srvCle(e) {
+  if (!e) return '';
+  if (e.s === 'offre') return `offre|${e.c}|${e.conv}|${e.oid}`;
+  if (e.s === 'message') return `message|${e.c}|${e.conv}|${e.mid}`;
+  if (e.s === 'deconnecte') return `deconnecte|${e.c}|${e.at}`;
+  return '';
+}
+// LE FIL d'une conversation (réponse de `/api/v2/conversations/{id}`) ⇒ les événements NEUFS : messages et offres de
+// L'AUTRE personne (jamais de moi), datés après `depuis`, pas déjà `vus`. Un seul événement par conversation est rendu
+// (le plus récent ; `n` compte les autres), toutes leurs clés sont dans `cles` (à marquer vues ensemble).
+function srvNeufsDuFil(conversation, uid, vus, depuis) {
+  const c = conversation && typeof conversation === 'object' ? (conversation.conversation || conversation) : null;
+  if (!c || !SRV_RE_UID.test(String(c.id == null ? '' : c.id)) || !Array.isArray(c.messages) || !SRV_RE_UID.test(String(uid || ''))) return { evs: [], cles: [] };
+  const conv = String(c.id), moi = String(uid);
+  const opp = c.opposite_user && c.opposite_user.id != null ? String(c.opposite_user.id) : '';
+  const v = vus && typeof vus === 'object' ? vus : {};
+  const d0 = Number(depuis) || 0;
+  const neufs = [];
+  for (const m of c.messages) {
+    const en = m && m.entity && typeof m.entity === 'object' ? m.entity : null;
+    if (!en) continue;
+    const de = en.user_id == null ? '' : String(en.user_id);
+    if (!de || de === moi || (opp && de !== opp)) continue;                     // de moi, ou pas su de qui : jamais
+    const at = srvMs(m.created_at_ts != null ? m.created_at_ts : en.created_at_ts != null ? en.created_at_ts : m.created_at != null ? m.created_at : en.created_at);
+    if (!at || !(at > d0)) continue;                                            // l'historique d'avant la 1re lecture : jamais
+    let e = null;
+    if (m.entity_type === 'message' && SRV_RE_UID.test(String(en.id == null ? '' : en.id)) && typeof en.body === 'string' && en.body.trim()) e = { s: 'message', c: moi, conv, mid: String(en.id), at };
+    else if (m.entity_type === 'offer_request_message' && SRV_RE_UID.test(String(en.offer_request_id == null ? '' : en.offer_request_id))
+      && en.current !== false && Number(en.status) === 10) e = { s: 'offre', c: moi, conv, oid: String(en.offer_request_id), at };
+    if (!e || v[srvCle(e)]) continue;
+    neufs.push(e);
+  }
+  if (!neufs.length) return { evs: [], cles: [] };
+  neufs.sort((a, b) => a.at - b.at);
+  // Une offre passe avant un message (elle demande une réponse) ; sinon le plus récent.
+  const offres = neufs.filter((e) => e.s === 'offre');
+  const principal = Object.assign({}, offres.length ? offres[offres.length - 1] : neufs[neufs.length - 1], { n: neufs.length });
+  return { evs: [principal], cles: neufs.map(srvCle) };
+}
+// Le texte d'un message pour la notification : sans balise, sans lien, sans caractère de contrôle, coupé PROPREMENT
+// (à un espace, jamais au milieu d'un mot ni d'un emoji) avec « … ».
+function srvTexte(t, n) {
+  const max = Number(n) > 10 ? Number(n) : SRV_TEXTE_MAX;
+  const s = String(t == null ? '' : t).replace(/<[^>]*>/g, ' ').replace(/https?:\/\/\S+/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const pts = Array.from(s);
+  if (pts.length <= max) return s;
+  let coupe = pts.slice(0, max - 1).join('');
+  const i = coupe.lastIndexOf(' ');
+  if (i > max * 0.6) coupe = coupe.slice(0, i);
+  return coupe.replace(/[\s,.;:!?·-]+$/u, '') + '…';
+}
+// LE TOUR D'ÉCRITURE (côté serveur, sur la ligne `tour_ecriture` lue). `d` = la ligne (ou null), `q` = { action, appareil,
+// compte, geste }. Rend { data } (à écrire par comparer-et-échanger), { ok, tour } (rien à écrire) ou { refus, tour }.
+//   prendre : libre (aucun tour, périmé, ou déjà à MOI pour le même compte) ⇒ à moi pour SRV_TOUR_MS ;
+//             tenu par un autre profil ou pour un autre compte ⇒ refus (il dit qui, et jusqu'à quand) ;
+//   rendre  : seulement le mien (sinon rien).
+function srvTour(d, q, maintenant) {
+  const t = Number(maintenant) || 0;
+  const app = String((q && q.appareil) || ''), compte = String((q && q.compte) || '');
+  if (!SRV_RE_APPAREIL.test(app) || !/^[\w:.-]{1,80}$/.test(compte)) return { refus: 'forme' };
+  const cur = d && typeof d === 'object' && d.par && Number(d.jusqua) > t ? { par: String(d.par), compte: String(d.compte || ''), jusqua: Number(d.jusqua), geste: String(d.geste || '') } : null;
+  const action = String((q && q.action) || '');
+  if (action === 'rendre') {
+    if (!cur || cur.par !== app) return { ok: true, tour: cur };
+    return { data: Object.assign({}, d, { par: '', compte: '', jusqua: 0, geste: '', rendu: t }) };
+  }
+  if (action !== 'prendre') return { refus: 'forme' };
+  if (cur && (cur.par !== app || cur.compte !== compte)) return { refus: 'occupe', tour: cur };
+  const geste = String((q && q.geste) || '').replace(/[^\w-]/g, '').slice(0, 30);
+  return { data: Object.assign({}, d || {}, { par: app, compte, geste, depuis: cur ? Number(d.depuis) || t : t, jusqua: t + SRV_TOUR_MS }) };
+}
+// L'ÉTAT d'un profil (ce que la présence publie sous `serveur`) ⇒ la ligne de la page « Ordinateur serveur ».
+// Rend { code, compte, nom, lu, prochain, actions, cap, jusqua } — code : eteint · off · deconnecte · captcha · pause ·
+// prudence · budget · pret. Aucun « pas su » ne vaut « prêt ».
+function srvLigne(p, maintenant) {
+  const t = Number(maintenant) || 0;
+  if (!p || typeof p !== 'object') return null;
+  const s = p.serveur && typeof p.serveur === 'object' ? p.serveur : null;
+  const allume = Number(p.atMs) > 0 && t - Number(p.atMs) < SRV_ALLUME_MS && Number(p.atMs) <= t + 120000;
+  const n = (x) => { const v = Number(x); return Number.isFinite(v) && v > 0 ? v : null; };
+  const base = { appareil: String(p.id || ''), compte: s && SRV_RE_UID.test(String(s.uid || '')) ? String(s.uid) : '', nom: s ? String(s.nom || '').slice(0, 60) : '',
+    lu: s ? n(s.lu) : null, prochain: s ? n(s.prochain) : null, actions: s && Number.isInteger(Number(s.actions)) ? Number(s.actions) : null,
+    cap: s ? n(s.cap) : null, jusqua: s ? n(s.jusqua) : null, atMs: n(p.atMs), rapide: !!(s && s.rapide === true) };
+  if (!allume) return Object.assign(base, { code: 'eteint' });
+  if (!s || s.on !== true) return Object.assign(base, { code: 'off' });
+  if (s.deconnecte === true || !base.compte) return Object.assign(base, { code: 'deconnecte' });
+  if (s.captcha === true) return Object.assign(base, { code: 'captcha' });
+  if (base.jusqua && base.jusqua > t && s.pause === true) return Object.assign(base, { code: 'pause' });
+  if (s.prudence === true) return Object.assign(base, { code: 'prudence' });
+  if (s.budget === true) return Object.assign(base, { code: 'budget' });
+  return Object.assign(base, { code: 'pret' });
+}
+// </serveur-regle>
+const SRV_REGLAGE = 'vrmServeur';                 // { on, at } — SON interrupteur
+const SRV_BASE = 'vrmServeurBase';                // { [uid]: { depuis, convs } }
+const SRV_VUS = 'vrmServeurVus';                  // { [clé]: at }
+const SRV_ETAT = 'vrmServeurEtat';                // { uid, nom, lu, prochain, precedent, code, deconnecte:{uid,at,signale}, onglet, echecs }
+const SRV_FILE = 'vrmServeurFile';                // [ { e, at } ] — ce qui attend d'être annoncé
+const SRV_TOUR_LOCAL = 'vrmServeurTour';          // { compte, jusqua } — le tour tenu par CE profil
+const SRV_URL_PUSH = 'https://vrm.center/api/push';
+async function serveurReglage() { try { const v = (await chrome.storage.local.get(SRV_REGLAGE))[SRV_REGLAGE]; return v && typeof v === 'object' ? v : {}; } catch (_) { return null; } }
+async function serveurAllume() { const r = await serveurReglage(); return !!(r && r.on === true); }
+async function serveurLire(cle) { try { const v = (await chrome.storage.local.get(cle))[cle]; return v && typeof v === 'object' ? v : (cle === SRV_FILE ? [] : {}); } catch (_) { return null; } }
+async function serveurEcrire(o) { try { await chrome.storage.local.set(o); return true; } catch (_) { return false; } }
+async function serveurPoster(corps) {
+  const s = await authToken().catch(() => null);
+  if (!s || !s.access_token) return { status: 401, json: null };
+  try {
+    const r = await fetch(SRV_URL_PUSH, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` }, body: JSON.stringify(corps), signal: signalDelai(10000) });
+    let j = null; try { j = await r.json(); } catch (_) { j = null; }
+    return { status: r.status, json: j };
+  } catch (_) { return { status: 0, json: null }; }
+}
+// ── Le tour d'écriture ──
+let _tourChaine = Promise.resolve();
+function tourAvantEcriture(compte, geste) {
+  const run = _tourChaine.then(() => tourAvantEcritureUn(compte, geste), () => tourAvantEcritureUn(compte, geste));
+  _tourChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function tourAvantEcritureUn(compte, geste) {
+  const r = await serveurReglage();
+  if (r === null) return { refus: 'stockage', resteMs: 60000 };
+  if (r.on !== true) return null;                                   // mode éteint : rien ne change (un seul profil)
+  const c = String(compte == null ? '' : compte), t = Date.now();
+  const local = (await serveurLire(SRV_TOUR_LOCAL)) || {};
+  if (local.compte === c && Number(local.jusqua) - t > SRV_TOUR_MARGE_MS) return null;   // déjà à moi, pour ce compte
+  const moi = await idAppareil();
+  if (!moi) return { refus: 'passu', resteMs: 60000 };
+  const rep = await serveurPoster({ action: 'tour', quoi: 'prendre', appareil: moi, compte: c, geste: String(geste || '') });
+  const j = rep.json || {};
+  if (rep.status === 200 && j.ok === true && Number(j.jusqua) > t) { await serveurEcrire({ [SRV_TOUR_LOCAL]: { compte: c, jusqua: Number(j.jusqua) } }); noterDiag('serveur_tour_pris'); return null; }
+  if (rep.status === 200 && j.occupe) { noterDiag('serveur_tour_occupe'); return { refus: 'occupe', compte: String(j.compte || ''), resteMs: Math.max(5000, Math.min(SRV_TOUR_MS, (Number(j.jusqua) || 0) - t)) }; }
+  noterDiag('serveur_tour_passu_' + (rep.status || 'reseau'));
+  return { refus: 'passu', resteMs: 60000 };
+}
+async function tourRendre() {
+  const local = (await serveurLire(SRV_TOUR_LOCAL)) || {};
+  if (!local.compte) return false;
+  await serveurEcrire({ [SRV_TOUR_LOCAL]: {} });
+  const moi = await idAppareil(); if (!moi) return false;
+  const rep = await serveurPoster({ action: 'tour', quoi: 'rendre', appareil: moi, compte: String(local.compte) });
+  return rep.status === 200;
+}
+function phraseTour(t) {
+  const min = Math.max(1, Math.ceil(Number((t && t.resteMs) || 60000) / 60000));
+  return t && t.refus === 'occupe'
+    ? `un autre compte de cet ordinateur agit en ce moment (jamais deux à la fois) — rien n'est parti, la suite dans ${min} min`
+    : `VRM n'a pas pu savoir si un autre compte de cet ordinateur agit (le serveur ne répond pas) — rien n'est parti, la suite dans ${min} min`;
+}
+// ── L'onglet épinglé ──
+async function serveurOnglet() {
+  let tabs = []; try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://vinted.fr/*'] }); } catch (_) { tabs = []; }
+  const etat = (await serveurLire(SRV_ETAT)) || {};
+  let t = (tabs || []).find((x) => x && x.id === etat.onglet) || (tabs || []).find((x) => x && x.pinned) || (tabs || [])[0] || null;
+  if (!t) {
+    try { t = await chrome.tabs.create({ url: 'https://www.vinted.fr/inbox', pinned: true, active: false }); noterDiag('serveur_onglet_rouvert'); } catch (_) { return { ok: false, code: 'onglet' }; }
+  } else {
+    try { if (t.discarded || t.status === 'unloaded') { await chrome.tabs.reload(t.id); noterDiag('serveur_onglet_recharge'); } } catch (_) {}
+  }
+  try { await chrome.tabs.update(t.id, { pinned: true, autoDiscardable: false }); } catch (_) {}
+  if (etat.onglet !== t.id) await serveurEcrire({ [SRV_ETAT]: Object.assign({}, etat, { onglet: t.id }) });
+  return { ok: true, id: t.id };
+}
+// ── L'annonce (identités seulement) ──
+let _srvFileChaine = Promise.resolve();
+function serveurAnnoncer(evs) {
+  const run = _srvFileChaine.then(() => serveurAnnoncerUn(evs), () => serveurAnnoncerUn(evs));
+  _srvFileChaine = run.then(() => {}, () => {});
+  return run;
+}
+async function serveurAnnoncerUn(evs) {
+  const t = Date.now();
+  const file = ((await serveurLire(SRV_FILE)) || []).filter((x) => x && x.e && t - Number(x.at) < 24 * 3600000);
+  for (const e of evs || []) if (!file.some((x) => srvCle(x.e) === srvCle(e))) file.push({ e, at: t });
+  if (!file.length) return { etat: 'vide' };
+  const lot = file.slice(0, 20);
+  const rep = await serveurPoster({ action: 'serveur', evenements: lot.map((x) => x.e) });
+  const fini = (rep.status >= 200 && rep.status < 300) || rep.status === 400;
+  const reste = fini ? file.slice(lot.length) : file;
+  await serveurEcrire({ [SRV_FILE]: reste.slice(-200) });
+  noterDiag(fini ? (rep.status === 400 ? 'serveur_push_refuse' : 'serveur_push_envoye') : 'serveur_push_ko_' + (rep.status || 'reseau'));
+  return { etat: fini ? (rep.status === 400 ? 'refuse' : 'envoye') : 'reessai', status: rep.status, n: lot.length };
+}
+// ── LA VEILLE ──
+let _srvEnVol = null;
+function serveurTick(source) {
+  if (_srvEnVol) return _srvEnVol;
+  _srvEnVol = serveurTickUn(source).catch(() => ({ erreur: true })).finally(() => { _srvEnVol = null; });
+  return _srvEnVol;
+}
+async function serveurNoterEtat(maj) {
+  const e = (await serveurLire(SRV_ETAT)) || {};
+  const n = Object.assign({}, e, maj, { maj: Date.now() });
+  await serveurEcrire({ [SRV_ETAT]: n });
+  return n;
+}
+const SRV_NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
+const SRV_NOMS_SYS = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
+async function serveurTickUn(source) {
+  const reglage = await serveurReglage();
+  if (!reglage || reglage.on !== true) return { saute: 'eteint' };
+  const moi = await relaisSessionOwner();
+  if (!moi) { await serveurNoterEtat({ code: 'session' }); return { saute: 'session' }; }
+  const t = Date.now();
+  // La file d'annonces d'avant (réseau revenu, base revenue).
+  { const f = (await serveurLire(SRV_FILE)) || []; if (f.length) await serveurAnnoncer([]); }
+  await serveurOnglet().catch(() => null);
+  const uid = await avecDelai(compteConnecte('www.vinted.fr'), 3000, null).catch(() => null);
+  let etat = (await serveurLire(SRV_ETAT)) || {};
+  // DÉCONNECTÉ : il y avait un compte, il n'y en a plus ⇒ une notification, une fois par déconnexion.
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) {
+    const avant = etat.uid && /^\d{1,20}$/.test(String(etat.uid)) ? String(etat.uid) : '';
+    if (avant) {
+      const d = etat.deconnecte && etat.deconnecte.uid === avant ? Object.assign({}, etat.deconnecte) : { uid: avant, at: t, signale: false };
+      if (!d.signale) {
+        const a = decrireAppareil();
+        const ordi = [SRV_NOMS_NAV[a.nav] || 'Chrome', SRV_NOMS_SYS[a.systeme] || ''].filter(Boolean).join(' · ');
+        const r = await serveurAnnoncer([{ s: 'deconnecte', c: avant, at: d.at, ordi }]);
+        if (r && (r.etat === 'envoye' || r.etat === 'refuse')) d.signale = true;
+      }
+      etat = await serveurNoterEtat({ code: 'deconnecte', deconnecte: d });
+    } else etat = await serveurNoterEtat({ code: 'deconnecte' });
+    await publierPresence(moi, true).catch(() => {});
+    return { saute: 'deconnecte' };
+  }
+  const u = String(uid);
+  if (etat.deconnecte && etat.deconnecte.uid === u) etat = await serveurNoterEtat({ deconnecte: null });
+  if (etat.uid !== u) etat = await serveurNoterEtat({ uid: u, nom: (await loginDe(u, { attendreMs: 800 }).catch(() => '')) || '', prochain: 0 });
+  // Les arrêts : pause de Vinted, vérification, prudence (lectures de fond suspendues).
+  const p = await pauseVinted();
+  if (p) { await serveurNoterEtat({ code: 'pause', jusqua: Number(p.jusqua) || 0 }); await publierPresence(moi, false).catch(() => {}); return { saute: 'pause' }; }
+  const ar = await arretCompteCarte(u);
+  if (ar && ar.quoi === 'captcha') { await serveurNoterEtat({ code: 'captcha' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'captcha' }; }
+  if (await prudenceDe(u)) { await serveurNoterEtat({ code: 'prudence' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'prudence' }; }
+  if (Number(etat.prochain) > t && source !== 'forcer') { if (etat.code !== 'pret' && etat.code !== 'budget') await serveurNoterEtat({ code: 'pret' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'pas-encore', prochain: Number(etat.prochain) }; }
+  // LES LECTURES DÉCALÉES (Discrétion, §3 : jamais deux comptes au même moment sur un ordinateur) : un autre profil de
+  //    l'ordinateur a lu il y a moins de SRV_DECALAGE_MS (sa présence le dit) ⇒ celle-ci attend 20 à 45 s de plus.
+  if (source !== 'forcer') {
+    const moiApp = await idAppareil().catch(() => null);
+    const pr = await sbGet('app_data?id=like.presence_*&select=id,serveur:data->serveur&limit=20');
+    const autre = Array.isArray(pr) && pr.some((x) => x && String(x.id) !== `presence_${moiApp}` && x.serveur && x.serveur.on === true && Math.abs(t - (Number(x.serveur.lu) || 0)) < SRV_DECALAGE_MS);
+    if (autre) { await serveurNoterEtat({ prochain: t + 20000 + Math.floor(Math.random() * 25000) }); noterDiag('serveur_lecture_decalee'); return { saute: 'decale' }; }
+  }
+  // L'intervalle suivant est tiré AVANT la lecture (une lecture ratée ne fait jamais relire en rafale).
+  const rapide = reglage.rapide !== false;            // « Veille rapide » (28 nov.) : allumée par défaut avec le mode
+  const plafondVeille = rapide ? SRV_RAPIDE_PLAFOND : SRV_PLAFOND_LECTURES;
+  const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0, rapide);
+  await serveurNoterEtat({ prochain: t + ecart, precedent: ecart });
+  const L = await compterLecture(u, plafondVeille);
+  if (!L || !L.ok) { await serveurNoterEtat({ code: 'budget', prochain: t + 60000 + Math.floor(Math.random() * 60000) }); await publierPresence(moi, true).catch(() => {}); return { saute: 'budget' }; }
+  const r = await vintedGetCookie('www.vinted.fr', `/api/v2/inbox?page=1&per_page=${SRV_CONVS_LUES}`);
+  if (!r || !r.ok || !r.json || !Array.isArray(r.json.conversations)) {
+    const st = Number(r && r.status) || 0;
+    const echecs = (Number(etat.echecs) || 0) + 1;
+    await serveurNoterEtat({ code: st === 429 || st === 403 ? 'pause' : 'lecture', echecs: echecs >= 3 ? 0 : echecs });
+    if (echecs >= 3) { try { if (etat.onglet) await chrome.tabs.reload(etat.onglet); noterDiag('serveur_onglet_recharge'); } catch (_) {} }
+    await publierPresence(moi, true).catch(() => {});
+    return { lu: false, status: st };
+  }
+  // Le compte n'a pas changé pendant la lecture (§5 : jamais les messages de B rangés sous A).
+  if (String((await compteConnecte('www.vinted.fr').catch(() => null)) || '') !== u) { noterDiag('serveur_compte_change'); return { lu: false, saute: 'compte-change' }; }
+  try { await storeHarvest('www.vinted.fr', 'inbox', null, JSON.stringify(r.json), '/api/v2/inbox'); } catch (_) {}
+  const bases = (await serveurLire(SRV_BASE)) || {};
+  const ch = srvChangees(bases[u], r.json.conversations, t);
+  bases[u] = ch.base;
+  const vus = (await serveurLire(SRV_VUS)) || {};
+  const evs = [];
+  let ouverts = 0;
+  for (const conv of ch.changees.slice(0, SRV_FILS_PAR_TOUR)) {
+    const L2 = await compterLecture(u, plafondVeille);
+    if (!L2 || !L2.ok) { delete bases[u].convs[conv]; continue; }        // relue au prochain passage
+    const f = await vintedGetCookie('www.vinted.fr', `/api/v2/conversations/${conv}`);
+    ouverts++;
+    if (!f || !f.ok || !f.json || !f.json.conversation) { delete bases[u].convs[conv]; continue; }
+    const n = srvNeufsDuFil(f.json, u, vus, ch.base.depuis);
+    if (!n.evs.length) continue;
+    // RANGÉ, puis RELU dans la base : le serveur ne dit que ce qui est dans SES lignes.
+    try { await storeHarvest('www.vinted.fr', 'conversation', conv, JSON.stringify(f.json), `/api/v2/conversations/${conv}`); } catch (_) {}
+    const rows = await sbGet(`app_data?id=eq.harvest_${u}_conv_${conv}&select=msgs:data->payload->conversation->messages`);
+    const msgs = Array.isArray(rows) && rows[0] && Array.isArray(rows[0].msgs) ? rows[0].msgs : null;
+    const e = n.evs[0];
+    const range = msgs && msgs.some((m) => m && m.entity && (e.s === 'message' ? String(m.entity.id) === e.mid : String(m.entity.offer_request_id) === e.oid));
+    if (!range) { delete bases[u].convs[conv]; noterDiag('serveur_fil_pas_range'); continue; }
+    for (const k of n.cles) vus[k] = t;
+    evs.push(e);
+  }
+  // Au-delà de 3 conversations neuves : les autres restent « changées » pour le passage suivant.
+  for (const conv of ch.changees.slice(SRV_FILS_PAR_TOUR)) delete bases[u].convs[conv];
+  const cles = Object.keys(vus);
+  if (cles.length > SRV_VUS_MAX) for (const k of cles.sort((a, b) => vus[a] - vus[b]).slice(0, cles.length - SRV_VUS_MAX)) delete vus[k];
+  await serveurEcrire({ [SRV_BASE]: bases, [SRV_VUS]: vus });
+  await serveurNoterEtat({ code: 'pret', lu: t, echecs: 0 });
+  if (evs.length) await serveurAnnoncer(evs);
+  await publierPresence(moi, true).catch(() => {});
+  noterDiag(ch.premiere ? 'serveur_point_de_depart' : 'serveur_lu');
+  return { lu: true, premiere: ch.premiere, changees: ch.changees.length, ouverts, annonces: evs.length };
+}
+// Ce que la présence publie sous `serveur` (srvLigne côté app).
+async function serveurPourPresence() {
+  const r = await serveurReglage();
+  if (!r || r.on !== true) return { on: false };
+  const e = (await serveurLire(SRV_ETAT)) || {};
+  const uid = /^\d{1,20}$/.test(String(e.uid || '')) && e.code !== 'deconnecte' ? String(e.uid) : '';
+  let actions = null, cap = null;
+  if (uid) {
+    try { const l = (((await chrome.storage.local.get('vrmActions')).vrmActions) || {})[uid] || []; actions = l.filter((x) => Date.now() - x < 3600000).length; } catch (_) { actions = null; }
+    try { cap = (await cadenceEffective(uid)).actionsHeure; } catch (_) { cap = null; }
+  }
+  const p = await pauseVinted();
+  return { on: true, rapide: r.rapide !== false, uid, nom: String(e.nom || '').slice(0, 60), lu: Number(e.lu) || 0, prochain: Number(e.prochain) || 0, actions, cap,
+    pause: !!p || e.code === 'pause', jusqua: p ? Number(p.jusqua) || 0 : 0, captcha: e.code === 'captcha', prudence: e.code === 'prudence', budget: e.code === 'budget',
+    deconnecte: e.code === 'deconnecte', code: String(e.code || '') };
+}
+// Le panneau : l'état, l'interrupteur (SON toucher).
+async function serveurCarte(msg) {
+  const q = String((msg && msg.quoi) || 'etat');
+  if (q === 'rapide' || q === 'lente') {
+    const r0 = (await serveurReglage()) || {};
+    if (!(await serveurEcrire({ [SRV_REGLAGE]: Object.assign({}, r0, { rapide: q === 'rapide', at: Date.now() }) }))) return { ok: false, raison: 'Rien n’a changé (stockage du navigateur muet).' };
+    const e0 = (await serveurLire(SRV_ETAT)) || {};
+    await serveurEcrire({ [SRV_ETAT]: Object.assign({}, e0, { prochain: 0, precedent: 0 }) });   // le nouveau rythme part tout de suite
+    const moi0 = await relaisSessionOwner().catch(() => null); if (moi0) publierPresence(moi0, true).catch(() => {});
+  }
+  if (q === 'allumer' || q === 'eteindre') {
+    const on = q === 'allumer';
+    const r0 = (await serveurReglage()) || {};
+    if (!(await serveurEcrire({ [SRV_REGLAGE]: { on, rapide: r0.rapide !== false, at: Date.now() } }))) return { ok: false, raison: 'Rien n’a changé (stockage du navigateur muet).' };
+    if (!on) { await tourRendre().catch(() => false); await serveurEcrire({ [SRV_BASE]: {} }); }   // éteint puis rallumé : le point de départ repart (jamais l'historique)
+    if (on) setTimeout(() => { serveurTick('forcer').catch(() => {}); }, 0);
+    const moi = await relaisSessionOwner().catch(() => null); if (moi) publierPresence(moi, true).catch(() => {});
+  }
+  const s = await serveurPourPresence();
+  const appareil = await idAppareil().catch(() => null);
+  let autres = null;
+  const rows = await sbGet('app_data?id=like.presence_*&select=id,atMs:meta->>atMs,serveur:data->serveur&limit=20');
+  if (Array.isArray(rows)) autres = rows.filter((x) => x && String(x.id) !== `presence_${appareil}`).map((x) => srvLigne(Object.assign({}, x, { id: String(x.id).slice(9) }), Date.now())).filter(Boolean);
+  return { ok: true, serveur: s, appareil, autres };
 }
 // ── Le temps réel : une prise sur SON sujet privé (`vrm-lignes:<owner>`, migration 040). Rien d'autre n'y est envoyé que la
 //    jonction (avec SON jeton) et le battement. Un message d'un autre vendeur n'est jamais pris ; une commande neuve réveille la file.
@@ -31147,6 +31612,7 @@ async function garde(uid, acc, opts = {}) {
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
   if (c.ok && opts && opts.sorte) await noterGesteAuto(uid, opts.sorte);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
+  if (!c.ok && c.code === 'tour') return { ok: false, code: 'tour', attendreMs: Number(c.resteMs) || 60000, error: phraseTour(c.tour) };   // 5.457
   if (!c.ok) {
     const refusDiscretion = phraseRefusDiscretion(c);
     if (refusDiscretion) return refusDiscretion;
