@@ -65,7 +65,8 @@ function FeuilleAuto({ def, reglage, ouverte, onFermer, onEnregistrer }) {
     <p className="crm-pied">{eval_ ? tr('crm.auto.evalPied') : tr('crm.auto.textes')} · {tr(eval_ ? 'crm.auto.variablesEval' : 'crm.auto.variables')}</p>
     {!eval_ ? <Champ libelle={tr('crm.auto.sujet')} valeur={sujet} onChange={(v) => setSujet(String(v).slice(0, 100))}/> : null}
     {def.delai ? <Champ libelle={tr('crm.auto.delai')} valeur={delai} inputMode="numeric" onChange={(v) => setDelai(String(v).replace(/\D/g, '').slice(0, 2))}/> : null}
-    {textes.map((t, i) => <ZoneTexte key={i} libelle={tr('crm.auto.texte', { n: i + 1 })} valeur={t} max={max} lignes={eval_ ? 2 : 4} onChange={(v) => setTextes((x) => x.map((y, k) => (k === i ? v : y)))} attrs={{ 'data-crm-version': i + 1 }}/>)}
+    {/* (28 nov., main-vert) une version ne se retire jamais (on n'en ajoute qu'à la fin) : « version 2 » EST son identité */}
+    {textes.map((t, i) => <ZoneTexte key={'version-' + (i + 1)} libelle={tr('crm.auto.texte', { n: i + 1 })} valeur={t} max={max} lignes={eval_ ? 2 : 4} onChange={(v) => setTextes((x) => x.map((y, k) => (k === i ? v : y)))} attrs={{ 'data-crm-version': i + 1 }}/>)}
     {textes.length < TEXTES_MAX ? <div className="crm-ligne-bouton"><Bouton variante="texte" onClick={() => setTextes((x) => [...x, ''])}>{tr('crm.auto.ajouterVersion')}</Bouton></div> : null}
   </Feuille>;
 }
@@ -95,7 +96,7 @@ function Automatismes({ headers, compte, confirm }) {
     <Groupe titre={tr('crm.auto.textes')}>{[...AUTO, EVAL].map((def) => <Rangee key={def.cle} titre={tr(def.titre)} sousTitre={(reg[def.cle].textes[0] || tr(def.defauts[0])).slice(0, 80)} fin="chevron" onClick={() => setEdit(def)} attrs={{ 'data-crm-modifier': def.cle }}/>)}</Groupe>
     <Groupe titre={tr('crm.auto.evalAuto')} pied={tr('crm.auto.evalPied')}>{rangee(EVAL)}</Groupe>
     <Groupe titre={tr('crm.journal.titre')} pied={d.dernierPassage ? tr('crm.journal.dernier', { quand: ilYa(d.dernierPassage.le), n: d.dernierPassage.envoyes }) : ''} attrs={{ 'data-crm-journal': lignes ? lignes.length : '' }}>
-      {lignes === null ? <Rangee titre={tr('crm.passu')}/> : lignes.length ? lignes.slice(0, 20).map((x, i) => <Rangee key={i} titre={tr(NOM_AUTO[x.quoi] || 'crm.auto.titre')} sousTitre={tr('crm.journal.ligne', { acheteur: x.acheteur, v: x.version })} detailValeur={tr('crm.etat.' + (x.etat === 'envoye' ? 'envoye' : x.etat === 'refuse' ? 'refuse' : 'incertain'))} valeur={ilYa(x.le)} ton={x.etat === 'incertain' ? 'ambre' : 'neutre'}/>) : <Rangee titre={tr('crm.journal.vide')}/>}
+      {lignes === null ? <Rangee titre={tr('crm.passu')}/> : lignes.length ? lignes.slice(0, 20).map((x) => <Rangee key={[x.le, x.quoi, x.acheteur, x.version].join('|')} titre={tr(NOM_AUTO[x.quoi] || 'crm.auto.titre')} sousTitre={tr('crm.journal.ligne', { acheteur: x.acheteur, v: x.version })} detailValeur={tr('crm.etat.' + (x.etat === 'envoye' ? 'envoye' : x.etat === 'refuse' ? 'refuse' : 'incertain'))} valeur={ilYa(x.le)} ton={x.etat === 'incertain' ? 'ambre' : 'neutre'}/>) : <Rangee titre={tr('crm.journal.vide')}/>}
     </Groupe>
     {err ? <p className="crm-pied" role="status">{err}</p> : null}
     <FeuilleAuto def={edit} reglage={edit ? reg[edit.cle] : null} ouverte={!!edit} onFermer={() => setEdit(null)} onEnregistrer={async (v) => { const def = edit; setEdit(null); await regler(def, { actif: reg[def.cle].actif, ...v }); }}/>
