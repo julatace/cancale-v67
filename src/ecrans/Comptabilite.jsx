@@ -112,7 +112,10 @@ import { occuperPendant, libererBoutonsImprime } from '../impression/occuper.js'
 import { papierThermique, MODULE_MIN_MM } from '../impression/thermique.js';
 import { casesEnSerie, caseHabitude, achatsARanger, CLE_FICHES as CLE_FICHES_RANGEES } from '../rangementArrivee.js';
 import { CLE_ATELIER } from '../atelierArrivee.js';
-import { lienCommande as lienCommandeMarche } from '../../api/_lib/ebay-marches-table.js';
+import { lienCommande as lienCommandeMarche, lienEtiquette as lienEtiquetteMarche } from '../../api/_lib/ebay-marches-table.js';
+// (28 nov., ebay-livraison) La livraison eBay : limite lue, transporteur lu, suivis lus chez eBay, port de l'acheteur (pour info).
+import { limiteEbay, transporteurEbay, etatEnvoiEbay, portAcheteurEbay, idEtiquetteEbay, PREFIXE_ETIQUETTE_EBAY } from '../../api/_lib/ebay-livraison.js';
+import { finDeLigne as finDeLigneSuivi, finDeLigneTransporteur as finDeTranspSuivi } from '../../api/_lib/suivi-colis.js';
 import { arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee } from '../../api/_lib/arrivee-colis.js';
 import { indexRecusParTransaction, recuDeLAchat, bilanRecusAchat } from '../../api/_lib/recu-achat.js';
 import { etatRetrait, estAVerifier, urgenceTri, GARDE_MAX_J, limiteEstimee } from '../../api/_lib/retrait-colis.js';
@@ -4958,6 +4961,8 @@ function LigneDestinationEbay({ d }) {
 }
 // ⟦← App.jsx #222⟧
 const lienCommandeEbay = (orderId, ref) => lienCommandeMarche(marcheEbayDeRef(ref), orderId);
+// (28 nov., ebay-livraison) La page « expédier » de CETTE commande chez eBay (l'étiquette prépayée par l'acheteur s'y imprime).
+const lienEtiquetteEbay = (orderId, ref) => lienEtiquetteMarche(marcheEbayDeRef(ref), orderId);
 // ⟦← App.jsx #223⟧
 // (9 nov., retraits frais) La dernière lecture RÉUSSIE chez un transporteur (ms) parmi les lignes `transp_`
 // lues, ou null (rien lu, ou pas su). Et l'âge en mots, une règle pour la ligne « Suivi vérifié … ».
@@ -6818,7 +6823,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // Une ligne illisible ou absente ⇒ la commande reste datée comme avant (sa date de commande).
     let datesV = {};
     if (r && !r.illisibles.length) { try { const rv2 = await lireEbayParCompte('ebay_versements', 'd:data->dates', r.comptes); datesV = datesVersementEbay(rv2 && rv2.lignes); } catch (_) { datesV = {}; } }
-    setEbayCmd((!r || r.illisibles.length) ? null : r.items.map((o) => (o && o.orderId && datesV[o.orderId]) ? { ...o, _versementEbay: datesV[o.orderId] } : o));
+    // (28 nov., ebay-livraison) Les n° de suivi lus chez eBay (`ebay_suivis{suffixe}`, rangés par la relecture, scalaires) et
+    // les étiquettes reçues par e-mail (`email_bordebay_{n° de commande}`, projetées : le PDF n'est lu qu'à l'impression)
+    // sont posés sur la commande (`_suivisEbay`, `_etiquetteEbay`) — par SON n° de commande, jamais par le titre.
+    // Une ligne illisible ⇒ rien n'est posé (la commande reste comme avant : « pas su » n'est pas « aucun suivi »).
+    let suivisE = {}, etiqE = {};
+    if (r && !r.illisibles.length) {
+      try { const rs = await lireEbayParCompte('ebay_suivis', 'p:data->parCommande', r.comptes);
+        for (const { compte, ligne } of ((rs && rs.lignes) || [])) { const pc = ligne && ligne.p && typeof ligne.p === 'object' ? ligne.p : null; if (pc) for (const [k, v] of Object.entries(pc)) if (v && Array.isArray(v.suivis)) suivisE[compte.ref + ':' + k] = v.suivis; }
+      } catch (_) { suivisE = {}; }
+      try { const le = await lireTout(`id=like.${PREFIXE_ETIQUETTE_EBAY}*&select=id,pdf:meta->>_pdf,suivi:meta->>suiviPdf,transporteur:meta->>transporteurPdf`, { strict: true });
+        for (const x of (Array.isArray(le) ? le : [])) { const k = String(x.id || '').slice(PREFIXE_ETIQUETTE_EBAY.length); if (k && x.pdf) etiqE[k] = { suivi: x.suivi || '', transporteur: x.transporteur || '' }; }
+      } catch (_) { etiqE = {}; }
+    }
+    setEbayCmd((!r || r.illisibles.length) ? null : r.items.map((o) => {
+      if (!o || !o.orderId) return o;
+      const su = suivisE[(o._compte || 'principal') + ':' + o.orderId], et = etiqE[String(o.orderId)];
+      return (datesV[o.orderId] || su || et) ? { ...o, ...(datesV[o.orderId] ? { _versementEbay: datesV[o.orderId] } : {}), ...(su ? { _suivisEbay: su } : {}), ...(et ? { _etiquetteEbay: et } : {}) } : o;
+    }));
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
       setEbayLuA(ts.length ? Math.min(...ts) : null);
@@ -11738,6 +11760,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (numsRemisCle === null) return;   // (13 nov.) les retours en stock pas encore sus : on attend
     const vivants = new Set();
     for (const it of presentes) { const n = String((numeros[it.id] || {}).numero || '').trim(); if (n) vivants.add(n); }
+    // (28 nov., lot ebay-automatismes) Les N° EN VENTE quelque part (une annonce présente, ou en vente sur eBay / Leboncoin) —
+    // sans les ventes à poster ni les retours : la preuve qu'une paire est chez lui ET pas vendue (remise en vente eBay auto).
+    const enVente = new Set(); for (const it of presentes) { const k0 = cleNum((numeros[it.id] || {}).numero); if (k0) enVente.add(k0); }
     for (const o of (sales.items || [])) {
       if (!needsBordereau(o.status)) continue;
       const n = String((saleOv[String(o.transaction_id)] || {}).numero || '').trim(); if (n) vivants.add(n);
@@ -11754,14 +11779,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     for (const o of (sales.items || [])) { if (classifyOrderStatus(o.status) === 'cancelled') continue; const l = lotDeVente(o); if (l && l.lu) for (const a of l.articles) if (a.num && a.par === 'main') { const k = cleNum(a.num); if (k && !clesVivants.has(k)) vendusPartis.add(k); } }
     const { articles, sansNumero } = articlesAutresPlateformes({ ebay: ebayStock || [], lbc: lbcStock || [], cle: cleNum, vendusPartis });
     const autres = [];
+    for (const a of articles) enVente.add(a.cle);
     for (const a of articles) { const surVinted = clesVivants.has(a.cle); if (!surVinted) { vivants.add(a.numero); clesVivants.add(a.cle); } autres.push({ numero: a.numero, title: a.title, photo: a.photo, plateformes: a.plateformes, vinted: surVinted }); }
     const liste = [...vivants].sort((a,b)=>(+a||0)-(+b||0));
     try {
       const avant = load('vinted_nums_physiques', null);
       const memeChose = avant && Array.isArray(avant.nums) && avant.nums.length === liste.length && avant.nums.every((x,i)=>x===liste[i])
         && JSON.stringify(avant.autres || []) === JSON.stringify(autres) && JSON.stringify(avant.sansNumero || null) === JSON.stringify(sansNumero)
-        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter;
-      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, at: Date.now() });
+        && JSON.stringify(avant.retours || []) === JSON.stringify(retoursStock) && (Number(avant.retoursANumeroter) || 0) === retoursANumeroter
+        && JSON.stringify(avant.enVente || null) === JSON.stringify([...enVente].sort());
+      if (!memeChose) save('vinted_nums_physiques', { nums: liste, autres, sansNumero, retours: retoursStock, retoursANumeroter, enVente: [...enVente].sort(), at: Date.now() });
     } catch (_) {}
   }, [annoncesPresentes, sales.items, numeros, saleOv, annoncesVendues, ebayStock, lbcStock, numsRemisCle, lotsTx, lotLiens]);
   const articlesVendusFavoris=useMemo(()=>{
@@ -20471,6 +20498,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (16 nov.) Un bordereau de RETOUR : SON PDF, par SON n° (`email_bordretour_{tx}`), ou le corps gardé.
       if (l.pdfGarde) { try { buf = b64ToBytes(l.pdfGarde); } catch (_) { buf = null; raison = 'retourIllisible'; } }
       else { const lu = await lirePdfLigne(`email_bordretour_${l.tx}`); if (lu === null) raison = 'pasLu'; else if (!lu.octets) raison = 'retourSansPdf'; else buf = lu.octets; }
+    } else if (l.site === 'ebay' && l.pdf && l.orderId) {
+      // (28 nov., ebay-livraison) L'étiquette eBay reçue par e-mail, par SON n° de commande (`email_bordebay_{n°}`).
+      const lu = await lirePdfLigne(idEtiquetteEbay(l.orderId)); if (lu === null) raison = 'pasLu'; else if (!lu.octets) raison = 'sansPdf'; else buf = lu.octets;
     } else if (l.site === 'leboncoin' && !l.pdf) {
       raison = 'sansPdf';
     } else if (l.site === 'leboncoin') {
@@ -20947,7 +20977,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
     const autresColis = [
       ...(voitSite('vestiaire') ? (((colisVestiaire(vcEtat) || {}).aEnvoyer) || []) : []).map((v) => { const tr = transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return { __autre: 'vc', key: 'vc:' + v.id, v, tr, trNom: nomEnvoye(tr), dl: joursAvantVc(v.limite) }; }),
-      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => ({ __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr: transporteurDuColis({ declare: '' }), trNom: TRANSP_INCONNU, dl: x.jours })),
+      // (28 nov., ebay-livraison) Le transporteur LU chez eBay (choisi par l'acheteur, `shippingStep`) et la date limite LUE
+      // (`shipByDate`, le délai de préparation de l'annonce) en jour et heure de Paris (`limiteEbay`) — la règle du nombre
+      // « à envoyer » ne change pas (`colisEbay`) : chaque commande y est une fois.
+      ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => { const o = x.ordre || {}; const et = o._etiquetteEbay || null;
+        const tr = transporteurDuColis({ declare: transporteurEbay(o, o._suivisEbay) || (et && et.transporteur) || '', suivi: (et && et.suivi) || '' });
+        return { __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr, trNom: nomEnvoye(tr), dl: x.jours, lim: limiteEbay(o), etiquette: !!et }; }),
       ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];
     return { vintedLu, exTout, autresColis };
@@ -21014,7 +21049,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
   // (24 nov., vitesse-lectures-toucher) Par version des données, comme `cartesColis` (liste vérifiée par
   // scripts/audit-calcul-par-version.cjs ; au plus 60 s).
-  const listeEnvoyes = useCalculParVersion(() => listeEnvoyesCalc(), () => [LIMITE_ENVOYES_J, bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, cochesNonPartis, colisEmailSources, ecranCalcul, emailBords, hiddenSales, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txnItem, txnLink, vcEtat, vcLoc0, venteMailItem, ventesEmailParTx, versements, reglesNumeros()], 'listeEnvoyes', ecranCalcul);
+  const listeEnvoyes = useCalculParVersion(() => listeEnvoyesCalc(), () => [LIMITE_ENVOYES_J, bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, cochesNonPartis, colisEmailSources, ecranCalcul, emailBords, hiddenSales, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txnItem, txnLink, vcEtat, vcLoc0, venteMailItem, ventesEmailParTx, versements, ebayCmd, reglesNumeros()], 'listeEnvoyes', ecranCalcul);
   const listeEnvoyesCalc = () => { compterCalcul('listeEnvoyes', ecranCalcul);
     const out = [];
     try {
@@ -21097,6 +21132,29 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             tr: transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }), lues: { depose: true, enroute: exp } });
         }
       }
+      // (28 nov., ebay-livraison) LES COMMANDES eBAY PARTIES, sans geste : eBay dit la commande expédiée ; le n° de suivi est LU
+      // chez eBay (`getShippingFulfillments`, rangé par la relecture : `_suivisEbay`) ⇒ « En route » ; le TRANSPORTEUR dit livré
+      // par CE n° (e-mail de suivi, ligne `transp_`) ⇒ « Livrée » (`etatEnvoiEbay`). Identité = le n° de commande, jamais le titre.
+      if (voitSite('ebay') && Array.isArray(ebayCmd)) {
+        const finSuiviEbay = (n) => { const k = normaliserSuivi(n); if (!k) return null;
+          const tl = transpMap instanceof Map ? transpMap.get(k) : null; const fT = tl ? finDeTranspSuivi(tl) : null; if (fT === 'retire') return 'retire';
+          let fE = null; for (const t of (Array.isArray(tracking) ? tracking : [])) { if (t && suiviDeLigne(t) === k) { const f = finDeLigneSuivi(t); if (f === 'delivered') return 'delivered'; if (f) fE = f; } }
+          return fE || fT; };
+        const vus = new Set();
+        for (const o of ebayCmd) {
+          if (!o || !o.orderId) continue;
+          const cle = 'e:' + (o._compte || 'principal') + ':' + o.orderId; if (vus.has(cle)) continue; vus.add(cle);
+          const t0 = Date.parse(o.creationDate || ''); const j = Number.isFinite(t0) ? Math.floor((Date.now() - t0) / 86400000) : null;
+          if (j != null && j > LIMITE_ENVOYES_J) continue;
+          const su = Array.isArray(o._suivisEbay) ? o._suivisEbay : [];
+          const et = etatEnvoiEbay(o, su, finSuiviEbay); if (!et) continue;
+          const l0 = (o.lineItems || [])[0] || {};
+          out.push({ cle, site: 'ebay', type: 'ebay', ordre: o, et, j, rang: et.livree ? 3 : 2, t: o.creationDate || null,
+            photo: photoCommande(o), titre: l0.title || `Commande ${o.orderId}`, num: numLigneEbay(o, l0) || '', suiviEbay: et.suivi,
+            tr: transporteurDuColis({ declare: transporteurEbay(o, su), suivi: et.suivi, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
+            lues: { imprime: true, depose: true, enroute: et.etat !== 'expediee', livre: !!et.livree } });
+        }
+      }
     } catch (_) {}
     // (9 nov.) LA DATE QUI RANGE UN COLIS ENVOYÉ (src/colisEnvoyes.js `quandEnvoye`) : la prise
     // en charge LUE (transporteur, son e-mail du MÊME n°), sinon son « Colis fait », sinon la vente.
@@ -21105,7 +21163,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const rv = tx && x.site === 'vinted' ? partisVinted.get(tx) : null;
       const depart = x.depart || (vuPartir(rv) ? rv : null);
       const coche = x.type === 'coche' && tx ? (shipDone[tx] || null) : (rv && rv.type === 'colis-fait' ? rv.at : null);
-      const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
+      const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : x.site === 'ebay' ? (x.ordre && x.ordre.creationDate) : (x.lo && x.lo.dateVente);
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
     });
   };
@@ -21237,6 +21295,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       + ':' + Object.values(saleOv || {}).filter((v) => v && v.buyPrice != null && String(v.buyPrice).trim() !== '').length;
     if (RELIER_VENTES.sig !== sig) { RELIER_VENTES.sig = sig; setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ventes')); } catch (_) {} }, 0); }
   }
+  // (28 nov., ebay-livraison) Le détail d'une commande eBay : le port PAYÉ PAR L'ACHETEUR, POUR INFO (§2.8 : ni recette ni
+  // charge — `montantRecuEbay` ne le lit pas, la compta non plus) et l'argent que tu reçois (la règle de la compta).
+  // Le prix de vente d'une commande eBay (les articles, `pricingSummary.priceSubtotal`, sans le port) — en euros seulement.
+  const prixVenteEbay = (o) => { const v = o && o.pricingSummary && o.pricingSummary.priceSubtotal; const n = v && v.currency === 'EUR' ? Number(v.value) : NaN; return Number.isFinite(n) ? montant(n) : ''; };
+  const detailEbayNatif = (o) => { if (!o) return null; let port = null, recu = null; try { port = portAcheteurEbay(o); } catch (_) { port = null; } try { recu = montantRecuEbay(o); } catch (_) { recu = null; }
+    const pv = port && port.devise === 'EUR' ? montant(port.montant) : ''; const rv = recu && Number.isFinite(recu.eur) ? montant(recu.eur) : '';
+    return { vendu: rv, pourToi: rv, portAcheteur: pv, etapes: null }; };
+  // (28 nov., ebay-livraison) Imprimer L'ÉTIQUETTE eBAY reçue par e-mail (`email_bordebay_{n° de commande}`), tamponnée de SON N° —
+  // la voie des bordereaux Vinted (`processBordereau`). Le PDF est lu au toucher seulement (§4.4).
+  const imprimerEtiquetteEbay = async (orderId, num, titre) => {
+    const lu = await lirePdfLigne(idEtiquetteEbay(orderId));
+    if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
+    await processBordereau(num, titre, lu.octets);
+  };
   const rangsEnvoyerNatif = (Ltous, coches) => {
     const lotPar = new Map((Ltous || []).map((l) => [String(l.cle), l]));
     return colisAEnvoyerRanges().map((e) => {
@@ -21256,11 +21328,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           marque: extractBrand(String(titre || '')) || '', achat: achatAutreSiteDe({ site, ordre: e.__autre === 'eb' ? (x.ordre || null) : null, num, annonce: annonceA, titre }),
           t: [v.date, v.soldAt, v.dateVente, x.date, x.creationDate, x.ordre && x.ordre.creationDate, o.date, o.createdAt], compte: e.__autre === 'eb' ? (x.pseudo || x.compte || '') : '',
           echeance: e.lim ? echeanceCourteColis(e.lim) : null, limiteEstimee: !!(e.lim && e.lim.limite === 'estimee'), presse: avantDemainColis(e), attente: attenteColis(e),
+          ...(e.__autre === 'eb' ? { pdf: !!e.etiquette, detail: detailEbayNatif(x.ordre), prix: prixVenteEbay(x.ordre) } : {}),
           ligneLot: lotPar.get(cle) || null, coches, place: num ? (() => { try { return emplacementVente(ouDansMeubles(num)); } catch (_) { return null; } })() : null,
           fiche: attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + cle, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre }),
           gestes: {
-            lien: e.__autre === 'eb' ? { sorte: 'etiquette-ebay', url: lienCommandeEbay(x.orderId, x.compte) } : e.__autre === 'lbc' && !(o.label && o.label.voucherUrl) && x.txId ? { sorte: 'generer-lbc', url: `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}` } : null,
-            imprimer: e.__autre === 'lbc' && o.label && o.label.voucherUrl ? () => onColisLeboncoin && onColisLeboncoin() : null,
+            lien: e.__autre === 'eb' ? { sorte: 'etiquette-ebay', url: lienEtiquetteEbay(x.orderId, x.compte) } : e.__autre === 'lbc' && !(o.label && o.label.voucherUrl) && x.txId ? { sorte: 'generer-lbc', url: `https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}` } : null,
+            imprimer: e.__autre === 'lbc' && o.label && o.label.voucherUrl ? () => onColisLeboncoin && onColisLeboncoin() : e.__autre === 'eb' && e.etiquette ? (ev) => occuperPendant(ev && ev.currentTarget, () => imprimerEtiquetteEbay(x.orderId, num, titre)) : null,
+            commandeEbay: e.__autre === 'eb' ? lienCommandeEbay(x.orderId, x.compte) : null,
           } });
       }
       const o = e.o, b = e.b;
@@ -21338,6 +21412,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
     // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
     if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
+    // (28 nov., ebay-livraison) Une commande eBay partie : ce que dit SON suivi (lu chez eBay, puis chez le transporteur).
+    if (x.type === 'ebay') return { t: tr(x.et && x.et.livree ? 'ebayLiv.livree' : x.et && x.et.etat === 'route' ? 'ebayLiv.route' : 'ebayLiv.expediee') + (x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''), ambre: !!(x.et && x.et.retour) };
     return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
   };
   // (20 nov.) « RETOURS ET LITIGES » : les lignes de `retoursEnCours` (src/retoursStock.js) en rangées pour RetoursVentes.jsx —
@@ -21442,9 +21518,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const rangsRouteNatif = (LT, sousDe) => (LT || []).map((x) => {
     const o = x.o || null; const cle = String(x.cle); const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
     const so = sousDe ? sousDe(x) : { t: '', ambre: false };
-    const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || '';
-    const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
-    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : null, titre: x.titre || '' }),
+    const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || x.suiviEbay || '';
+    const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : x.site === 'ebay' ? prixVenteEbay(x.ordre) : '';
+    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : (x.site === 'ebay' && x.ordre ? (x.ordre._pseudo || '') : ''), achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, ordre: x.ordre || null, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : x.ordre ? ((((x.ordre.lineItems || [])[0]) || {}).legacyItemId || null) : null, titre: x.titre || '' }),
+      ...(x.site === 'ebay' ? { detail: detailEbayNatif(x.ordre) } : {}),
       marque: (o && (o.brand_title || o.brand)) || extractBrand(String(x.titre || '')) || '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
       taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: (() => { const ph = x.photo || (x.site === 'vinted' && o ? photoVenteNatif(o) : null); return ph && !imgMortes.has(ph) ? ph : null; })(),
       prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
@@ -21554,7 +21631,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // rougit si un nom manque (`--ecrire` réécrit la liste). Même règle, même résultat : seulement moins souvent calculé.
   const cleVerifier = useRef(null);
   const commandesAVerifier = () => {
-    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisDans, colisEmailSources, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, only, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, retraitsOutils, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, sub, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, venteMailItem, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000)] /* ⟦/cle-verifier⟧ */;
+    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisDans, colisEmailSources, colisParTx, ebayCmd, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, only, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, retraitsOutils, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, sub, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, venteMailItem, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000)] /* ⟦/cle-verifier⟧ */;
     const m = cleVerifier.current;
     if (m && m.cle.length === cle.length && m.cle.every((x, i) => Object.is(x, cle[i])) && stockageInchange(m.lu)) return m.r;
     const { r, lu } = suivreStockage(commandesAVerifierCalc);

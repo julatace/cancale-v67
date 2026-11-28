@@ -2742,7 +2742,15 @@ const RA = {};
       // d'ebay-parametres.js, et seulement pour `format: 'enchere'` (vérifié juste dessous).
       const dP = path.basename(f) === 'ebay-parametres.js' ? t.indexOf('export function appelTrading(') : -1;
       const finP = dP < 0 ? -1 : t.indexOf('\n}', dP);
-      while ((m = APPEL.exec(t))) if (!(d >= 0 && m.index > d && m.index < fin) && !(dP >= 0 && m[0] === "'AddItem'" && m.index > dP && m.index < finP)) fautifs.push(`${path.basename(f)}:${t.slice(0, m.index).split('\n').length} ${m[0]}`);
+      // (28 nov., lot ebay-automatismes, E4 — demande de Julien : « copie tous les concurrents, fais pareil pour eBay »)
+      // La REMISE EN VENTE AUTOMATIQUE des invendus : permise SEULEMENT dans le bloc du moteur `relance` de `passageCompte`
+      // (éteint par défaut, allumé sur SA confirmation), qui passe par la MÊME règle `jugerRelance`, exige la paire prouvée
+      // chez lui (`presente`) et ne lance le vrai Relist qu'après la vérification des frais. Tenu par audit-ebay-automatismes.
+      const dA = path.basename(f) === 'ebay-automatismes.js' ? t.indexOf('if (R.relance.actif && Array.isArray(invendues)') : -1;
+      const finA = dA < 0 ? -1 : t.indexOf("for (const m of ['baisse', 'offres', 'paliers'])", dA);
+      const blocA = dA >= 0 && finA > dA ? t.slice(dA, finA) : '';
+      const okA = !!blocA && /jugerRelance\(/.test(blocA) && /presente\(/.test(blocA) && blocA.indexOf("'VerifyRelistFixedPriceItem'") < blocA.indexOf("'RelistFixedPriceItem'");
+      while ((m = APPEL.exec(t))) if (!(d >= 0 && m.index > d && m.index < fin) && !(okA && m.index > dA && m.index < finA) && !(dP >= 0 && m[0] === "'AddItem'" && m.index > dP && m.index < finP)) fautifs.push(`${path.basename(f)}:${t.slice(0, m.index).split('\n').length} ${m[0]}`);
     }
     try {
       const { appelTrading } = await import(require('url').pathToFileURL(path.join(RACINE, 'api', '_lib', 'ebay-parametres.js')).href);

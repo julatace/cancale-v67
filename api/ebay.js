@@ -41,6 +41,7 @@ import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_l
 import { jugerOffre, offreEnCours, offresEnCours, noterOffre } from './_lib/ebay-offre.js';   // (23 nov.) le prix vu, une offre par annonce
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { creerRemisesEbay } from './_lib/ebay-remises.js';
+import { creerAutomatismesEbay } from './_lib/ebay-automatismes.js';   // (28 nov., lot ebay-automatismes) E1-E6 : baisse, offres, paliers, relance, masse, similaire
 // (15 nov., eBay complet 2) L'argent réel (Finances, signé), le trafic, la santé du compte, les litiges.
 import { creerTableauEbay } from './_lib/ebay-tableau.js';
 import { creerGestesEbay } from './_lib/ebay-gestes.js';   // (15 nov., 2e tour) corriger, relier au catalogue, photos — sur SON clic
@@ -753,7 +754,7 @@ function itemXml(it) {
     `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` + X.apresEtat +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
-    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
+    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` + (X.colis || '') +
     // ⚠️ LIVRAISON GÉRÉE PAR eBay. MESURÉ 3 fois à blanc sur son compte (27 sept.) :
     // eBay REFUSE tout <ShippingDetails> que VRM envoie — transporteur + coût ET
     // transporteur seul sortent « Item.ShippingDetails non valides ». Seul un item
@@ -2082,6 +2083,12 @@ const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeComman
 // (11 nov., lot import-historique-sites) Tout l'historique des ventes eBay, fenêtre par fenêtre (api/_lib/ebay-historique.js).
 const importerHistoriqueEbay=creerHistoriqueEbay({lire:lireDonnee,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
+// (28 nov., lot ebay-automatismes) Les automatismes eBay (api/_lib/ebay-automatismes.js). La modification en masse
+// passe par les MÊMES chemins que SON clic : `handleRevise` (prix vu relu, garde du prix, règle d'offre) et la fin
+// d'annonce (`terminerAnnonce` + sortie des règles d'offre).
+const automatismesEbay=creerAutomatismesEbay({lireDonnee,modifierDonnee,lireReglageVendeur,accessToken,fetcher:(...a)=>fetchAvecDelai(...a),marche:()=>marcheCourant(),
+  reviser:(b,ctx)=>handleRevise(b,ctx),
+  terminer:async(b,ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;}});
 // (17 octobre) Après la vente : retours, annulations, promotion, achats.
 // Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
 // échanger) : elle sort aussitôt des colis à faire, sans attendre la synchro.
@@ -2399,6 +2406,12 @@ async function handleApp(req, res) {
       crmlitiges: (ctx) => crmEbay.litiges(b, ctx),
       crmcontester: (ctx) => crmEbay.contester(b, ctx),
       relancer: (ctx) => handleRelance(b, ctx, false),
+      // (28 nov., lot ebay-automatismes) La page eBay › Automatismes.
+      autolire: (ctx) => automatismesEbay.lire(b, ctx),
+      autoregler: (ctx) => automatismesEbay.regler(b, ctx),
+      autolancer: (ctx) => automatismesEbay.lancer(b, ctx),
+      masse: (ctx) => automatismesEbay.masse(b, ctx),
+      similaire: (ctx) => automatismesEbay.similaire(b, ctx),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);

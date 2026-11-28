@@ -24,6 +24,7 @@ import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_gains from './en/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './en/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './en/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
+import ecran_sneakers from './en/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './en/aDistance.js';
@@ -54,6 +55,7 @@ import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './en/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './en/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './en/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './en/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './en/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './en/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -1568,6 +1570,13 @@ export default {
   "ebay.param.livraison": "Delivery",
   "ebay.param.livraison.aide": "You never pay postage: the buyer pays it to eBay.",
   "ebay.param.livraison.geree": "Managed by eBay",
+  "ebay.param.colis": "Parcel weight and size",
+  "ebay.param.colis.aide": "A medium parcel by default (1.2 kg): eBay works out the postage, paid by the buyer.",
+  "ebay.param.colis.mesures": "Weight (g) · length · width · height (cm)",
+  "ebay.param.colis.poids": "Weight in grams",
+  "ebay.param.colis.longueur": "Length in centimetres",
+  "ebay.param.colis.largeur": "Width in centimetres",
+  "ebay.param.colis.hauteur": "Height in centimetres",
   "ebay.param.delaiEnvoi": "Handling time",
   "ebay.param.delaiEnvoi.aide": "Business days between payment and drop-off.",
   "ebay.param.delai.jour": "Same day",
@@ -2426,6 +2435,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
@@ -2487,4 +2497,5 @@ export default {
   ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
+  ...ecran_sneakers,
 };
