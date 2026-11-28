@@ -18,12 +18,26 @@
 //  `otp_expired`, comme GoTrue) et `grant_type=pkce` (le code rendu par
 //  `autoriser(défi, email)` ne s'échange qu'avec le BON vérificateur).
 //  Un compte à `null` n'a pas de mot de passe (créé avec Google / Discord).
+//  5.456 (27 nov.) — `captcha: true` : la protection anti-robot ALLUMÉE, comme le vrai Supabase de VRM (MESURÉ le 27 nov. :
+//  `POST /token?grant_type=password` et `POST /otp` sans jeton ⇒ 400 {"code":400,"error_code":"captcha_failed","msg":
+//  "captcha protection: request disallowed (no captcha_token found)"} ; /verify n'est pas protégé). Un jeton accepté
+//  commence par `jetonsPermis` (le faux Turnstile du banc) et ne sert qu'UNE fois (comme Turnstile). `formeReelle: true` :
+//  les refus dans la forme de GoTrue d'aujourd'hui (`invalid_credentials`, `email_not_confirmed`). `nonConfirmes` : des
+//  adresses dont le compte attend sa confirmation. `create_user: true` crée le compte (inscriptions ouvertes).
 // ════════════════════════════════════════════════════════════════════════════
-function fauxGoTrue({ maintenant = () => Date.now(), retardMs = 0, comptes = { 'julien@exemple.fr': 'bon-mot-de-passe', 'google@exemple.fr': null }, codeOtp = '482913' } = {}) {
+function fauxGoTrue({ maintenant = () => Date.now(), retardMs = 0, comptes = { 'julien@exemple.fr': 'bon-mot-de-passe', 'google@exemple.fr': null }, codeOtp = '482913', captcha = false, jetonsPermis = 'jeton-banc-', formeReelle = false, nonConfirmes = [] } = {}) {
+  const jetonsVus = new Set();
+  const refusCaptcha = (corps) => {
+    if (!captcha) return null;
+    const t = corps && corps.gotrue_meta_security && corps.gotrue_meta_security.captcha_token;
+    if (typeof t !== 'string' || !t.trim()) return { status: 400, body: { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (no captcha_token found)' } };
+    if (!t.startsWith(jetonsPermis) || jetonsVus.has(t)) { jetonsVus.add(t); return { status: 400, body: { code: 400, error_code: 'captcha_failed', msg: 'captcha protection: request disallowed (captcha verification process failed)' } }; }
+    jetonsVus.add(t); return null;
+  };
   let n = 0;
   const jetons = new Map();      // jeton → { famille, revoque, at, parent }
   const familles = new Map();    // famille → { actif, morte, uid, email }
-  const j = { refresh: [], login: [], refus: [], otp: [], verify: [], pkce: [], corps: [] };
+  const j = { refresh: [], login: [], refus: [], otp: [], verify: [], pkce: [], corps: [], captchaRefus: 0 };
   const codes = new Map();       // email → { code, at }
   const pkce = new Map();        // code d'autorisation → { defi, email }
   const neuf = (famille, parent) => { const t = 'rt-' + (++n) + '-' + Math.random().toString(36).slice(2, 8); jetons.set(t, { famille, revoque: false, at: maintenant(), parent }); familles.get(famille).actif = t; return t; };
@@ -35,8 +49,10 @@ function fauxGoTrue({ maintenant = () => Date.now(), retardMs = 0, comptes = { '
     const g = new URL(url).searchParams.get('grant_type');
     if (g === 'password') {
       j.login.push({ email: corps.email, at: maintenant() });
+      const rc = refusCaptcha(corps); if (rc) { j.captchaRefus++; return rc; }
       const mdp = comptes[String(corps.email || '').toLowerCase()];
-      if (typeof mdp !== 'string' || mdp !== corps.password) return { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid login credentials' } };
+      if (typeof mdp !== 'string' || mdp !== corps.password) return { status: 400, body: formeReelle ? { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' } : { error: 'invalid_grant', error_description: 'Invalid login credentials' } };
+      if (nonConfirmes.includes(String(corps.email || '').toLowerCase())) return { status: 400, body: { code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' } };
       return { status: 200, body: ouvrir(String(corps.email).toLowerCase()).corps };
     }
     if (g === 'refresh_token') {
@@ -67,7 +83,9 @@ function fauxGoTrue({ maintenant = () => Date.now(), retardMs = 0, comptes = { '
   async function otp(corps) {
     const email = String(corps.email || '').toLowerCase();
     j.otp.push({ email, create_user: corps.create_user, at: maintenant() });
-    if (corps.create_user !== false || !(email in comptes)) return { status: 422, body: { code: 422, error_code: 'otp_disabled', msg: 'Signups not allowed for otp' } };
+    const rc = refusCaptcha(corps); if (rc) { j.captchaRefus++; return rc; }
+    if (corps.create_user === true && captcha && !(email in comptes)) comptes[email] = null;   // inscriptions ouvertes (forme réelle)
+    if ((corps.create_user !== false && !(captcha && corps.create_user === true)) || !(email in comptes)) return { status: 422, body: { code: 422, error_code: 'otp_disabled', msg: 'Signups not allowed for otp' } };
     const avant = codes.get(email);
     if (avant && maintenant() - avant.at < 60000) return { status: 429, body: { code: 429, error_code: 'over_email_send_rate_limit', msg: `For security purposes, you can only request this after ${Math.ceil((60000 - (maintenant() - avant.at)) / 1000)} seconds.` } };
     codes.set(email, { code: codeOtp, at: maintenant() });

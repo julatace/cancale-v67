@@ -455,6 +455,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `connexionpanneau` | `ouvrirPanneauConnexion` | **5.456.0** (27 nov.) | pas connecté : grand panneau flouté, connexion dedans ; mot de passe et code avec le jeton anti-robot de vrm.center |
 | `favorislisteentiere` | `listeClocheJusqua` | **5.440.2** (24 nov.) | « pas trouvé dans tes notifications » seulement liste de Vinted lue jusqu'au bout ; sinon le favori attend |
 | `favorislienapp` `favoriscommande` | `lienFavoriProfond` · `identiteParCommande` | **5.440.1** (23 nov. nuit) | favoris : la notification au lien d'application (`vintedfr://messaging?item_id=&user_id=`) reconnue par ses DEUX identités ; conversation sans article ⇒ identité par SA commande (uuid, n°, acheteur, côté vendeur, article), forme inconnue notée (clés/types), sinon rien ne part |
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
@@ -485,20 +486,20 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **27 nov. 23 h · CONNEXION DANS LE PANNEAU, ext. 5.456.0** : mot de passe et code refusés par le captcha de Supabase (mesuré) ⇒ jeton de `vrm.center/verif-extension.html` ; pas connecté = grand panneau flouté, la connexion dedans. `2026-11-27-connexion-panneau.md`. Geste : installer 5.456.0.
 - **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
 - **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
-- **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.455.7** (27 nov. nuit ; avant 5.455.6, 5.455.5, 5.455.4, 5.455.3, 5.455.2, 5.455.1 ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.456.0** (27 nov. 23 h ; avant 5.455.7, 5.455.6, 5.455.5, 5.455.4, 5.455.3, 5.455.2, 5.455.1 ; versions servies avant : `historique-divers.md`, « Extension servie », fin). **À lire en premier : `docs/passation/2026-11-23-passation-generale.md`** (23 nov. soir), puis `docs/passation/2026-11-22-passation-generale.md` (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.455.7** (27 nov. nuit : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
+- Installer l’extension **5.456.0** (après fusion : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip`). Versions d’avant : `historique-divers.md`.
 - Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le

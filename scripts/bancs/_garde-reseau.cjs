@@ -104,6 +104,17 @@ function surveiller(ctx, cartes) {
     ctx.route((u) => PROD.test(u.hostname) && !carteDe(cartes, u.hostname), (r) => { noter('production', r.request().url()); if (process.env.BANC_GARDE_TRACE) { const q = r.request(); let fr = ''; try { fr = q.frame().url(); } catch (_) { fr = 'sw?'; } console.log('GARDE', q.method(), q.resourceType(), fr, q.url().slice(0, 200)); } return r.abort('blockedbyclient'); }).catch(() => {});
   } catch (_) {}
   try {
+    // (28 nov., ext. 5.456) LA VÉRIFICATION ANTI-ROBOT DE LA CONNEXION DE L'EXTENSION, SERVIE ICI. Le formulaire de
+    // connexion (vrm-badge.js, popup.js) pose en cadre `https://vrm.center/verif-extension.html`, qui charge Turnstile chez
+    // Cloudflare. Tout test ou banc qui ouvre le panneau pas connecté demandait donc la production (CI rouge, PR #1461).
+    // Pour TOUS (posée sur le contexte, AVANT les routes du banc : une route du banc garde la main) : la VRAIE page du dépôt
+    // (public/verif-extension.*) et un faux Turnstile (`_faux-turnstile.cjs`) — rien ne sort, rien n'est noté. Un banc qui
+    // sert vrm.center depuis son propre serveur local garde sa page ; Turnstile, lui, n'est JAMAIS demandé à Cloudflare.
+    const { servirVerif } = require('./_faux-turnstile.cjs');
+    ctx.route((u) => (u.hostname === 'vrm.center' && /^\/verif-extension\.(html|js)$/.test(u.pathname) && !carteDe(cartes, u.hostname)) || (u.hostname === 'challenges.cloudflare.com' && /^\/turnstile\//.test(u.pathname)),
+      (r) => { if (!servirVerif(r)) return r.abort('blockedbyclient'); }).catch(() => {});
+  } catch (_) {}
+  try {
     // Une requête vers la production qui a ÉCHOUÉ AU RÉSEAU (nom non résolu — la règle ci-dessus —, proxy, connexion) :
     // elle est partie. Un `route.abort()` du banc (failed, aborted, internetdisconnected…) ne compte pas : rien n'est sorti.
     const RESEAU = /ERR_NAME_NOT_RESOLVED|ERR_NAME_RESOLUTION_FAILED|ERR_TUNNEL_CONNECTION_FAILED|ERR_PROXY|ERR_CONNECTION_(REFUSED|RESET|CLOSED|TIMED_OUT)|ERR_CERT|ERR_SSL|ERR_TIMED_OUT|ERR_ADDRESS_UNREACHABLE/;

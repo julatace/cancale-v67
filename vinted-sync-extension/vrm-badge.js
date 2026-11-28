@@ -1763,6 +1763,29 @@ function vrmVerifVisible(sel) {
     .carte[data-grand] .pied6 { padding: 10px 16px; }
   }
   /* ══ fin 5.427 ══ */
+  /* ══ 5.456 — PAS CONNECTÉ : le grand panneau FLOUTÉ (inert), la connexion en feuille DEDANS ══
+     (Julien, 27 nov. : « le gros panneau directement […] avec les données floutées […] Et on se connecte ici »). */
+  .carte[data-hors-ligne] > .contenu { filter: blur(6px) saturate(.85); opacity: .92; pointer-events: none; user-select: none; -webkit-user-select: none; }
+  .carte[data-hors-ligne]::after { content: ''; position: absolute; inset: 0; z-index: 4; background: rgb(16 18 22 / .10); pointer-events: none; }
+  .carte[data-hors-ligne] > .connexion { position: absolute; z-index: 5; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(400px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; overscroll-behavior: contain; margin: 0 !important; padding: 18px 18px 14px !important; border-radius: 16px !important; background: var(--n-carte, #FFFFFF) !important; color: var(--n-encre, #16181D); border: 1px solid var(--n-trait, #E4E4E7) !important; box-shadow: 0 12px 40px rgb(0 0 0 / .22) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; font-size: 14px; line-height: 1.45; }
+  .carte[data-hors-ligne] > .connexion[hidden] { display: none; }
+  .carte[data-hors-ligne] .cx .lab { color: var(--n-encre-2); }
+  .carte[data-hors-ligne] .cx input { font-size: 16px; }
+  .cx-tete { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+  .cx-tete img { width: 40px; height: 40px; border-radius: 10px; flex: none; display: block; }
+  .cx-tete > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .cx-tete b { font: 700 20px/26px var(--vu-police, Inter, system-ui, sans-serif); letter-spacing: -.01em; color: var(--n-encre, #16181D); }
+  .cx-tete span { font-size: 14px; line-height: 20px; color: var(--n-encre-2, #5F646C); }
+  .cx-x { flex: none; width: 44px; height: 44px; border-radius: 22px; border: 0; background: var(--n-carte-2, #F2F2F7); color: var(--n-encre, #16181D); font-size: 22px; line-height: 1; cursor: pointer; }
+  .cx-x:focus-visible { outline: 2px solid var(--n-encre, #16181D); outline-offset: 2px; }
+  .cx .cx-liens { display: flex; flex-wrap: wrap; gap: 0 16px; justify-content: center; margin-top: 4px; }
+  .cx .verif { margin-top: 10px; }
+  .cx .verif .etat { margin-top: 0; }
+  .cx .verif .etat[hidden] { display: none; }
+  .fl6 { display: inline-block; max-width: 100%; height: 14px; border-radius: 7px; background: currentColor; opacity: .22; vertical-align: middle; }
+  @media (max-width: 760px) { .carte[data-hors-ligne] > .connexion { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-height: calc(100% - 150px); } }
+  @media (prefers-reduced-motion: reduce) { .carte[data-hors-ligne] > .connexion { transition: none; } }
+  /* ══ fin 5.456 ══ */
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -6151,9 +6174,53 @@ function vrmVerifVisible(sel) {
     if (CADRE) { if (!cadreDitPrete) { cadreDitPrete = true; direAuSite({ __vrmCarte: 'hauteur', h: Math.ceil(hote.getBoundingClientRect().height) + 6 }); direAuSite({ __vrmCarte: 'prete' }); } return; }
     rendreQuestion();
   }
+  // ══ 5.456 (Julien, 27 nov., 23 h : « Je ne veux pas que ce soit un petit module à droite […] Je veux que ce soit le gros
+  //    panneau directement qui s'affiche avec les données floutées, comme on avait dit. Et on se connecte ici. Comme ça, on
+  //    voit un petit peu l'état du compte avant même de se connecter ou de créer un compte ») — PAS CONNECTÉ À VRM, sur
+  //    Vinted, Leboncoin ou Vestiaire : LE GRAND PANNEAU (sa vraie structure : barre, Accueil, Comptes, Aujourd'hui, ce qui
+  //    est capté), FLOUTÉ et `inert` (aucune action, aucun lien, rien de lisible au clavier ni au lecteur d'écran — la règle
+  //    « Sans abonnement » de l'app), et la connexion DEDANS, en feuille au centre. Le seul vrai nom montré (flouté) est
+  //    celui du compte du site lu par l'extension dans CE navigateur ; tout le reste est une forme grise, jamais un faux
+  //    chiffre (« n'invente jamais de données »). Connecté ⇒ le panneau se dé-floute sur place (`rafraichir` à la session).
+  const SITES_HORS_LIGNE = ['vinted', 'leboncoin', 'vestiaire'];
+  function horsLigneVoulu(e) { return !CADRE && !LISTES && !!e && !!e.vrm && e.vrm.connecte === false && !changerCompte && SITES_HORS_LIGNE.includes(e.plateforme); }
+  function apercuFlouHtml(e) {
+    const site = (e && e.site) || {};
+    const forme = (w, h) => `<i class="fl6" style="width:${w}${typeof w === 'number' ? '%' : ''}${h ? ';height:' + h + 'px' : ''}" aria-hidden="true"></i>`;
+    const tuile = (k) => `<div class="tu6" data-apercu-tuile="${k}"><span>${esc(TU(k))}</span><b>${forme(46, 22)}</b></div>`;
+    const ligne = (i) => `<div class="rg6" data-apercu-ligne><span><b>${forme(40 + ((i * 17) % 40))}</b><small>${forme(24 + ((i * 11) % 30), 10)}</small></span><span class="v6">${forme('52px', 18)}</span></div>`;
+    return `<div class="acc6" data-accueil-page data-apercu-flou>
+      <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
+        <div class="rg6"><span><b>${site.nom ? esc(site.nom) : forme(38)}</b><small>${esc(NOM_SITE[e.plateforme] || '')} · ${esc(TU('v6_compte_onglet'))}</small></span><span class="v6">${etiquette5('lie', TU('v6_pas_lie'), 'ambre')}</span></div>
+        <div class="rg6"><span><b>${forme(44)}</b><small>${esc(TU('v6_compte_vrm'))}</small></span></div>
+      </section>
+      <section class="sec6"><h3>${esc(TU('v6_aujourdhui'))}</h3><div class="tuiles6">${tuile('v6_ventes_jour')}${tuile('v6_a_expedier')}${tuile('v6_non_lus')}${tuile('v6_en_vente')}</div></section>
+      <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${[1, 2, 3, 4, 5].map(ligne).join('')}</section>
+    </div>`;
+  }
+  function rendreHorsLigne(e) {
+    carte.setAttribute('data-grand', ''); carte.setAttribute('data-hors-ligne', '');
+    carte.classList.add('doigt');
+    const avant = ongletListe; ongletListe = 'accueil';
+    poserHtml(contenu, vxHtml(e, `<p class="note5" data-apercu-note>${esc(TU('cx_apercu'))}</p>${apercuFlouHtml(e)}`, ''));
+    ongletListe = avant;
+    try { contenu.inert = true; } catch (_) {}
+    contenu.setAttribute('inert', ''); contenu.setAttribute('aria-hidden', 'true'); contenu.setAttribute('data-floute', '');
+    // Le formulaire (le cadre de l'extension, la vérification anti-robot) n'est posé que panneau OUVERT : rien ne se
+    //    charge en douce à chaque page vue (ni cadre, ni Cloudflare) tant qu'il ne l'a pas ouvert.
+    poserFormulaire(carte.classList.contains('on'));
+  }
   function rendreCarte() {
     const e = etat;
     pt.classList.toggle('on', aFaire(e) || perime);
+    if (horsLigneVoulu(e)) { rendreHorsLigne(e); return; }
+    if (carte.hasAttribute('data-hors-ligne')) {
+      // Connecté (ou plus de raison de flouter) : le panneau se dé-floute ICI, sans recharger la page.
+      carte.removeAttribute('data-hors-ligne');
+      try { contenu.inert = false; } catch (_) {}
+      contenu.removeAttribute('inert'); contenu.removeAttribute('aria-hidden'); contenu.removeAttribute('data-floute');
+      if (formulaireEl || cadreEl) { poserFormulaire(false); }
+    }
     // Le code qui tourne n'est pas celui du manifeste : recharger la PAGE ne
     // change rien, c'est l'extension qu'il faut recharger (⟳) — et on le fait
     // nous-mêmes (page de réparation) ; le geste manuel n'est dit qu'en secours.
@@ -6659,7 +6726,11 @@ function vrmVerifVisible(sel) {
   // (déplie le champ) ; 3. Google, Discord — dans une petite fenêtre sur
   // ordinateur, dans CET onglet sur Orion (il revient ici, connecté).
   // `modeCx` : 'code' (l'e-mail) · 'mdp' (e-mail + mot de passe) · 'saisie' (les cases du code).
-  let modeCx = 'code', mailSaisi = '', codeEnvoi = null, codeEtatDemande = false, minuteurRenvoi = null, erreurAuRetour = '';
+  // 5.456 (Julien, 27 nov. : « je veux pouvoir bien se connecter avec l'adresse mail et le mot de passe ») : là où le mot
+  //    de passe est permis (le cadre de l'extension), il est le PREMIER moyen ; la carte dessinée (Orion) garde le code.
+  //    `modeCx` : 'mdp' · 'code' · 'creer' (créer un compte, par code) · 'saisie' (les cases du code).
+  let modeCx = MDP_PERMIS ? 'mdp' : 'code', mailSaisi = '', codeEnvoi = null, codeEtatDemande = false, minuteurRenvoi = null, erreurAuRetour = '';
+  const MODE_DEPART = MDP_PERMIS ? 'mdp' : 'code';
   const LONG_CODE = 6;
   function focaliser() {
     setTimeout(() => {
@@ -6691,7 +6762,10 @@ function vrmVerifVisible(sel) {
   // CACHÉ tant qu'il n'a pas dit « prête », et se re-cache à chaque nouveau
   // chargement : une page qui ferait naviguer l'iframe vers SA page (une fausse
   // connexion) n'est jamais montrée — la carte retombe sur son formulaire.
-  const CADRE_DELAI_MS = 1500;
+  // 5.456 : 4 s (1,5 s avant). Mesuré au banc : le cadre (popup.html + vrm-ui.js + popup.js + vrm-badge.js) se dit prêt en
+  //    1,3 à 1,6 s sur une machine chargée — il retombait sur la carte dessinée, qui n'a PAS de mot de passe. Un cadre
+  //    vraiment muet attend « Connexion… » 4 s, puis la carte dessinée.
+  const CADRE_DELAI_MS = 4000;
   // ⚠️ 5.362 (revue, moyenne 69) — JAMAIS LE MOT DE PASSE DANS LA CARTE DESSINÉE.
   //    Dessinée (Orion, ou cadre muet), la carte vit dans le DOM de la page du site :
   //    un écouteur de touches posé par la page AVANT le nôtre recevait chaque lettre.
@@ -6734,7 +6808,7 @@ function vrmVerifVisible(sel) {
   }
   function poserCadre() {
     if (formulaireEl) { viderSecrets(); formulaireEl = null; }
-    if (cadreEl && cadreChanger === changerCompte) { connexion.hidden = false; return true; }
+    if (cadreEl && cadreChanger === changerCompte && !!connexion.querySelector('[data-cx-tete]') === carte.hasAttribute('data-hors-ligne')) { connexion.hidden = false; return true; }
     retirerCadre();
     connexion.hidden = false;
     cadreChanger = changerCompte;
@@ -6743,7 +6817,7 @@ function vrmVerifVisible(sel) {
     f.title = 'Connexion à VRM';
     f.setAttribute('data-cadre-connexion', '');
     f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:0;background:transparent;color-scheme:normal;visibility:hidden;';
-    poserHtml(connexion, `${erreurAuRetour ? `<div class="err" role="alert">${esc(erreurAuRetour)}</div>` : ''}<div class="etat" data-cadre-attente>Chargement de la connexion…</div>`);
+    poserHtml(connexion, `${teteFeuille()}${erreurAuRetour ? `<div class="err" role="alert">${esc(erreurAuRetour)}</div>` : ''}<div class="etat" data-cadre-attente>${esc(TU('cx_connexion'))}</div>`);
     erreurAuRetour = '';
     connexion.appendChild(f);
     cadreEl = f; cadreChargements = 0;
@@ -6784,6 +6858,7 @@ function vrmVerifVisible(sel) {
     });
   } catch (_) {}
 
+  try { connexion.addEventListener('click', (ev) => { const x = ev.target && ev.target.closest ? ev.target.closest('[data-cx-fermer]') : null; if (x) { ev.preventDefault(); fermerCarte(); } }); } catch (_) {}
   function poserFormulaire(montrer, refaire) {
     if (montrer && cadreVoulu() && poserCadre()) return;
     if (!montrer) retirerCadre();
@@ -6799,60 +6874,84 @@ function vrmVerifVisible(sel) {
     if (formulaireEl) { const m = champ('vrm-cx-mail'); if (m) mailSaisi = String(m.value || '').trim(); viderSecrets(); }
     clearInterval(minuteurRenvoi);
     if (!mailSaisi && etat && etat.vrm && etat.vrm.expiree && etat.vrm.email) mailSaisi = etat.vrm.email;
-    const mail = `<label class="lab" for="vrm-cx-mail">E-mail de ton compte VRM</label>
+    const mail = `<label class="lab" for="vrm-cx-mail">${esc(TU('cx_mail_lab'))}</label>
       <input id="vrm-cx-mail" name="vrm-carte-identifiant" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="${modeCx === 'mdp' ? 'next' : 'send'}" placeholder="prenom@exemple.fr" value="${esc(mailSaisi)}" data-1p-ignore data-lpignore="true">`;
-    const pied = `<button type="button" class="b sec" data-annuler-changer hidden>Annuler</button>
+    const pied = `<button type="button" class="b sec" data-annuler-changer hidden>${esc(TU('cx_annuler'))}</button>
       <div class="err" id="vrm-cx-err" role="alert" hidden></div>
       <div class="etat" id="vrm-cx-etat" role="status" aria-live="polite" hidden></div>`;
+    // 5.456 : la vérification anti-robot que Supabase exige (mot de passe, demande de code) — le cadre de vrm.center.
+    const verif = `<div class="verif" data-verif><div class="etat" data-verif-etat>${esc(TU('cx_verif_attente'))}</div></div>`;
+    const fourn = '<div data-fournisseurs-carte hidden></div>';
+    const relier = `<button type="button" class="lien" data-cx-relier>${esc(TU('cx_relier'))}</button>`;
     let corps;
     if (modeCx === 'saisie' && codeEnvoi) {
-      corps = `<div class="envoye">Code envoyé à <b>${esc(codeEnvoi.email)}</b>. Regarde ta boîte mail (et les indésirables).</div>
-      <label class="lab" for="vrm-cx-code">Code reçu par e-mail</label>
+      corps = `<div class="envoye">${esc(TU('cx_code_envoye', { m: '\u0001' })).replace('\u0001', '<b>' + esc(codeEnvoi.email) + '</b>')}</div>
+      <label class="lab" for="vrm-cx-code">${esc(TU('cx_code_lab'))}</label>
       <div class="cases" data-cases>${Array.from({ length: LONG_CODE }, () => '<span class="case" aria-hidden="true"></span>').join('')}
         <input id="vrm-cx-code" name="vrm-carte-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="vrm-cx-aide-code" data-1p-ignore data-lpignore="true">
       </div>
-      <div class="aide" id="vrm-cx-aide-code">6 chiffres. Seul le dernier code reçu marche.</div>
-      <button type="submit" class="b" data-principal data-code-valider disabled>Valider le code</button>
+      <div class="aide" id="vrm-cx-aide-code">${esc(TU('cx_code_aide2'))}</div>
+      <button type="submit" class="b" data-principal data-code-valider disabled>${esc(TU('cx_valider'))}</button>
       ${pied}
-      <button type="button" class="b sec" data-code-renvoyer disabled>Renvoyer le code</button>
-      <button type="button" class="lien" data-code-changer>Changer d’e-mail</button>`;
+      <button type="button" class="b sec" data-code-renvoyer disabled>${esc(TU('cx_renvoyer'))}</button>
+      <button type="button" class="lien" data-code-changer>${esc(TU('cx_changer_mail'))}</button>`;
     } else if (modeCx === 'mdp' && MDP_PERMIS) {
       corps = `${mail}
-      <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
-      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
-      <div class="aide">Ceux de vrm.center — pas ceux de Vinted.</div>
-      <button type="submit" class="b" data-principal data-me-connecter>Me connecter</button>
+      <label class="lab" for="vrm-cx-mdp">${esc(TU('cx_mdp_lab'))}</label>
+      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" aria-label="${esc(TU('cx_mdp_lab'))}" data-1p-ignore data-lpignore="true">
+      <div class="aide">${esc(TU('cx_mdp_aide'))}</div>
+      ${verif}
+      <button type="submit" class="b" data-principal data-me-connecter>${esc(TU('cx_me_connecter'))}</button>
       ${pied}
-      <button type="button" class="b sec" data-basculer-mode>Recevoir un code à la place</button>
-      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>Mot de passe oublié ?</a>`;
+      ${fourn}
+      <button type="button" class="b sec" data-basculer-mode>${esc(TU('cx_code_b'))}</button>
+      <div class="cx-liens"><button type="button" class="lien" data-cx-creer>${esc(TU('cx_creer_b'))}</button><a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>${esc(TU('cx_oubli'))}</a>${relier}</div>`;
+    } else if (modeCx === 'creer') {
+      corps = `<div class="envoye" data-cx-creer-titre><b>${esc(TU('cx_creer_titre'))}</b></div>
+      ${mail}
+      ${verif}
+      <button type="submit" class="b" data-principal data-code-demander data-creer-envoi>${esc(TU('cx_creer_envoyer'))}</button>
+      <div class="aide">${esc(TU('cx_creer_aide'))}</div>
+      ${pied}
+      ${fourn}
+      <div class="cx-liens"><button type="button" class="lien" data-cx-deja>${esc(TU('cx_deja'))}</button></div>`;
     } else {
       corps = `${mail}
-      <button type="submit" class="b" data-principal data-code-demander>Me connecter avec un code</button>
-      <div class="aide">Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.</div>
+      ${verif}
+      <button type="submit" class="b" data-principal data-code-demander>${esc(TU('cx_code_envoyer'))}</button>
+      <div class="aide">${esc(TU('cx_code_aide'))}</div>
       ${pied}
-      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>' : ''}`;
+      ${fourn}
+      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>' + esc(TU('cx_mdp_b')) + '</button>' : ''}
+      <div class="cx-liens"><button type="button" class="lien" data-cx-creer>${esc(TU('cx_creer_b'))}</button>${relier}</div>`;
     }
-    poserHtml(connexion, `<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}
-      <div data-fournisseurs-carte hidden></div></form>`);
+    poserHtml(connexion, `${teteFeuille()}<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}</form>`);
     formulaireEl = connexion.querySelector('form');
     formulaireEl.addEventListener('submit', (ev) => {
       ev.preventDefault(); ev.stopPropagation();
-      if (modeCx === 'mdp') seConnecter(); else if (modeCx === 'saisie') validerCode(); else demanderCode();
+      if (modeCx === 'mdp') seConnecter(); else if (modeCx === 'saisie') validerCode(); else demanderCode(false, modeCx === 'creer');
     });
-    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { if (CADRE) { direAuSite({ __vrmCarte: 'annuler' }); return; } changerCompte = false; formulaireDemande = false; modeCx = 'code'; rendre(); });
+    formulaireEl.querySelector('[data-annuler-changer]').addEventListener('click', () => { if (CADRE) { direAuSite({ __vrmCarte: 'annuler' }); return; } changerCompte = false; formulaireDemande = false; modeCx = MODE_DEPART; rendre(); });
     const bascule = formulaireEl.querySelector('[data-basculer-mode]');
     if (bascule) bascule.addEventListener('click', () => { modeCx = (modeCx === 'mdp' || !MDP_PERMIS) ? 'code' : 'mdp'; poserFormulaire(true, true); focaliser(); });
+    const creerB = formulaireEl.querySelector('[data-cx-creer]');
+    if (creerB) creerB.addEventListener('click', () => { modeCx = 'creer'; poserFormulaire(true, true); focaliser(); });
+    const dejaB = formulaireEl.querySelector('[data-cx-deja]');
+    if (dejaB) dejaB.addEventListener('click', () => { modeCx = MODE_DEPART; poserFormulaire(true, true); focaliser(); });
+    const relierB = formulaireEl.querySelector('[data-cx-relier]');
+    if (relierB) relierB.addEventListener('click', () => { relierB.disabled = true; demanderAuFond({ from: 'vrm-badge', action: 'lierAvecVRM' }, () => { relierB.disabled = false; }); });
     if (modeCx === 'saisie') brancherCases();
+    poserVerif();
     if (erreurAuRetour) { direErreur(erreurAuRetour); erreurAuRetour = ''; }
     rendreFournisseurs(); majAnnuler();
     // Une demande de code déjà partie (iOS a pu recharger la page pendant qu'il
     // lisait ses e-mails) : on reprend aux cases, une fois par page.
-    if (!codeEtatDemande && modeCx === 'code') {
+    if (!codeEtatDemande && (modeCx === 'code' || modeCx === 'mdp')) {
       codeEtatDemande = true;
       try {
         chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'authCodeEtat' }, (r) => {
           let err = null; try { err = chrome.runtime.lastError; } catch (_) {}
-          if (err || !r || !r.enCours || !formulaireEl || modeCx !== 'code') return;
+          if (err || !r || !r.enCours || !formulaireEl || (modeCx !== 'code' && modeCx !== 'mdp')) return;
           codeEnvoi = { email: r.email, at: r.at }; mailSaisi = r.email; modeCx = 'saisie';
           poserFormulaire(true, true);
         });
@@ -6898,7 +6997,7 @@ function vrmVerifVisible(sel) {
     const ren = formulaireEl.querySelector('[data-code-renvoyer]');
     if (ren) ren.addEventListener('click', () => demanderCode(true));
     const chg = formulaireEl.querySelector('[data-code-changer]');
-    if (chg) chg.addEventListener('click', () => { modeCx = 'code'; codeEnvoi = null; poserFormulaire(true, true); focaliser(); });
+    if (chg) chg.addEventListener('click', () => { modeCx = codeEnvoi && codeEnvoi.creer ? 'creer' : 'code'; codeEnvoi = null; poserFormulaire(true, true); focaliser(); });
   }
   function minuterRenvoi() {
     clearInterval(minuteurRenvoi);
@@ -6906,8 +7005,8 @@ function vrmVerifVisible(sel) {
     if (!ren || !codeEnvoi) return;
     const tic = () => {
       const reste = Math.ceil((60000 - (Date.now() - Number(codeEnvoi.at || 0))) / 1000);
-      if (reste > 0 && reste <= 60) { ren.disabled = true; ren.textContent = `Renvoyer le code (dans ${reste} s)`; return; }
-      ren.disabled = false; ren.textContent = 'Renvoyer le code'; clearInterval(minuteurRenvoi);
+      if (reste > 0 && reste <= 60) { ren.disabled = true; ren.textContent = TU('cx_renvoyer_dans', { s: reste }); return; }
+      ren.disabled = false; ren.textContent = TU('cx_renvoyer'); clearInterval(minuteurRenvoi);
     };
     tic(); minuteurRenvoi = setInterval(tic, 1000);
   }
@@ -6923,45 +7022,49 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { fin(null, true); }
   }
-  function demanderCode(renvoi) {
+  function demanderCode(renvoi, creer) {
     if (envoiEnVol || !formulaireEl) return;
     const m = champ('vrm-cx-mail');
     const email = renvoi && codeEnvoi ? codeEnvoi.email : String((m && m.value) || '').trim();
-    if (!email) { direErreur('Tape l’e-mail de ton compte VRM.'); try { m.focus(); } catch (_) {} return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    const pourCreer = renvoi && codeEnvoi ? codeEnvoi.creer === true : creer === true;
+    if (!email) { direErreur(TU('cx_e_mail')); try { m.focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur(TU('cx_e_forme')); return; }
     mailSaisi = email;
     const b = formulaireEl.querySelector(renvoi ? '[data-code-renvoyer]' : '[data-code-demander]');
     const texte = b ? b.textContent : '';
     envoiEnVol = true; direErreur(''); direEtat('');
-    if (b) { b.disabled = true; b.textContent = 'Envoi du code…'; }
-    demanderAuFond({ from: 'vrm-badge', action: 'authCodeDemande', email }, (r, muet) => {
-      envoiEnVol = false;
-      if (r && r.ok) {
-        codeEnvoi = { email: r.email || email.toLowerCase(), at: Number(r.at) || Date.now() };
-        modeCx = 'saisie'; poserFormulaire(true, true);
-        if (renvoi) direEtat('Nouveau code envoyé. Seul ce dernier code marche.');
-        focaliser(); return;
-      }
-      if (b) { b.textContent = texte; b.disabled = false; }
-      if (renvoi) minuterRenvoi();
-      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Le code n’a pas pu partir.'));
-    });
+    if (b) { b.disabled = true; b.textContent = TU('cx_envoi'); }
+    // 5.456 : le jeton anti-robot d'abord (Supabase refuse la demande de code sans lui — mesuré le 27 nov.).
+    prendreJeton((captcha) => {
+      demanderAuFond({ from: 'vrm-badge', action: 'authCodeDemande', email, captcha, creer: pourCreer }, (r, muet) => {
+        envoiEnVol = false;
+        if (r && r.ok) {
+          codeEnvoi = { email: r.email || email.toLowerCase(), at: Number(r.at) || Date.now(), creer: pourCreer };
+          modeCx = 'saisie'; poserFormulaire(true, true);
+          if (renvoi) direEtat(TU('cx_nouveau_code'));
+          focaliser(); return;
+        }
+        if (b) { b.textContent = texte; b.disabled = false; }
+        if (renvoi) minuterRenvoi();
+        direErreur(muet ? TU('cx_e_muet') : r && r.captcha && verifEtat === 'erreur' ? TU('cx_verif_erreur') : ((r && r.error) || TU('cx_e_refus')));
+      });
+    }, () => { envoiEnVol = false; if (b) { b.textContent = texte; b.disabled = false; } });
   }
   function validerCode() {
     if (envoiEnVol || !formulaireEl || !codeEnvoi) return;
     const c = champ('vrm-cx-code'), b = formulaireEl.querySelector('[data-code-valider]');
     const code = String((c && c.value) || '').replace(/\D+/g, '');
-    if (!/^\d{6,10}$/.test(code)) { direErreur('Tape les 6 chiffres du code reçu par e-mail.'); return; }
+    if (!/^\d{6,10}$/.test(code)) { direErreur(TU('cx_e_code6')); return; }
     envoiEnVol = true; direErreur(''); direEtat('');
-    if (b) { b.disabled = true; b.textContent = 'Vérification…'; }
+    if (b) { b.disabled = true; b.textContent = TU('cx_verification'); }
     demanderAuFond({ from: 'vrm-badge', action: 'authCodeVerif', email: codeEnvoi.email, code }, (r, muet) => {
       envoiEnVol = false;
       // Le code ne reste nulle part : le champ est vidé dès la réponse.
       try { if (c) { c.value = ''; c.dispatchEvent(new Event('blur')); } } catch (_) {}
-      if (b) { b.textContent = 'Valider le code'; b.disabled = true; }
-      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; codeEnvoi = null; rafraichir(); return; }
-      if (r && r.expire) { modeCx = 'code'; poserFormulaire(true, true); }
-      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Code refusé.'));
+      if (b) { b.textContent = TU('cx_valider'); b.disabled = true; }
+      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = MODE_DEPART; codeEnvoi = null; rafraichir(); return; }
+      if (r && r.expire) { modeCx = codeEnvoi && codeEnvoi.creer ? 'creer' : 'code'; poserFormulaire(true, true); }
+      direErreur(muet ? TU('cx_e_muet') : ((r && r.error) || TU('cx_e_refus')));
       focaliser();
     });
   }
@@ -6969,21 +7072,96 @@ function vrmVerifVisible(sel) {
     if (envoiEnVol || !formulaireEl) return;
     const m = champ('vrm-cx-mail'), p = champ('vrm-cx-mdp'), b = formulaireEl.querySelector('[data-me-connecter]');
     const email = String((m && m.value) || '').trim(), password = String((p && p.value) || '');
-    if (!email || !password) { direErreur(!email && !password ? 'Tape l’e-mail et le mot de passe de ton compte VRM.' : !email ? 'Tape l’e-mail de ton compte VRM.' : 'Tape ton mot de passe VRM.'); try { (!email ? m : p).focus(); } catch (_) {} return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    if (!email || !password) { direErreur(!email && !password ? TU('cx_e_vides') : !email ? TU('cx_e_mail') : TU('cx_e_pw')); try { (!email ? m : p).focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur(TU('cx_e_forme')); return; }
     mailSaisi = email;
     envoiEnVol = true; direErreur(''); direEtat('');
-    if (b) { b.disabled = true; b.textContent = 'Connexion…'; }
-    demanderAuFond({ from: 'vrm-badge', action: 'authLogin', email, password }, (r, muet) => {
-      envoiEnVol = false;
-      if (b) { b.disabled = false; b.textContent = 'Me connecter'; }
-      try { if (p) p.value = ''; } catch (_) {}
-      if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; rafraichir(); return; }
-      if (muet) { direErreur('L’extension n’a pas répondu. Réessaie dans un instant.'); return; }
-      if (r && r.captcha) { direErreur('VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.'); return; }
-      direErreur((r && r.error) || 'Connexion refusée.');
-      try { if (p) p.focus(); } catch (_) {}
+    if (b) { b.disabled = true; b.textContent = TU('cx_connexion'); }
+    // 5.456 : le jeton anti-robot d'abord (Supabase refuse le mot de passe sans lui — mesuré le 27 nov.).
+    prendreJeton((captcha) => {
+      demanderAuFond({ from: 'vrm-badge', action: 'authLogin', email, password, captcha }, (r, muet) => {
+        envoiEnVol = false;
+        if (b) { b.disabled = false; b.textContent = TU('cx_me_connecter'); }
+        try { if (p) p.value = ''; } catch (_) {}
+        if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = MODE_DEPART; rafraichir(); return; }
+        if (muet) { direErreur(TU('cx_e_muet')); return; }
+        if (r && r.captcha) { direErreur(verifEtat === 'erreur' ? TU('cx_verif_erreur') : r.error || TU('cx_verif_case')); return; }
+        direErreur((r && r.error) || TU('cx_e_refus'));
+        try { if (p) p.focus(); } catch (_) {}
+      });
+    }, () => { envoiEnVol = false; if (b) { b.disabled = false; b.textContent = TU('cx_me_connecter'); } });
+  }
+  // ══ 5.456 — LA VÉRIFICATION ANTI-ROBOT (Turnstile) DANS LE FORMULAIRE ═══════════════════════════════════════════════
+  // MESURÉ le 27 nov. sur le vrai Supabase : sans jeton captcha, `grant_type=password` ET `/otp` répondent 400
+  // `captcha_failed`. Le jeton vient de la petite page de VRM (`verif-extension.html`, la clé de site de vrm.center),
+  // posée ici en cadre ; elle répond par `postMessage` à NOTRE origine seulement, avec le nonce de CE cadre. Le jeton part
+  // une fois avec la demande (jamais rangé), puis le cadre en refait un neuf. Le mot de passe, l'e-mail, le code ne vont
+  // JAMAIS vers ce cadre. Cadre muet, refusé ou bloqué ⇒ la demande part sans jeton et la réponse de VRM est dite.
+  let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null, verifVu = false, verifMuet = null;
+  const URL_VERIF = 'https://vrm.center/verif-extension.html';
+  function nonceVerif() { try { const a = new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a, (x) => x.toString(16).padStart(2, '0')).join(''); } catch (_) { return String(Date.now()) + Math.random().toString(36).slice(2, 10); } }
+  function majVerif() {
+    const box = formulaireEl && formulaireEl.querySelector('[data-verif]'); if (!box) return;
+    box.setAttribute('data-verif-etat-v', verifEtat || '');
+    const t = box.querySelector('[data-verif-etat]');
+    if (t) { t.textContent = verifEtat === 'erreur' ? TU('cx_verif_erreur') : verifEtat === 'interactif' ? TU('cx_verif_case') : verifEtat === 'pret' ? '' : TU('cx_verif_attente'); t.hidden = verifEtat === 'pret' || (verifEtat === 'charge' && !!verifEl && verifEl.getBoundingClientRect().height > 20); }
+  }
+  function poserVerif() {
+    const box = formulaireEl && formulaireEl.querySelector('[data-verif]');
+    if (!box) { verifEl = null; verifN = ''; verifJeton = ''; return; }
+    verifN = nonceVerif(); verifJeton = ''; verifEtat = 'charge';
+    let sombre = false; try { sombre = hote.getAttribute('data-theme') === 'sombre' || (hote.getAttribute('data-theme') !== 'clair' && matchMedia('(prefers-color-scheme: dark)').matches); } catch (_) {}
+    const f = document.createElement('iframe');
+    f.src = URL_VERIF + '?parent=' + encodeURIComponent(location.origin) + '&n=' + verifN + '&theme=' + (sombre ? 'sombre' : 'clair');
+    f.title = TU('cx_verif_titre');
+    f.setAttribute('data-verif-cadre', '');
+    f.setAttribute('allow', 'cross-origin-isolated');
+    f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:8px 0 0;background:transparent;color-scheme:normal;overflow:hidden;';
+    // Un cadre qui ne dit RIEN 3 s après son chargement (page refusée, bloquée, introuvable) = en panne : la demande ne
+    //    l'attend pas (elle part sans jeton, VRM dira s'il le faut).
+    verifVu = false; clearTimeout(verifMuet);
+    f.addEventListener('load', () => { clearTimeout(verifMuet); verifMuet = setTimeout(() => { if (verifEl === f && !verifVu) { verifEtat = 'erreur'; majVerif(); if (verifSuite) verifSuite(); } }, 3000); });
+    box.appendChild(f); verifEl = f;
+    majVerif();
+  }
+  function remettreVerif() {
+    verifJeton = ''; verifEtat = 'charge'; majVerif();
+    try { if (verifEl && verifEl.contentWindow) verifEl.contentWindow.postMessage({ __vrmVerif: 'reset', n: verifN }, 'https://vrm.center'); } catch (_) {}
+  }
+  // Le jeton pour UNE demande : tout de suite s'il est là ; en route ⇒ on attend (12 s au plus) ; pas de cadre, cadre en
+  // panne ou case à cocher sans réponse ⇒ la demande part sans (VRM dira s'il le faut). `annuler` : rien n'est parti.
+  function prendreJeton(suite, annuler) {
+    const prendre = () => { const j = verifJeton; if (j) remettreVerif(); return j; };
+    if (verifJeton || !verifEl || verifEtat === 'erreur') { suite(prendre()); return; }
+    if (verifEtat === 'interactif') { direErreur(TU('cx_verif_case')); annuler(); return; }
+    direEtat(TU('cx_verif_attente'));
+    clearTimeout(verifMinut);
+    verifSuite = () => { clearTimeout(verifMinut); verifSuite = null; direEtat(''); suite(prendre()); };
+    verifMinut = setTimeout(() => { if (verifSuite) verifSuite(); }, 12000);
+  }
+  try {
+    window.addEventListener('message', (ev) => {
+      if (ev.origin !== 'https://vrm.center') return;
+      const d = ev.data;
+      if (!d || typeof d !== 'object' || typeof d.__vrmVerif !== 'string' || !verifN || d.n !== verifN) return;
+      verifVu = true;
+      if (d.__vrmVerif === 'jeton' && typeof d.jeton === 'string' && d.jeton.length >= 20 && d.jeton.length <= 4096) { verifJeton = d.jeton; verifEtat = 'pret'; majVerif(); if (verifSuite) verifSuite(); }
+      else if (d.__vrmVerif === 'etat' && ['charge', 'interactif', 'expire', 'erreur'].includes(d.etat)) {
+        verifEtat = d.etat === 'expire' ? 'charge' : d.etat; verifJeton = '';
+        majVerif();
+        if (d.etat === 'erreur' && verifSuite) verifSuite();
+        if (d.etat === 'interactif' && verifSuite) { clearTimeout(verifMinut); verifSuite = null; direEtat(''); direErreur(TU('cx_verif_case')); envoiEnVol = false; const b = formulaireEl && formulaireEl.querySelector('[data-principal]'); if (b) { b.disabled = false; b.textContent = TU(modeCx === 'mdp' ? 'cx_me_connecter' : modeCx === 'creer' ? 'cx_creer_envoyer' : 'cx_code_envoyer'); } }
+      } else if (d.__vrmVerif === 'hauteur' && verifEl) { const h = Math.max(0, Math.min(140, Math.ceil(Number(d.h) || 0))); verifEl.style.height = h + 'px'; majVerif(); }
     });
+  } catch (_) {}
+  // ══ 5.456 — LA TÊTE DE LA FEUILLE DE CONNEXION, DANS LE PANNEAU FLOUTÉ ══════════════════════════════════════════════
+  // Le logo, « Connecte VRM », une ligne (l'état s'il y en a un), et le × (le panneau derrière est `inert`).
+  function teteFeuille() {
+    if (CADRE || !carte.hasAttribute('data-hors-ligne')) return '';
+    const v = etat && etat.vrm;
+    let logo = ''; try { logo = chrome.runtime.getURL('logo-vrm-96.png'); } catch (_) {}
+    return `<div class="cx-tete" data-cx-tete><img src="${esc(logo)}" alt="" width="40" height="40"><div><b>${esc(TU('cx_titre'))}</b><span data-cx-ligne>${esc(TU(v && v.expiree ? 'cx_expiree' : 'cx_sous'))}</span></div>
+      <button type="button" class="cx-x" data-cx-fermer aria-label="${esc(TU('cx_fermer'))}" title="${esc(TU('cx_fermer'))}">×</button></div>`;
   }
   // Google / Discord : seulement pour un fournisseur que Supabase dit activé.
   // Ordinateur : une petite fenêtre qui se ferme seule. Sans fenêtre (Orion) :
@@ -7008,7 +7186,7 @@ function vrmVerifVisible(sel) {
     box.setAttribute('data-oauth', etat && etat.oauthFenetre === true ? 'fenetre' : 'meme-onglet');
     if (!actifs.length) { box.hidden = true; return; }
     if (box.querySelector('[data-fournisseur]')) { box.hidden = false; return; }
-    poserHtml(box, `<div class="ou"><span>ou</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>Continuer avec ${NOM_FOURN[f]}</span></button>`).join(''));
+    poserHtml(box, `<div class="ou"><span>${esc(TU('cx_ou'))}</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>${esc(TU('cx_fourn', { f: NOM_FOURN[f] }))}</span></button>`).join(''));
     box.querySelectorAll('[data-fournisseur]').forEach((el) => el.addEventListener('click', () => connexionFournisseur(el.getAttribute('data-fournisseur'))));
     box.hidden = false;
   }
@@ -7016,7 +7194,7 @@ function vrmVerifVisible(sel) {
   function connexionFournisseur(f) {
     if (!NOM_FOURN[f] || envoiEnVol) return;
     const fenetre = !!(etat && etat.oauthFenetre === true);
-    direErreur(''); direEtat(fenetre ? `Une petite fenêtre ${NOM_FOURN[f]} s’ouvre. Connecte-toi : elle se ferme toute seule.` : `Je t’emmène chez ${NOM_FOURN[f]}, dans cet onglet. Tu reviendras ici, connecté.`);
+    direErreur(''); direEtat(TU(fenetre ? 'cx_fourn_fenetre' : 'cx_fourn_onglet', { f: NOM_FOURN[f] }));
     demanderAuFond({ from: 'vrm-badge', action: 'oauthDepart', fournisseur: f }, (r, muet) => {
       if (muet || !r) { direEtat(''); direErreur('L’extension n’a pas répondu. Connecte-toi avec un code reçu par e-mail.'); return; }
       if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); return; }
@@ -7085,7 +7263,20 @@ function vrmVerifVisible(sel) {
   // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
   try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && vxPlus && carte.classList.contains('on')) { vxPlus = false; ev.stopPropagation(); rendre(); return; } if (ev.key === 'Escape' && favFeuille && carte.classList.contains('on')) { favFeuille = null; vueFav = null; ev.stopPropagation(); rendre(); return; } if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+  // 5.456 : le fond (`ouvrirPanneauConnexion`, l'icône de l'extension pas connectée) ⇒ le panneau s'ouvre ici, sans
+  //    recharger la page. Seulement la page principale, jamais le cadre ni la fenêtre des listes.
+  try {
+    if (!CADRE && !LISTES) chrome.runtime.onMessage.addListener((m, sender, repondre) => {
+      if (!m || m.from !== 'vrm-fond' || m.action !== 'panneauConnexion') return false;
+      if (sender && sender.id && chrome.runtime.id && sender.id !== chrome.runtime.id) return false;
+      try { cacherCapte('carte'); } catch (_) {}
+      doigt = true; formulaireDemande = true; carte.classList.add('on');
+      rafraichir().catch(() => {});
+      repondre({ ok: true });
+      return false;
+    });
+  } catch (_) {}
+  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-hors-ligne')) { carte.classList.remove('on'); poserFormulaire(false); } if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
   // ══ 5.410.2 — LE PANNEAU RESTE OUVERT, DANS LE MÊME ÉTAT, JUSQU'À SON × ═══════════════════════════════════════
   // Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ». Mesuré au banc
@@ -7361,6 +7552,7 @@ function vrmVerifVisible(sel) {
     // 5.410.2 : le GRAND panneau ne s'ouvre pas au simple survol (il couvrait l'écran puis se refermait dès que la
     // souris sortait de la fenêtre : « il se ferme tout seul ») — un clic sur le logo l'ouvre, son × le ferme.
     if (carte.hasAttribute('data-grand') && !carte.classList.contains('on')) return;
+    if (horsLigneVoulu(etat)) return;   // 5.456 : pas connecté ⇒ le grand panneau flouté, ouvert par un clic seulement
     // 22 nov. (audit) : le grand panneau DÉJÀ ouvert n'a rien à ouvrir — la souris qui revient dessus (depuis la barre
     //    d'onglets, une autre fenêtre) relançait une lecture d'état et un rendu complet à chaque passage.
     if (carte.hasAttribute('data-grand')) return;
@@ -7591,5 +7783,9 @@ function vrmVerifVisible(sel) {
   }
 
   (CADRE || LISTES ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);
+  // 5.456 : dans le cadre de l'extension, le formulaire n'attend pas l'état du service worker (un réveil lent dépassait le
+  //    délai de la carte, qui retombait sur sa carte dessinée — SANS mot de passe) : il est posé et dit « prête » tout de
+  //    suite ; l'état, arrivé ensuite, ne le redessine pas (le texte tapé reste).
+  if (CADRE) { try { rendre(); } catch (_) {} }
   rafraichir();
 })();

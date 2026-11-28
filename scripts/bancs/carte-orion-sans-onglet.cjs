@@ -34,11 +34,15 @@ const path = require('path');
 const fs = require('fs');
 const { faireFond } = require('../_fond-vm.cjs');
 const { fauxGoTrue } = require('../tests/_faux-gotrue.cjs');
+const { servirVerif } = require('./_faux-turnstile.cjs');   // 5.456 : la vérification anti-robot (vraie page, faux Turnstile)
 
 const RACINE = path.join(__dirname, '..', '..');
 const EXT = path.join(RACINE, 'vinted-sync-extension');
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? path.resolve(process.argv[i + 1]) : null; };
 const BADGE = fs.readFileSync(arg('--badge') || path.join(EXT, 'vrm-badge.js'), 'utf8');
+// 5.456 : la feuille et les textes communs (vrm-ui.js, chargé AVANT vrm-badge.js par le manifeste) ; sans eux le banc
+//    voyait des clés de texte et un bouton plein sans style (rouges déjà sur main avant la 5.456).
+const UI = (() => { try { return fs.readFileSync(path.join(arg('--badge') ? path.dirname(arg('--badge')) : EXT, 'vrm-ui.js'), 'utf8'); } catch (_) { return ''; } })();
 // 5.332 : les fichiers du cadre (popup.html, popup.js, vrm-badge.js) — `--ext dossier` pour une autre copie.
 const EXT_CADRE = arg('--ext') || (arg('--badge') ? path.dirname(arg('--badge')) : EXT);
 const SRC = arg('--src') || path.join(EXT, 'background.js');
@@ -87,6 +91,7 @@ async function onglet(nav, f, { scheme = 'light', mobile = true, autoriser = nul
   await ctx.route('**/*', (r) => {
     const u = r.request().url();
     if (r.request().isNavigationRequest()) urls.push(u);
+    if (servirVerif(r)) return;
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
     // Comme Orion : la page d'extension dans un iframe ne s'affiche jamais.
     if (/popup\.html/.test(u)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body></body>' });
@@ -106,7 +111,7 @@ async function onglet(nav, f, { scheme = 'light', mobile = true, autoriser = nul
     const r = await f.envoyer(msg, { id: 'x', tab: { id: 7, url: ici }, url: ici });
     return r === undefined ? null : JSON.parse(JSON.stringify(r));
   });
-  await ctx.addInitScript(({ badge, retour, version }) => {
+  await ctx.addInitScript(({ badge, ui, retour, version }) => {
     window.__ouverts = [];
     window.open = (...a) => { window.__ouverts.push(a[0]); return null; };
     window.chrome = {
@@ -116,7 +121,7 @@ async function onglet(nav, f, { scheme = 'light', mobile = true, autoriser = nul
         getManifest: () => ({ version }),
         sendMessage: (msg, cb) => { window.__fond(msg, location.href).then((r) => { if (typeof cb === 'function') cb(r === null ? undefined : r); }); },
       },
-      storage: { onChanged: { addListener() {} } },
+      storage: { onChanged: { addListener() {} }, local: { get(k, cb) { if (typeof cb === 'function') cb({}); return Promise.resolve({}); }, set(o, cb) { if (typeof cb === 'function') cb(); return Promise.resolve(); } } },   // 5.456 : comme Chrome (vrm-ui.js le lit)
     };
     if (location.hostname === 'vrm.center') { (0, eval)(retour); return; }   // document_start, comme le manifeste
     // La page du site : ses propres écouteurs, qui notent tout ce qu'ils entendent.
@@ -128,10 +133,11 @@ async function onglet(nav, f, { scheme = 'light', mobile = true, autoriser = nul
     window.__modes = [];
     Element.prototype.attachShadow = function (o) { window.__modes.push(o && o.mode); const r = orig.call(this, o); if (this.id === 'vrm-badge') window.__racine = r; return r; };
     document.addEventListener('DOMContentLoaded', () => {
+      if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
       const s = document.createElement('script'); s.textContent = badge; document.documentElement.appendChild(s);
       window.addEventListener('keydown', (e) => window.__entendu.push('win-keydown-capture-apres:' + e.key), true);
     });
-  }, { badge: BADGE, retour: RETOUR_JS, version: VERSION });
+  }, { badge: BADGE, ui: UI, retour: RETOUR_JS, version: VERSION });
   return { ctx, pg, erreurs, urls, messages };
 }
 async function allerVinted(o, url = URL_VINTED) { await o.pg.goto(url); await o.pg.waitForTimeout(400); }
@@ -151,7 +157,7 @@ const lire = (pg) => pg.evaluate(() => {
     // 5.351 : le détail est replié quand tout va bien — ouvert le temps de lire, puis remis.
     carte: carte ? (() => { const ds = Array.from(carte.querySelectorAll('details[data-detail]')); const av = ds.map((d) => d.open); ds.forEach((d) => { d.open = true; }); const t = carte.innerText; ds.forEach((d, i) => { d.open = av[i]; }); return t; })() : '',
     form: !!form, mode: form ? form.getAttribute('data-mode') : '',
-    iframes: (r ? r.querySelectorAll('iframe').length : 0) + document.querySelectorAll('iframe:not([aria-hidden])').length,
+    iframes: (r ? r.querySelectorAll('iframe:not([data-verif-cadre])').length : 0) + document.querySelectorAll('iframe:not([aria-hidden])').length,   // 5.456 : hors la vérification anti-robot (voulue)
     champsPage: document.querySelectorAll('input').length,
     champsCarte: r ? r.querySelectorAll('input').length : 0,
     mdpVisible: vis(q('#vrm-cx-mdp')),
@@ -194,7 +200,7 @@ const aucuneOuverture = (f, o, l) => f.ouvertures.tabs.length === 0 && f.ouvertu
 // que la page, comme chrome-extension://…) : la vraie popup.html, le vrai
 // popup.js, le vrai vrm-badge.js. `cadre: 'muet'` : la page d'extension ne dit
 // rien (comme Orion en 5.328). `orionPage` : le paquet Orion (compat posée).
-const EXT_FICHIERS = { 'popup.html': 'text/html', 'popup.js': 'text/javascript', 'vrm-badge.js': 'text/javascript', 'parcours-popup.js': 'text/javascript', 'logo-vrm-96.png': 'image/png' };
+const EXT_FICHIERS = { 'vrm-ui.js': 'text/javascript', 'popup.html': 'text/html', 'popup.js': 'text/javascript', 'vrm-badge.js': 'text/javascript', 'parcours-popup.js': 'text/javascript', 'logo-vrm-96.png': 'image/png' };
 async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = 'vrai', orionPage = false } = {}) {
   const ctx = await nav.newContext(mobile
     ? { colorScheme: scheme, viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
@@ -207,6 +213,7 @@ async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = '
   await ctx.route('**/*', (r) => {
     const u = r.request().url();
     if (r.request().isNavigationRequest()) urls.push(u);
+    if (servirVerif(r)) return;
     if (/^https:\/\/ext\.test\//.test(u)) {
       const nom = new URL(u).pathname.slice(1);
       if (nom === 'popup.html') cadreDemandes.push(u);
@@ -223,7 +230,7 @@ async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = '
     const r = await f.envoyer(msg, { id: 'x', tab: { id: 7, url: ici }, url: ici });
     return r === undefined ? null : JSON.parse(JSON.stringify(r));
   });
-  await ctx.addInitScript(({ badge, version, orionPage, urlVinted }) => {
+  await ctx.addInitScript(({ badge, ui, version, orionPage, urlVinted }) => {
     window.__ouverts = [];
     window.open = (...a) => { window.__ouverts.push(a[0]); return null; };
     const ext = location.hostname === 'ext.test';
@@ -236,7 +243,7 @@ async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = '
         getManifest: () => ({ version, manifest_version: 3 }),
         sendMessage: (msg, cb) => { window.__fond(msg, ici).then((r) => { if (typeof cb === 'function') cb(r === null ? undefined : r); }); },
       },
-      storage: { onChanged: { addListener() {} } },
+      storage: { onChanged: { addListener() {} }, local: { get(k, cb) { if (typeof cb === 'function') cb({}); return Promise.resolve({}); }, set(o, cb) { if (typeof cb === 'function') cb(); return Promise.resolve(); } } },   // 5.456 : comme Chrome (vrm-ui.js le lit)
     };
     const orig = Element.prototype.attachShadow;
     window.__modes = [];
@@ -249,9 +256,10 @@ async function ongletChrome(nav, f, { scheme = 'light', mobile = true, cadre = '
     window.addEventListener('input', (e) => window.__entendu.push('win-input-capture-avant:' + (e.data || '')), true);
     document.addEventListener('keydown', (e) => window.__entendu.push('doc-keydown:' + e.key), false);
     document.addEventListener('DOMContentLoaded', () => {
+      if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
       const s = document.createElement('script'); s.textContent = badge; document.documentElement.appendChild(s);
     });
-  }, { badge: BADGE, version: VERSION, orionPage, urlVinted: URL_VINTED });
+  }, { badge: BADGE, ui: UI, version: VERSION, orionPage, urlVinted: URL_VINTED });
   return { ctx, pg, erreurs, urls, messages, cadreDemandes };
 }
 const lireCadre = (pg) => pg.evaluate(() => {
@@ -261,7 +269,7 @@ const lireCadre = (pg) => pg.evaluate(() => {
   const carte = r && r.querySelector('.carte');
   return {
     cadre: c ? (c.getAttribute('data-cadre') || '') : '',
-    iframes: r ? r.querySelectorAll('iframe').length : 0,
+    iframes: r ? r.querySelectorAll('iframe:not([data-verif-cadre])').length : 0,
     iframeSrc: f ? f.getAttribute('src') : '',
     iframeVisible: !!(f && getComputedStyle(f).visibility === 'visible' && f.getBoundingClientRect().height > 0 && carte && getComputedStyle(carte).display !== 'none'),
     iframeH: f ? Math.round(f.getBoundingClientRect().height) : 0,
@@ -278,9 +286,9 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
   const r = window.__racine; const q = (s) => (r ? r.querySelector(s) : null);
   const form = q('form[data-connexion-carte]');
   const y = (s) => { const el = q(s); return el && el.offsetParent ? Math.round(el.getBoundingClientRect().top) : null; };
-  const o = { mail: y('#vrm-cx-mail'), code: y('[data-code-demander]'), mdp: y('[data-basculer-mode]'), google: y('[data-fournisseur="google"]') };
+  const o = { mail: y('#vrm-cx-mail'), mdpChamp: y('#vrm-cx-mdp'), plein: y('[data-principal]'), code: y('[data-code-demander]'), mdp: y('[data-basculer-mode]'), google: y('[data-fournisseur="google"]') };
   return { form: !!form, mode: form ? form.getAttribute('data-mode') : '', principal: q('[data-principal]') ? q('[data-principal]').textContent.trim() : '',
-    ordreOk: o.mail != null && o.code > o.mail && o.mdp > o.code && (o.google == null || o.google > o.mdp), ordre: o, mdpVisible: !!(q('#vrm-cx-mdp') && q('#vrm-cx-mdp').offsetParent) };
+    ordreOk: o.mail != null && o.mdpChamp > o.mail && o.plein > o.mdpChamp && o.mdp > o.plein && (o.google == null || o.google < o.mdp), ordre: o, mdpVisible: !!(q('#vrm-cx-mdp') && q('#vrm-cx-mdp').offsetParent) };
 });
 
 (async () => {
@@ -483,14 +491,14 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
       const { pg } = o;
       const t0 = Date.now();
       if (mobile) await pg.tap('#vrm-badge'); else await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 22);
-      await pg.waitForFunction(() => { const r = window.__racine; const c = r && r.querySelector('.connexion'); return c && /pret|repli/.test(c.getAttribute('data-cadre') || ''); }, null, { timeout: 4000 }).catch(() => {});
+      await pg.waitForFunction(() => { const r = window.__racine; const c = r && r.querySelector('.connexion'); return c && /pret|repli/.test(c.getAttribute('data-cadre') || ''); }, null, { timeout: 6000 }).catch(() => {});
       const dt = Date.now() - t0;
       await pg.waitForTimeout(300);   // la hauteur dite par le cadre après « prête »
       let l = await lireCadre(pg);
       dit(l.cadre === 'pret' && l.iframeVisible && /^https:\/\/ext\.test\/popup\.html\?mode=carte/.test(l.iframeSrc) && !l.formTop && l.champsPage === 1, 'pas connecté : le formulaire est dans l’iframe de l’extension (popup.html?mode=carte), aucun champ dans la carte du site ni dans son DOM', JSON.stringify({ cadre: l.cadre, vis: l.iframeVisible, src: l.iframeSrc, formTop: l.formTop, champs: l.champsPage, dt }));
       const fr = cadreFrame(pg);
       const lf = fr ? await lireDansCadre(fr) : null;
-      dit(!!lf && lf.form && lf.mode === 'code' && lf.ordreOk && lf.principal.includes('code'), 'dans le cadre : le même formulaire (e-mail, « Me connecter avec un code », mot de passe replié, Google / Discord)', JSON.stringify(lf));
+      dit(!!lf && lf.form && lf.mode === 'mdp' && lf.ordreOk && /connecter/i.test(lf.principal), 'dans le cadre (5.456) : e-mail, mot de passe, « Me connecter », puis Google / Discord, puis « Recevoir un code », Google / Discord)', JSON.stringify(lf));
       dit(l.iframeH >= 150 && l.iframeH <= 640 && !l.deborde, 'le cadre prend la hauteur du formulaire (dit par lui), rien ne déborde', JSON.stringify({ h: l.iframeH, deborde: l.deborde }));
       await pg.screenshot({ path: path.join(SORTIE, `carte-cadre-chrome-${mobile ? '390' : '1512'}.png`) });
       // La frappe : l'e-mail puis le code, DANS le cadre. (Sans cadre — code
@@ -502,6 +510,9 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
         dit(ent.length === 0, 'la page du site n’a RIEN entendu — même son écouteur posé en capture AVANT la carte', JSON.stringify(ent.slice(0, 4)));
         await o.ctx.close(); continue;
       }
+      // 5.456 : le cadre s'ouvre sur le mot de passe ; « Recevoir un code par e-mail » passe au code.
+      await fr.evaluate(() => window.__racine.querySelector('[data-basculer-mode]').click());
+      await fr.waitForFunction(() => !!window.__racine.querySelector('[data-code-demander]'), null, { timeout: 3000 }).catch(() => {});
       await fr.evaluate(() => { const el = window.__racine.querySelector('#vrm-cx-mail'); el.focus(); });
       await pg.keyboard.type('google@exemple.fr', { delay: 5 });
       await fr.evaluate(() => window.__racine.querySelector('[data-code-demander]').click());
@@ -530,10 +541,10 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     const { pg } = o;
     const t0 = Date.now();
     await pg.tap('#vrm-badge');
-    await pg.waitForFunction(() => { const r = window.__racine; return !!(r && r.querySelector('form[data-connexion-carte]')); }, null, { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => { const r = window.__racine; return !!(r && r.querySelector('form[data-connexion-carte]')); }, null, { timeout: 8000 }).catch(() => {});
     const dt = Date.now() - t0;
     const l = await lireCadre(pg);
-    dit(l.formTop && l.cadre === 'repli' && l.iframes === 0 && dt < 2000, `repli en ${dt} ms (< 2 s) : le formulaire dessiné dans la carte, plus d’iframe`, JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes, dt }));
+    dit(l.formTop && l.cadre === 'repli' && l.iframes === 0 && dt < 4800, `repli en ${dt} ms (< 4,8 s ; 5.456 : le cadre a 4 s pour se dire prêt) : le formulaire dessiné dans la carte, plus d’iframe`, JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes, dt }));
     dit(aucuneOuverture(f, o, { ouverts: l.ouverts }) && !o.messages.includes('lierAvecVRM'), 'jamais d’onglet, jamais « Se connecter avec VRM »', JSON.stringify(f.ouvertures.tabs));
     const sansMdp = await lire(pg);
     dit(sansMdp.form && !sansMdp.mdpPresent, 'repli dessiné (5.362) : aucun mot de passe proposé, le code seulement', JSON.stringify({ form: sansMdp.form, present: sansMdp.mdpPresent }));
@@ -561,7 +572,7 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     let l = await lireCadre(pg);
     const vuPendant = l.iframeVisible && /evil/.test(l.iframeDoc || '');
     dit(!l.iframeVisible || l.iframes === 0, 'dès son chargement, la fausse page est CACHÉE (jamais montrée dans la carte)', JSON.stringify({ vis: l.iframeVisible, cadre: l.cadre, vuPendant }));
-    await pg.waitForTimeout(1800);
+    await pg.waitForTimeout(4400);   // 5.456 : le cadre a 4 s pour se dire prêt
     l = await lireCadre(pg);
     dit(l.formTop && l.cadre === 'repli' && l.iframes === 0, 'puis la carte retombe sur son formulaire dessiné (l’iframe est retiré)', JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes }));
     await o.ctx.close();

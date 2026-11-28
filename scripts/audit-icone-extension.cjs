@@ -12,8 +12,22 @@
 //  (connexion, `lier-extension`) ; la fenêtre d'avant s'ouvre par le clic droit (« Connexion à VRM » /
 //  « État de l'extension »). Sans menu (Orion iPhone) : la fenêtre de connexion, comme avant.
 //  `SRC=<ancien background.js>` : sur la 5.369, les contrôles « 5.370 » sont rouges.
+//  ⚠️ 5.456 (27 nov., Julien : « Je ne veux pas que ce soit un petit module […] je veux que ce soit le gros panneau
+//  directement qui s'affiche avec les données floutées […] Et on se connecte ici ») — REMPLACE la règle « déconnecté ⇒ un
+//  onglet vrm.center (lier-extension) » de la 5.370 : déconnecté, l'icône (et « Connexion à VRM ») ouvre LE PANNEAU dans
+//  l'onglet du site (message `panneauConnexion`, la page n'est pas rechargée), sinon un onglet vinted.fr sur le panneau ;
+//  jamais vrm.center, jamais de fenêtre. Ce qui reste de la 5.370 : connecté ⇒ VRM ; le menu du clic droit et ses deux
+//  entrées ; « État de l'extension » (et « Connexion à VRM » connecté) ouvre la fenêtre d'avant dans un onglet.
+//  `--mutation` : l'icône redevient « lier par vrm.center » ⇒ les contrôles 5.456 doivent être rouges.
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const src = fs.readFileSync(process.env.SRC ? path.resolve(process.env.SRC) : path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+let src = fs.readFileSync(process.env.SRC ? path.resolve(process.env.SRC) : path.join(__dirname, '..', 'vinted-sync-extension', 'background.js'), 'utf8');
+const MUTATION = process.argv.includes('--mutation');
+if (MUTATION) {
+  const avant = src;
+  src = src.replace('    await ouvrirPanneauConnexion(tab);\n    return;', "    await lierAvecVRM(tab && tab.url, '', tab && tab.id, fenetre);\n    return;")
+    .replace('if (!s || s.mort || !s.refresh_token) return ouvrirPanneauConnexion(tab);', "if (!s || s.mort || !s.refresh_token) { try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' }); } catch (_) {} return null; }");
+  if (src === avant) { console.log('❌ mutation : rien n’a été remplacé (le code a changé ?)'); process.exit(1); }
+}
 const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
 let ko = 0, ok = 0;
 const dit = (bon, quoi, det) => { if (bon) { ok++; console.log(`✅ ${quoi}`); } else { ko++; console.log(`❌ ${quoi}${det ? ' — ' + det : ''}`); } };
@@ -21,7 +35,7 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
 
 // Fabrique un contexte d'exécution du service worker, avec une session donnée.
 function faire({ session = null, urlActive = '', menus = false, onglets = [] } = {}) {
-  const j = { setPopup: [], crees: [], majOnglet: [], openPopup: 0, focus: [], menus: [], requetes: [], actives: [] };
+  const j = { setPopup: [], crees: [], majOnglet: [], openPopup: 0, focus: [], menus: [], requetes: [], actives: [], messages: [] };
   let menuClic = null;
   const store = session ? { vrmSession: session } : {};
   let clicHandler = null;
@@ -41,6 +55,8 @@ function faire({ session = null, urlActive = '', menus = false, onglets = [] } =
         query: (q, cb) => { j.requetes.push(q); const r = onglets.filter((t) => /vrm\.center/.test(t.url) && (q.windowId == null || t.windowId === q.windowId)); cb && cb(r); },
         create: (o, cb) => { j.crees.push(o.url); cb && cb({ id: 1 }); },
         update: (id, o, cb) => { if (o.url) j.majOnglet.push(o.url); if (o.active) j.actives.push(id); cb && cb(); },
+        // 5.456 : l'onglet du site répond au fond (vrm-badge.js ouvre son panneau).
+        sendMessage: (id, m, cb) => { j.messages.push({ id, action: m && m.action }); cb && cb({ ok: true }); },
       },
       windows: { update: (id, o) => j.focus.push(id) },
       action: {
@@ -64,7 +80,7 @@ function faire({ session = null, urlActive = '', menus = false, onglets = [] } =
   // Une session vivante : on court-circuite le vrai réseau (authEtat lit authToken).
   ctx.authToken = async () => (session ? session : null);
   ctx.isCloisonne = async () => true;
-  return { ctx, j, clic: (tab) => clicHandler && clicHandler(tab), menu: (id) => menuClic && menuClic({ menuItemId: id }) };
+  return { ctx, j, clic: (tab) => clicHandler && clicHandler(tab), menu: (id, tab) => menuClic && menuClic({ menuItemId: id }, tab) };
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -109,14 +125,20 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   });
 
   // ── 4. 5.370 : AVEC LE MENU DU CLIC DROIT (Chrome, Edge, Firefox) ───────────
-  await essaie('5.370 : déconnecté, le clic ouvre VRM (connexion)', async () => {
+  await essaie('5.456 : déconnecté, le clic ouvre le panneau', async () => {
     const { j, clic } = faire({ session: null, menus: true });
     await wait(20);
     dit(!j.setPopup.includes('popup.html'), '5.370 : plus de fenêtre à l’icône, même déconnecté', 'setPopup=' + JSON.stringify(j.setPopup));
-    await clic({ url: 'https://www.vinted.fr/', windowId: 7 });
+    await clic({ id: 12, url: 'https://www.vinted.fr/items/1', windowId: 7, status: 'complete' });
     await wait(30);
     const vrm = [...j.crees, ...j.majOnglet].filter((u) => /vrm\.center/.test(u || ''));
-    dit(vrm.length === 1 && /lier-extension=x/.test(vrm[0]) && j.openPopup === 0, '5.370 : déconnecté ⇒ un onglet vrm.center pour se connecter (lier-extension), aucune fenêtre', vrm.join(','));
+    dit(j.messages.some((m) => m.id === 12 && m.action === 'panneauConnexion') && !j.crees.length && !j.majOnglet.length, '5.456 : déconnecté sur Vinted ⇒ le panneau s’ouvre DANS cet onglet (aucun rechargement, aucun onglet)', JSON.stringify({ m: j.messages, c: j.crees, u: j.majOnglet }));
+    dit(vrm.length === 0 && j.openPopup === 0, '5.456 : déconnecté ⇒ aucun onglet vrm.center, aucune fenêtre', JSON.stringify({ vrm, popup: j.openPopup }));
+    const k = faire({ session: null, menus: true });
+    await wait(20);
+    await k.clic({ id: 13, url: 'https://www.google.com/', windowId: 7, status: 'complete' });
+    await wait(30);
+    dit(k.j.crees.length === 1 && /^https:\/\/www\.vinted\.fr\/\?vrm=panneau$/.test(k.j.crees[0]) && k.j.openPopup === 0, '5.456 : hors d’un site ⇒ UN onglet vinted.fr sur le panneau, jamais vrm.center', JSON.stringify(k.j.crees));
   });
   await essaie('5.370 : l’onglet VRM de cette fenêtre', async () => {
     const s = { access_token: 'x', expires_at: Date.now() + 3600e3 };
@@ -136,7 +158,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     await wait(20);
     dit(j.menus.map((m) => m.id).join(',') === 'vrm-connexion,vrm-etat' && j.menus.every((m) => m.contexts.join() === 'action'), '5.370 : clic droit sur l’icône ⇒ « Connexion à VRM » et « État de l’extension »', JSON.stringify(j.menus));
     menu('vrm-connexion');
-    dit(j.crees.some((u) => /^chrome-extension:\/\/x\/popup\.html/.test(u)), '5.370 : le menu ouvre la fenêtre d’avant (connexion, état, réparation) dans un onglet', j.crees.join(','));
+    await wait(30);
+    dit(j.crees.length === 1 && /^https:\/\/www\.vinted\.fr\/\?vrm=panneau$/.test(j.crees[0]) && !j.crees.some((u) => /vrm\.center|popup\.html/.test(u)), '5.456 : « Connexion à VRM », déconnecté ⇒ le panneau (onglet vinted.fr), ni vrm.center ni la petite fenêtre', j.crees.join(','));
+    const e = faire({ session: null, menus: true });
+    await wait(20);
+    e.menu('vrm-etat');
+    dit(e.j.crees.some((u) => /^chrome-extension:\/\/x\/popup\.html\?mode=onglet&vue=etat/.test(u)), '5.370 : « État de l’extension » ouvre la fenêtre d’avant (état, réparation) dans un onglet', e.j.crees.join(','));
+    const s = { access_token: 'x', refresh_token: 'r', expires_at: Date.now() + 3600e3 };
+    const c = faire({ session: s, menus: true });
+    await wait(20);
+    c.menu('vrm-connexion');
+    await wait(30);
+    dit(c.j.crees.some((u) => /^chrome-extension:\/\/x\/popup\.html\?mode=onglet/.test(u)), '5.370 : connecté, « Connexion à VRM » ouvre la fenêtre d’avant (compte, se déconnecter) dans un onglet', c.j.crees.join(','));
   });
 
   console.log(`\n${ko ? '❌' : '✅'} icône : ${ok} vert${ok > 1 ? 's' : ''}, ${ko} rouge${ko > 1 ? 's' : ''}`);

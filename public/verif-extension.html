@@ -1,0 +1,17 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><title>Vérification · VRM</title>
+<!-- 5.456 (27 nov.) — LA VÉRIFICATION ANTI-ROBOT DE LA CONNEXION DE L'EXTENSION.
+     Supabase exige un jeton Turnstile pour le mot de passe et pour la demande de code (mesuré le 27 nov. : `captcha_failed`).
+     Une page d'extension ne peut pas charger le script de Cloudflare, et la clé de site ne vaut que sur vrm.center :
+     cette page est posée en petit cadre DANS le formulaire de l'extension (voir verif-extension.js). Elle ne lit ni ne
+     reçoit aucun e-mail, mot de passe ou code : elle rend seulement le jeton à usage unique à la page qui l'a posée. -->
+<style>
+:root{color-scheme:light dark}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden}
+body{font:13px/18px -apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;color:#555A62}
+@media (prefers-color-scheme:dark){body{color:#B0B4BB}}
+#w{min-height:65px;display:flex;align-items:center;justify-content:center}
+#msg{margin:4px 0 0;text-align:center}
+#msg:empty{display:none}
+</style></head><body><div id="w"></div><p id="msg" role="status" aria-live="polite"></p>
+<script src="/verif-extension.js"></script>
+</body></html>

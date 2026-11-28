@@ -9,6 +9,9 @@ const F = path.join(__dirname, '..', 'vinted-sync-extension', 'vrm-badge.js');
 const SRC = fs.readFileSync(F, 'utf8');
 const PERMIS = [
   /VRM-extension\.zip/, /VRM-Orion\.xpi/, /\?connexion/,                       // l'extension elle-même, la connexion
+  // (5.456) la vérification anti-robot de la CONNEXION (Turnstile, clé de vrm.center) : un cadre posé DANS le formulaire de
+  //   connexion — elle n'ouvre rien, n'est le lien d'aucun geste, ne reçoit que le jeton qu'elle rend.
+  /URL_VERIF = 'https:\/\/vrm\.center\/verif-extension\.html';/,
   /\?tab=annonces&site=vinted" target="_blank" rel="noopener" data-geste="vrm"/,  // VOIR la fiche dans VRM
   /\?tab=ventes&site=vinted&cible=vente&tx=/,                                      // VOIR la vente dans VRM
   /'https:\/\/vrm\.center\/' \+ \(e\.s ===/,                                       // VOIR une notification dans VRM

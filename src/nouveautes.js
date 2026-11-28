@@ -54,6 +54,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (27 nov. 23 h, ext. 5.456.0 — Julien : « le gros panneau directement […] avec les données floutées […] Et on se connecte ici ») docs/passation/2026-11-27-connexion-panneau.md
+  { id: 'connexion-panneau', date: '2026-11-27', titre: 'Extension : on se connecte dans le panneau', phrase: 'Panneau flouté, mot de passe et code qui marchent.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. 23 h, ext. 5.455.7) docs/passation/2026-11-27-favoris-panneau-uniques.md
   { id: 'favoris-envoyer-un', date: '2026-11-27', titre: 'Favoris : Envoyer sur chaque favori', phrase: 'Extension 5.455.7 : six états clairs, messages uniques.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. 22:42, ext. 5.455.6 — jujuf38 : « acheteur pas encore confirmé » ×5) docs/passation/2026-11-27-favoris-jujuf38.md
