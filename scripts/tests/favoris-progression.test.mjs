@@ -88,5 +88,8 @@ test('5.455.5 : le bail renouvelé tient l’autorisation et la tentative ; sans
  // borne absolue
  let h=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot4'}).data;h=reserverFile(h,{owner,maintenant:100000,jeton:'m1'}).data;
  for(let t=130000;t<100000+BAIL_MAX_MS;t+=60000)h=prolongerFile(h,{owner,jeton:'m1',maintenant:t}).data;
- assert.throws(()=>prolongerFile(h,{owner,jeton:'m1',maintenant:100000+BAIL_MAX_MS+1000}));
+ // 5.455.8 (revue 2) : au-delà de la borne, le renouvellement est REFUSÉ (la route rend 409) et ce refus est NOTÉ (la grâce en part).
+ const hr=prolongerFile(h,{owner,jeton:'m1',maintenant:100000+BAIL_MAX_MS+1000});
+ assert.equal(hr.valeur.prolonge,false);assert.equal(hr.data.enCours.refuseLe,100000+BAIL_MAX_MS+1000);assert.equal(hr.data.enCours.abandonne,true);
+ assert.equal(hr.data.groupes[owner].jobs[0].etat,'incertain');
 });
