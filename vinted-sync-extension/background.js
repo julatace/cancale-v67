@@ -36967,6 +36967,7 @@ ${lettre[1]}`;
   var AUTO_PAUSE_MS = 24 * 3600 * 1e3;
   var AUTO_FAVORI_MAX_MS = 72 * 3600 * 1e3;
   var AUTO_RECONTACT_MS = 30 * 24 * 3600 * 1e3;
+  var AUTO_ECART_MS = [3 * 6e4, 12 * 6e4];
   var entier = (v2, min, max, msg) => {
     const s = String(v2 ?? "").trim();
     if (!/^\d{1,5}$/.test(s) || Number(s) < min || Number(s) > max) throw Error(msg);

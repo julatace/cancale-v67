@@ -3,10 +3,10 @@
 //  5.455.8 — « JE VEUX UN VRAI AGENT AUTONOME QUI ENVOIE DES MESSAGES AUX FAVORIS » (Julien, 28 nov.)
 //  L'interrupteur par compte (« Envoyer automatiquement aux nouveaux favoris », éteint tant qu'IL ne l'allume pas) ; allumé,
 //  chaque NOUVEAU favori part seul par le MÊME chemin que son envoi à la main (conversation → offre jamais sous le plancher →
-//  message), dans les mêmes plafonds, la pause tirée au hasard (20–60 s), le compte de l'onglet seulement.
+//  message), dans les mêmes plafonds, l'écart protégé de l'agent (3 à 12 min au hasard, inchangé), le compte de l'onglet seulement.
 //  On EXÉCUTE la vraie route du serveur (`auto_regler`, `auto`, `suivant`, `terminer`) et le vrai background.js
 //  (`piloteFavorisTick`), l'horloge sautant au prochain tour que l'agent se donne :
-//   A1 3 nouveaux favoris ⇒ 3 envois (3 conversations, 3 offres à 49,50 €, 3 messages), espacés au hasard dans 20–60 s ;
+//   A1 3 nouveaux favoris ⇒ 3 envois (3 conversations, 3 offres à 49,50 €, 3 messages), espacés de 3 à 12 min au hasard ;
 //      le journal de l'agent (heure, personne, article, offre, message) et « N envoyés aujourd'hui » ;
 //   A2 les mêmes favoris revus ⇒ rien de plus (jamais deux fois) ;
 //   A3 son plafond de l'heure atteint (2/h) ⇒ le 3ᵉ ATTEND (rien ne part, l'heure de reprise posée) ;
@@ -18,7 +18,7 @@
 const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process');
 const RACINE = process.env.FAV_AGENT_RACINE ? path.resolve(process.env.FAV_AGENT_RACINE) : path.join(__dirname, '..');
 const MUTATIONS = {
-  'ecart-ancien': ['src/favorisAuto.js', 'export const AUTO_ECART_MS = [20000, 60000];', 'export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];'],
+  'ecart-20-60': ['src/favorisAuto.js', 'export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];', 'export const AUTO_ECART_MS = [20000, 60000];'],
   'sans-pause': ['vinted-sync-extension/background.js', "    if (st.pause && st.pause[uid]) return fin('pause_agent', { uid });", ''],
   'sans-captcha': ['vinted-sync-extension/background.js', "    if (av && av.stop) return fin(av.stop, { uid });     // captcha ('verification'), Tout arrêter, stockage : ARRÊT", ''],
   'sans-journal': ['vinted-sync-extension/background.js', "      st.journal[uid] = [{ at: maintenant,", "      st.journal[uid + 'x'] = [{ at: maintenant,"],
@@ -43,7 +43,6 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     const f = path.join(racine, M[0]), s = fs.readFileSync(f, 'utf8'); if (!s.includes(M[1])) { console.log('mutation introuvable : ' + argMut); process.exit(2); }
     fs.writeFileSync(f, s.split(M[1]).join(M[2]));
     // La copie de src/favorisAuto.js dans background.js (GARDES_APP) suit la source, comme le générateur.
-    if (/^src\//.test(M[0])) { const bg = path.join(racine, 'vinted-sync-extension', 'background.js'); const b = fs.readFileSync(bg, 'utf8'); fs.writeFileSync(bg, b.split('AUTO_ECART_MS = [2e4, 6e4]').join('AUTO_ECART_MS = [3 * 6e4, 12 * 6e4]')); }
     process.on('exit', () => { try { fs.rmSync(racine, { recursive: true, force: true }); } catch (_) {} });
   }
   const { monde } = require('./_favoris-monde-reel.cjs');
@@ -70,19 +69,20 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
   };
   const W = (m, re) => m.f.j.vinted.filter((v) => v.methode !== 'GET' && re.test(v.chemin)).map((v) => { try { return Object.assign({ at: v.at }, JSON.parse(v.corps)); } catch (_) { return { at: v.at }; } });
   try {
-    console.log('\nA1. Trois nouveaux favoris : trois envois, espacés au hasard (20–60 s)');
+    console.log('\nA1. Trois nouveaux favoris : trois envois, espacés au hasard (3 à 12 min, l’écart protégé)');
     const m = await nouveauMonde();
     const vus = await tours(m, 40, () => W(m, /replies$/).length >= 3);
     const dem = W(m, /inquiries$/), off = W(m, /\/offers$/), msg = W(m, /replies$/);
     const fs0 = m.fileServeur(), jobs = (fs0 && Object.values(fs0.groupes)[0].jobs) || [];
     const env = jobs.filter((j) => j.etat === 'envoye').sort((a, b) => a.envoyeLe - b.envoyeLe);
     const ecarts = env.slice(1).map((j, i) => j.envoyeLe - env[i].envoyeLe);
-    console.log(`     mesuré : ${dem.length} conversations · ${off.length} offres · ${msg.length} messages · écarts ${ecarts.map((x) => (x / 1000).toFixed(0) + ' s').join(', ')} · tours ${vus.join(',')}`);
+    console.log(`     mesuré : ${dem.length} conversations · ${off.length} offres · ${msg.length} messages · écarts ${ecarts.map((x) => (x / 60000).toFixed(1) + ' min').join(', ')} · tours ${vus.join(',')}`);
     dit(dem.length === 3 && new Set(dem.map((x) => String(x.receiver_id))).size === 3 && off.length === 3 && off.every((x) => x.offer && x.offer.price === '49.5') && msg.length === 3, 'A1 3 envois : 3 conversations (3 personnes), 3 offres à 49,50 €, 3 messages', JSON.stringify({ dem: dem.length, off: off.map((x) => x.offer && x.offer.price), msg: msg.length, vus }));
-    // La pause tirée par le serveur (20–60 s) est un MINIMUM : une garde de l'extension (discrétion, plafond) peut ajouter son attente.
-    const tirages = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => m.f.ctx.GARDES_APP && 0).length && (await import(path.join(racine, 'src', 'favorisAuto.js') + '?r=' + Math.random())).ecartAutoMs;
+    // L'écart PROTÉGÉ de l'agent (CLAUDE.md §3, défaut jamais changé sans lui) : 3 à 12 min tirés au hasard, un MINIMUM (une garde
+    //    de l'extension peut ajouter son attente) ; jamais la pause de 20–60 s de ses envois à la main.
+    const tirages = (await import(path.join(racine, 'src', 'favorisAuto.js') + '?r=' + Math.random())).ecartAutoMs;
     const ech = Array.from({ length: 40 }, (_, k) => tirages('jeton-' + k));
-    dit(ecarts.length === 2 && ecarts.every((x) => x >= 20000 && x < 180000) && ech.every((x) => x >= 20000 && x <= 60000) && new Set(ech).size > 30, 'A1 espacés : la pause tirée au hasard dans 20–60 s (au moins), jamais les 3 à 12 min d’avant', JSON.stringify({ ecarts, min: Math.min(...ech), max: Math.max(...ech) }));
+    dit(ecarts.length === 2 && ecarts.every((x) => x >= 3 * 60000) && ech.every((x) => x >= 3 * 60000 && x <= 12 * 60000) && new Set(ech).size > 30, 'A1 espacés par l’écart protégé de l’agent : 3 à 12 min au hasard (jamais 20–60 s)', JSON.stringify({ ecarts, min: Math.min(...ech), max: Math.max(...ech) }));
     const ag = await m.f.ctx.agentFavorisPour(m.UID);
     dit(ag && ag.actif === true && ag.envoyes === 3 && ag.journal.length === 3 && ag.journal.every((x) => x.etat === 'envoye' && x.px === 49.5 && /il te plaît toujours/.test(x.t || '') && m.ACH.includes(x.qui) && m.ITEMS.includes(x.item)), 'A1 « 3 envoyés aujourd’hui » et le journal : heure, personne, article, offre 49,50 €, message', JSON.stringify(ag && { a: ag.actif, n: ag.envoyes, j: ag.journal.map((x) => [x.etat, x.px, x.qui, x.item, (x.t || '').slice(0, 20)]) }).slice(0, 700));
     console.log('\nA2. Les mêmes favoris revus : rien de plus');
