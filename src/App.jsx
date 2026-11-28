@@ -25,6 +25,7 @@ import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
+import { poserSourcesSneakers } from './sneakers/stockage.js';   // (28 nov., lot sneakers-cote) les lectures de la feuille Sneakers, à la demande
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 // (25 nov.) `requeteConnexions` chargé À LA DEMANDE (src/connexions/connexions.js n'est plus dans le premier JS de chaque écran).
 import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir, lireUneCommande as lireUneCommandeAgir } from './aDistance.js';
@@ -1483,6 +1484,8 @@ import './natif/natif.css'; // (8 nov.) style de ./RelanceFavorisCarte.jsx, gard
 import './styles-vendre-plus.css'; // (8 nov.) style de ./RelanceFavorisCarte.jsx, gardé à sa place (son écran est chargé à la demande)   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CalculetteAchat (était importé en statique)   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 const CalculetteAchat = aLaDemandeFeuille(() => import('./CalculetteAchat.jsx'));
+// (28 nov., lot sneakers-cote) La feuille « Sneakers » (cote VRM, valeur du stock, entonnoir, étiquettes, en masse) : à la demande.
+const FeuilleSneakers = aLaDemandeFeuille(() => import('./sneakers/FeuilleSneakers.jsx'));
 // ⟦→ ecrans/Comptabilite.jsx #84⟧
 import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
 // (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
@@ -3745,6 +3748,8 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (28 nov., lot sneakers-cote) La référence fabricant, la pointure, la marque et les étiquettes de SES N° (src/sneakers/stockage.js) — SON geste seulement.
+  'vrm_sneakers',
   // (22 nov., choix n° 35) « Ce n'est pas un doublon » (Annonces · Photo en double) : { [ids du groupe]: at } — SON toucher, sur tous ses appareils (src/photoEnDouble.js).
   'vrm_photo_double_non',
   // (21 nov., lot rentabilite) Le forfait d'emballage qu'IL règle (éteint par défaut) : { actif, montant } — src/beneficePaire.js.
@@ -9866,7 +9871,18 @@ const montantRecuEbay = (o) => {
   if (d.currency !== 'EUR') return { eur: null, raison: 'devise ' + (d.currency || 'inconnue') };
   if (!f) return { eur: null, raison: 'frais eBay inconnus' };
   if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
-  return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
+  // (28 nov., ebay-livraison — §2.8) LE PORT N'ENTRE NULLE PART. En livraison gérée par eBay, si le dû au vendeur PORTE le port
+  // payé par l'acheteur (il est plus proche de « articles + port » que des articles seuls — `pricingSummary.priceSubtotal`,
+  // `deliveryCost` − `deliveryDiscount`, en euros), ce port est retiré : il paie l'étiquette, il n'est pas une recette. Les
+  // montants de la MÊME commande sont comparés, rien n'est deviné ; illisible ⇒ rien n'est retiré (le dû tel qu'avant).
+  const ps = o && o.pricingSummary, sous = lu(ps && ps.priceSubtotal), port = lu(ps && ps.deliveryCost), remise = lu(ps && ps.deliveryDiscount);
+  const dC = Math.round(Number(d.value) * 100);
+  let portC = 0;
+  if (sous && port && sous.currency === 'EUR' && port.currency === 'EUR') {
+    const pC = Math.max(0, Math.round(Number(port.value) * 100) - (remise && remise.currency === 'EUR' ? Math.abs(Math.round(Number(remise.value) * 100)) : 0)), sC = Math.round(Number(sous.value) * 100);
+    if (pC > 0 && Math.abs(dC - (sC + pC)) < Math.abs(dC - sC)) portC = pC;
+  }
+  return { eur: (dC - portC - Math.round(Number(f.value) * 100)) / 100, raison: '', ...(portC ? { portRetire: portC / 100 } : {}) };
 };
 // ⟦→ ecrans/Comptabilite.jsx #159⟧
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
@@ -32319,6 +32335,9 @@ function AppCoeur() {
   // (10 nov., lot L) LA CALCULETTE D'ACHAT : ouverte par Achats (`vrm:calculette`) ou ⌘K ; elle n'écrit rien.
   const [calcOuverte,setCalcOuverte]=useState(false);
   useEffect(()=>{const ouvrir=()=>setCalcOuverte(true);window.addEventListener('vrm:calculette',ouvrir);return()=>window.removeEventListener('vrm:calculette',ouvrir);},[]);
+  // (28 nov., lot sneakers-cote) « Sneakers » : `vrm:sneakers` (detail : la vue — valeur · entonnoir · tags · masse).
+  const [snkOuverte,setSnkOuverte]=useState(null);
+  useEffect(()=>{const ouvrir=(e)=>setSnkOuverte(e&&typeof e.detail==='string'&&e.detail?e.detail:'valeur');window.addEventListener('vrm:sneakers',ouvrir);return()=>window.removeEventListener('vrm:sneakers',ouvrir);},[]);
   const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
@@ -32814,6 +32833,51 @@ function AppCoeur() {
     const g = grouperPrixMarche(sold, online);
     setPqmData({ groups: g, valo: valoriserStock(g, online) });
   })(); /* eslint-disable-next-line */ },[tab,platSub]);
+  // ── (28 nov., lot sneakers-cote) LES SOURCES DE LA FEUILLE « SNEAKERS » ET DE LA COTE À L'ACHAT ──
+  // Posées une fois, LUES À LA DEMANDE (la feuille ouverte, la calculette qui cherche une référence) : SES ventes Vinted
+  // (prix LU, jamais 0 €, annulées écartées) et eBay (le prix de la ligne en euros), avec le N° de la vente PAR IDENTITÉ
+  // (l'annonce `item_id` → sa fiche ; le SKU `VRM-{n°}`) et la date de mise en ligne de SON annonce (le délai) ; ses
+  // annonces Vinted et eBay quand l'écran Annonces n'a pas publié ses articles (src/sneakers/stockage.js). Aucune clé,
+  // aucune lecture de StockX (décision de Julien du 28 nov.). `null` = pas su, jamais [].
+  const vaSnk=useRef(vintedAccounts); vaSnk.current=vintedAccounts;
+  useEffect(()=>{ poserSourcesSneakers({
+    ventes: async()=>{
+      const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+      const [so, dress, eb]=await Promise.all([sb('app_data?id=like.harvest_*_orders_sold&select=mo:data->payload->my_orders'), lireDressings(sb,{uids:uidsLies(vaSnk.current)}), lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders').catch(()=>null)]);
+      if(so===null) return null;
+      const fiches=load('vinted_annonce_numeros',{})||{}; const cree={};
+      for(const r of (dress||[])){ for(const it of ((r&&r.data&&r.data.payload&&r.data.payload.items)||[])){ if(!it||it.id==null) continue; const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts)?it.created_at_ts:(Number.isFinite(it.createdTs)?it.createdTs:null), id: it.id }, null); if(c!=null) cree[String(it.id)]=c; } }
+      const out=[]; const vus=new Set();
+      for(const r of so){ for(const o of (Array.isArray(r&&r.mo)?r.mo:[])){
+        const tx=String(o&&(o.transaction_id||o.id)||''); if(tx&&vus.has(tx)) continue; if(tx) vus.add(tx);
+        if(!o||classifyOrderStatus(o.status)==='cancelled') continue;
+        const eur=montantCommandeLu(o), t=tsCommande(o); if(eur==null||!t) continue;
+        const item=o.item_id!=null?String(o.item_id):''; const f=item?fiches[item]:null;
+        out.push({ site:'vinted', prix:eur, venduMs:t, misEnLigneMs:item?cree[item]??null:null, titre:o.title||'', taille:o.size||o.size_title||'', num:f&&f.numero!=null?String(f.numero):'', itemId:item }); } }
+      if(eb&&Array.isArray(eb.items)) for(const o of eb.items){
+        if(!o||(o.cancelStatus&&/CANCEL/i.test(String(o.cancelStatus.cancelState||'')))) continue;
+        const t=Date.parse(o.creationDate||''); if(!t) continue;
+        for(const li of (Array.isArray(o.lineItems)?o.lineItems:[])){ const m=li&&li.lineItemCost; if(!m||String(m.currency||'').toUpperCase()!=='EUR') continue;
+          const q=Number(li.quantity)||1; const v=Number(m.value); if(!Number.isFinite(v)||v<=0) continue;
+          const n=numDeSkuEbay(li.sku); out.push({ site:'ebay', prix:Math.round(v*100/q)/100, venduMs:t, titre:li.title||'', num:n?String(n):'' }); } }
+      return out;
+    },
+    annonces: async()=>{
+      const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+      const rows=await lireDressings(sb,{uids:uidsLies(vaSnk.current)}); if(!rows) return null;
+      const lst=(await lireLignesEnLigne(rows)).lignes; const fiches=load('vinted_annonce_numeros',{})||{}; const buy=load('vinted_buyprice_by_num',{})||{};
+      const out=[];
+      for(const r of lst){ const uid=(String(r&&r.id||'').match(/^harvest_(\d+)_listings$/)||[])[1]||''; for(const it of ((r.data&&r.data.payload&&r.data.payload.items)||[])){
+        if(!it||it.id==null||it.is_closed) continue; const f=fiches[String(it.id)]||null;
+        out.push({ cle:'vinted:'+it.id, site:'vinted', id:String(it.id), compte:uid, titre:it.title||'', prix:montantCommandeLu(it), devise:'EUR', num:f&&f.numero!=null?String(f.numero):'', mini:f&&f.min!=null?montantCommandeLu({price:f.min}):null, achat:prixAchatDe(f,buy),
+          vues:Number.isFinite(it.view_count)?it.view_count:null, favoris:Number.isFinite(it.favourite_count)?it.favourite_count:null, enLigne:!it.is_hidden&&!it.is_draft, taille:it.size_title||it.size||'' }); } }
+      const eb=await lireEbayTous('ebay_listings',SEL_EBAY_ANNONCES,'items').catch(()=>null);
+      if(eb&&Array.isArray(eb.items)) for(const x of eb.items){ if(!x||x.itemId==null) continue; const n=numEbayLu(x.sku,x.itemId,null,x.depuis);
+        out.push({ cle:'ebay:'+x.itemId, site:'ebay', id:String(x.itemId), compte:x._compte||'', titre:x.title||'', prix:x.price!=null?Number(x.price):null, devise:String(x.currency||'EUR').toUpperCase(), num:n?String(n):'', mini:null, achat:n&&buy[n]!=null?Number(String(buy[n]).replace(',','.')):null, vues:null, favoris:null, enLigne:true, taille:x.taille||'' }); }
+      return out;
+    },
+    ebay: (s,p)=>envoisPrix({ appelEbay:(c)=>appelEbay(c), resultatReviseEbay:(x)=>resultatReviseEbay(x), corpsCompteEbay:(c)=>corpsCompteEbay(c), vmrCmdSuivi:()=>null, deposer:async()=>null }).ebay(s,p),
+  }); return ()=>poserSourcesSneakers(null); },[]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
   // transaction le dit) — jamais déduite d'une transaction vue en liste. Lecture
@@ -36220,7 +36284,9 @@ function AppCoeur() {
             ouvrirNumero={(n)=>{ setRpOuvert(false); try{ window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)})); }catch(_){} }}
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
-        {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
+        {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)} load={load}/></GardeEcran>}
+        {snkOuverte && <GardeEcran nom="sneakers" feuille onFermer={()=>setSnkOuverte(null)}><FeuilleSneakers ouverte vue={snkOuverte} onFermer={()=>setSnkOuverte(null)} load={load} save={save}
+          confirmer={({n})=>askConfirm({ title: tr('snk.masse.appliquer',{n}), desc: tr('snk.masse.notePrix'), ok: tr('snk.masse.appliquer',{n}) })}/></GardeEcran>}
         {/* (16 nov., relier-fiable) « Reçu » de l'achat relié, ouvert depuis la fiche : au-dessus d'elle. */}
         {recuFicheVue && <FeuilleRecuAchat recu={recuFicheVue} z={Z_CONFIRMATION + 10} fermer={()=>setRecuFicheVue(null)}/>}
         {ficheNum && <FermeAuRetour fermer={()=>{ ficheDeLoupe.current=null; setFicheNum(null); }}/>}

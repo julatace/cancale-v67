@@ -23,6 +23,7 @@ import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_gains from './en/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './en/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './en/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
+import ecran_sneakers from './en/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './en/aDistance.js';
@@ -1566,6 +1567,13 @@ export default {
   "ebay.param.livraison": "Delivery",
   "ebay.param.livraison.aide": "You never pay postage: the buyer pays it to eBay.",
   "ebay.param.livraison.geree": "Managed by eBay",
+  "ebay.param.colis": "Parcel weight and size",
+  "ebay.param.colis.aide": "A medium parcel by default (1.2 kg): eBay works out the postage, paid by the buyer.",
+  "ebay.param.colis.mesures": "Weight (g) · length · width · height (cm)",
+  "ebay.param.colis.poids": "Weight in grams",
+  "ebay.param.colis.longueur": "Length in centimetres",
+  "ebay.param.colis.largeur": "Width in centimetres",
+  "ebay.param.colis.hauteur": "Height in centimetres",
   "ebay.param.delaiEnvoi": "Handling time",
   "ebay.param.delaiEnvoi.aide": "Business days between payment and drop-off.",
   "ebay.param.delai.jour": "Same day",
@@ -2485,4 +2493,5 @@ export default {
   ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
+  ...ecran_sneakers,
 };

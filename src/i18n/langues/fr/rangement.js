@@ -36,7 +36,7 @@ export default {
   "rgt.q.porte": "Quel meuble est le plus près de la porte ? Les nouveaux articles y seront proposés en premier : ils partent souvent vite.",
   "rgt.c.aucunPorte": "Aucun en particulier",
   "rgt.choix.meuble": "{nom} · {piece}",
-  "rgt.q.numero": "Comment numérotes-tu tes boîtes ?",
+  "rgt.q.numero": "Comment numérotes-tu tes articles ?",
   "rgt.c.numGarder": "Comme maintenant",
   "rgt.c.numVrm": "VRM numérote (1, 2, 3…)",
   "rgt.c.numLettre": "VRM, avec une lettre devant",
