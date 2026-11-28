@@ -38,5 +38,6 @@ export default {
   "envois.dejaParti.desc": "{raison}. Das Etikett trotzdem erneut drucken?",
   "envois.dejaParti.ok": "Trotzdem drucken",
   "envois.aConfirmer": "Zu bestätigen · Vinted auf {compte} seit {heures} h nicht neu gelesen",
+  "envois.aConfirmerCourt": "Zu bestätigen: Vinted nicht neu gelesen",
   "envois.aConfirmerGeste": "Öffne Vinted auf {compte}",
 };

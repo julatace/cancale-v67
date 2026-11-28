@@ -38,5 +38,6 @@ export default {
   "envois.dejaParti.desc": "{raison}. Imprimer encore son bordereau ?",
   "envois.dejaParti.ok": "Imprimer quand même",
   "envois.aConfirmer": "À confirmer · Vinted pas relu sur {compte} depuis {heures} h",
+  "envois.aConfirmerCourt": "À confirmer : Vinted pas relu",
   "envois.aConfirmerGeste": "Ouvre Vinted sur {compte}",
 };

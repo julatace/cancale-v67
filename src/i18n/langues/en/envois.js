@@ -38,5 +38,6 @@ export default {
   "envois.dejaParti.desc": "{raison}. Print its label again?",
   "envois.dejaParti.ok": "Print anyway",
   "envois.aConfirmer": "To confirm · Vinted not re-read on {compte} for {heures} h",
+  "envois.aConfirmerCourt": "To confirm: Vinted not re-read",
   "envois.aConfirmerGeste": "Open Vinted on {compte}",
 };

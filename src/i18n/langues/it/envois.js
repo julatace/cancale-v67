@@ -38,5 +38,6 @@ export default {
   "envois.dejaParti.desc": "{raison}. Stampare di nuovo la sua etichetta?",
   "envois.dejaParti.ok": "Stampa comunque",
   "envois.aConfirmer": "Da confermare · Vinted non riletto su {compte} da {heures} h",
+  "envois.aConfirmerCourt": "Da confermare: Vinted non riletto",
   "envois.aConfirmerGeste": "Apri Vinted su {compte}",
 };

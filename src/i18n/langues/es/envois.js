@@ -38,5 +38,6 @@ export default {
   "envois.dejaParti.desc": "{raison}. ¿Imprimir otra vez su etiqueta?",
   "envois.dejaParti.ok": "Imprimir de todos modos",
   "envois.aConfirmer": "Por confirmar · Vinted sin releer en {compte} desde hace {heures} h",
+  "envois.aConfirmerCourt": "Por confirmar: Vinted sin releer",
   "envois.aConfirmerGeste": "Abre Vinted en {compte}",
 };
