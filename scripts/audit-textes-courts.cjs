@@ -39,6 +39,8 @@ const LISTE = [
   'src/JournalEmails.jsx', 'src/ReceptionEmails.jsx', 'src/ebayGestion.jsx', 'src/Tournee.jsx',
   'src/JaugeActions.jsx', 'src/ModeEmballage.jsx', 'src/GuideIphone.jsx', 'src/ExpliqueMondialRelay.jsx',
   'src/ParcoursArrivee.jsx', 'src/parcoursArrivee.js',
+  // (27 nov., lot tout-va-bien) « Ce qui tourne » : une phrase courte par rangée, le détail sous « Pourquoi ? ».
+  'src/SondesToutVaBien.jsx', 'src/ToutVaBien.jsx',
 ];
 // Gardés exprès (dits dans docs/passation/2026-11-10-textes-courts-4.md).
 const EXCEPTIONS = [

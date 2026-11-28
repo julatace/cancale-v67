@@ -93,11 +93,14 @@ const prepare = (prefsJ, prefsK) => {
 
 // ── Les e-mails fabriqués (formes mesurées le 3 nov., valeurs inventées) ────
 let n = 0;
+// (28 nov.) L'e-mail est daté d'il y a une heure, comme la limite (dans 6 jours) : une date fixe
+// (3 nov.) éloignait la limite « 04/12 » de plus d'un mois de son e-mail, et B3 rougissait avec le calendrier.
+const T0_MAIL = Date.now() - 3600e3;
 const FROM_MR = 'Mondial Relay via Vinted <shipping_at_relay_vinted_com_banc@icloud.com> (shipping@relay.vinted.com.banc)';
 const FROM_MR_DIRECT = 'Mondial Relay - Service Client <noreply@mondialrelay.fr>';
 const FROM_VG = 'Vinted Go <no-reply_at_vinted_com_banc@icloud.com> (no-reply@vinted.com.banc)';
 const FROM_V = '"L\'équipe Vinted" <no-reply_at_vinted_fr_banc@icloud.com> (no-reply@vinted.fr.banc)';
-const mail = (from, subject, text, to = ADR) => ({ messageId: `<notif-${++n}@banc>`, from, to, subject, text, html: '', attachments: [], source: 'gmail-v2', sourceDate: new Date(Date.UTC(2026, 10, 3, 8, 0, n)).toISOString() });
+const mail = (from, subject, text, to = ADR) => ({ messageId: `<notif-${++n}@banc>`, from, to, subject, text, html: '', attachments: [], source: 'gmail-v2', sourceDate: new Date(T0_MAIL + n * 1000).toISOString() });
 // (15 nov.) La date limite du faux e-mail est TOUJOURS dans 6 jours (heure de Paris) : une date
 // fixe (« 12/11 ») devient passée avec le calendrier, et une limite passée n'est plus dite (« à
 // vérifier »), le contrôle B3 rougissait sur un code juste. Le texte attendu est refait par Intl,
@@ -206,7 +209,7 @@ const V_COMMANDE = (titre, phrase, conv) => mail(FROM_V, `Commande mise à jour 
     // Un « disponible » GARDÉ d'un e-mail précédent (rangé sans sonner : rejeu en lot)
     // n'est pas constaté par un « en route » arrivé ensuite : rien.
     prepare();
-    base.set(k(J, 'email_track_mondialrelay_84000077'), { type: 'suivi', carrier: 'mondialrelay', suivi: '84000077', status: 'available', statusLabel: 'Arrivé au point de retrait', code: '777111', lieu: 'TABAC DU QUAI, 12 RUE DES MOUETTES, 99990 PORTVILLE', subject: 'Votre colis 84000077 est disponible 📦', emailAt: '2026-11-03T09:00:00.000Z', receivedAt: '2026-11-03T09:00:00.000Z' });
+    base.set(k(J, 'email_track_mondialrelay_84000077'), { type: 'suivi', carrier: 'mondialrelay', suivi: '84000077', status: 'available', statusLabel: 'Arrivé au point de retrait', code: '777111', lieu: 'TABAC DU QUAI, 12 RUE DES MOUETTES, 99990 PORTVILLE', subject: 'Votre colis 84000077 est disponible 📦', emailAt: new Date(T0_MAIL + 3600e3).toISOString(), receivedAt: new Date(T0_MAIL + 3600e3).toISOString() });
     await recoit(MR_ROUTE('84000077'));
     dit(pushes.length === 0 && (base.get(k(J, 'email_track_mondialrelay_84000077')) || {}).status === 'available', 'C6 un « en route » après un « disponible » rangé : la ligne reste à retirer, mais rien ne sonne « t’attend » (l’e-mail ne le constate pas)', resume());
   });
