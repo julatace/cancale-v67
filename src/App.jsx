@@ -25,7 +25,7 @@ import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
 import { poserFaitsAgir, poserEnvoiAgir, poserReverifAgir } from './agir/porte.js';
-import { poserSourcesSneakers } from './sneakers/stockage.js';   // (28 nov., lot sneakers-cote) les lectures de la feuille Sneakers, à la demande
+import { poserSourcesSneakers } from './sneakers/sources.js';   // (28 nov., lot sneakers-cote) les lectures de la feuille Sneakers, à la demande (main-vert : le registre seul au démarrage)
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 // (25 nov.) `requeteConnexions` chargé À LA DEMANDE (src/connexions/connexions.js n'est plus dans le premier JS de chaque écran).
 import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir, lireUneCommande as lireUneCommandeAgir } from './aDistance.js';

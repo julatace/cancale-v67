@@ -24,7 +24,9 @@ const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().
 // l'écran ouvre alors CETTE conversation dans son propre fil, avec ses règles
 // d'envoi (extension, recette APPRISE, 50 actions/h) — ce module n'envoie rien.
 
-import { estQuestion, sansReponse } from './questionsEbay.js';   // (27 nov.) « à répondre » : la règle des questions eBay
+import { estQuestion, sansReponse } from './questionsEbay.js';
+import { avatarPersonne } from './messages/avatarPersonne.js';
+export { avatarPersonne };   // (27 nov.) « à répondre » : la règle des questions eBay
 
 export const CLE_FILS_RELIES = 'vrm_fils_relies';
 export const PLATEFORMES_FIL = ['vinted', 'leboncoin', 'vestiaire', 'ebay'];
@@ -70,16 +72,8 @@ const entree = (o) => ({
 // ({ texte, deMoi: true | false }, `extraitConversation` source « fil ») : il remplace l'aperçu de
 // la boîte (auteur pas su). Absent, ou auteur pas su ⇒ l'aperçu de la boîte, `deMoi: null` (jamais lu
 // par l'anti-arnaque, jamais compté).
-// (28 nov., messages-parfaits — Julien : « la photo de profil de la personne ») La PHOTO DE PROFIL de l'interlocuteur,
-// telle que Vinted la donne dans la boîte (`opposite_user.photo.url`, mesuré le 28 nov. : 2 253 sur 2 548 conversations
-// captées). L'image « pas de photo » de Vinted (`static.vinted.com/assets/no-photo/…`) n'est PAS une photo : rien ⇒ l'initiale.
-// Une adresse https seulement (jamais `data:`, jamais un autre schéma) ; c'est une image à montrer, jamais une identité.
-export function avatarPersonne(v) {
-  const u = txt(v && typeof v === 'object' ? v.url : v);
-  if (!/^https:\/\/[^\s"'<>]{8,600}$/.test(u)) return null;
-  if (/\/assets\/no-photo\//i.test(u) || /\/no[-_]?photo/i.test(u)) return null;
-  return u;
-}
+// (28 nov., messages-parfaits) La photo de profil : src/messages/avatarPersonne.js (léger : l'en-tête du fil, au démarrage,
+// n'emporte plus tout ce module ni les questions eBay — budget-vitesse, main-vert).
 export function convVinted(c, paire, compte, dernier) {
   if (!c || c.id == null) return null;
   const u = c.opposite_user || {};

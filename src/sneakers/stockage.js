@@ -50,13 +50,14 @@ export function poserFiches(x, nums, champs, maintenant = new Date().toISOString
 //   annonces() → [{ cle, site, id, compte, titre, prix, devise, num, mini, achat, vues, favoris, fermee, enLigne, taille }] · null
 //   ebay(s, euros) → { etat, raison }   (la route `revise`, src/prixPartout.js)
 //   file(geste)    → envoyerGeste (src/agir/porte.js)
-let sources = {};
-export function poserSourcesSneakers(s) { sources = s && typeof s === 'object' ? s : {}; }
-export const sourcesSneakers = () => sources;
+// (28 nov., main-vert) Le registre des lectures vit dans ./sources.js (léger, au démarrage) ; il est relu ici à chaque appel.
+import { poserSourcesSneakers, sourcesSneakers } from './sources.js';
+export { poserSourcesSneakers, sourcesSneakers };
 // Les ventes, mémorisées 10 min (une lecture pour toutes les fiches ouvertes de suite).
 let memoVentes = null;
 export async function ventesPourCote(maintenant = Date.now()) {
   if (memoVentes && maintenant - memoVentes.at < 600000) return memoVentes.v;
+  const sources = sourcesSneakers();
   if (typeof sources.ventes !== 'function') return null;
   let v = null; try { v = await sources.ventes(); } catch (_) { v = null; }
   if (Array.isArray(v)) memoVentes = { at: maintenant, v };
@@ -88,6 +89,7 @@ export function annoncesDesArticles(articles) {
 }
 export async function annoncesPourSneakers() {
   if (articlesPublies && Date.now() - articlesPublies.at < 30 * 60000) return annoncesDesArticles(articlesPublies.articles);
+  const sources = sourcesSneakers();
   if (typeof sources.annonces !== 'function') return null;
   try { const a = await sources.annonces(); return Array.isArray(a) ? a : null; } catch (_) { return null; }
 }

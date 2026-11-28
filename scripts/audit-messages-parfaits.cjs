@@ -21,7 +21,8 @@ const MUTATIONS = {
   'statut : compte non relié dit « ok »': ['messages/statutExtension.js', 'if (!Object.prototype.hasOwnProperty.call(comptes || {}, uid))', 'if (false)'],
   'contre : sous le plancher sans le dire': ['messages/contreOffre.js', 'if (c < p) return', 'if (false) return'],
   'contre : à ou sous l\'offre permis': ['messages/contreOffre.js', 'if (o != null && c <= o)', 'if (false)'],
-  'avatar : « pas de photo » gardée': ['filUnique.js', "if (/\\/assets\\/no-photo\\//i.test(u) || /\\/no[-_]?photo/i.test(u)) return null;", ''],
+  'avatar : « pas de photo » gardée': ['messages/avatarPersonne.js',   // (28 nov., main-vert) la règle a déménagé de filUnique.js (même texte)
+    "if (/\\/assets\\/no-photo\\//i.test(u) || /\\/no[-_]?photo/i.test(u)) return null;", ''],
 };
 
 async function charger(mut) {
@@ -32,7 +33,7 @@ async function charger(mut) {
   };
   // Une copie de src/ (les seuls fichiers lus) dans un dossier temporaire, la règle affaiblie.
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-mparf-'));
-  for (const f of ['messages/statutExtension.js', 'messages/contreOffre.js', 'filUnique.js', 'questionsEbay.js', 'extension/peutFaire.js']) {
+  for (const f of ['messages/statutExtension.js', 'messages/contreOffre.js', 'messages/avatarPersonne.js', 'filUnique.js', 'questionsEbay.js', 'extension/peutFaire.js']) {
     const d = path.join(dir, f); fs.mkdirSync(path.dirname(d), { recursive: true });
     let t = fs.readFileSync(path.join(SRC, f), 'utf8');
     if (f === mut[0]) { if (!t.includes(mut[1])) throw new Error('mutation introuvable : ' + mut[1]); t = t.replace(mut[1], mut[2]); }

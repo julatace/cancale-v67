@@ -3,7 +3,7 @@
 import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
-import { avatarPersonne } from '../filUnique.js';   // (28 nov., messages-parfaits) la photo de profil de l'en-tête du fil (jamais la photo de l'article)
+import { avatarPersonne } from '../messages/avatarPersonne.js';   // (28 nov., messages-parfaits) la photo de profil de l'en-tête du fil (jamais la photo de l'article)
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
 import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
