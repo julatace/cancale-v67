@@ -38,6 +38,7 @@
 // Module PUR : aucune lecture, aucune écriture, aucune langue. Exécuté par scripts/audit-essoufflement.cjs.
 // ═══════════════════════════════════════════════════════════════════════════
 import { jourCourbe } from './courbeAnnonce.js';
+import { jourParis } from './dateParis.js';
 
 export const ESS = Object.freeze({ jours: 4, vuesMax: 1, favorisMax: 0, fraicheur: 1, gainJours: 3 });
 export const CLE_NOTIF_ESS = 'vrm_essouffle';          // ce que l'écran publie pour la notification (ligne du vendeur)
@@ -147,7 +148,5 @@ export function notificationEssouffle(n) {
   if (!Number.isInteger(k) || k < 1) return null;
   return { title: k > 1 ? `${k} annonces s’essoufflent` : '1 annonce s’essouffle', body: 'Elles remontent en tête de « À republier ». C’est toi qui lances.', tag: 'vrm-essouffle', url: '/?tab=annonces&vue=arepublier' };
 }
-// Le jour de Paris (AAAA-MM-JJ) : la borne « une par jour ».
-export function jourParis(t = Date.now()) {
-  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); }
-}
+// Le jour de Paris (AAAA-MM-JJ) : la borne « une par jour » — LA règle de src/dateParis.js.
+export { jourParis };
