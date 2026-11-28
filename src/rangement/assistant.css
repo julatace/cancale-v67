@@ -1,0 +1,55 @@
+/* L'assistant de rangement (28 nov., lot agent-rangement) — jetons « VRM natif » (--n-*) seulement, clair et sombre par
+   les jetons (aucune couleur en dur hors des repères). Une bulle de l'assistant à gauche (carte), la sienne à droite
+   (teinte d'accent) ; les réponses en boutons de 44 px ; le plan dessiné par MeubleDessin (src/stockV2/meubles.css). */
+.rgt-feuille { --rgt-gap: 12px; }
+.rgt-moteur { display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 0 0 12px; border-radius: var(--n-r-carte, 12px);
+  background: var(--n-carte-2); color: var(--n-encre-2); font-size: 13px; line-height: 1.35; }
+.rgt-moteur-texte { flex: 1; min-width: 0; }
+.rgt-moteur-pastille { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--n-carte); color: var(--n-encre-2); flex: none; }
+.rgt-moteur-pastille[data-ia] { background: var(--n-teinte); color: var(--n-accent); }
+.rgt-moteur .n-bouton, .rgt-moteur button { min-height: 44px; }
+
+.rgt-fil { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rgt-bulle { max-width: 86%; align-self: flex-start; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: var(--n-carte-2);
+  color: var(--n-texte, var(--n-encre)); font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 6px; }
+.rgt-bulle.is-moi { align-self: flex-end; border-radius: 18px 18px 6px 18px; background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-encre)); }
+.rgt-bulle.is-note { background: transparent; border: 1px solid var(--n-bord); color: var(--n-encre-2); font-size: 14px; }
+.rgt-bulle-photo { width: 160px; max-width: 100%; height: auto; border-radius: 10px; display: block; }
+.rgt-points { display: inline-flex; gap: 4px; padding: 4px 0; }
+.rgt-points i { width: 7px; height: 7px; border-radius: 50%; background: var(--n-encre-3); animation: rgt-point 1s infinite ease-in-out; }
+.rgt-points i:nth-child(2) { animation-delay: .15s; } .rgt-points i:nth-child(3) { animation-delay: .3s; }
+@keyframes rgt-point { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rgt-points i { animation: none; opacity: .7; } }
+
+.rgt-reponses { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.rgt-choix { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.rgt-choix-b { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--n-bord); background: var(--n-carte);
+  color: var(--n-encre); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; max-width: 100%; text-align: center; }
+.rgt-choix-b:active { background: var(--n-appui); }
+.rgt-choix-b:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.rgt-saisie { display: flex; align-items: center; gap: 6px; }
+.rgt-saisie-champ { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--n-bord);
+  background: var(--n-carte); color: var(--n-encre); font: inherit; font-size: 16px; }
+.rgt-saisie-champ::placeholder { color: var(--n-encre-2); }
+.rgt-note { margin: 6px 4px 0; font-size: 13px; color: var(--n-encre-2); line-height: 1.4; }
+.rgt-alerte { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--n-ambre-fond); border: 1px solid var(--n-ambre-bord);
+  color: var(--n-encre); font-size: 14px; font-weight: 600; line-height: 1.4; }
+
+.rgt-cle { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.rgt-cle-champ { display: flex; flex-direction: column; gap: 4px; }
+.rgt-cle-libelle { font-size: 13px; color: var(--n-encre-2); }
+.rgt-cle-champ input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--n-bord); background: var(--n-carte-2);
+  color: var(--n-encre); font: inherit; font-size: 16px; }
+
+.rgt-apercu { margin-top: 18px; display: flex; flex-direction: column; gap: 4px; }
+.rgt-resume { margin: 0 4px 6px; font-size: 15px; font-weight: 600; color: var(--n-encre); }
+.rgt-meubles { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 12px; }
+@media (min-width: 1024px) { .rgt-meubles { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+.rgt-meuble { margin: 0; min-width: 0; }
+.rgt-meuble-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.rgt-meuble-nom { font-weight: 600; font-size: 15px; color: var(--n-encre); display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rgt-meuble-n { font-size: 13px; color: var(--n-encre-2); }
+.rgt-porte { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--n-vert-fond); color: var(--n-vert); border: 1px solid var(--n-vert-bord); }
+.rgt-meuble .sm-meuble { max-width: 100%; }
+.rgt-gestes { display: flex; justify-content: center; margin-top: 6px; }
