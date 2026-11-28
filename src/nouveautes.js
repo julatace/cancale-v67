@@ -56,6 +56,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ventes-compte-telephone', date: '2026-11-27', titre: 'Ventes : « Toutes », et filtre par compte', phrase: '« Toutes » liste chaque vente ; un compte au choix, retenu.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'annulations-compte-alerte', date: '2026-11-27', titre: 'Un compte annule plus : VRM le dit', phrase: 'Dans Statistiques, au-dessus des taux d’annulation par compte.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (27 nov. 23 h, ext. 5.455.7) docs/passation/2026-11-27-favoris-panneau-uniques.md
+  { id: 'favoris-envoyer-un', date: '2026-11-27', titre: 'Favoris : Envoyer sur chaque favori', phrase: 'Extension 5.455.7 : six états clairs, messages uniques.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (27 nov. 22:42, ext. 5.455.6 — jujuf38 : « acheteur pas encore confirmé » ×5) docs/passation/2026-11-27-favoris-jujuf38.md
+  { id: 'favoris-acheteur-lu', date: '2026-11-27', titre: 'Favoris : chaque acheteur reconnu', phrase: 'Extension 5.455.6 : plus d’« acheteur pas confirmé ».', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. nuit, ext. 5.455.5) docs/passation/2026-11-27-favoris-suite.md
   { id: 'favoris-bail', date: '2026-11-27', titre: 'Favoris : un envoi long tient', phrase: 'Extension 5.455.5 : jamais « à vérifier » à tort.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. 18:42, ext. 5.455.4 — Julien : « autre article dans la conversation », « le chronomètre ne marche pas ») docs/passation/2026-11-27-favoris-tous-les-cas.md

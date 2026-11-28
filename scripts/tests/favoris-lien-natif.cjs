@@ -119,9 +119,9 @@ async function serveur(){
  const nav=(item,off,rec=off,p='/inbox/want_it')=>({uid:'111',method:'NAV',path:p,itemId:String(item),recipientId:String(rec),contexteFavori:`https://www.vinted.fr/items/${item}/want_it/new?offering_id=${off}`});
  const essai=(selection,lectures)=>{try{return resoudreCiblesFavoris({uid:'111',capture,trace,selection,lectures});}catch(e){return {refus:e.message,code:e.code};}};
  let r=essai(['n1'],[nav(101,201)]);ok(Array.isArray(r)&&r[0].recipientId==='201','serveur : la preuve de navigation confirme ce favori');
- r=essai(['n1'],[nav(101,201,999)]);ok(!Array.isArray(r),'serveur : un destinataire différent du lien enregistré est refusé');
- r=essai(['n1'],[nav(101,201,201,'/settings/x')]);ok(!Array.isArray(r),'serveur : une destination sans rapport est refusée');
- r=essai(['n2'],[nav(101,201)]);ok(!Array.isArray(r),'serveur : une seule preuve ne vaut pas pour un autre favori');
+ r=essai(['n1'],[nav(101,201,999)]);ok(Array.isArray(r)&&r[0].recipientId==='201','serveur : une navigation vers un autre destinataire ne compte pas — 5.455.6 : la personne du LIEN (offering_id), jamais 999');
+ r=essai(['n1'],[nav(101,201,201,'/settings/x')]);ok(Array.isArray(r)&&r[0].recipientId==='201','serveur : une destination sans rapport ne prouve rien — 5.455.6 : le lien se prouve seul (offering_id)');
+ r=essai(['n2'],[nav(101,201)]);ok(Array.isArray(r)&&r[0].recipientId==='202','serveur : la preuve d’un favori ne désigne pas un autre — 5.455.6 : n2 se prouve par SON lien (202)');
  r=essai(['n3'],[nav(101,201),nav(102,202)]);ok(Array.isArray(r)&&r[0].recipientId==='203','serveur : deux destinataires natifs distincts établissent le paramètre');
  r=essai(['n1'],[nav(101,201),{uid:'111',method:'GET',path:'/api/v2/conversations/55',conversationId:'55',itemId:'101',recipientId:'999',contexteFavori:'https://www.vinted.fr'+STOCKE}]);
  ok(!Array.isArray(r),'serveur : deux preuves contradictoires bloquent le favori');

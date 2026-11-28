@@ -181,7 +181,9 @@ async function scenarios() {
       const j = t.body.vue?.auto?.journal || [];
       dit(t.body.ajoute === false && j.some((x) => x.raison === raison), `paire ${nom} : aucun message, et le journal dit pourquoi (${raison})`, JSON.stringify(t.body).slice(0, 220));
     }
-    // 4. Garde absente / incomplète / périmée ; dressing ancien ; boîte ancienne : RIEN.
+    // 4. 5.455.6 (Julien, 27 nov. 22:50 : « comme Vintex », plus aucun blocage sur une donnée ancienne) : garde absente / incomplète /
+    //    périmée, dressing ancien ou partiel ⇒ le favori PART QUAND MÊME (l'extension relit l'annonce et la conversation à l'envoi) ;
+    //    une paire PROUVÉE vendue / réservée / en pause / vendue ailleurs reste écartée (cas 3, plus haut).
     for (const [nom, opts, etat] of [
       ['garde absente', { garde: null }, 'garde_absente'],
       ['garde incomplète', { garde: { v: 1, at: T0, items: [], complet: false, manques: ['eBay'], ambigus: 0 } }, 'garde_absente'],
@@ -190,16 +192,23 @@ async function scenarios() {
       horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
       monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]], ...opts });
       const t = await call('auto');
-      dit(t.body.ajoute === false && t.body.etat === etat, `${nom} : rien ne part (« pas su » ≠ « oui »)`, JSON.stringify(t.body).slice(0, 160));
+      dit(t.body.ajoute === true, `${nom} : n’arrête plus le mode auto, le favori part (5.455.6)`, JSON.stringify(t.body).slice(0, 160));
     }
     { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
       monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
       b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - 30 * H).toISOString(), payload: { pagination: { total_entries: 1 }, items: [{ id: 101 }] } });
       const t = await call('auto');
-      dit(t.body.ajoute === false && t.body.etat === 'dressing_ancien', 'dressing lu il y a plus de 24 h : rien ne part', JSON.stringify(t.body).slice(0, 160));
-      b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - H).toISOString(), payload: { pagination: { total_entries: 9 }, items: [{ id: 101 }] } });
+      dit(t.body.ajoute === true, 'dressing lu il y a plus de 24 h : le favori part quand même (5.455.6)', JSON.stringify(t.body).slice(0, 160)); }
+    { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
+      monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
+      b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - H).toISOString(), payload: { pagination: { total_entries: 9 }, items: [{ id: 999 }] } });
       const t2 = await call('auto');
-      dit(t2.body.ajoute === false && t2.body.etat === 'dressing_partiel', 'dressing partiel : rien ne part', JSON.stringify(t2.body).slice(0, 160)); }
+      dit(t2.body.ajoute === true, 'dressing partiel (l’annonce absente de la partie lue : pas su) : le favori part quand même (5.455.6)', JSON.stringify(t2.body).slice(0, 160));
+      horloge = T0; const n2 = neuf(); await allumer(n2.call); horloge = T0 + 2 * H;
+      monde(n2.b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
+      n2.b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - 30 * H).toISOString(), payload: { pagination: { total_entries: 1 }, items: [{ id: 101, is_reserved: true }] } });
+      const t3 = await n2.call('auto');
+      dit(t3.body.ajoute === false, 'dressing ancien qui dit RÉSERVÉE : toujours écartée (une preuve, même ancienne)', JSON.stringify(t3.body).slice(0, 160)); }
     // 5. Conversation existante avec cette personne (n'importe quel article) : jamais.
     { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
       monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]], boite: [{ id: 55, opposite_user: { id: 201 } }] });
@@ -323,9 +332,7 @@ async function scenarios() {
       monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
       b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(horloge - 30 * H).toISOString(), payload: { pagination: { total_entries: 1 }, items: [{ id: 101 }] } });
       const t = await call('auto', { extension: { disponible: true } });
-      dit(t.body.vue?.auto?.demande?.code === 'dressing_ancien' || t.body.nouvelleDemande === 'dressing_ancien', 'dressing ancien : VRM demande de rouvrir le dressing', JSON.stringify(t.body).slice(0, 200));
-      const v = await call();
-      dit(v.body.vue?.auto?.demande?.code === 'dressing_ancien', "la demande est gardée côté serveur (l'écran la lit)", JSON.stringify(v.body.vue?.auto?.demande)); }
+      dit(t.body.ajoute === true && t.body.vue?.auto?.demande?.code !== 'dressing_ancien', 'dressing ancien : plus de demande qui arrête tout, le favori part (5.455.6)', JSON.stringify(t.body).slice(0, 200)); }
     { horloge = T0; const { b, call } = neuf(); await allumer(call); horloge = T0 + 2 * H;
       monde(b, { maintenant: horloge, favoris: [['n9', 'pas-un-id', 109, 61 * MIN]] });
       const t = await call('auto', { extension: { disponible: true } });
@@ -394,8 +401,7 @@ const MUTATIONS = [
   ['api/_lib/favoris-auto.js', "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>j.id===id&&", "return Object.values(d?.groupes||{}).some(g=>(g.jobs||[]).some(j=>false&&", 'un message par couple oublié (partout)'],
   ['api/_lib/favoris-auto.js', "if(quand>maintenant){", "if(false){", 'attente après le favori retirée'],
   ['api/_lib/favoris.js', "if(dansBoite.length||fil.length){sauts.push({...pr,raison:'conversation_existante'});continue;}", '', 'conversation existante ignorée'],
-  ['api/_lib/favoris.js', "if(gTout&&gTout!=='vendue-ailleurs')return await stop('garde_absente');", '', 'garde absente acceptée'],
-  ['api/_lib/favoris.js', "const ed=etatDressingAuto(dr,maintenant);if(ed)return await stop(ed);", '', 'dressing non vérifié'],
+  ['api/_lib/favoris.js', "const ea=ea0==='annonce_absente'&&!drSur?null:ea0;", "const ea=null;", 'paire prouvée vendue/réservée envoyée quand même'],
   ['src/favorisAuto.js', "if (it.is_reserved) return 'reservee';", '', 'paire réservée acceptée'],
   ['api/_lib/favoris-file.js', "if(AUTO_FREINS.includes(raison)){", "if(false){", 'frein de Vinted sans pause'],
   ['src/favorisAuto.js', "export const AUTO_ESSAIS = 2;", "export const AUTO_ESSAIS = 99;", 'boucle : essais illimités'],

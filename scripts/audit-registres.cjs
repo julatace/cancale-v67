@@ -61,7 +61,7 @@ const muter = (quoi, avant, apres) => {
 };
 // Date de VENTE au lieu du versement (la règle d'avant le 3 octobre).
 if (MUT === 'versement') muter('app', "const t = v ? Date.parse(v) : 0;\n    if (eur == null)", "const t = Date.parse(o.date || '') || 0;\n    if (eur == null)");
-else if (MUT === 'exclu') muter('app', "masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {} });\n  // (1er nov., audits A2/A10)", "masquee: (o) => hTx.has(String(o && o.transaction_id)), excluAutre, versements: versements || {} });\n  // (1er nov., audits A2/A10)");
+else if (MUT === 'exclu') muter('app', "masquee: (o) => hTx.has(String(o && o.transaction_id)), exclu: (o) => ecarte(uidDe(o)), excluAutre, versements: versements || {}, importees, main, declare });\n  // (1er nov., audits A2/A10)", "masquee: (o) => hTx.has(String(o && o.transaction_id)), excluAutre, versements: versements || {}, importees, main, declare });\n  // (1er nov., audits A2/A10)");   // (27 nov., bancs-compta) l'appel porte aussi importees, main, declare depuis le 11 nov.
 else if (MUT === 'adater') muter('mod', "if (a) horsPeriode.push({ ...ligne({ ...a, ts: null }, Number(a.eur), 'à dater'), date: '' });", "if (a) lignes.push(ligne({ ...a, ts: null }, Number(a.eur), 'à dater'));");
 else if (MUT === 'zero') muter('mod', "if (dansPeriode(ymLocal(x.ts), periode)) lignes.push(ligne(x, null, x.raison || 'montant pas lu'));", "if (dansPeriode(ymLocal(x.ts), periode)) lignes.push(ligne(x, 0, ''));");
 else if (MUT === 'complet') muter('mod', "complet: !sansMontant && !manques.length };", "complet: true };");
