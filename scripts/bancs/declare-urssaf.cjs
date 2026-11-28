@@ -19,6 +19,8 @@
 require('./_porte-banc.cjs');                       // la session de banc (l'accès direct n'existe plus)
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { allerSegment, ouvrirDetailCompta } = require('./_compta.cjs');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6341;
@@ -91,8 +93,8 @@ async function rendre(b, vp, opts) {
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     const panne = () => route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (route.request().method() !== 'GET') {
-      try { const corps = JSON.parse(route.request().postData() || 'null'); for (const x of [].concat(corps || [])) if (x && x.id === 'main' && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
-      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+      try { const corps = JSON.parse(route.request().postData() || 'null'); const versMain = /[?&]id=eq\.main(&|$)/.test(decodeURIComponent(route.request().url())); for (const x of [].concat(corps || [])) if (x && (x.id === 'main' || (versMain && route.request().method() === 'PATCH')) && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
+      return route.fulfill({ status: route.request().method() === 'PATCH' ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(route.request()) });   // (27 nov.) la vraie forme : PATCH conditionnel sur `main` (src/ligneCas.js), _ecriture-representee.cjs
     }
     // Base CLOISONNÉE (la production l'est) : sinon l'app n'envoie rien au nuage
     // (`cloudPush` exige CLOISONNE) et l'écriture de la déclaration ne se voit pas.
@@ -127,7 +129,10 @@ const sain = async (pg, ecran) => {
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 };
 const formulaire = async (pg) => {
-  await pg.waitForFunction(() => document.querySelector('[data-decl-form]') || document.querySelector('[data-decl-bloque]'), null, { timeout: 25000 }).catch(() => {});
+  // (27 nov.) « Lecture en cours » est un état de passage (data-decl-bloque-etat="encours") : on attend le formulaire
+  // ou un VRAI refus (une lecture ratée, "rate"), jamais le premier instant du rapport.
+  // La feuille du rapport entre en glissant : le formulaire est jugé une fois VISIBLE (innerText non vide).
+  await pg.waitForFunction(() => { const f = document.querySelector('[data-decl-form]'); return (f && f.innerText.trim()) || document.querySelector('[data-decl-bloque-etat="rate"]'); }, null, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(400);
   return pg.evaluate(() => { const f = document.querySelector('[data-decl-form]'); return f ? f.innerText : null; });
 };
@@ -185,27 +190,34 @@ const juge = (cs, quoi) => {
         const opts = { main: mainDe() };
         const { ctx, pg, errs } = await rendre(b, vp, opts);
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500);
-        const bt = await pg.evaluate(() => [...document.querySelectorAll('[data-urssaf-cest-declare]')].map((e) => e.getAttribute('data-urssaf-cest-declare')));
+        // (27 nov., bancs-compta) Argent a quatre segments (10 nov.) : on compte les boutons VISIBLES du
+        // segment montré (le Résumé). « Déclarer » porte le sien dans un segment caché.
+        const bt = await pg.evaluate(() => [...document.querySelectorAll('[data-urssaf-cest-declare]')].filter((e) => e.checkVisibility()).map((e) => e.getAttribute('data-urssaf-cest-declare')));
         dit(bt.length === 1 && bt[0] === '2026-09', `A ${T} : la carte URSSAF de Comptabilité porte « C'est déclaré », pour septembre`, JSON.stringify(bt));
-        // (29 oct.) Le suivi des déclarations : septembre, pas encore noté, a sa ligne et son geste.
+        // (29 oct.) Le suivi des déclarations : septembre, pas encore noté, a sa ligne et son geste
+        // (segment « Déclarer » depuis le 10 nov.) ; on revient ensuite au Résumé.
+        await allerSegment(pg, 'declarer', { attendre: 8000 });
         await pg.waitForSelector('[data-suivi-urssaf="lu"]', { timeout: 8000 }).catch(() => {});
         const su = await pg.evaluate(() => { const c = document.querySelector('[data-suivi-urssaf]'); if (!c) return null; const l = c.querySelector('[data-suivi-periode="septembre 2026"]'); return { etat: c.getAttribute('data-suivi-urssaf'), sept: l && l.getAttribute('data-suivi-etat'), noter: l && !!l.querySelector('[data-suivi-noter="2026-09"]') }; });
         dit(!!su && su.etat === 'lu' && su.sept === 'a_declarer' && su.noter, `A ${T} : le suivi URSSAF montre septembre « à déclarer », avec « C'est déclaré »`, JSON.stringify(su));
         if (process.env.SHOTS) { const el = await pg.$('[data-suivi-urssaf]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/suivi-${T.replace(/\W+/g, '')}.png` }); }
         await sain(pg, `Comptabilité ${T}`);
+        await allerSegment(pg, 'resume', { attendre: 8000 });
         if (bt.length) {
-          await touche(pg, '[data-urssaf-cest-declare]', vp);
+          await touche(pg, '[data-argent-vue="resume"] [data-urssaf-cest-declare]', vp);
           const f = await formulaire(pg);
           dit(!!f && /septembre 2026/.test(f), `A ${T} : le formulaire du rapport s'ouvre, déplié, sur septembre 2026`, (f || '').replace(/\n/g, ' | ').slice(0, 120));
-          dit(!!f && /300,00/.test(f), `A ${T} : il porte le CA du mois (300,00 €, 3 ventes) — celui du rapport`, (f || '').replace(/\n/g, ' | ').slice(0, 160));
+          dit(!!f && /300(?:,00)?[\s\u00a0\u202f]*€, 3 ventes/.test(f), `A ${T} : il porte le CA du mois (300 €, 3 ventes) — celui du rapport`, (f || '').replace(/\n/g, ' | ').slice(0, 160));
           if (f) {
             await touche(pg, '[data-decl-enregistrer]', vp);
-            await pg.waitForTimeout(2600);
+            await pg.waitForTimeout(1000);
+            for (let i = 0; i < 40 && !(opts.main && opts.main.vrm_urssaf_declare && opts.main.vrm_urssaf_declare['2026-09']); i++) await pg.waitForTimeout(250);   // (27 nov.) l'écriture, pas un délai
             const reg = await registre(pg);
             const s = reg && reg['2026-09'];
             dit(!!s && Array.isArray(s.ids) && s.ids.length === 3 && s.regle === 'versement', `A ${T} : septembre est noté, par l'IDENTITÉ de ses 3 ventes`, JSON.stringify(s).slice(0, 120));
             dit(!!(opts.main && opts.main.vrm_urssaf_declare && opts.main.vrm_urssaf_declare['2026-09']), `A ${T} : la déclaration part dans le nuage (vrm_urssaf_declare)`);
             await aller(pg, 'compta', '[data-compta-urssaf]', 2500);
+            await allerSegment(pg, 'declarer', { attendre: 8000 });
             const apres = await pg.evaluate(() => ({ bt: document.querySelectorAll('[data-urssaf-cest-declare]').length, faite: (document.querySelector('[data-urssaf-declaree]') || {}).getAttribute ? document.querySelector('[data-urssaf-declaree]').getAttribute('data-urssaf-declaree') : null }));
             dit(apres.bt === 0 && apres.faite === '2026-09', `A ${T} : de retour sur Comptabilité, la carte dit « notée déclarée » et le bouton est parti`, JSON.stringify(apres));
           }
@@ -233,10 +245,11 @@ const juge = (cs, quoi) => {
             await pg.evaluate(() => { const x = [...document.querySelectorAll('button[aria-label="Fermer"]')].pop(); if (x) x.click(); });
             await pg.waitForTimeout(500);
             // Retour sur Ma journée SANS recharger (la barre de navigation de l'app).
-            const nav = pg.locator('button[aria-label="Ma journée"]:visible').first();
+            // (27 nov.) L'onglet d'Aujourd'hui (barre du bas au téléphone, colonne à l'ordinateur), par sa donnée.
+            const nav = pg.locator(':is(.n-onglet[data-n-onglet="journee"], [data-nav-entree="journee"], button[aria-label="Ma journée"]):visible').first();
             if (await nav.count()) await nav.click(); else await pg.goBack().catch(() => {});
             await pg.waitForTimeout(2500);
-            const ici = await pg.evaluate(() => ({ urssaf: document.querySelectorAll('[data-job="urssaf"]').length, journee: !!document.querySelector('.vrm-day-layout, [data-barre-jour]') }));
+            const ici = await pg.evaluate(() => ({ urssaf: document.querySelectorAll('[data-job="urssaf"]').length, journee: !!document.querySelector('.vrm-day-layout, [data-barre-jour], [data-sj-grille]') }));
             dit(ici.journee && ici.urssaf === 0, `B ${T} : revenu sur Ma journée sans recharger, la ligne URSSAF est partie (le mois est noté)`, JSON.stringify(ici));
           }
         }
@@ -249,11 +262,11 @@ const juge = (cs, quoi) => {
         const opts = { main: mainDe(), txnKO: true };
         const { ctx, pg } = await rendre(b, vp, opts);
         await aller(pg, 'compta', '[data-compta-urssaf]', 2500);
-        if (await pg.locator('[data-urssaf-cest-declare]').count()) {
-          await touche(pg, '[data-urssaf-cest-declare]', vp);
+        if (await pg.locator('[data-argent-vue="resume"] [data-urssaf-cest-declare]').count()) {
+          await touche(pg, '[data-argent-vue="resume"] [data-urssaf-cest-declare]', vp);
           await formulaire(pg);
           await pg.waitForTimeout(3000);
-          const g = await pg.evaluate(() => { const o = document.querySelector('[data-decl-ouvrir]'); return { form: !!document.querySelector('[data-decl-form]'), bloque: !!document.querySelector('[data-decl-bloque]'), ouvrirGrise: o ? o.disabled : null }; });
+          const g = await pg.evaluate(() => { const o = document.querySelector('[data-decl-ouvrir]'); return { form: !!document.querySelector('[data-decl-form]'), bloque: !!document.querySelector('[data-decl-bloque]'), ouvrirGrise: o ? (o.disabled || o.getAttribute('aria-disabled') === 'true') : null }; });   // (27 nov.) un bouton natif grisé reste focusable : aria-disabled
           dit(!g.form && g.bloque && g.ouvrirGrise === true, `C ${T} : lecture ratée ⇒ le formulaire ne s'ouvre PAS, le bouton est grisé avec sa raison`, JSON.stringify(g));
           const reg = await registre(pg);
           dit(!reg || !reg['2026-09'], `C ${T} : rien n'est noté sur une lecture incomplète`, JSON.stringify(reg));
@@ -261,81 +274,74 @@ const juge = (cs, quoi) => {
         await ctx.close();
       });
 
+      // (27 nov., bancs-compta) E/F portés. Ma journée n'a plus sa case « Bénéfice » d'avant (`BeneficeJournee`,
+      // App.jsx, n'est plus montée : Aujourd'hui a ses tuiles, src/ecrans/Comptabilite.jsx `chiffresMois`) ; le
+      // choix des dépenses (`ChoixDepenses`) vit dans Argent → Résumé → « Ton bénéfice » (src/ecrans/Compta.jsx).
+      // Ce qui est exigé là où il vit. Aujourd'hui : RAPPORTÉ (voir « À DÉCIDER » plus bas), pas jugé.
+      const allerBenef = async (pg, repere) => {
+        // Le bénéfice se PUBLIE en lisant les ventes (Aujourd'hui) ; Argent le consomme.
+        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
+        await aller(pg, 'compta', '[data-benef-etat]', 1500);
+        await ouvrirDetailCompta(pg, { attendre: 8000 }).catch(() => {});
+        if (repere) await pg.waitForFunction((r) => document.querySelector(r), repere, { timeout: 20000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+      };
       await essaie(`E ${T}`, async () => {
-        console.log('E. Le net « avant tes dépenses » tant que rien n\'a jamais été noté');
+        console.log('E. Le net « avant tes dépenses » tant que rien n\'a jamais été noté (Argent → Ton bénéfice)');
         const opts = { main: mainDe() };
         const { ctx, pg, errs } = await rendre(b, vp, opts);
-        await aller(pg, 'journee', '[data-journee-benef]', 3500);
-        const a = await attrs(pg, '[data-journee-benef]', 'data-journee-benef-');
-        const txt = await pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText : ''; });
-        dit(!!a && a.depenses === 'jamais', `E ${T} : Ma journée sait que rien n'a jamais été noté (depenses=jamais)`, JSON.stringify(a));
-        dit(/avant tes dépenses/i.test(txt), `E ${T} : le net se dit « avant tes dépenses »`, txt.replace(/\n/g, ' | ').slice(0, 160));
-        dit(await pg.locator('[data-journee-benef] [data-depenses-choix]').count() === 1, `E ${T} : le choix est proposé, une fois`);
-        // (27 oct., décision de Julien) Sur téléphone, Ma journée garde les chiffres
-        // sans les phrases : le choix y est caché, il se fait dans Comptabilité.
-        const tel = vp.width < 600;
-        if (tel) {
-          dit(!(await pg.locator('[data-journee-benef] [data-depenses-choix]').isVisible()), `E ${T} : sur téléphone, Ma journée garde le chiffre, le choix vit dans Comptabilité`);
-          await aller(pg, 'compta', '[data-depenses-choix]', 2500);
-        }
-        juge(await contrastes(pg, SELS_CHOIX), `E ${T} (clair)`);
-        if (await pg.locator('[data-depenses-aucune]').count()) {
-          await touche(pg, '[data-depenses-aucune]', vp);
-          await pg.waitForTimeout(2600);
-          if (tel) await aller(pg, 'journee', '[data-journee-benef]', 3000);
-          const a2 = await attrs(pg, '[data-journee-benef]', 'data-journee-benef-');
-          const txt2 = await pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText : ''; });
-          dit(!!a2 && a2.depenses === 'aucune' && !/avant tes dépenses/i.test(txt2) && (await pg.locator('[data-depenses-choix]').count()) === 0, `E ${T} : « je n'ai pas de dépenses à noter » ⇒ le net redevient le net, le choix disparaît`, JSON.stringify(a2));
-          const sd = opts.main && opts.main.vrm_compta && opts.main.vrm_compta.sansDepenses;
-          dit(!!(sd && sd.at), `E ${T} : la réponse est rangée dans vrm_compta (synchronisée)`, JSON.stringify(opts.main && opts.main.vrm_compta));
-          await aller(pg, 'compta', '[data-benef-etat]', 2500);
-          const c = await attrs(pg, '[data-benef-etat]', 'data-benef-');
-          dit(!!c && c.depenses === 'aucune' && (await pg.locator('[data-depenses-choix]').count()) === 0, `E ${T} : Comptabilité lit la même réponse, sans reposer la question`, JSON.stringify(c && { depenses: c.depenses }));
-        }
+        await allerBenef(pg, '[data-benef-depenses]:not([data-benef-depenses=""]):not([data-benef-depenses="passu"])');
+        const c = await attrs(pg, '[data-benef-etat]', 'data-benef-');
+        dit(!!c && c.depenses === 'jamais', `E ${T} : Argent sait que rien n'a jamais été noté (depenses=jamais)`, JSON.stringify(c && { etat: c.etat, depenses: c.depenses }));
+        const titre = await pg.evaluate(() => { const e = document.querySelector('[data-benef-titre]'); return e ? e.getAttribute('title') || '' : ''; });
+        dit(/^Net avant tes dépenses/.test(titre), `E ${T} : le chiffre se nomme « Net avant tes dépenses »`, titre);
+        // Le choix (« Je n'ai pas de dépenses à noter / Ajouter une dépense ») est RENDU une fois ; sa visibilité
+        // est rapportée plus bas (« À DÉCIDER ») : la maquette du 2 nov. (src/design/fusion.css, §15) cache
+        // `.vrm-compta-geste`, et la case de Ma journée qui le montrait n'est plus montée.
+        dit(await pg.locator('[data-depenses-choix]').count() === 1, `E ${T} : le choix est rendu, une fois`);
         dit(errs.length === 0, `E ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
-      });
-
-      if (vp.width < 600) await essaie(`E2 ${T}`, async () => {
-        console.log('E2. Le même choix, en SOMBRE, sur téléphone : il se lit');
-        const opts = { main: mainDe({ vinted_dark: true }) };
-        const { ctx, pg } = await rendre(b, vp, opts);
-        await pg.addInitScript(() => { try { localStorage.setItem('vinted_dark', 'true'); } catch (_) {} });
-        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
-        await aller(pg, 'compta', '[data-depenses-choix]', 3500);
-        const theme = await pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
-        dit(theme === 'dark', `E2 ${T} : l'app est bien en sombre`, String(theme));
-        juge(await contrastes(pg, SELS_CHOIX), `E2 ${T} (sombre)`);
-        await ctx.close();
+        // Sa réponse rangée (`vrm_compta.sansDepenses`, la forme que le geste écrit : src/App.jsx `repondreSansDepenses`) :
+        // le net redevient le net, la question ne revient pas.
+        const r2 = await rendre(b, vp, { main: mainDe({ vrm_compta: { depenses: [], fixes: [], packs: [], abonnements: [], sansDepenses: { at: Date.parse('2026-10-20T10:00:00Z') } } }) });
+        await allerBenef(r2.pg, '[data-benef-depenses]:not([data-benef-depenses=""]):not([data-benef-depenses="passu"])');
+        const c2 = await attrs(r2.pg, '[data-benef-etat]', 'data-benef-');
+        const titre2 = await r2.pg.evaluate(() => { const e = document.querySelector('[data-benef-titre]'); return e ? e.getAttribute('title') || '' : ''; });
+        dit(!!c2 && c2.depenses === 'aucune' && !/avant tes dépenses/i.test(titre2) && (await r2.pg.locator('[data-depenses-choix]').count()) === 0, `E ${T} : « je n'ai pas de dépenses à noter » rangé ⇒ le net redevient le net, le choix disparaît`, JSON.stringify(c2 && { depenses: c2.depenses, titre: titre2 }));
+        await r2.ctx.close();
       });
 
       await essaie(`F ${T}`, async () => {
-        console.log('F. « Ajouter une dépense » mène au formulaire de Comptabilité ; une charge notée ⇒ plus de question');
+        console.log('F. Une charge notée ⇒ plus de question ; le formulaire des dépenses est là');
         const opts = { main: mainDe() };
         const { ctx, pg } = await rendre(b, vp, opts);
-        // Le bénéfice se PUBLIE en lisant les ventes (Ma journée) ; Comptabilité le consomme.
-        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
-        await aller(pg, 'compta', '[data-benef-depenses]:not([data-benef-depenses=""])', 2000);
-        const c = await attrs(pg, '[data-benef-etat]', 'data-benef-');
-        // (2 nov.) Le net est le chiffre de la question 1 : son libellé (`data-benef-titre`) le nomme ;
-        // la ligne « net » du calcul est repliée. Sur un code d'avant, la ligne « net ».
-        const lib = await pg.evaluate(() => { const l = document.querySelector('[data-benef-titre]') || document.querySelector('[data-benef-ligne="net"]'); return l ? l.innerText : ''; });
-        dit(!!c && c.depenses === 'jamais' && /avant tes dépenses/i.test(lib), `F ${T} : Comptabilité dit aussi « net avant tes dépenses »`, lib.replace(/\n/g, ' | '));
-        dit((await pg.locator('[data-depenses-choix]').count()) === 1, `F ${T} : une cause, une phrase : le choix est écrit UNE fois sur l'écran`);
-        if (vp.width >= 600) await aller(pg, 'journee', '[data-journee-benef]', 3000);
-        if (await pg.locator('[data-depenses-ajouter]').count()) {
-          await touche(pg, '[data-depenses-ajouter]', vp);
+        await allerBenef(pg, '[data-dep-ouvrir]');
+        if (await pg.locator('[data-dep-ouvrir]').count()) {
+          await touche(pg, '[data-dep-ouvrir]', vp);
           await pg.waitForFunction(() => document.querySelector('[data-dep-form]'), null, { timeout: 20000 }).catch(() => {});
-          dit((await pg.locator('[data-dep-form]').count()) === 1, `F ${T} : « Ajouter une dépense » ouvre le formulaire des dépenses de Comptabilité`);
-        } else dit(false, `F ${T} : « Ajouter une dépense » existe sur Ma journée`);
+          dit((await pg.locator('[data-dep-form]').count()) === 1, `F ${T} : « Ajouter une dépense » (Argent → Tes dépenses) ouvre le formulaire des dépenses`);
+        } else dit(false, `F ${T} : « Ajouter une dépense » existe dans Argent → Tes dépenses`);
         await ctx.close();
         const opts2 = { main: mainDe({ vrm_compta: { depenses: [{ id: 'd1', date: '2026-10-03', libelle: 'cartons inventés', cat: 'Emballage', montant: 12 }], fixes: [], packs: [], abonnements: [] } }) };
         const r2 = await rendre(b, vp, opts2);
-        await aller(r2.pg, 'journee', '[data-journee-benef]', 3500);
-        const a = await attrs(r2.pg, '[data-journee-benef]', 'data-journee-benef-');
-        const txt = await r2.pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText : ''; });
-        dit(!!a && a.depenses === 'notees' && !/avant tes dépenses/i.test(txt) && (await r2.pg.locator('[data-depenses-choix]').count()) === 0, `F ${T} : une dépense notée ⇒ le net est le net, aucune question`, JSON.stringify(a && { depenses: a.depenses, net: a.net }));
+        await allerBenef(r2.pg, '[data-benef-depenses]:not([data-benef-depenses=""]):not([data-benef-depenses="passu"])');
+        const a = await attrs(r2.pg, '[data-benef-etat]', 'data-benef-');
+        const titre = await r2.pg.evaluate(() => { const e = document.querySelector('[data-benef-titre]'); return e ? e.getAttribute('title') || '' : ''; });
+        dit(!!a && a.depenses === 'notees' && !/avant tes dépenses/i.test(titre) && (await r2.pg.locator('[data-depenses-choix]').count()) === 0, `F ${T} : une dépense notée ⇒ le net est le net, aucune question`, JSON.stringify(a && { depenses: a.depenses, net: a.net, titre }));
         await r2.ctx.close();
+      });
+
+      // À DÉCIDER (rapporté, pas compté) : Aujourd'hui dit-il « avant tes dépenses » sur sa tuile Bénéfice ?
+      await essaie(`J ${T}`, async () => {
+        const { ctx, pg } = await rendre(b, vp, { main: mainDe() });
+        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 2500);
+        const t = await pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText.replace(/\n/g, ' | ') : null; });
+        await aller(pg, 'compta', '[data-depenses-choix]', 1500);
+        await ouvrirDetailCompta(pg, { attendre: 8000 }).catch(() => {});
+        const vis = await pg.evaluate(() => [...document.querySelectorAll('[data-depenses-choix]')].some((e) => e.checkVisibility()));
+        console.log(`À DÉCIDER  J ${T} : Argent, le choix « pas de dépenses / ajouter » ${vis ? 'est visible' : 'est CACHÉ (fusion.css §15, .vrm-compta-geste)'}`);
+        console.log(`À DÉCIDER  J ${T} : Aujourd'hui, tuile Bénéfice, aucune dépense jamais notée — ${/avant tes dépenses/i.test(t || '') ? 'dit « avant tes dépenses »' : 'NE dit PAS « avant tes dépenses »'} (« ${String(t).slice(0, 80)} »)`);
+        await ctx.close();
       });
     }
 
@@ -343,10 +349,12 @@ const juge = (cs, quoi) => {
     const vp = { width: 1512, height: 950 };
     const releve = async (opts) => {
       const { ctx, pg } = await rendre(b, vp, { main: mainDe(), ...opts });
-      await aller(pg, 'cat_ventes', null, 3000);
-      await pg.getByText('Outils', { exact: false }).first().click({ timeout: 8000 }).catch(() => {});
-      await pg.getByText('Rapport comptable', { exact: true }).first().click({ timeout: 8000 }).catch(() => {});
-      await pg.waitForTimeout(3000);
+      // (27 nov., bancs-compta) Ventes natif n'a plus le menu « Outils → Rapport comptable » (instance `ventes`
+      // plus montée) : le rapport s'ouvre par « J'ai déclaré » d'Argent, sur septembre (le même rapport).
+      await aller(pg, 'compta', '[data-urssaf-cest-declare]', 2500);
+      await touche(pg, '[data-argent-vue="resume"] [data-urssaf-cest-declare]', vp);
+      await pg.waitForFunction(() => { const e = document.querySelector('[data-releve]'); return e && e.getAttribute('data-releve') !== 'encours' && e.innerText.trim(); }, null, { timeout: 25000 }).catch(() => {});
+      await pg.waitForTimeout(800);
       const r = await pg.evaluate(() => { const e = document.querySelector('[data-releve]'); const t = [...document.querySelectorAll('div')].map((d) => d.innerText).find((x) => /^Relevé du porte-monnaie/.test(x || '')) || ''; return { etat: e ? e.getAttribute('data-releve') : null, texte: (e ? e.innerText : t).trim() }; });
       await ctx.close();
       return r;

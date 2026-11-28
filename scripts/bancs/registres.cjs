@@ -233,7 +233,7 @@ const somme=(l,i)=>String(l.reduce((s,x)=>s+Math.round(x[i]*100),0));
               dit(!/encaiss/i.test(t+csv.octets.toString('utf8')),`${type} : jamais « encaissé »`);
               if(type==='achats'){
                 const C=lireCsv(csv.octets.toString('utf8')); const iH=C.findIndex(r=>r[0]==='Date'); const iT=C.findIndex((r,i)=>i>iH&&r[0]==='Total');
-                const H=C[iH]||[]; const iP=H.indexOf('Paires'), iF=H.indexOf('Dont frais'), iMo=H.indexOf('Montant'), iFo=H.indexOf('Fournisseur'), iS=H.indexOf('Montant lu');
+                const H=C[iH]||[]; const iP=H.findIndex(h=>h==='Paires'||h==='Articles'),   /* (27 nov., bancs-compta) la colonne porte le mot du vendeur (motsVendeur().Noms, lot vocabulaire-article, §2.11 « l'objet central est l'ARTICLE ») */ iF=H.indexOf('Dont frais'), iMo=H.indexOf('Montant'), iFo=H.indexOf('Fournisseur'), iS=H.indexOf('Montant lu');
                 const corps=C.slice(iH+1,iT);
                 const lg=corps.find(r=>r[iFo]==='Grossiste inventé'&&r[iP]==='10');
                 dit(iP>0&&iF>0&&!!lg&&lg[iMo]==='325,00'&&lg[iF]==='25,00',`achats : tableur — l’achat en gros sur UNE ligne : Grossiste inventé · 10 paires · 325,00 dont 25,00 de frais`,JSON.stringify(lg));
