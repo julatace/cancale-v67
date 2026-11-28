@@ -132,6 +132,7 @@ import ecran_actions_ext from './it/actionsExt.js';
 import ecran_ebay_series from './it/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './it/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_ameliorations27 from './it/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_sites_soignes from './it/sitesSoignes.js';   // (28 nov.) les pages des sites soignées
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './it/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './it/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -2479,6 +2480,7 @@ export default {
   ...ecran_offres_photos,
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
+  ...ecran_sites_soignes,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
 };

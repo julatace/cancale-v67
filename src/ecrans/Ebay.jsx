@@ -43,6 +43,9 @@ import { CLE_DEFAUTS_EBAY, CLE_GUIDE_VU, defautsDepuis, fusionner as fusionnerRe
 import FeuilleParametresEbay from '../ebay/FeuilleParametresEbay.jsx';
 import { FenetreGuideeEbay, QuestionsEbay, BoutonGuideEbay } from '../ebay/FenetresEbay.jsx';
 import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay/ConnexionEbayGuidee.jsx';
+import { TeteSite, EtatSite } from '../sites/SiteSoigne.jsx';   // (28 nov.) les pages des sites soignées
+import * as Natif from '../natif/index.js';
+import { Bouton as BoutonNatif } from '../natif/Bouton.jsx';
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
@@ -1897,79 +1900,50 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
   const eti = { fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 12, padding: '14px 16px' });
   return (
-    <div style={boite()}>
-      <div style={{ ...eti, marginBottom: 6 }}>Compte eBay · connexion</div>
+    <div data-ebay-cx-page="" className="ss-ebay-cx">
       <BilanSynchronisation owner={AUTH.user?.id||''} sources={['annonces','commandes'].map(type=>({id:'ebay-'+type,libelle:type==='annonces'?'Annonces eBay':'Commandes eBay',comptes:(data?.lectures||[]).map(l=>({uid:l.compte.ref,nom:nomCompteEbay(l.compte)})),items:data?(type==='annonces'?data.listings:data.orders).map(x=>({id:type==='annonces'?x.itemId:x.orderId,compte:x._compte||'principal',titre:x.title||x.lineItems?.[0]?.title,valeurs:type==='annonces'?[x.title,x.price,x.quantity,x.listingStatus]:[x.orderPaymentStatus,x.orderFulfillmentStatus,x.cancelStatus]})):null,charge:syncing,echecs:(data?.lectures||[]).filter(l=>!l[type]||syncResult[l.compte.ref]?.etat==='erreur'||syncResult[l.compte.ref]?.manque?.includes(type)).map(l=>l.compte.ref),partiel:(data?.lectures||[]).some(l=>l[type]?.complet!==true),revision:(data?.lectures||[]).map(l=>[l.compte.ref,l[type]?.capturedAt])}))}/>
       {retour && <div style={{ fontSize: 13, color: C.text, background: C.bg || 'transparent', border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', marginBottom: 10 }}>{retour}</div>}
       {retourCx && <RetourConnexionEbay C={C} {...retourCx} onReessayer={() => { setRetourCx(null); connecter(retourCx.nouveau === true); }} onFermer={() => setRetourCx(null)}/>}
       {feuilleDefauts && <FeuilleParametresEbay Feuille={SheetShell} C={C} mode="defauts" valeurs={defautsEbay} onChange={changerDefauts} onClose={() => setFeuilleDefauts(false)} compte={compteParams} typeCompte={Array.isArray(comptesStatut) && comptesStatut.length === 1 ? (comptesStatut[0].type || '') : (Array.isArray(comptesStatut) && comptesStatut.every((c) => c.type === 'pro') && comptesStatut.length ? 'pro' : '')} onUsine={() => changerDefauts(REGLAGES_EBAY_USINE)}/>}
+      {/* (28 nov., sites soignés) Chaque état dit comme la page de connexion (tuile du logo, titre, une phrase ou des
+          étapes, UN geste) ; relié : une liste groupée native (comptes, publication, données), plus des boîtes grises. */}
       {st === null ? (
-        <div style={{ fontSize: 13, color: C.muted }}>Vérification…</div>
+        <p className="ss-etat-note" role="status">{tr('ss.cx.verif')}</p>
       ) : st.passu ? (
-        <div data-ebay-statut="passu" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          Connexion eBay pas vérifiée (serveur muet). Rouvre dans un instant.
-        </div>
+        <EtatSite site="ebay" sorte="panne" titre={tr('ss.cx.passu.titre')} phrase={tr('ss.cx.passu.phrase')} attrs={{ 'data-ebay-statut': 'passu' }}/>
       ) : !st.ready ? (
-        <div data-ebay-statut="non-configure" data-ebay-admin={proprio ? 'proprietaire' : 'vendeur'} style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          {proprio
-            ? <>eBay n'est <b>pas encore configuré</b>. Clés eBay et RuName dans Vercel : voir <b>docs/ebay-api.md</b>.</>
-            : <>eBay n'est <b>pas encore activé sur VRM</b>. Rien à faire : le bouton apparaîtra ici.</>}
-        </div>
+        <EtatSite site="ebay" sorte="jamais" titre={tr(proprio ? 'ss.cx.config.titre' : 'ss.cx.pasActive.titre')} phrase={tr(proprio ? 'ss.cx.config.phrase' : 'ss.cx.pasActive.phrase')} attrs={{ 'data-ebay-statut': 'non-configure', 'data-ebay-admin': proprio ? 'proprietaire' : 'vendeur' }}/>
       ) : !st.canConsent ? (
-        <div data-ebay-statut="sans-runame" data-ebay-admin={proprio ? 'proprietaire' : 'vendeur'} style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-          {proprio
-            ? <>Tes clés eBay sont posées ✓. Il manque le <b>RuName</b> (l'URL de redirection, variable <code>EBAY_RUNAME</code>) à créer dans le portail eBay Developer et à coller dans Vercel — voir <b>docs/ebay-api.md</b>.</>
-            : <>eBay n'est <b>pas encore activé sur VRM</b> : tu ne peux pas encore y relier ton compte. Tu n'as rien à faire.</>}
-        </div>
+        <EtatSite site="ebay" sorte="jamais" titre={tr(proprio ? 'ss.cx.runame.titre' : 'ss.cx.pasActive.titre')} phrase={tr(proprio ? 'ss.cx.runame.phrase' : 'ss.cx.pasActive.phrase')} attrs={{ 'data-ebay-statut': 'sans-runame', 'data-ebay-admin': proprio ? 'proprietaire' : 'vendeur' }}/>
       ) : connected === true ? (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-            <div style={{ flex: '1 1 180px', minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-              <Icon name="check" size={15}/> <b>Compte eBay relié</b>
-              {Array.isArray(comptesStatut) && comptesStatut.length === 1 && typeCompteEbayTexte(comptesStatut[0]) && <span data-ebay-compte-type={comptesStatut[0].type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(comptesStatut[0])}</span>}
-              {Array.isArray(comptesStatut) && comptesStatut.length === 1 && <div style={{ marginTop: 4 }}><EtatJetonEbay C={C} compte={comptesStatut[0]} busy={busy} onReconnecter={() => connecter(!comptesStatut[0].principal)}/></div>}
-            </div>
-            {/* (14 nov., passe design 3) Le geste secondaire du système (capsule), plus un rectangle encadré. */}
-            <Bouton variante="secondaire" onClick={synchroniser} disabled={syncing} style={{ flexShrink: 0 }}>
-              {syncing ? 'Lecture eBay…' : 'Actualiser'}
-            </Bouton>
-          </div>
-          {/* (9 octobre) SES COMPTES eBAY : chacun nommé (son pseudo eBay), relié
-              ou non, et « Déconnecter » — qui ne touche pas aux autres. La liste
-              n'apparaît qu'à partir de deux comptes (un seul : rien ne change). */}
-          {Array.isArray(comptesStatut) && comptesStatut.length >= 2 && (
-            <div data-ebay-comptes={comptesStatut.length} style={{ background: 'var(--d-case)', borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
-              <div style={{ ...eti, marginBottom: 6 }}>Tes comptes eBay</div>
-              {comptesStatut.map((c) => {
-                const ref = c.principal ? 'principal' : c.cle; const etat = deconnexion[ref];
-                return (
-                  <div key={ref} data-ebay-compte-ligne={ref} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '7px 0', borderTop: `1px solid ${C.border}` }}>
-                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomCompteEbay(c)}{typeCompteEbayTexte(c) ? <span data-ebay-compte-type={c.type} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{typeCompteEbayTexte(c)}</span> : null}{siteCompteEbayTexte(c) ? <span data-ebay-compte-site={c.site || ''} style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 999, padding: '1px 7px' }}>{siteCompteEbayTexte(c)}</span> : null}</div>
-                      <div style={{ marginTop: 2 }}><EtatJetonEbay C={C} compte={c} busy={busy} onReconnecter={() => connecter(!c.principal)}/></div>
-                      {etat && etat !== '…' && <div style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{etat}</div>}
-                    </div>
-                    <button type="button" data-ebay-deconnecter={ref} disabled={etat === '…'} onClick={() => deconnecter(c)}
-                      style={{ flexShrink: 0, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '7px 11px', fontSize: 13, fontWeight: 600, cursor: etat === '…' ? 'default' : 'pointer', fontFamily: 'inherit', opacity: etat === '…' ? 0.6 : 1 }}>{etat === '…' ? 'Déconnexion…' : 'Déconnecter'}</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ marginBottom: 10 }}>
-            <Bouton variante="secondaire" data-ebay-connecter-autre="" onClick={() => connecter(true)} disabled={busy}>
-              {busy ? 'Ouverture d\'eBay…' : '+ Connecter un autre compte eBay'}
-            </Bouton>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>Choisis l'AUTRE compte chez eBay. Chacun garde ses ventes à part.</div>
-          </div>
-          {/* (11 nov.) Les réglages que chaque nouvelle annonce reprend. */}
-          <div data-ebay-defauts-ligne="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: 'var(--d-case)', borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
-            <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('ebay.param.titreDefauts')}</div>
-              <div data-ebay-defauts-resume={resumeReglagesEbay(defautsEbay).length} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{resumeReglagesEbay(defautsEbay).length ? resumeReglagesEbay(defautsEbay).map((x) => tr(x.cle, x.vars)).join(' · ') : tr('ebay.param.commeAvant')}</div>
-            </div>
-            <Bouton variante="secondaire" data-ebay-defauts-ouvrir="" onClick={ouvrirDefauts}>{tr('ebay.param.regler')}</Bouton>
-          </div>
+        <div className="ss-ebay-relie" data-ebay-relie="">
+          {(() => {
+            const liste = Array.isArray(comptesStatut) ? comptesStatut : [];
+            const plusieurs = liste.length >= 2;
+            const etiquettes = (c) => <>{typeCompteEbayTexte(c) ? <span className="ss-etiquette" data-ebay-compte-type={c.type}>{typeCompteEbayTexte(c)}</span> : null}{plusieurs && siteCompteEbayTexte(c) ? <span className="ss-etiquette" data-ebay-compte-site={c.site || ''}>{siteCompteEbayTexte(c)}</span> : null}</>;
+            return <>
+              <TeteSite site="ebay" section="compte" titre={plusieurs ? tr('ss.cx.relies', { n: liste.length }) : tr('ss.cx.relie')}
+                droite={<BoutonNatif variante="texte" taille="compact" indisponible={syncing} onClick={synchroniser} attrs={{ 'data-ebay-actualiser': '' }}>{syncing ? 'Lecture eBay…' : tr('ss.cx.actualiser')}</BoutonNatif>}/>
+              <Natif.Groupe titre={tr('ss.cx.comptes')} attrs={{ 'data-ebay-comptes': liste.length }}>
+                {liste.map((c) => {
+                  const ref = c.principal ? 'principal' : c.cle; const etat = deconnexion[ref];
+                  return <Natif.Rangee key={ref} titre={nomCompteEbay(c)} attrs={{ 'data-ebay-compte-ligne': ref }}
+                    sousTitre={<span className="ss-jeton">{etiquettes(c)}</span>}
+                    note={etat && etat !== '…' ? etat : ''}
+                    pied={<EtatJetonEbay C={C} compte={c} busy={busy} onReconnecter={() => connecter(!c.principal)}/>}
+                    fin={plusieurs ? <BoutonNatif variante="texte" taille="compact" indisponible={etat === '…'} onClick={() => deconnecter(c)} attrs={{ 'data-ebay-deconnecter': ref }}>{etat === '…' ? 'Déconnexion…' : 'Déconnecter'}</BoutonNatif> : null}/>;
+                })}
+                <Natif.Rangee titre={busy ? 'Ouverture d\'eBay…' : tr('ss.cx.autre')} sousTitre={tr('ss.cx.autre.sous')} sousLignes={2} fin="chevron"
+                  onClick={() => { if (!busy) connecter(true); }} attrs={{ 'data-ebay-connecter-autre': '' }}/>
+              </Natif.Groupe>
+              <Natif.Groupe titre={tr('ss.cx.publication')} attrs={{ 'data-ebay-defauts-ligne': '' }}>
+                <Natif.Rangee titre={tr('ebay.param.titreDefauts')} fin="chevron" onClick={ouvrirDefauts} attrs={{ 'data-ebay-defauts-ouvrir': '' }}
+                  sousTitre={<span data-ebay-defauts-resume={resumeReglagesEbay(defautsEbay).length}>{resumeReglagesEbay(defautsEbay).length ? resumeReglagesEbay(defautsEbay).map((x) => tr(x.cle, x.vars)).join(' · ') : tr('ebay.param.commeAvant')}</span>}/>
+              </Natif.Groupe>
+            </>;
+          })()}
+          <Natif.Groupe titre={tr('ss.cx.donnees')} nu>
+          <div className="ss-ebay-details">
           <details style={{fontSize:12,marginBottom:12}}><summary style={{cursor:'pointer',minHeight:'var(--d-h-ctrl)',display:'flex',alignItems:'center'}}>Synchronisation par compte</summary><div style={{display:'grid',gap:8,marginTop:10}}>{(data?.lectures || []).map(l=>{const result=syncResult[l.compte.ref];const lecture=(v)=>v===undefined?'Lecture indisponible':v===null?'Jamais lu':Number(v.capturedAt)>0?new Date(Number(v.capturedAt)).toLocaleString('fr-FR'):'Date inconnue';return <div key={l.compte.ref} data-ebay-sync-compte={l.compte.ref} style={{border:`1px solid ${C.border}`,borderRadius:12,padding:10}}><b>{nomCompteEbay(l.compte)}</b><div style={{color:C.muted,fontSize:11,marginTop:4}}>Annonces : {lecture(l.annonces)}{l.annonces && l.annonces.complet!==true?' · partiel':''}<br/>Commandes : {lecture(l.commandes)}{l.commandes && l.commandes.complet!==true?' · partiel':''}</div>{l.commandes?.lecture!=null && <p style={{fontSize:11,color:C.muted}}>{l.commandes.lecture}{l.commandes.totalLecture!=null?` sur ${l.commandes.totalLecture}`:''} commandes pour cette lecture eBay</p>}{commandesSuite[l.compte.ref] && <p role="status" style={{fontSize:11}}>{commandesSuite[l.compte.ref]}</p>}{result && <p role="status" style={{fontSize:11}}>{result.etat==='lecture'?'Lecture en cours…':result.etat==='ok'?'Actualisé':result.etat==='partiel'?[result.manque?.length?`Non relu : ${result.manque.join(', ')}.`:'',result.incompletes?.length?`Lecture partielle : ${result.incompletes.join(', ')}.`:'','Historique conservé.'].filter(Boolean).join(' '):'Lecture échouée. Dernières données conservées.'}</p>}<button type="button" disabled={syncing} onClick={()=>synchroniser(l.compte.ref)} style={{marginTop:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>{result && (result.etat==='erreur' || result.manque?.length)?'Reprendre ce compte':'Actualiser ce compte'}</button>{l.commandes?.complet!==true && <button type="button" disabled={syncing} onClick={()=>chargerPlusCommandes(l.compte.ref)} style={{marginTop:6,marginLeft:6,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,padding:'6px 9px',cursor:'pointer'}}>Lire davantage de commandes</button>}</div>;})}</div></details>
           <details className="vrm-ebay-settings"><summary>Solde et paramètres du compte</summary>
           {data == null ? (
@@ -2086,7 +2060,9 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
             </div>
           </>)}
           </details>
-        </>
+          </div>
+          </Natif.Groupe>
+        </div>
       ) : (
         <>
           {/* (11 nov., ebay-complet) La connexion GUIDÉE : ce qui va se passer,

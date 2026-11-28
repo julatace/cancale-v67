@@ -16,25 +16,30 @@ import React from 'react';
 import { tr, date as dateI18n } from '../i18n/index.js';
 import { BoutonBase } from '../composants/Bouton.jsx';
 import { etatCompte, raisonConnexion } from './parametres.js';
+import { TuileSite } from '../sites/SiteSoigne.jsx';
 
 export function ConnexionEbayGuidee({ C, busy, onConnecter, passu = false }) {
+  // (28 nov., sites soignés) La RÉFÉRENCE de qualité que Julien aime, posée sur les jetons natifs (src/sites/site-soigne.css) :
+  // la tuile du logo, le titre, trois étapes dans des pastilles teintées, UN plein, une note courte. Les autres pages des
+  // sites reprennent cette recette (`EtatSite`). Les attributs data-* lus par les bancs restent les mêmes.
   return (
-    <div data-ebay-connexion-guidee="" style={{ display: 'grid', gap: 12 }}>
-      <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{tr('ebay.cx.titre')}</div>
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+    <section className="ss-etat" data-ss-site="ebay" data-ss-etat="connexion" data-ebay-connexion-guidee="">
+      <TuileSite site="ebay" taille={44}/>
+      <h3 className="ss-etat-titre">{tr('ebay.cx.titre')}</h3>
+      <ol className="ss-etapes">
         {[1, 2, 3].map((n) => (
-          <li key={n} data-ebay-cx-etape={n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: `${C.accent}15`, color: C.accentTexte || C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700 }}>{n}</span>
-            <span style={{ fontSize: 15, color: C.text, lineHeight: 1.45, paddingTop: 4 }}>{tr(`ebay.cx.etape.${n}`)}</span>
+          <li key={n} className="ss-etape" data-ebay-cx-etape={n}>
+            <span className="ss-etape-n" aria-hidden="true">{n}</span>
+            <span className="ss-etape-texte">{tr(`ebay.cx.etape.${n}`)}</span>
           </li>
         ))}
       </ol>
-      <div>
+      <div className="ss-etat-gestes">
         <BoutonBase variante="primaire" occupe={busy} onClick={() => onConnecter(false)} data-ebay-connecter="">{tr(busy ? 'ebay.cx.ouverture' : 'ebay.cx.bouton')}</BoutonBase>
       </div>
-      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{tr('ebay.cx.plusieurs')}</div>
-      {passu && <div data-ebay-cx-passu style={{ fontSize: 12, color: C.muted }}>{tr('ebay.cx.passu')}</div>}
-    </div>
+      <p className="ss-etat-note">{tr('ebay.cx.plusieurs')}</p>
+      {passu && <p className="ss-etat-note" data-ebay-cx-passu>{tr('ebay.cx.passu')}</p>}
+    </section>
   );
 }
 

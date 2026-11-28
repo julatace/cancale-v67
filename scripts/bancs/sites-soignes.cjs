@@ -13,8 +13,9 @@
 //         (`overflow-wrap:anywhere` qui casse un mot court), texte qui déborde de sa boîte ;
 //    · K  contraste < 4,5:1 ;
 //    · S  le SQUELETTE de la page (la même forme d'un site à l'autre, §2.11) : une tête de page native (`[data-site-tete]`,
-//         logo du site + titre + une ligne), des groupes natifs (`.n-groupe`), des rangées natives ; « brut » = une page
-//         dont le contenu principal n'est fait d'aucun composant natif (texte nu, listes sans hiérarchie).
+//         logo du site + titre + une ligne) sur chaque page propre à un site qui n'est pas une LISTE (`tete: true` : les
+//         sections eBay, Messages, la connexion — une liste montre d'abord ses lignes, AJOUT 3 de vrm-design) ; un état
+//         sans contenu dit comme la page de connexion (`[data-ss-etat]` : tuile, titre, étapes, UN geste), jamais un texte nu.
 //  Mesure reprise du banc minimaliste (`mesurer`) pour P, T, K et les coupes, plus S et la casse des mots.
 //  Sorties (`SORTIE=…`, défaut /tmp/banc-sites-soignes) : `releve.json`, `releve.md`, `ecrans/<page>-<fen>-<th>-<base>.png`.
 //  `PAGES=a,b` `FENETRES=390,1512` `THEMES=clair,sombre` `BASES=volume,vide,panne`.
@@ -40,26 +41,26 @@ const ATTENTE = Number(process.env.ATTENTE || 2600);
 
 // Les pages propres aux trois sites. `tache` : la même tâche d'un site à l'autre (le squelette doit être le même).
 const PAGES = [
-  { cle: 'ebay.connexion', site: 'ebay', tache: 'compte', url: '?tab=plat_ebay&section=compte' },
+  { cle: 'ebay.connexion', site: 'ebay', tache: 'compte', url: '?tab=plat_ebay&section=compte' , tete: true },
   { cle: 'ebay.connexion-vide', site: 'ebay', tache: 'compte-vide', url: '?tab=plat_ebay&section=compte', ebay: { nonRelie: true } },
   { cle: 'ebay.ventes', site: 'ebay', tache: 'ventes', url: '?tab=plat_ebay&section=ventes' },
-  { cle: 'ebay.tableau', site: 'ebay', tache: 'tableau', url: '?tab=plat_ebay&section=tableau' },
-  { cle: 'ebay.agent', site: 'ebay', tache: 'agent', url: '?tab=plat_ebay&section=agent' },
-  { cle: 'ebay.offres', site: 'ebay', tache: 'offres', url: '?tab=plat_ebay&section=offres' },
-  { cle: 'ebay.argent', site: 'ebay', tache: 'argent', url: '?tab=plat_ebay&section=argent' },
-  { cle: 'ebay.sante', site: 'ebay', tache: 'sante', url: '?tab=plat_ebay&section=sante' },
+  { cle: 'ebay.tableau', site: 'ebay', tache: 'tableau', url: '?tab=plat_ebay&section=tableau' , tete: true },
+  { cle: 'ebay.agent', site: 'ebay', tache: 'agent', url: '?tab=plat_ebay&section=agent' , tete: true },
+  { cle: 'ebay.offres', site: 'ebay', tache: 'offres', url: '?tab=plat_ebay&section=offres' , tete: true },
+  { cle: 'ebay.argent', site: 'ebay', tache: 'argent', url: '?tab=plat_ebay&section=argent' , tete: true },
+  { cle: 'ebay.sante', site: 'ebay', tache: 'sante', url: '?tab=plat_ebay&section=sante' , tete: true },
   { cle: 'ebay.annonces', site: 'ebay', tache: 'annonces', url: '?tab=plat_ebay&section=annonces' },
-  { cle: 'ebay.trafic', site: 'ebay', tache: 'trafic', url: '?tab=plat_ebay&section=trafic' },
-  { cle: 'ebay.promo', site: 'ebay', tache: 'promo', url: '?tab=plat_ebay&section=promo' },
-  { cle: 'ebay.messages', site: 'ebay', tache: 'messages', url: '?tab=plat_ebay&section=messages' },
-  { cle: 'ebay.recherches', site: 'ebay', tache: 'recherches', url: '?tab=settings', evt: 'vrm:ebay-recherches' },
+  { cle: 'ebay.trafic', site: 'ebay', tache: 'trafic', url: '?tab=plat_ebay&section=trafic' , tete: true },
+  { cle: 'ebay.promo', site: 'ebay', tache: 'promo', url: '?tab=plat_ebay&section=promo' , tete: true },
+  { cle: 'ebay.messages', site: 'ebay', tache: 'messages', url: '?tab=plat_ebay&section=messages' , tete: true },
+  { cle: 'ebay.recherches', site: 'ebay', tache: 'recherches', url: '?tab=journee', evt: 'vrm:ebay-recherches' },
   { cle: 'lbc.annonces', site: 'leboncoin', tache: 'annonces', url: '?tab=plat_leboncoin&section=annonces' },
   { cle: 'lbc.ventes', site: 'leboncoin', tache: 'ventes', url: '?tab=plat_leboncoin&section=ventes' },
-  { cle: 'lbc.messages', site: 'leboncoin', tache: 'messages', url: '?tab=plat_leboncoin&section=messages' },
+  { cle: 'lbc.messages', site: 'leboncoin', tache: 'messages', url: '?tab=plat_leboncoin&section=messages' , tete: true },
   { cle: 'lbc.achats', site: 'leboncoin', tache: 'achats', url: '?tab=plat_leboncoin&section=achats' },
   { cle: 'vc.annonces', site: 'vestiaire', tache: 'annonces', url: '?tab=plat_vestiaire&section=annonces' },
   { cle: 'vc.ventes', site: 'vestiaire', tache: 'ventes', url: '?tab=plat_vestiaire&section=ventes' },
-  { cle: 'vc.messages', site: 'vestiaire', tache: 'messages', url: '?tab=plat_vestiaire&section=messages' },
+  { cle: 'vc.messages', site: 'vestiaire', tache: 'messages', url: '?tab=plat_vestiaire&section=messages' , tete: true },
   { cle: 'vc.achats', site: 'vestiaire', tache: 'achats', url: '?tab=plat_vestiaire&section=achats' },
 ];
 const VOULUES = liste('PAGES', PAGES.map((p) => p.cle).join(','));
@@ -147,17 +148,27 @@ function forme({ mut }) {
   return { tete, groupes, rangees, casses: [...new Set(casses)].slice(0, 12), premier, nTexte: (racine.innerText || '').length };
 }
 
-async function ouvrirPage(nav, fen, sombre, pg0, base) {
+// Un contexte par (base, fenêtre, thème) : on ouvre l'app UNE fois, puis chaque page par `vrm:aller` (comme un lien de
+// l'app) — sinon chaque page recharge l'app entière. Une page à scénario eBay propre (non relié) a son contexte.
+async function ouvrirApp(nav, fen, sombre, base, sc, url) {
   const f = FEN[fen];
   if (base === 'panne') process.env.BANC_PANNE = '1'; else delete process.env.BANC_PANNE;
-  const o = await P.ouvrir(nav, { W: f.tel ? 390 : 1512, sombre, b: baseDe(base), url: '/' + pg0.url, api: apiEbay(base === 'vide' ? { nonRelie: true } : (pg0.ebay || {})) });
+  const o = await P.ouvrir(nav, { W: f.tel ? 390 : 1512, sombre, b: baseDe(base), url: '/' + url, api: apiEbay(sc) });
   await P.pret(o.pg);
   await o.pg.evaluate((x) => { window.__bancExceptions = x[0]; window.__bancFeuilles = x[1]; }, ['.n-onglets, .n-barre-titre, .n-laterale, .n-plaque, .n-pastille, .n-interrupteur, input, textarea, select, img, canvas, video, svg, [data-banc-exception]', '.n-feuille-panneau, .n-feuille, .n-volet, .vrm-fs, .sb-feuille, .v2-feuille, .vrm-sheet, .n-poussee']);
-  if (pg0.evt) { await o.pg.evaluate((n) => window.dispatchEvent(new Event(n)), pg0.evt); }
-  await o.pg.waitForTimeout(ATTENTE);
-  await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast button')) t.click(); }).catch(() => {});
-  await o.pg.waitForTimeout(250);
   return o;
+}
+async function allerPage(o, pg0, premiere) {
+  if (!premiere) {
+    // Fermer une feuille restée ouverte (les recherches eBay), puis le lien.
+    await o.pg.keyboard.press('Escape').catch(() => {});
+    await o.pg.evaluate((u) => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: u })), pg0.url);
+    await o.pg.waitForTimeout(400);
+  }
+  if (pg0.evt) await o.pg.evaluate((n) => window.dispatchEvent(new Event(n)), pg0.evt);
+  await o.pg.waitForTimeout(ATTENTE);
+  await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast button')) t.click(); window.scrollTo(0, 0); }).catch(() => {});
+  await o.pg.waitForTimeout(200);
 }
 
 function md(res) {
@@ -170,19 +181,37 @@ if (require.main === module) (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   const res = [];
+  const mesurerIci = async (o, p, fen, th, base) => {
+    const f = await o.pg.evaluate(forme, { mut: MUT });
+    if (process.env.SONDE2) console.log(await o.pg.evaluate(() => { const m = document.querySelector('main'); const k = Object.keys(m).find((x) => x.startsWith('__reactProps')); return 'props=' + (k ? m[k]['data-n-volets'] : 'aucune') + ' attr=' + m.getAttribute('data-n-volets') + ' n=' + document.querySelectorAll('main').length; }));
+    if (process.env.SONDE) console.log((await o.pg.evaluate((sel) => { const e = document.querySelector(sel); const out = []; for (let x = e; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); out.push(x.tagName + '.' + String(x.className).slice(0, 70) + ' [' + [...x.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name + '=' + a.value).join(' ').slice(0, 120) + ']' + ' w=' + Math.round(x.getBoundingClientRect().width) + ' ' + cs.display + ' gtc=' + cs.gridTemplateColumns.slice(0, 50) + ' max=' + cs.maxWidth); } return out; }, process.env.SONDE)).join('\n'));
+    const m = await o.pg.evaluate(M.mesurer, { tel: FEN[fen].tel, mut: '' });
+    await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `${p.cle}-${fen}-${th}-${base}.png`), fullPage: !!process.env.PLEINE_PAGE }).catch(() => {});
+    const r = { page: p.cle, site: p.site, tache: p.tache, fen, theme: th, base, erreurs: o.erreurs.splice(0).slice(0, 4), pleins: m.pleins.length, pleinsNoms: m.pleins, cibles: m.cibles, contraste: m.contraste, coupes: m.coupes, f };
+    res.push(r);
+    console.log(`· ${p.cle} ${fen} ${th} ${base} : tête ${f.tete.join(',') || '—'} · groupes ${f.groupes} · rangées ${f.rangees} · pleins ${r.pleins} · cibles ${r.cibles.length} · contraste ${r.contraste.length} · cassé ${r.coupes.length + f.casses.length}${r.erreurs.length ? ' ❌ ' + r.erreurs.join(' / ') : ''}`);
+  };
+  const rate = (p, fen, th, base, e) => { console.log(`❌ ${p.cle} ${fen} ${th} ${base} : ${String(e.message || e).slice(0, 200)}`); res.push({ page: p.cle, site: p.site, tache: p.tache, fen, theme: th, base, erreurs: [String(e.message || e).slice(0, 200)], pleins: 0, cibles: [], contraste: [], coupes: [], f: { tete: [], groupes: 0, rangees: 0, casses: [] } }); };
   try {
-    for (const base of BASES) for (const fen of FENETRES) for (const th of THEMES) for (const p of CHOISIES) {
-      let o;
+    for (const base of BASES) for (const fen of FENETRES) for (const th of THEMES) {
+      const communes = CHOISIES.filter((p) => !p.ebay), propres = CHOISIES.filter((p) => p.ebay);
+      let o = null;
       try {
-        o = await ouvrirPage(nav, fen, th === 'sombre', p, base);
-        const f = await o.pg.evaluate(forme, { mut: MUT });
-        const m = await o.pg.evaluate(M.mesurer, { tel: FEN[fen].tel, mut: '' });
-        await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `${p.cle}-${fen}-${th}-${base}.png`), fullPage: !!process.env.PLEINE_PAGE }).catch(() => {});
-        const r = { page: p.cle, site: p.site, tache: p.tache, fen, theme: th, base, erreurs: o.erreurs.slice(0, 4), pleins: m.pleins.length, pleinsNoms: m.pleins, cibles: m.cibles, contraste: m.contraste, coupes: m.coupes, f };
-        res.push(r);
-        console.log(`· ${p.cle} ${fen} ${th} ${base} : tête ${f.tete.join(',') || '—'} · groupes ${f.groupes} · rangées ${f.rangees} · pleins ${r.pleins} · cibles ${r.cibles.length} · contraste ${r.contraste.length} · cassé ${r.coupes.length + f.casses.length}${r.erreurs.length ? ' ❌ ' + r.erreurs.join(' / ') : ''}`);
-      } catch (e) { console.log(`❌ ${p.cle} ${fen} ${th} ${base} : ${String(e.message || e).slice(0, 200)}`); res.push({ page: p.cle, fen, theme: th, base, erreurs: [String(e.message || e).slice(0, 200)], pleins: 0, cibles: [], contraste: [], coupes: [], f: { tete: [], groupes: 0, rangees: 0, casses: [] } }); }
-      if (o) await o.ctx.close();
+        for (let i = 0; i < communes.length; i++) {
+          const p = communes[i];
+          try {
+            if (!o) { o = await ouvrirApp(nav, fen, th === 'sombre', base, base === 'vide' ? { nonRelie: true } : {}, p.url); await allerPage(o, p, true); }
+            else await allerPage(o, p, false);
+            await mesurerIci(o, p, fen, th, base);
+          } catch (e) { rate(p, fen, th, base, e); if (o) { await o.ctx.close().catch(() => {}); o = null; } }
+        }
+      } finally { if (o) await o.ctx.close().catch(() => {}); }
+      for (const p of propres) {
+        let x = null;
+        try { x = await ouvrirApp(nav, fen, th === 'sombre', base, p.ebay, p.url); await allerPage(x, p, true); await mesurerIci(x, p, fen, th, base); }
+        catch (e) { rate(p, fen, th, base, e); }
+        if (x) await x.ctx.close().catch(() => {});
+      }
     }
   } finally { await nav.close(); P.srv.close(); }
   fs.writeFileSync(path.join(SORTIE, 'releve.json'), JSON.stringify(res, null, 1));
@@ -194,16 +223,17 @@ if (require.main === module) (async () => {
       if (r.erreurs.length) rouges.push(`${r.page} ${r.fen} ${r.theme} ${r.base} : erreur de page`);
       if (r.pleins > 1) rouges.push(`${r.page} ${r.fen} ${r.theme} ${r.base} : ${r.pleins} pleins`);
       if (r.base !== 'volume') continue;
-      if (!r.f.tete.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : pas de tête de page native`);
+      const pg = PAGES.find((x) => x.cle === r.page) || {};
+      if (pg.tete && !r.f.tete.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : pas de tête de page native`);
       if (r.cibles.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : ${r.cibles.length} cibles trop petites (${r.cibles.slice(0, 3).join(' / ')})`);
       if (r.coupes.length || r.f.casses.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : texte cassé (${[...r.coupes, ...r.f.casses].slice(0, 3).join(' / ')})`);
     }
-    // Mêmes squelettes : pour une même tâche, chaque site a une tête et des groupes natifs.
+    // Mêmes squelettes : pour une même tâche, chaque site a la même tête (ou aucun n'en a : une liste).
     const parTache = {};
     for (const r of res.filter((x) => x.base === 'volume')) (parTache[r.tache + ' ' + r.fen + ' ' + r.theme] ||= []).push(r);
     for (const [k, l] of Object.entries(parTache)) {
       if (l.length < 2) continue;
-      const sq = l.map((r) => `${r.site}:${r.f.tete.length ? 'tête' : '—'}/${r.f.groupes ? 'groupes' : '—'}`);
+      const sq = l.map((r) => `${r.site}:${r.f.tete.length ? 'tête' : '—'}`);
       if (new Set(sq.map((s) => s.split(':')[1])).size > 1) rouges.push(`squelettes différents pour ${k} : ${sq.join(' · ')}`);
     }
     if (rouges.length) { console.log(`\n❌ sites soignés : ${rouges.length} rouge(s)\n  ` + rouges.slice(0, 60).join('\n  ')); process.exitCode = 1; }

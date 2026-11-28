@@ -1,0 +1,65 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Les pages des sites, soignées (28 nov. 2026) — src/sites/SiteSoigne.jsx.
+   La recette de la page de connexion eBay, en jetons natifs : tuile du logo, titre net, étapes numérotées dans des
+   pastilles teintées, UN plein, une note courte. Mêmes mesures sur Leboncoin, Vestiaire et eBay ; le logo seul change.
+   Aucune couleur de marque sur un TEXTE (contrastes : voir docs/passation/2026-11-28-sites-soignes.md §4).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  /* La teinte discrète de chaque site : jamais sur un texte, seulement le fond de la tuile et des pastilles. */
+  [data-ss-site="leboncoin"], .ss-tete[data-site-tete="leboncoin"] { --ss-teinte: rgb(236 90 19 / .12); }
+  [data-ss-site="ebay"], .ss-tete[data-site-tete="ebay"] { --ss-teinte: rgb(0 100 210 / .10); }
+  [data-ss-site="vestiaire"], .ss-tete[data-site-tete="vestiaire"] { --ss-teinte: rgb(26 26 30 / .07); }
+  :root[data-theme="dark"] [data-ss-site="leboncoin"], :root[data-theme="dark"] .ss-tete[data-site-tete="leboncoin"] { --ss-teinte: rgb(255 122 61 / .18); }
+  :root[data-theme="dark"] [data-ss-site="ebay"], :root[data-theme="dark"] .ss-tete[data-site-tete="ebay"] { --ss-teinte: rgb(77 155 255 / .18); }
+  :root[data-theme="dark"] [data-ss-site="vestiaire"], :root[data-theme="dark"] .ss-tete[data-site-tete="vestiaire"] { --ss-teinte: rgb(255 255 255 / .10); }
+
+  .ss-tuile { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 40px; height: 40px; border-radius: 11px; background: var(--ss-teinte, var(--n-carte-2)); }
+  .ss-tuile[data-ss-taille="44"] { width: 48px; height: 48px; border-radius: 13px; }
+  .ss-tuile .n-logo-site { vertical-align: 0; }
+  .ss-tuile .n-logo-site[data-site="ebay"] { width: 30px; height: 18px; }
+  .ss-tuile[data-ss-taille="44"] .n-logo-site[data-site="ebay"] { width: 34px; height: 20px; }
+  .ss-tuile .n-logo-site[data-site="vestiaire"] { width: 24px; height: 18px; }
+
+  /* ── La tête d'une page de site ── */
+  .ss-tete { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 0 4px; padding: 4px 0;
+    container-type: inline-size; }
+  .ss-tete-textes { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+  .ss-tete-titre { font: 700 17px/22px var(--n-police); letter-spacing: -0.01em; color: var(--n-encre); }
+  .ss-tete-ligne { font: var(--n-t-second); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ss-tete-droite { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  @container (max-width: 360px) { .ss-tete-ligne { white-space: normal; } }
+  /* Hôte : la tête prend la marge de la page. */
+  .ss-tete-hote { padding: 12px 16px 0; }
+
+  /* ── Un état sans contenu, dit comme la page de connexion ── */
+  .ss-etat { display: grid; justify-items: start; gap: 12px; padding: 20px; border-radius: var(--n-r-carte, 12px);
+    background: var(--n-carte); box-shadow: var(--n-ombre-carte); color: var(--n-texte); max-width: 640px; }
+  .ss-etat-titre { margin: 4px 0 0; font: 700 17px/22px var(--n-police); letter-spacing: -0.01em; color: var(--n-encre); }
+  .ss-etat-phrase { margin: 0; font: 400 15px/21px var(--n-police); color: var(--n-texte); max-width: 52ch; }
+  .ss-etapes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .ss-etape { display: flex; gap: 12px; align-items: flex-start; }
+  .ss-etape-n { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--ss-teinte, var(--n-carte-2)); color: var(--n-encre); font: 700 15px/1 var(--n-police); font-variant-numeric: tabular-nums; }
+  .ss-etape-texte { font: 400 15px/21px var(--n-police); color: var(--n-texte); padding-top: 4px; max-width: 56ch; }
+  .ss-etat-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 2px; }
+  .ss-etat-note { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); max-width: 60ch; }
+  .ss-etat + .ss-etat { margin-top: 12px; }
+  .ss-hote { padding: 4px 0 12px; }
+  @media (max-width: 599px) { .ss-etat { padding: 16px; } .ss-etat .n-bouton-bloc { width: 100%; } }
+
+  /* ── eBay : la connexion reliée, en liste groupée (Réglages) ── */
+  .ss-ebay-relie { display: grid; gap: 20px; }
+  .ss-ebay-relie .n-groupe { margin: 0; }
+  .ss-jeton { display: inline-flex; align-items: center; gap: 6px; }
+  .ss-compte-fin { display: inline-flex; align-items: center; gap: 4px; }
+  .ss-etiquette { display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 999px;
+    font: var(--n-t-legende-fort); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }
+
+  /* Le titre qui redit la page (« Offres eBay ») : la tête du site le dit déjà — gardé pour le lecteur d'écran. */
+  .vrm-market-space .vrm-ebay-offers .vrm-ebay-titre-onglet { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .vrm-market-space .vrm-ebay-offers > div:first-child { justify-content: flex-end; }
+  /* Leboncoin · À envoyer : « Générer le bordereau » de CHAQUE vente n'est plus un plein (un plein par écran, §7 :
+     « Générer tous » le reste) — une touche à contour, même place, même geste. !important : la règle de fusion.css l'est. */
+  html body .vrm-rangee-bord [data-ss-geste-ligne] { background: var(--n-carte-2) !important; color: var(--n-encre) !important; border: 1px solid var(--n-bord) !important; }
+}

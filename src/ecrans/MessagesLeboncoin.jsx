@@ -15,6 +15,7 @@ import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   //
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 import { tr } from '../i18n/index.js';
+import { EtatSite } from '../sites/SiteSoigne.jsx';   // (28 nov.) les pages des sites soignées
 import { interessesParAnnonce } from '../interessesLbc.js';   // (20 nov., 5.410) les personnes qui ont écrit, par annonce
 
 
@@ -160,7 +161,6 @@ function ConversationsLeboncoin() {
   const typeDe = (id) => (((d && d.comptes[id]) || {}).pro || accDe(id).type === 'pro') ? 'pro' : accDe(id).type === 'particulier' ? 'particulier' : '';
   const age = (iso) => { const t = Date.parse(iso || ''); if (!t) return null; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
   // (5 nov., chantier G) Le geste principal de l'état « jamais relevé » : le bouton commun (`Bouton`), plus un aplat fait main.
-  const ouvrir = <Bouton variante="primaire" href="https://www.leboncoin.fr/messages" target="_blank" rel="noreferrer" data-ouvrir-messages-lbc="" style={{ marginTop: 10 }}>{tr('messages.ouvrirLeboncoin')}</Bouton>;
   if (d === undefined) return <div role="status" data-messages-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
   // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne` : la raison, UN « Réessayer » ; le site reste à un lien.
   if (d === null) return <div data-messages-lbc="pas-su"><EtatPanne quoi="Tes messages Leboncoin" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); setTickLbc((t) => t + 1); }}/>
@@ -176,15 +176,12 @@ function ConversationsLeboncoin() {
   const fils = Array.isArray(d.fils) ? trierRecents(sansDoublons(d.fils, (f) => f && f.conv, (f) => f && f.da), (f) => f && f.da) : [];
   if (!releves.length && !fils.length) {
     return (
-      <div data-messages-lbc="jamais" style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{tr('messages.encoreMessagesReleves')}</div>
-        <div style={{ color: C.muted }}>
-          {cap === 'ok' ? <>{tr('messages.ouvre')} <b>{tr('messages.leboncoinFr')}</b> {tr('messages.foisConnecteNon')}</>
-            : cap === 'retard' ? <>{tr('messages.extensionInstalleeReleve')} <b>{EXT_CAPACITES.lbcmsg}</b>{tr('messages.metsJour')}</>
-            : <>{tr('messages.extensionReleveQuand')}</>}
-        </div>
-        {ouvrir}
-      </div>
+      // (28 nov., sites soignés) Dit comme la page de connexion eBay : la tuile, les étapes, UN geste.
+      <EtatSite site="leboncoin" sorte="jamais" titre={tr('ss.msg.jamais.titre', { site: 'Leboncoin' })}
+        etapes={[tr('ss.msg.lbc.etape.1'), tr('ss.msg.etape.2'), tr('ss.msg.etape.3')]}
+        action={{ libelle: tr('messages.ouvrirLeboncoin'), href: 'https://www.leboncoin.fr/messages', attrs: { 'data-ouvrir-messages-lbc': '' } }}
+        note={cap === 'retard' ? tr('ss.msg.majExt', { v: EXT_CAPACITES.lbcmsg }) : ''}
+        attrs={{ 'data-messages-lbc': 'jamais' }}/>
     );
   }
   const total = releves.reduce((a, l) => a + (Number(l.c.unread) || 0), 0);

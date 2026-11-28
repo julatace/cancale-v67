@@ -77,3 +77,11 @@ button.ebt-rangee:active, a.ebt-rangee:active { transform: scale(.985); }
 [data-ebt-diagnostic] .ebt-titre, [data-ebt-diagnostic] .ebt-pied { color: var(--sv-encre-2, var(--d-gris, #6E6E73)); }
 [data-ebt-diagnostic] .ebt-titre .ebt-lien, [data-ebt-diagnostic] .ebt-pied .ebt-lien { color: var(--sv-lien, var(--sb-lien, #16181D)); }
 [data-ebt-diagnostic] .ebt-pied.ebt-large { color: var(--sv-encre, #1C1C20); font-size: 15px; }
+/* (28 nov., sites soignés) À l'ordinateur, Ventes · eBay pose ses sections dans la colonne de LISTE (≈ 460 px, le détail à
+   droite) : deux colonnes de cartes y coupaient chaque libellé (« Disponi… », « Niv… »). La mise en page suit la place
+   RÉELLE de la section (requête de conteneur), plus la largeur de la fenêtre : une colonne sous 700 px. Le conteneur est
+   posé sur la section eBay de ces quatre pages seulement (aucune feuille fixe n'y vit : elles passent par un portail). */
+.vrm-tache[data-tache-site="ebay"]:is([data-tache-section="tableau"], [data-tache-section="argent"], [data-tache-section="sante"], [data-tache-section="trafic"]) { container: ebt-place / inline-size; }
+@container ebt-place (max-width: 699px) {
+  .ebt { grid-template-columns: minmax(0, 1fr); padding: 4px 16px 28px; }
+}

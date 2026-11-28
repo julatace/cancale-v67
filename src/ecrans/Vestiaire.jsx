@@ -19,6 +19,7 @@ import { lazySur } from '../chargementSur.js';   // (15 nov.) un morceau qui rat
 import { suivi, suivreJob } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre
 import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { PAS_SU } from '../libelles.js';
+import { EtatSite } from '../sites/SiteSoigne.jsx';   // (28 nov.) les pages des sites soignées
 import { trierRecents } from '../ordreConversations.js';
 import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   // (12 nov.) l'envoi vu dans le fil
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
@@ -1052,7 +1053,12 @@ function MessagesVestiaire() {
   if (d === undefined) corps = <div role="status" data-vc-messages="charge" style={{ ...style, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
   // (5 nov., chantier G, revue 1.10) La panne par `EtatPanne`, avec SON « Réessayer ».
   else if (d === null) corps = <div data-vc-messages="pas-su"><EtatPanne quoi="Tes messages Vestiaire" raison="Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={() => { setD(undefined); return relire(); }}/></div>;
-  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <div data-vc-messages="jamais" style={style}>Pas encore relevés. Ouvre Vestiaire dans le navigateur où l'extension VRM est installée{extSait('vcmessages') === 'retard' ? <> — mise à jour en <b>{EXT_CAPACITES.vcmessages}</b> d'abord</> : ''}.</div>;
+  // (28 nov., sites soignés) Dit comme la page de connexion eBay : la tuile, les étapes, UN geste.
+  else if (!d.compteur && !d.conversations && !(d.fils && Object.keys(d.fils).length)) corps = <EtatSite site="vestiaire" sorte="jamais" titre={tr('ss.msg.jamais.titre', { site: 'Vestiaire' })}
+    etapes={[tr('ss.msg.vc.etape.1'), tr('ss.msg.etape.2'), tr('ss.msg.etape.3')]}
+    action={{ libelle: tr('ss.manque.ouvrir', { site: 'Vestiaire' }) + ' ↗', href: lien, attrs: { 'data-ouvrir-messages-vc': '' } }}
+    note={extSait('vcmessages') === 'retard' ? tr('ss.msg.majExt', { v: EXT_CAPACITES.vcmessages }) : ''}
+    attrs={{ 'data-vc-messages': 'jamais' }}/>;
   else {
     const nl = nonLusVestiaire(d.compteur, d.compteurs);
     const n = nl ? nl.n : null;

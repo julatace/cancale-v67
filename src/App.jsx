@@ -1586,6 +1586,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
 import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
+import { EtatSite as EtatSiteSoigne, TeteSite } from "./sites/SiteSoigne.jsx";   // (28 nov.) les pages des sites soignées
 import { PopEvenements } from "./natif/PopEvenements.jsx";
 // (27 nov., budget-vitesse) GaleriePops : chargée au premier « vrm:galerie-pops » (GaleriePopsCoque, plus bas).
 // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
@@ -30943,14 +30944,27 @@ function OngletManque({ site, onglet, onNav }) {
   const m = ongletSansDonnee(site, onglet);
   if (!m) return null;
   const lien = { leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://fr.vestiairecollective.com/', vinted: 'https://www.vinted.fr/' }[site];
+  // (28 nov., sites soignés) Dit comme la page de connexion eBay (src/sites/SiteSoigne.jsx) : la tuile du logo, ce qui
+  // manque, les étapes qui le font venir, UN geste. eBay : les trois étapes de la connexion elles-mêmes.
+  if (site === 'leboncoin' || site === 'ebay' || site === 'vestiaire') {
+    const ebay = site === 'ebay';
+    return (
+      <div className="ss-hote" style={{ margin: '12px 16px' }}>
+        <EtatSiteSoigne site={site} sorte="jamais" titre={m.manque}
+          etapes={ebay ? [1, 2, 3].map((n) => tr('ebay.cx.etape.' + n)) : [<span key="g" data-onglet-geste="">{m.geste}</span>, tr('ss.manque.etape.2'), tr('ss.manque.etape.3')]}
+          action={ebay ? { libelle: tr('ss.manque.relierEbay'), onClick: allerComptesEbay, attrs: { 'data-onglet-geste-bouton': 'comptes', 'data-vers-comptes-ebay': '' } }
+            : lien ? { libelle: tr('ss.manque.ouvrir', { site: nomPlateforme(site) }) + ' ↗', href: lien, attrs: { 'data-onglet-geste-bouton': 'site' } } : null}
+          note={ebay ? tr('ss.manque.ebay.note') : tr('ss.manque.note')}
+          attrs={{ 'data-onglet-manque': site, 'data-onglet': onglet }}/>
+      </div>
+    );
+  }
   return (
     <div className="vrm-onglet-manque" data-onglet-manque={site} data-onglet={onglet} style={{ margin: '12px 16px', padding: 16, border: `1px solid ${C.border}`, borderRadius: 14, background: C.card }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}><LogoSite site={site}/>{m.manque}</div>
       <div data-onglet-geste="" style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: C.muted }}>{m.geste}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        {site === 'ebay'
-          ? <Bouton variante="primaire" data-onglet-geste-bouton="comptes" data-vers-comptes-ebay="" onClick={allerComptesEbay}>Relier eBay</Bouton>
-          : lien ? <Bouton variante="secondaire" data-onglet-geste-bouton="site" href={lien} target="_blank" rel="noopener noreferrer">Ouvrir {nomPlateforme(site)} ↗</Bouton> : null}
+        {lien ? <Bouton variante="secondaire" data-onglet-geste-bouton="site" href={lien} target="_blank" rel="noopener noreferrer">Ouvrir {nomPlateforme(site)} ↗</Bouton> : null}
       </div>
     </div>
   );
@@ -34914,6 +34928,7 @@ function AppCoeur() {
   // de l'extension Vestiaire vit dans « Plus › Vestiaire ».
   const rendreVestiaire=(t)=>(t==='achats' && !baseKO ? <AchatsVestiaire/> :
     <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:t==='annonces'?12:18}}>
+      {t==='messages' && <TeteSite site="vestiaire" section="messages"/>}
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
@@ -35196,6 +35211,7 @@ function AppCoeur() {
           <Comptabilite key={'pv_'+sec+(filTous?'_tous':'')} filTous={!!filTous} accounts={vintedAccounts} only={sec==='apercu'?'ventes':sec} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum} compteSel={compteSel} setCompteSel={setCompteSel} compteConnecte={compteConnecte} dansPlateforme vueAchats={achats?'achats':undefined}/>
         </section>); };
   const rendreLeboncoin=(sec)=>{ return (<section className="vrm-market-space" aria-label="Leboncoin">
+          {sec==='messages' && <div className="ss-tete-hote"><TeteSite site="leboncoin" section="messages"/></div>}
           {/* Julien : « Leboncoin, la même mise en page que Vinted ». Vinted a
               Ventes / Achats / Annonces ; côté Leboncoin on a maintenant les
               VENTES et les ACHATS (les deux prouvés par `isSeller`, cf.
@@ -35237,6 +35253,9 @@ function AppCoeur() {
           {sec==='annonces'||sec==='colis' ? <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div> : null}
         </section>); };
   const rendreEbay=(sec)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay">
+          {/* (28 nov., sites soignés) La tête des pages propres à eBay : la tuile du logo, le titre, UNE ligne (src/sites/SiteSoigne.jsx).
+              Pas sur les listes (Commandes, Annonces, Achats) : la liste d'abord. */}
+          {['tableau','agent','offres','argent','sante','trafic','promo','messages'].includes(sec) && <div className="ss-tete-hote"><TeteSite site="ebay" section={sec}/></div>}
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
               ventes ». Même structure, dans le skin eBay (noir). Aperçu garde la
               connexion + la publication ; Ventes liste les commandes captées ;
