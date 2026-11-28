@@ -275,7 +275,17 @@ import { trierARefaire } from "../brouillonsARefaire.js";
 import { CLE_SANTE, publierSante } from "../santeDonnees.js";
 // ⟦← App.jsx #26⟧
 import { litigesEtRetours } from '../litigesTousSites.js';   // (23 nov., lot litiges-retours)
-import { RetoursAchatBloc, RetoursAImprimer, RetoursLot, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "../RetoursLitiges.jsx";
+// (28 nov., main-vert — budget-vitesse) Les blocs « Retours et litiges » (src/RetoursLitiges.jsx, ~15 Ko compressés et sa
+// feuille de style) : chargés quand un écran en montre un (rien pendant le chargement), plus au démarrage d'Aujourd'hui.
+const chargerRetours = () => import('../RetoursLitiges.jsx');
+const RetoursAchatBloc = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.RetoursAchatBloc })));
+const RetoursAImprimer = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.RetoursAImprimer })));
+const RetoursLot = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.RetoursLot })));
+const PasAPasRetour = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.PasAPasRetour })));
+const ARenvoyerJournee = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.ARenvoyerJournee })));
+const RetoursLitigesJournee = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.RetoursLitigesJournee })));
+const RetoursAVerifier = aLaDemandeDiscret(() => chargerRetours().then((m) => ({ default: m.RetoursAVerifier })));
+
 // ⟦← App.jsx #27⟧
 import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
 import { pasAPasVente } from "../retourPasAPas.js";
