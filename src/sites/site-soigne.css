@@ -64,4 +64,12 @@
   /* Leboncoin · À envoyer : « Générer le bordereau » de CHAQUE vente n'est plus un plein (un plein par écran, §7 :
      « Générer tous » le reste) — une touche à contour, même place, même geste. !important : la règle de fusion.css l'est. */
   html body .vrm-rangee-bord [data-ss-geste-ligne] { background: var(--n-carte-2) !important; color: var(--n-encre) !important; border: 1px solid var(--n-bord) !important; }
+  /* Cibles au doigt (banc sites-soignes) : le segmenté d'Annonces · eBay (Annonces · Trafic · Promotion) faisait 38 px au
+     téléphone ; « Actualiser » de Recherches et alertes eBay 22 px. 44 px, rien d'autre ne change. */
+  [data-ebay-recherches] .ops-entete button { min-height: 44px !important; }
+}
+/* Le segmenté d'Annonces · eBay : studio-paires.css (couche vrm-premium) le force à 38 px en !important ; une règle
+   !important ne passe devant que depuis une couche déclarée AVANT elle (index.html) — `vrm-a11y`, la couche des cibles. */
+@layer vrm-a11y {
+  @media (pointer: coarse) { .vrm-tache[data-tache-site="ebay"] .vrm-tache-sous .vrm-seg-btn { height: 44px !important; min-height: 44px !important; } }
 }

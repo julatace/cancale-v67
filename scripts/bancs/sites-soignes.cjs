@@ -63,6 +63,9 @@ const PAGES = [
   { cle: 'vc.messages', site: 'vestiaire', tache: 'messages', url: '?tab=messages&site=vestiaire' },
   { cle: 'vc.achats', site: 'vestiaire', tache: 'achats', url: '?tab=achats&site=vestiaire' },
 ];
+// Depuis le 20 nov. (« sans sélecteur ») Ventes, Annonces, Messages et Achats sont des écrans COMMUNS à tous les sites
+// (tout est mélangé, `site=` n'en change rien) : capturés pour la comparaison, jamais jugés ici (leurs propres bancs le font).
+for (const p of PAGES) if (['ventes', 'annonces', 'messages', 'achats'].includes(p.tache)) p.commune = true;
 const VOULUES = liste('PAGES', PAGES.map((p) => p.cle).join(','));
 const CHOISIES = PAGES.filter((p) => VOULUES.includes(p.cle));
 
@@ -225,6 +228,7 @@ if (require.main === module) (async () => {
       if (r.erreurs.length) rouges.push(`${r.page} ${r.fen} ${r.theme} ${r.base} : erreur de page`);
       if (r.pleins > 1) rouges.push(`${r.page} ${r.fen} ${r.theme} ${r.base} : ${r.pleins} pleins`);
       if (r.base !== 'volume') continue;
+      if ((PAGES.find((x) => x.cle === r.page) || {}).commune) continue;
       const pg = PAGES.find((x) => x.cle === r.page) || {};
       if (pg.tete && !r.f.tete.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : pas de tête de page native`);
       if (r.cibles.length) rouges.push(`${r.page} ${r.fen} ${r.theme} : ${r.cibles.length} cibles trop petites (${r.cibles.slice(0, 3).join(' / ')})`);
