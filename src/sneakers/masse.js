@@ -9,10 +9,14 @@
 //    connu, la ligne n'est envoyée que s'il coche « aussi celles sans plancher » dans le récapitulatif.
 // ⚠️ QUI EXÉCUTE (décision de Julien du 20 nov., `src/actionsExtension.js`, `audit-actions-app`) :
 //    · eBay : l'API (la route `revise` existante, confirmée, au prix VU — `envoisPrix(...).ebay`, src/prixPartout.js) ;
-//    · Vinted, Leboncoin, Vestiaire : le PANNEAU de l'extension, ouvert par `lienPanneau` sur la page « Prix » avec
-//      la sélection (ids) — l'extension refait ses gardes (compte de l'onglet, prix relu, plafonds, plancher) et
-//      rien ne part avant SON « Lancer ». L'app ne range AUCUNE commande `cmd_prix_*` (« plus de baisse rangée par
-//      l'app », 20 nov.) et n'envoie aucune commande de plateforme (`CMDS_PLATEFORME`).
+//    · Vinted, Leboncoin, Vestiaire : LA FILE que l'extension exécute déjà — `envoyerGeste` de src/agir/porte.js
+//      (geste 'baisser', file 'prix' ⇒ une commande `cmd_dist_*` d'« À distance » par annonce, au nom du compte de
+//      SON annonce, prise par l'extension qui a CE compte dans son onglet, avec tous ses garde-fous : prix relu
+//      avant, 45/h, pause 429/403, captcha). C'est le chemin de « Paires qui dorment » (27 nov.). La PORTE
+//      (`agirMaintenant`) dit non pour un compte (pas connecté, bloqué, extension absente) ⇒ cette ligne passe par le
+//      PANNEAU de l'extension (`lienPanneau`, page « Prix », la sélection en ids) — rien ne part avant SON « Lancer ».
+//      L'app ne range AUCUNE `cmd_prix_*` (« plus de baisse rangée par l'app », 20 nov.) et n'envoie aucune commande
+//      de plateforme par le pont (`CMDS_PLATEFORME`). Une HAUSSE ne passe jamais par la file (§3) : le panneau.
 //    · marque, pointure, référence : écrites dans VRM seulement (la fiche du N°), jamais envoyées à un site.
 // Module PUR. Exécuté par scripts/audit-sneakers.cjs.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -41,19 +45,19 @@ export function lireOperation(sorte, valeur) {
 
 // LE RÉCAPITULATIF. lignes : [{ cle, site, id, compte, titre, prix (euros), devise, mini, achat }]
 // Rend [{ ...ligne, avantC, apresC, plancher, etat, voie }] — etat :
-//   ok · sous-plancher · sans-plancher · inchange · pas-lu · devise · hausse (refusée par le panneau, §3) · site
-// voie : 'api' (eBay) · 'panneau' (Vinted, Leboncoin, Vestiaire)
+//   ok · sous-plancher · sans-plancher · inchange · pas-lu · devise · hausse (jamais par la file, §3 : le panneau)
+// voie : 'api' (eBay) · 'file' (Vinted, Leboncoin, Vestiaire — une baisse) · 'panneau' (une hausse sur ces sites)
 export function planMasse(lignes, op) {
   if (!op) return [];
   return (lignes || []).filter((l) => l && SITES_MASSE.includes(l.site)).slice(0, MAX_MASSE * 4).map((l) => {
-    const voie = l.site === 'ebay' ? 'api' : 'panneau';
+    const voie = l.site === 'ebay' ? 'api' : 'file';
     const base = { ...l, voie, avantC: c(l.prix), apresC: null, plancher: plancherDe(l) };
     if (l.devise && String(l.devise).toUpperCase() !== 'EUR') return { ...base, etat: 'devise' };
     if (base.avantC == null || base.avantC <= 0) return { ...base, etat: 'pas-lu' };
     const apres = op.sorte === 'pct' ? Math.round(base.avantC * (1 - op.pct / 100)) : op.cents;
     const r = { ...base, apresC: apres };
     if (apres === base.avantC) return { ...r, etat: 'inchange' };
-    if (apres > base.avantC && voie === 'panneau') return { ...r, etat: 'hausse' };
+    if (apres > base.avantC && voie === 'file') return { ...r, voie: 'panneau', etat: 'hausse' };
     if (!r.plancher) return { ...r, etat: 'sans-plancher' };
     if (apres < r.plancher.cents) return { ...r, etat: 'sous-plancher' };
     return { ...r, etat: 'ok' };
@@ -64,14 +68,16 @@ export const lignesAEnvoyer = (plan, avecSansPlancher = false) => (plan || []).f
 export function resumePlan(plan, avecSansPlancher = false) {
   const n = {}; for (const l of plan || []) n[l.etat] = (n[l.etat] || 0) + 1;
   const part = lignesAEnvoyer(plan, avecSansPlancher);
-  return { parEtat: n, partent: part.length, api: part.filter((l) => l.voie === 'api').length, panneau: part.filter((l) => l.voie === 'panneau').length };
+  return { parEtat: n, partent: part.length, api: part.filter((l) => l.voie === 'api').length, file: part.filter((l) => l.voie === 'file').length,
+    hausses: (plan || []).filter((l) => l.etat === 'hausse').length };
 }
 // Les liens du panneau : UN par site (et par compte quand il est connu), la sélection en ids, l'action du panneau
 // (« baisser » pour un pourcentage, « changer » pour un prix). Rien ne part : le panneau s'ouvre sur la sélection.
-export function liensPanneau(plan, op, avecSansPlancher = false) {
+// `lignes` : celles que la porte a refusées (rendues par `appliquerFile`) et les hausses.
+export function liensPanneau(lignes, op) {
   const g = new Map();
-  for (const l of lignesAEnvoyer(plan, avecSansPlancher)) {
-    if (l.voie !== 'panneau') continue;
+  for (const l of lignes || []) {
+    if (!l || l.site === 'ebay') continue;
     const k = l.site + '|' + (l.compte || '');
     const x = g.get(k) || { site: l.site, compte: l.compte || '', ids: [] };
     if (x.ids.length < MAX_MASSE) x.ids.push(String(l.id));
@@ -91,4 +97,23 @@ export async function appliquerEbay(plan, envoyerEbay, { avecSansPlancher = fals
     if (surEtat) surEtat(l.cle, res[l.cle]);
   }
   return res;
+}
+
+// La FILE (SON clic) : une commande par annonce de Vinted / Leboncoin / Vestiaire, par `envoyerGeste` (src/agir/porte.js,
+// donné par l'appelant). Rend { res: { [cle]: { etat: 'file' | 'panneau' | 'refuse', raison } }, panneau: [lignes] } —
+// les lignes que la porte refuse (le compte n'est pas joignable) vont au panneau, jamais perdues, jamais forcées.
+export async function appliquerFile(plan, envoyer, { avecSansPlancher = false, surEtat = null } = {}) {
+  const res = {}, panneau = [];
+  for (const l of lignesAEnvoyer(plan, avecSansPlancher)) {
+    if (l.voie !== 'file') continue;
+    if (surEtat) surEtat(l.cle, { etat: 'envoi' });
+    let r;
+    try { r = await envoyer({ site: l.site, compte: String(l.compte || ''), geste: 'baisser', distGeste: 'prix', args: { id: String(l.id), prix: l.apresC / 100, prixAvant: l.avantC / 100 }, num: l.num || '', avant: l.avantC / 100 }); } catch (_) { r = { ok: false, raison: 'base' }; }
+    if (r && r.ok) res[l.cle] = { etat: 'file', raison: null, id: r.id || null };
+    else if (r && r.raison === 'deja') res[l.cle] = { etat: 'file', raison: 'deja' };
+    else if (r && r.verdict) { res[l.cle] = { etat: 'panneau', raison: r.raison || null }; panneau.push(l); }
+    else res[l.cle] = { etat: 'refuse', raison: (r && r.raison) || 'base' };
+    if (surEtat) surEtat(l.cle, res[l.cle]);
+  }
+  return { res, panneau };
 }

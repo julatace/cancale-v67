@@ -1,0 +1,30 @@
+/* (28 nov. 2026, lot sneakers-cote) — la fiche « Modèle », la feuille Sneakers, la cote à l'achat. Jetons natifs seulement :
+   aucune couleur d'accent nouvelle (§7) ; les pastilles d'étiquette sont des gris et des tons doux (ni rouge, ni violet, ni ambre). */
+.snk-feuille { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 24px; }
+.snk-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--n-texte-2, #6b6b70); }
+.snk-pad { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.snk-tags, .snk-propositions, .snk-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.snk-filtres { flex-direction: row; }
+.snk-propositions { padding: 0 0 4px; }
+.snk-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--n-filet, rgba(0,0,0,.12));
+  background: var(--n-fond-2, transparent); color: var(--n-texte, inherit); font: inherit; font-size: 14px; cursor: pointer; }
+.snk-tag[aria-pressed="true"] { background: var(--n-teinte, rgba(0,104,214,.1)); border-color: transparent; color: var(--n-sur-teinte, inherit); font-weight: 600; }
+.snk-tag-plus { color: var(--n-texte-2, #6b6b70); }
+.snk-tag-saisie { display: inline-flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.snk-pastille { width: 8px; height: 8px; border-radius: 50%; background: #8e8e93; flex: none; display: inline-block; }
+.snk-pastille-grande { width: 14px; height: 14px; }
+[data-snk-couleur="bleu"] .snk-pastille, .snk-pastille[data-snk-couleur="bleu"] { background: #5b8fd6; }
+[data-snk-couleur="vert"] .snk-pastille, .snk-pastille[data-snk-couleur="vert"] { background: #5aa36e; }
+[data-snk-couleur="sable"] .snk-pastille, .snk-pastille[data-snk-couleur="sable"] { background: #c2a878; }
+[data-snk-couleur="ardoise"] .snk-pastille, .snk-pastille[data-snk-couleur="ardoise"] { background: #5f6b7a; }
+[data-snk-couleur="turquoise"] .snk-pastille, .snk-pastille[data-snk-couleur="turquoise"] { background: #4aa3a8; }
+.snk-edite { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.snk-edite-gestes { display: flex; justify-content: flex-end; gap: 8px; }
+.snk-pied-masse { position: sticky; bottom: 0; background: var(--n-fond, #f2f2f7); }
+.snk-cote-achat { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-top: 1px solid var(--n-filet, rgba(0,0,0,.08)); border-bottom: 1px solid var(--n-filet, rgba(0,0,0,.08)); }
+.snk-cote-res { display: flex; flex-direction: column; gap: 6px; }
+.snk-cote-tete { font-size: 15px; }
+.snk-cote-tete b { font-size: 20px; }
+.snk-cote-marge { margin: 0; font-size: 15px; }
+.snk-cote-marge small { color: var(--n-texte-2, #6b6b70); }
+.snk-estimation { font-size: 12px; }
