@@ -22825,7 +22825,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const login=oppL&&typeof oppL.login==='string'&&/^[\w.\-]{1,80}$/.test(oppL.login)?oppL.login:'';
     // 5.455.8 : pas de transaction dans la réponse de la demande ⇒ celle de la CONVERSATION relue (la boîte de l'offre).
     let txAutre=false,txDeConv=false;
-    if(!tx){const t2=txDeConversationFavori(cv,body.itemId);txAutre=t2.autre;if(t2.tx){tx=t2.tx;txDeConv=true;noterDiag('favori_req_tx_conversation');await retenirRouteFavori('transaction','conversation');}}
+    if(!tx&&offre&&!repriseMoitie){const t2=txDeConversationFavori(cv,body.itemId);txAutre=t2.autre;if(t2.tx){tx=t2.tx;txDeConv=true;noterDiag('favori_req_tx_conversation');await retenirRouteFavori('transaction','conversation');}}
     // 4a. La transaction de la réponse, relue (comme Vintex) : le prix de CET article, maintenant.
     let prixAnnonce=null,devise='EUR',titre='';
     if(tx){
@@ -22836,8 +22836,12 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       if(frein)return rep('refuse',t.status);
       const tr=t.ok?(t.json&&t.json.transaction||t.json):null;
       const artTx=tr&&typeof tr==='object'?String(tr.item_id||(tr.item&&tr.item.id)||(tr.offer&&tr.offer.item_id)||''):'';
-      if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');return rep('refuse',t.status,txDeConv?'offre_prix_inconnu':'article_different');}   // 5.455.8 : celle de la conversation (repli) ⇒ « pas de transaction pour CET article », rien d'écrit de plus   // la transaction de LA DEMANDE dit un autre article : jamais une offre dessus
-      if(tr&&typeof tr==='object'){
+      // 5.455.8 : celle de la CONVERSATION (repli) dit un autre article ⇒ écartée, comme si la boîte de l'offre manquait pour CET
+      //    article (une offre demandée ⇒ rien de plus ; sans offre, le message part, comme Vintex).
+      let txEcartee=false;
+      if(artTx&&artTx!==body.itemId&&txDeConv){noterDiag('favori_req_tx_conv_autre_article');tx='';txAutre=true;txEcartee=true;}
+      else if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');return rep('refuse',t.status,'article_different');}   // la transaction de LA DEMANDE dit un autre article : jamais une offre dessus
+      if(!txEcartee&&tr&&typeof tr==='object'){
         const ach=String(tr.buyer_id||(tr.buyer&&tr.buyer.id)||'');
         if(ach&&ach!==body.recipientId){noterDiag('favori_req_tx_autre_acheteur');return rep('refuse',t.status,'destinataire_different');}
         {const ind=annonceIndisponible(tr.item&&typeof tr.item==='object'?tr.item:null,null,null);if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('ignore',t.status,'annonce_indisponible');}}
@@ -23471,7 +23475,10 @@ async function favorisCarte(msg, sender) {
     //    hasard par le serveur, jamais deux fois la même ; « Plus prudent » garde ses 2 à 4 min.
     let plage = null;
     try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && cad.pauseMax > cad.pauseMin) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(ajout ? { ajouter: true } : {}), ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
+    let r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(ajout ? { ajouter: true } : {}), ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
+    // 5.455.8 : ses réglages ont changé ailleurs (l'app, une autre fenêtre) ⇒ l'aperçu relu chez VRM, puis la MÊME sélection relancée
+    //    UNE fois avec ses réglages à jour — jamais un refus « actualise » qui l'arrête.
+    if (!r.ok && r.json && /réglages ont changé/.test(String(r.json.message || ''))) { const f2 = await apercuCarteFrais(o.uid); if (f2.ok && f2.apercu && f2.apercu.reglages) { reglagesL = f2.apercu.reglages; noterDiag('favori_lancer_reglages_relus'); r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(ajout ? { ajouter: true } : {}), ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) }); } }
     if (!r.ok || !r.json || !r.json.vue) return refuse('serveur', (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.');
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.

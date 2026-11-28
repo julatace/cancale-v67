@@ -43,7 +43,7 @@ juger('favoris-historique-interface', [
   { garantie: 'le diagnostic détaillé reprend le contrôle de la vraie ouverture', retiree: 'idem : composant parent retiré' },
   { garantie: 'le rapport ne recycle pas un refus effacé', retiree: 'idem : rapport de l’écran retiré' },
   { garantie: 'une nouvelle vérification retire seulement l’ancien refus de raccordement', retiree: RETIRE },
-  { garantie: 'un article vendu ne peut pas être choisi (ni avant, ni au lancement)', ou: [['liste', /un favori VENDU \(n1\) ⇒ refusé, rien ne part/], ['liste', /un favori vendu AILLEURS \(n2\) ⇒ refusé, rien ne part/]] },
+  { garantie: 'un article vendu ne peut pas être choisi (ni avant, ni au lancement)', ou: [['liste', /un favori VENDU \(n1\) ⇒ écarté \(dit\), jamais envoyé/], ['liste', /un favori vendu AILLEURS \(n2\) ⇒ écarté \(dit\), jamais envoyé/]] },
   { garantie: 'le favori d’un article vendu sort de la liste et est compté', ou: [['liste', /articles vendus \(sur Vinted, et ailleurs\) : cachés et comptés/], ['clair', /annonce vendue : jamais choisissable/]] },
   { garantie: 'la liste à contacter écarte les vendus et garde les autres', ou: [['liste', /les \d+ autres : cochables/]] },
   { garantie: 'un article vendu entre-temps sort de la sélection en cours', ou: [['file', /article vendu avant dispatch : arrêt clair de la file/], ['file', /un article devenu vendu avant le dispatch ne sollicite pas l’extension/]] },

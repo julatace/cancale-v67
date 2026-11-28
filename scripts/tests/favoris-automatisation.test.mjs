@@ -14,7 +14,9 @@ test('message figé et aucun effet réseau au lancement ; pas de lancement concu
   const targets=[cible(1),cible(2)],r=lancer(null,targets);targets[0].recipientId='999';
   assert.equal(r.data.groupes[owner].jobs[0].recipientId,'201');assert.equal(r.valeur.active,true);
   assert.ok(r.data.groupes[owner].jobs.every(x=>x.message==='Message identique avec remise de 10 %.'));
-  assert.throws(()=>lancer(r.data));assert.equal(r.data.groupes[owner].jobs[0].etat,'attente');
+  // 5.455.8 : relancer les MÊMES favoris ne refuse plus — ils remplacent ceux qui attendaient, jamais en double.
+  const r2=lancer(r.data);const j2=r2.data.groupes[owner].jobs;assert.equal(j2.filter(x=>x.id==='101:201').length,1);assert.equal(j2.find(x=>x.id==='101:201').etat,'attente');
+  assert.equal(r.data.groupes[owner].jobs[0].etat,'attente');
 });
 test('une autorisation est consommable une seule fois et seulement par le bon propriétaire',()=>{
   const d=claim(lancer().data).data;
@@ -28,7 +30,8 @@ test('une réservation en cours ne repart jamais sur un autre appel, même aprè
   let d=claim(lancer().data).data;
   for(let i=0;i<30;i++)assert.equal(claim(d,T+i*1000).valeur.travail,undefined);
   const r=claim(d,T+121000);assert.equal(r.valeur.travail,undefined);assert.equal(r.data.groupes[owner].jobs[0].etat,'incertain');assert.equal(r.data.groupes[owner].active,false);
-  assert.throws(()=>lancer(r.data,[cible(2)]));
+  // 5.455.8 : l'envoi « à vérifier » n'est JAMAIS renvoyé, mais il ne bloque plus les autres favoris.
+  assert.throws(()=>lancer(r.data,[cible(1)]));assert.ok(lancer(r.data,[cible(2)]).valeur.active);
 });
 test('arrêt avant consommation interdit l’envoi ; arrêt après départ n’invente pas une annulation',()=>{
   const d=claim(lancer(null,[cible(1),cible(2)]).data).data;
@@ -44,7 +47,8 @@ test('plus de plafond de dix par heure (29 oct.) : la onzième réservation part
   for(let i=0;i<10;i++){const r=claim(d,T+i*90000,owner,'t'+i);assert.ok(r.valeur.travail);d=regler(r.data,T+i*90000,owner,'t'+i);}
   const r=claim(d,T+10*90000,autre);assert.ok(r.valeur.travail);
   d=terminerFile(r.data,{owner:autre,jeton:'jeton-unique',resultat:'refuse'}).data;
-  assert.equal(d.tentatives.length,11);assert.equal(d.groupes[autre].active,false);
+  // 5.455.8 : un favori refusé n'arrête plus les autres (cible 21 attend toujours).
+  assert.equal(d.tentatives.length,11);assert.equal(d.groupes[autre].active,true);assert.equal(d.groupes[autre].jobs.filter(x=>x.etat==='refuse').length,1);
 });
 test('cadence fixe prioritaire, et pas de rattrapage en rafale après une fermeture',()=>{
   let d=lancerFile(null,{owner,targets:[cible(1),cible(2),cible(3)],message:'Bonjour',intervalleMinutes:7,maintenant:T}).data;
@@ -78,13 +82,13 @@ test('une clôture manuelle ne renvoie rien et conserve le dédoublonnage ; accu
   assert.equal(terminerFile(d,{owner,jeton:'jeton-unique',resultat:'envoye'}).data,undefined);
   assert.deepEqual(vueFile(d,autre).jobs,[]);assert.equal(JSON.stringify(vueFile(d,owner)).includes('recipientId'),false);
 });
-test('une réponse incertaine bloque aussi les autres appareils/propriétaires du même compte',()=>{
+// 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer ») : une réponse incertaine ne bloque plus les AUTRES favoris (ni les
+//    autres propriétaires du compte) ; elle reste écartée pour SON favori, jamais renvoyée.
+test('une réponse incertaine ne bloque plus les autres favoris ; elle-même n’est jamais renvoyée',()=>{
   let d=lancer(null,[cible(1)]).data;d=lancer(d,[cible(2)],autre).data;
   d=claim(d).data;d=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'incertain',maintenant:T+10000}).data;
-  assert.equal(claim(d,T+3600000,autre).valeur.travail,undefined);
-  d=cloreIncertains(d,{owner,maintenant:T+3600000}).data;
-  assert.equal(claim(d,T+3600000,autre).valeur.travail,undefined);
-  assert.ok(claim(d,T+3660000,autre).valeur.travail);
+  assert.ok(claim(d,T+3600000,autre,'j2').valeur.travail);
+  assert.throws(()=>lancer(d,[cible(1)]));
 });
 const capture=()=>({uid:'123',type:'notifications',domain:'www.vinted.fr',payload:{notifications:[1,2].map(i=>({id:'n'+i,user_id:200+i,body:'Camille a ajouté ton article à ses favoris.',link:`/items/${100+i}/conversation/new?from_notification=true`}))}});
 const trace=()=>({uid:'123',method:'POST',path:'/api/v2/conversations',body:JSON.stringify({initiator:'native-fixture',item_id:'101',opposite_user_id:'201'})});

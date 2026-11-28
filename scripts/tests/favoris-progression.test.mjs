@@ -43,9 +43,11 @@ test('5.455.4 : conversation pas relue ⇒ réessayée une fois après les autre
  const fin=f.valeur.jobs.find(x=>x.notificationId==='n1');assert.equal(fin.etat,'ignore');assert.equal(fin.raison,'fil_non_relu');
  const b=bilanFavoris(f.valeur.jobs);assert.equal(b.sautes,1);assert.equal(b.parSaut.fil_non_relu,1);assert.match(phraseBilanFavoris(b),/conversation pas relue chez Vinted/);
 });
-test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») arrêtait la file — la cause',()=>{
+// 5.455.8 : un refus propre à UN favori (identité non confirmée après une écriture) n'arrête plus la file : la raison précise
+//    est dite et les autres favoris partent.
+test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») — la cause dite, la file continue',()=>{
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'identite_non_confirmee',ecrits:1,etape:'conversation',maintenant:102000});
- assert.equal(f.valeur.active,false);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
+ assert.equal(f.valeur.active,true);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
 });
 // 5.455.4 : trois conversations ouvertes de suite sans pouvoir être relues ⇒ la file s'arrête (avant : « ignore » ne comptait
 //    pas, une messagerie illisible ouvrait une conversation vide avec CHAQUE acheteur) ; et un saut après écriture garde le rythme.

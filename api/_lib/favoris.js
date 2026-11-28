@@ -255,8 +255,9 @@ export async function routeFavoris(req,res){
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
         const p=validerReglagesFavoris(prefs);
-        // 5.455.8 : des réglages changés ailleurs depuis l'aperçu ne refusent plus l'envoi : ce sont SES réglages enregistrés (`p`,
-        //    relus ici) qui partent — la feuille de l'extension les relit avant « Envoyer ».
+        // Ce qu'il a vu est ce qui part : des réglages changés ailleurs depuis l'aperçu ⇒ refusé (409) ; 5.455.8 : l'extension relit
+        //    alors l'aperçu et relance UNE fois d'elle-même avec ses réglages à jour (aucun cul-de-sac).
+        if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
         const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
         if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
         if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))throw new RefusFavoris('L’historique de ce compte doit être vérifié avant de lancer.');
