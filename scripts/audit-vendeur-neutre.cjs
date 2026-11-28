@@ -274,7 +274,8 @@ const confirmation = (source, code, { auth = AUTH_GOOGLE, langue = 'fr', codeCor
     const sonde = async (jeton) => { const r = faireRes(); await ai.default({ method: 'GET', query: {}, headers: jeton ? { authorization: 'Bearer ' + jeton } : {} }, r); return r.corps || {}; };
     const [sans, vb, vj] = [await sonde(''), await sonde(jwt(B)), await sonde(jwt(J))];
     dit(sans.ready === false && vb.ready === false, "E. GET /api/ai ne dit pas « prête » à un visiteur ni à un autre vendeur (§2.9 : c'est la clé de Julien)", JSON.stringify({ sans: sans.ready, B: vb.ready }));
-    dit(vj.ready === true, "E. … et le dit au propriétaire de l'installation (l'autre sens)", JSON.stringify({ J: vj.ready }));
+    // (28 nov., ia-sans-cle) Plus aucune IA serveur : pas « prête » non plus pour le propriétaire (l'IA est dans le navigateur).
+    dit(vj.ready !== true && vj.reason === 'retire', "E. … ni au propriétaire : l'IA du serveur est retirée (28 nov., IA du navigateur, aucune clé)", JSON.stringify({ J: vj.ready, r: vj.reason }));
     delete process.env.AI_API_KEY;
   });
 

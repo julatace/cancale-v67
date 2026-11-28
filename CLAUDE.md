@@ -83,6 +83,8 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    Chrome, modèle local dans la page) ; sinon **la clé du vendeur**, collée par
    lui, rangée côté serveur, jamais relue par le navigateur. Une fonction qui
    n'a ni l'un ni l'autre se tait et dit pourquoi — jamais un repli sur sa clé.
+   ⚠️ **28 nov. (« je ne veux pas avoir à mettre de clé, ni pour moi ni pour les utilisateurs ») : AUCUNE clé IA** —
+   l'IA du navigateur (`src/iaNavigateur.js`), sinon les règles ; ni clé ni IA serveur (`audit-ia-sans-cle`).
 10. **« L'outil doit être pratique, pas chiant »** (19 nov.) : pas de carte de reproche récurrente, pas de
     confirmation sans risque, pas d'étape à la main que l'extension sait faire, ce qui est certain se remplit seul,
     1 à 2 touchers par geste courant.
@@ -485,9 +487,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **28 nov. · L'IA sans aucune clé (ia-sans-cle)** : rangement sur l'IA du navigateur (`LanguageModel`, téléchargée sur son toucher) sinon assistant guidé ; « ✦ Proposer » ; clé IA et IA serveur retirées. `2026-11-28-ia-sans-cle.md`. Geste : aucun.
 - **28 nov. · Sneakers : référence, pointure, cote VRM, étiquettes, en masse (sneakers-cote)** : référence fabricant + pointure sur la fiche (proposées, SON toucher pose ; jamais une identité) ; cote = SES ventes de la même référence à l'ACHAT (calculette) et dans la valeur du stock, jamais à la mise en ligne ; StockX : pas sans clé, écarté sur décision du 28 nov. ; masse par la file `prix` / l'API eBay, plancher mini / achat + 10 %. `2026-11-28-sneakers-cote.md`. Geste : aucun.
-- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
-- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

@@ -30,11 +30,13 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., ia-sans-cle) src/iaNavigateur.js : l'IA intégrée au navigateur (rangement, « ✦ Proposer »), sinon l'assistant guidé.
+  { id: 'ia-sans-cle', date: '2026-11-28', titre: 'L’IA sans aucune clé', phrase: 'Celle de ton navigateur, sur l’appareil ; sinon l’assistant guidé.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (28 nov., sneakers-cote) src/sneakers/ : référence fabricant, pointure, cote VRM (SES ventes), étiquettes, en masse.
   { id: 'sneakers-cote', date: '2026-11-28', titre: 'Référence, pointure et cote de tes ventes', phrase: 'Valeur du stock, étiquettes et modification en masse, sans aucune clé.', tab: 'annonces', pour: 'sneakers', mode: 'tous' },
   // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.
   { id: 'ebay-livraison', date: '2026-11-28', titre: 'eBay : colis, étiquette et suivi dans Ventes', phrase: 'Date limite eBay, étiquette prépayée par l’acheteur, En route puis Livrée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
-  // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
+  // (28 nov., agent-rangement) src/rangement/ : l'entretien (IA du navigateur ou assistant guidé, aucune clé), le plan, rien avant ton toucher.
   { id: 'assistant-rangement', date: '2026-11-28', titre: 'Un assistant qui organise ton rangement', phrase: 'Il pose des questions, propose pièces, meubles et étages, puis tu valides.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
   { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },

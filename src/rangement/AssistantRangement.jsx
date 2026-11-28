@@ -6,13 +6,14 @@
 //  Une question à la fois ; réponses en boutons, en texte libre (tapé ou dicté par le clavier), photo facultative. À la
 //  fin : LE PLAN, dessiné (pièces → meubles → étages → cases, les cartons d'aujourd'hui à leur place), ses incohérences,
 //  les déplacements proposés — et rien n'est écrit avant « Appliquer ce plan » (SON toucher).
-//  DEUX MOTEURS, choisis seuls (`/api/ai?usage=rangement`) et DITS en haut de la feuille :
-//    · « IA » : sa clé (rangée chiffrée côté serveur, api/_lib/ia-cle.js — collée ici, jamais relue par le navigateur),
-//      ou, pour le seul propriétaire de l'installation, la clé du serveur ; chaque réponse du modèle est VALIDÉE
-//      (src/rangement/moteurIA.js ⇒ src/rangement/plan.js) : une réponse fausse est refusée et l'assistant continue SANS IA ;
-//    · « Sans IA » : l'entretien par règles (src/rangement/entretien.js), le même plan.
-//  CLAUDE.md §2.9 : jamais un repli sur la clé de Julien pour un autre vendeur. §5 : aucun N° changé (le plan ne touche
-//  que des emplacements, src/rangement/plan.js `appliquerPlan`).
+//  DEUX MOTEURS, AUCUNE CLÉ (28 nov., lot ia-sans-cle : « je ne veux pas avoir à mettre de clé, ni pour moi ni pour les
+//  utilisateurs »), choisis seuls et DITS en haut de la feuille :
+//    · « IA de ton navigateur » : le modèle intégré à Chrome (src/iaNavigateur.js), sur l'appareil, gratuit ; s'il
+//      reste à télécharger, une rangée le propose (SON toucher, progression affichée) et l'assistant guidé répond en
+//      attendant ; chaque réponse du modèle est VALIDÉE (src/rangement/moteurIA.js ⇒ src/rangement/plan.js) : une
+//      réponse fausse est refusée et l'assistant guidé prend la suite ;
+//    · « Assistant guidé » : l'entretien par règles (src/rangement/entretien.js), le même plan.
+//  Rien ne part chez un tiers. §5 : aucun N° changé (le plan ne touche que des emplacements, `appliquerPlan`).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, nombre } from '../i18n/index.js';
@@ -20,12 +21,8 @@ import { Feuille, Groupe, Rangee, Bouton, BoutonIcone } from '../natif/index.js'
 import MeubleDessin from '../stockV2/MeubleDessin.jsx';
 import { demarrer, question, repondre, planDe } from './entretien.js';
 import { validerPlan, appliquerPlan, incoherences, capacite, placeDe } from './plan.js';
-import { contexteIA, corpsRequete, lireReponseIA } from './moteurIA.js';
-
-// (28 nov.) Une bulle du fil garde la même clé React tant qu'elle existe (objet ajouté une fois, jamais recréé) :
-// pas de clé d'index (audit-stockage-sur).
-const _idsBulles = new WeakMap(); let _nBulle = 0;
-const idBulle = (b) => { if (!_idsBulles.has(b)) _idsBulles.set(b, ++_nBulle); return _idsBulles.get(b); };
+import { contexteIA, consigne, premierMessage, SCHEMA_REPONSE, lireReponseIA } from './moteurIA.js';
+import { etatModele, ouvrirSession, demanderJSON, fermerSession } from '../iaNavigateur.js';
 import './assistant.css';
 
 // Une photo réduite (1024 px, JPEG) avant tout envoi — jamais l'original.
@@ -47,44 +44,6 @@ function reduirePhoto(fichier) {
   });
 }
 
-// ── LA CLÉ IA DU VENDEUR (rangée côté serveur ; le navigateur n'en apprend que la fin) ──
-function CarteCle({ enTete, onChange }) {
-  const [etat, setEtat] = React.useState(undefined);   // undefined lecture · null pas su · { etat, fin }
-  const [cle, setCle] = React.useState('');
-  const [msg, setMsg] = React.useState('');
-  const [enCours, setEnCours] = React.useState(false);
-  const lire = React.useCallback(() => {
-    fetch('/api/compte?mode=ia-cle', { headers: enTete() }).then((r) => r.json().then((j) => (r.ok ? j : null))).then((j) => setEtat(j || null)).catch(() => setEtat(null));
-  }, [enTete]);
-  React.useEffect(() => { lire(); }, [lire]);
-  const envoyer = async (corps) => {
-    setEnCours(true); setMsg('');
-    try {
-      const r = await fetch('/api/compte?mode=ia-cle', { method: 'POST', headers: { 'content-type': 'application/json', ...enTete() }, body: JSON.stringify(corps) });
-      const j = await r.json().catch(() => null);
-      if (r.ok && j) { setEtat(j); setCle(''); onChange && onChange(); setMsg(corps.action === 'poser' ? tr('rgt.cle.rangee') : tr('rgt.cle.retiree')); }
-      else setMsg((j && j.message) || tr('rgt.cle.echec'));
-    } catch (_) { setMsg(tr('rgt.cle.echec')); }
-    finally { setEnCours(false); }
-  };
-  const posee = etat && etat.etat === 'posee';
-  return (
-    <Groupe titre={tr('rgt.cle.titre')} pied={tr('rgt.cle.pied')} attrs={{ 'data-rgt-cle': posee ? 'posee' : etat === undefined ? 'lecture' : etat === null ? 'passu' : 'aucune' }}>
-      {posee ? <Rangee titre={tr('rgt.cle.posee', { fin: etat.fin || '' })} sousTitre={etat.verif === 'ok' ? tr('rgt.cle.verifiee') : tr('rgt.cle.pasVerifiee')}
-        valeur={<Bouton variante="texte" chargement={enCours} onClick={() => envoyer({ action: 'retirer', confirme: true })} attrs={{ 'data-rgt-cle-retirer': '' }}>{tr('rgt.cle.retirer')}</Bouton>}/> : (
-        <div className="rgt-cle">
-          <label className="rgt-cle-champ">
-            <span className="rgt-cle-libelle">{tr('rgt.cle.libelle')}</span>
-            <input type="password" autoComplete="off" spellCheck="false" value={cle} onChange={(e) => setCle(e.target.value)} placeholder={tr('rgt.cle.exemple')} data-rgt-cle-champ="" maxLength={300}/>
-          </label>
-          <Bouton variante="teinte" chargement={enCours} indisponible={!cle.trim()} onClick={() => envoyer({ action: 'poser', cle: cle.trim() })} attrs={{ 'data-rgt-cle-poser': '' }}>{tr('rgt.cle.poser')}</Bouton>
-        </div>)}
-      {etat === null ? <p className="rgt-note" role="status">{tr('rgt.cle.passu')}</p> : null}
-      {msg ? <p className="rgt-note" role="status" data-rgt-cle-msg="">{msg}</p> : null}
-    </Groupe>
-  );
-}
-
 // ── L'APERÇU DU PLAN ──────────────────────────────────────────────────────────
 function Apercu({ plan, resultat, existants, articles }) {
   const parId = new Map(resultat.meubles.map((m) => [String(m.id), m]));
@@ -100,8 +59,8 @@ function Apercu({ plan, resultat, existants, articles }) {
   const place = (x) => { const m = parId.get(String(x.m)) || existants.find((y) => String(y.id) === String(x.m)); const p = placeDe(x.i, m); return tr('rgt.place', { nom: nomDe(x.m), r: p.rangee, c: p.colonne }); };
   return (
     <div className="rgt-apercu" data-rgt-apercu={resultat.meubles.length} data-rgt-places={cap.places}>
-      <p className="rgt-resume" data-rgt-resume="">{tr('rgt.resume', { n: cap.pieces, pieces: cap.pieces, meubles: cap.meubles, places: nombre(cap.places) })}{Number.isFinite(articles) ? ' ' + tr('rgt.resumeArticles', { n: nombre(articles) }) : ''}</p>
-      {inco.map((x) => <p key={[x.k, x.piece || '', x.meuble || ''].join('|')} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
+      <p className="rgt-resume" data-rgt-resume="">{tr('rgt.resume', { n: cap.pieces, meubles: cap.meubles, places: nombre(cap.places) })}{Number.isFinite(articles) ? ' ' + tr('rgt.resumeArticles', { n: nombre(articles) }) : ''}</p>
+      {inco.map((x) => <p key={x.k + ':' + (x.piece || '') + ':' + (x.meuble || '')} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
       {groupes.map((g) => (
         <Groupe key={g.nom} titre={g.nom} attrs={{ 'data-rgt-piece': g.nom }}>
           <div className="rgt-meubles">
@@ -128,17 +87,21 @@ function Apercu({ plan, resultat, existants, articles }) {
 
 // ── LA FEUILLE ────────────────────────────────────────────────────────────────
 // Props : ouverte, fermer, meubles, slots (les lus : null = pas su), articles (nombre | null), methode ({ qui } | null),
-// archive (la lettre des anciens N°), enTete() (l'en-tête de session), appliquer(resultat, plan) → Promise<bool>, Icon.
-export default function AssistantRangement({ ouverte, fermer, meubles, slots, articles = null, methode = null, archive = '', enTete, appliquer, Icon, langue = 'fr' }) {
+// archive (la lettre des anciens N°), appliquer(resultat, plan) → Promise<bool>, Icon. (`enTete` n'est plus lu : rien
+// ne part au serveur.)
+export default function AssistantRangement({ ouverte, fermer, meubles, slots, articles = null, methode = null, archive = '', appliquer, Icon, langue = 'fr' }) {
   const lu = Array.isArray(meubles) && !!slots && typeof slots === 'object';
   const ctx = React.useMemo(() => ({ meubles: lu ? meubles : [], slots: lu ? slots : {}, articles, methode, archive, dire: (cle, v) => tr(cle, v) }), [lu, meubles, slots, articles, methode, archive]);
   const [moteur, setMoteur] = React.useState(undefined);          // undefined lecture · 'ia' · 'regles'
-  const [source, setSource] = React.useState(null);               // 'vendeur' · 'proprietaire'
-  const [cleOuverte, setCleOuverte] = React.useState(false);
-  const [fil, setFil] = React.useState([]);                       // [{ de: 'vrm'|'moi', texte, photo? , note? }]
+  const [modele, setModele] = React.useState(undefined);          // l'état du modèle du navigateur (src/iaNavigateur.js)
+  const [progres, setProgres] = React.useState(null);             // 0…1 pendant le téléchargement
+  const session = React.useRef(null);
+  const [fil, setFilBrut] = React.useState([]);                       // [{ de: 'vrm'|'moi', texte, photo? , note? }]
+  // Chaque bulle reçoit un identifiant stable à son arrivée (jamais une clé d'index).
+  const idBulle = React.useRef(0);
+  const setFil = React.useCallback((v) => setFilBrut((f) => { const n = typeof v === 'function' ? v(f) : v; return n.map((b) => (b.id ? b : { ...b, id: 'b' + (++idBulle.current) })); }), []);
   const [etat, setEtat] = React.useState(null);                   // l'entretien sans IA
   const [qIA, setQIA] = React.useState(null);                     // la question en cours de l'IA
-  const [hist, setHist] = React.useState([]);                     // l'historique envoyé au modèle
   const [attente, setAttente] = React.useState(false);
   const [plan, setPlan] = React.useState(null);                   // { plan, explication }
   const [texte, setTexte] = React.useState('');
@@ -148,16 +111,17 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
   const bas = React.useRef(null);
   const refPhoto = React.useRef(null);
 
+  // Quel moteur ? Le modèle du navigateur s'il est PRÊT ; sinon l'assistant guidé (et, s'il est téléchargeable, la rangée
+  // qui le propose). Aucune requête réseau.
   const sonder = React.useCallback(() => {
-    setMoteur(undefined);
-    fetch('/api/ai?usage=rangement', { headers: enTete() }).then((r) => r.json()).then((j) => {
-      if (j && (j.moteur === 'vendeur' || j.moteur === 'proprietaire')) { setSource(j.moteur); setMoteur('ia'); } else { setSource(null); setMoteur('regles'); }
-    }).catch(() => { setSource(null); setMoteur('regles'); });
-  }, [enTete]);
+    setMoteur(undefined); fermerSession(session.current); session.current = null;
+    etatModele({ langue }).then((e) => { setModele(e); setMoteur(e === 'disponible' ? 'ia' : 'regles'); }).catch(() => { setModele('absente'); setMoteur('regles'); });
+  }, [langue]);
+  React.useEffect(() => () => { fermerSession(session.current); session.current = null; }, []);
   // À chaque ouverture : un entretien neuf.
   React.useEffect(() => {
     if (!ouverte) return;
-    setFil([]); setEtat(null); setQIA(null); setHist([]); setPlan(null); setTexte(''); setPhoto(null); setApplique(false); graine.current = Date.now().toString(36);
+    setFil([]); setEtat(null); setQIA(null); setPlan(null); setTexte(''); setPhoto(null); setApplique(false); graine.current = Date.now().toString(36);
     sonder();
   }, [ouverte]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -166,24 +130,43 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
     setFil((f) => [...f, ...(note ? [{ de: 'vrm', texte: note, note: true }] : [])]);
     setEtat(demarrer(ctx));
   };
-  const appelIA = async (h, ph) => {
+  // Un tour du modèle du navigateur. `texte` : la réponse du vendeur (null au premier tour : le contexte). La session
+  // garde l'entretien ; ce qui sort est validé avant d'être montré.
+  const appelIA = async (texte) => {
     setAttente(true);
     try {
-      const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', ...enTete() },
-        body: JSON.stringify(corpsRequete({ historique: h, contexte: contexteIA({ meubles: ctx.meubles, slots: ctx.slots, articles, methode, langue }), photo: ph })) });
-      const j = await r.json().catch(() => null);
-      if (!j || !j.ok) { versRegles(tr(j && j.reason === 'no-key' ? 'rgt.ia.sansCle' : 'rgt.ia.panne')); return; }
-      const l = lireReponseIA(j.reponse, { existants: ctx.meubles });
+      if (!session.current) {
+        session.current = await ouvrirSession({ systeme: consigne(langue), langue, surProgres: setProgres });
+        setProgres(null);
+        if (!session.current) { versRegles(tr('rgt.ia.panne')); return; }
+      }
+      const msg = texte == null ? premierMessage(contexteIA({ meubles: ctx.meubles, slots: ctx.slots, articles, methode, langue })) : texte;
+      const j = await demanderJSON(session.current, msg, SCHEMA_REPONSE);
+      if (!j.ok) { versRegles(tr(j.raison === 'forme' ? 'rgt.ia.refusee' : 'rgt.ia.panne')); return; }
+      const l = lireReponseIA(j.objet, { existants: ctx.meubles });
       if (!l.ok) { versRegles(tr('rgt.ia.refusee')); return; }
-      if (l.type === 'question') { setQIA(l); setHist([...h, { role: 'assistant', texte: JSON.stringify(j.reponse) }]); setFil((f) => [...f, { de: 'vrm', texte: l.texte }]); }
-      else { setHist([...h, { role: 'assistant', texte: JSON.stringify(j.reponse) }]); setPlan({ plan: l.plan, explication: l.explication }); setFil((f) => [...f, { de: 'vrm', texte: l.explication || tr('rgt.planPret') }]); }
+      if (l.type === 'question') { setQIA(l); setFil((f) => [...f, { de: 'vrm', texte: l.texte }]); }
+      else { setPlan({ plan: l.plan, explication: l.explication }); setFil((f) => [...f, { de: 'vrm', texte: l.explication || tr('rgt.planPret') }]); }
     } catch (_) { versRegles(tr('rgt.ia.panne')); }
     finally { setAttente(false); }
+  };
+  // SON toucher « Télécharger » : Chrome télécharge le modèle une fois (progression affichée), puis l'entretien
+  // recommence avec lui. Un échec laisse l'assistant guidé, et le dit.
+  const telecharger = async () => {
+    if (progres != null) return;
+    setProgres(0);
+    const s = await ouvrirSession({ systeme: consigne(langue), langue, surProgres: setProgres });
+    setProgres(null);
+    if (!s) { setModele('absente'); setFil((f) => [...f, { de: 'vrm', texte: tr('rgt.ia.telechargeKo'), note: true }]); return; }
+    fermerSession(session.current); session.current = s;
+    setModele('disponible');
+    setPlan(null); setFil([]); setEtat(null); setQIA(null); graine.current = Date.now().toString(36); dernierId.current = null;
+    setMoteur('ia');
   };
   // Le premier mot de l'assistant, quand le moteur est connu.
   React.useEffect(() => {
     if (!ouverte || moteur === undefined || fil.length || !lu) return;
-    if (moteur === 'ia') { setFil([{ de: 'vrm', texte: tr('rgt.bonjourIA'), note: true }]); appelIA([], null); }
+    if (moteur === 'ia') { setFil([{ de: 'vrm', texte: tr('rgt.bonjourIA'), note: true }]); appelIA(null); }
     else { setFil([{ de: 'vrm', texte: tr('rgt.bonjour'), note: true }]); setEtat(demarrer(ctx)); }
   }, [ouverte, moteur, lu]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -210,33 +193,38 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
     const ph = photo; setPhoto(null); setTexte('');
     const dit = rep.libelle != null ? rep.libelle : rep.texte;
     setFil((f) => [...f, { de: 'moi', texte: dit, photo: ph }]);
-    if (moteur === 'ia') { const h = [...hist, { role: 'user', texte: dit }]; setHist(h); appelIA(h, ph); return; }
+    if (moteur === 'ia') { appelIA(dit); return; }
     if (ph) setFil((f) => [...f, { de: 'vrm', texte: tr('rgt.photoSansIA'), note: true }]);
     setEtat((e) => repondre(e, rep.v !== undefined ? { v: rep.v } : { texte: rep.texte }, ctx));
   };
   const resultat = React.useMemo(() => (plan && lu ? appliquerPlan({ meubles: ctx.meubles, slots: ctx.slots, plan: plan.plan, idNeuf: (k) => 'm' + graine.current + k }) : null), [plan, lu, ctx]);
   const choix = qIA ? qIA.choix.map((c) => ({ libelle: c, texte: c })) : qR ? (qR.choix || []).map((c) => ({ v: c.v, libelle: tr(c.cle, c.vars) })) : [];
   const saisie = qIA ? qIA.saisie : qR ? qR.saisie : null;
-  const photoPermise = qIA ? true : qR ? !!qR.photo : false;
+  const photoPermise = qR ? !!qR.photo : false;   // le modèle du navigateur ne lit pas les photos ici : aucune promesse
   const enQuestion = !plan && (qIA || qR) && !attente;
   const valider = async () => { if (!resultat || applique) return; setApplique(true); const ok = await appliquer(resultat, plan.plan); if (ok) fermer(); else setApplique(false); };
-  const recommencer = () => { setPlan(null); setFil([]); setEtat(null); setQIA(null); setHist([]); graine.current = Date.now().toString(36); dernierId.current = null; sonder(); };
+  const recommencer = () => { setPlan(null); setFil([]); setEtat(null); setQIA(null); graine.current = Date.now().toString(36); dernierId.current = null; sonder(); };
 
-  const ligneMoteur = moteur === undefined ? tr('rgt.moteur.lecture') : moteur === 'ia' ? tr(source === 'proprietaire' ? 'rgt.moteur.iaProprio' : 'rgt.moteur.ia') : tr('rgt.moteur.regles');
+  const ligneMoteur = moteur === undefined ? tr('rgt.moteur.lecture') : moteur === 'ia' ? tr('rgt.moteur.ia') : tr('rgt.moteur.regles');
+  const proposerModele = moteur === 'regles' && (modele === 'telechargeable' || modele === 'telechargement' || progres != null);
   return (
     <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('rgt.titre')} detente="pleine" className="rgt-feuille"
       pied={plan && resultat ? <Bouton variante="plein" chargement={applique} onClick={valider} attrs={{ 'data-rgt-appliquer': '' }}>{tr('rgt.appliquer')}</Bouton> : null}
-      attrs={{ 'data-rgt': moteur || 'lecture', 'data-rgt-source': source || undefined }}>
+      attrs={{ 'data-rgt': moteur || 'lecture', 'data-rgt-modele': modele || undefined }}>
       <div className="rgt-moteur" data-rgt-moteur={moteur || 'lecture'}>
         <span className="rgt-moteur-pastille" data-ia={moteur === 'ia' ? '' : undefined} aria-hidden="true">{Icon ? <Icon name={moteur === 'ia' ? 'spark' : 'chat'} size={16}/> : null}</span>
         <span className="rgt-moteur-texte" role="status">{ligneMoteur}</span>
-        <Bouton variante="texte" attrs={{ 'data-rgt-cle-ouvrir': '' }} onClick={() => setCleOuverte((x) => !x)}>{tr(moteur === 'ia' && source === 'vendeur' ? 'rgt.cle.gerer' : 'rgt.cle.ajouter')}</Bouton>
       </div>
-      {cleOuverte ? <CarteCle enTete={enTete} onChange={() => { setCleOuverte(false); recommencer(); }}/> : null}
+      {proposerModele ? (
+        <Groupe pied={tr('rgt.modele.pied')} attrs={{ 'data-rgt-telecharger': progres != null ? 'en-cours' : modele }}>
+          <Rangee titre={tr('rgt.modele.titre')} sousTitre={progres != null ? tr('rgt.modele.progres', { p: Math.round(progres * 100) }) : tr('rgt.modele.sous')}
+            valeur={<Bouton variante="texte" chargement={progres != null} onClick={telecharger} attrs={{ 'data-rgt-telecharger-b': '' }}>{tr('rgt.modele.b')}</Bouton>}/>
+          {progres != null ? <progress className="rgt-progres" max={1} value={progres} aria-label={tr('rgt.modele.titre')}/> : null}
+        </Groupe>) : null}
       {!lu ? <p className="rgt-alerte" role="status" data-rgt-pas-lu="">{tr('rgt.pasLu')}</p> : null}
       <ol className="rgt-fil" aria-live="polite" data-rgt-fil={fil.length}>
         {fil.map((b) => (
-          <li key={idBulle(b)} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
+          <li key={b.id} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
             {b.photo ? <img className="rgt-bulle-photo" src={b.photo} alt={tr('rgt.photoJointe')}/> : null}
             {b.texte ? <span>{b.texte}</span> : null}
           </li>))}
@@ -254,7 +242,7 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
               placeholder={tr(saisie === 'nombre' ? 'rgt.saisie.nombre' : 'rgt.saisie.texte')} aria-label={tr('rgt.saisie.libelle')} data-rgt-saisie="" maxLength={200}/>
             <BoutonIcone libelle={tr('rgt.envoyer')} icone={Icon ? <Icon name="send" size={20}/> : '→'} indisponible={!texte.trim() && !photo} onClick={() => { if (texte.trim() || photo) envoyer({ texte: texte.trim() || tr('rgt.photoSeule') }); }} attrs={{ 'data-rgt-envoyer': '' }}/>
           </form>
-          {photo ? <p className="rgt-note" data-rgt-photo-prete="">{tr(moteur === 'ia' ? 'rgt.photoPrete' : 'rgt.photoPreteSansIA')}</p> : null}
+          {photo ? <p className="rgt-note" data-rgt-photo-prete="">{tr('rgt.photoPreteSansIA')}</p> : null}
         </div>) : null}
       {plan && resultat ? <>
         <Apercu plan={plan.plan} resultat={resultat} existants={ctx.meubles} articles={articles}/>

@@ -50,7 +50,6 @@ const SECTIONS = [
   { nom: 'Bilan', cond: 'showWrapped', feuille: true },
   { nom: 'Sourcing', cond: 'showSourcing', feuille: true },
   { nom: 'Qr', cond: 'qrView', feuille: true },
-  { nom: 'Ia', cond: 'iaOpen', feuille: true },
   { nom: 'Choix', cond: 'pickerFor', feuille: true },
   { nom: 'Lot', cond: 'lotOpen', feuille: true },
   { nom: 'Audit', cond: 'auditOpen', feuille: true },

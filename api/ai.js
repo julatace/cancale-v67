@@ -1,214 +1,23 @@
-// api/ai.js — Assistant de rédaction d'annonces (RESELL AI).
-// Réécrit un titre + une description d'annonce Vinted pour la rendre plus
-// vendeuse, à partir de l'annonce existante et de SES vraies caractéristiques.
+// api/ai.js — aujourd'hui : le DÉTOURAGE Photoroom de l'écran Vestiaire (`?mode=detourage`, /api/detourage par
+// réécriture) et rien d'autre.
 //
-// SÉCURITÉ : la clé de l'IA ne vit JAMAIS dans le code du site ni dans
-// l'extension. Deux sources possibles, dans cet ordre :
-//   1. une variable d'environnement Vercel  AI_API_KEY  (recommandé) ;
-//   2. à défaut, la clé fournie par l'app depuis l'appareil de Julien (sa
-//      propre clé, stockée en local, jamais synchronisée, envoyée en HTTPS).
-// Sans aucune clé → réponse 200 { ok:false, reason:'no-key' } : l'app le sait
-// et retombe sur ses suggestions calculées (aucune rédaction inventée).
-//
-// L'IA a une consigne stricte : NE RIEN INVENTER. Elle ne reformule que ce
-// qu'on lui donne (marque, taille, état) — jamais un état ou une matière non
-// fournis. On ne veut pas de belles annonces mensongères.
+// ⚠️⚠️ (28 nov. 2026, lot ia-sans-cle) AUCUNE IA NE PASSE PLUS PAR LE SERVEUR. Julien : « je ne veux pas avoir à mettre
+//    de clé, ni pour moi ni pour les utilisateurs, débrouille-toi ». Les anciens modes de cette route — la rédaction
+//    d'annonce (retirée de l'interface le 30 sept.), l'aide à la réponse (`reply`, plus appelée par rien) et l'assistant
+//    de rangement (`rangement`, sur la clé du vendeur ou celle du serveur) — sont RETIRÉS : l'IA tourne dans le
+//    navigateur (src/iaNavigateur.js, le modèle intégré à Chrome, sur l'appareil), sinon l'assistant guidé par règles.
+//    Plus aucun appel à un fournisseur d'IA, plus aucune clé lue (ni `AI_API_KEY`, ni la clé d'un vendeur).
+//    Une ancienne app (onglet resté ouvert) qui appelle encore ces modes reçoit 410 `retire` : son écran retombe déjà
+//    sur ses règles (« pas su » ≠ « oui »). Ne pas remettre d'IA serveur sans une décision de Julien (CLAUDE.md §2.9).
+// Le fichier reste parce que le plan Hobby plafonne à 12 fonctions et que le détourage vit ici.
 
 import './_lib/sans-bruit.js';
-import { utilisateurDe } from './_lib/session.js';
-import { accesVendeur } from './_lib/abonnement.js';
 import { handleDetourage } from './_lib/detourage.js';
-import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
-import { lireCleIa } from './_lib/ia-cle.js';   // (28 nov., agent-rangement) la clé IA du VENDEUR, dans le coffre
-import { handleRangement, MODELE_RANGEMENT } from './_lib/rangement-ia.js';
-
-// (11 nov., B117) le prix part dans le prompt : un nombre ou rien, jamais un objet ou 10 000 caractères.
-export const prixBorne = (v) => { if (v == null || v === '') return undefined; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 && n < 1e6 ? n : undefined; };
-const MODEL = process.env.AI_MODEL || 'claude-haiku-4-5-20251001';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');   // (11 nov., B116) la réponse dépend de la session
-  // ⚠️ LE DÉTOURAGE PHOTOROOM EST UN MODE DE CETTE ROUTE (/api/detourage par
-  //    réécriture) : le plan Hobby plafonne à 12 fonctions, et le projet y est.
-  //    Il passe AVANT tout le reste — en particulier avant le « no-key » de l'IA,
-  //    qui sinon répondrait pour lui tant que la clé de l'IA n'est pas posée.
   if (req.query && req.query.mode === 'detourage') return handleDetourage(req, res);
-  // Santé : l'app interroge cette route pour afficher « IA branchée / non ».
-  // ⚠️ (1er nov., VRM vendu à d'autres — §2.9) « prête » ne se dit qu'à celui
-  //    que la clé du SERVEUR sert vraiment : le propriétaire de l'installation
-  //    (`VRM_OWNER_UID`, la même règle que le POST ci-dessous). Elle répondait
-  //    `ready` à TOUT visiteur dès qu'`AI_API_KEY` était posée : le bouton
-  //    « ✨ Rédiger » apparaissait chez chaque vendeur, et répondait « no-key »
-  //    au clic. Sans session, ou un autre vendeur : `ready:false` et la raison
-  //    (`pas-active`) — l'app n'affiche pas un bouton qui ne marchera pas.
-  //    Aucune clé ne se lit ni ne se dit ici.
-  // (28 nov., agent-rangement) « Quel moteur répond à l'assistant de rangement ? » : la clé du VENDEUR (coffre), sinon
-  //    celle du serveur pour le SEUL propriétaire de l'installation, sinon aucun (le moteur sans IA). Aucune clé ne se dit.
-  if (req.method === 'GET' && req.query && req.query.usage === 'rangement') {
-    const u = await utilisateurDe(req);
-    if (u === undefined) { res.status(503).json({ ok: false, reason: 'connexion-injoignable' }); return; }
-    if (!u) { res.status(200).json({ ok: true, moteur: null, raison: 'session' }); return; }
-    const cleV = await lireCleIa(u.id);
-    if (cleV === undefined) { res.status(200).json({ ok: true, moteur: null, raison: 'cle-pas-su' }); return; }
-    const proprio = String(process.env.VRM_OWNER_UID || '');
-    const srv = !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY) && !!proprio && u.id === proprio;
-    res.status(200).json({ ok: true, moteur: cleV ? 'vendeur' : srv ? 'proprietaire' : null, ...(cleV || srv ? {} : { raison: 'no-key' }), model: MODELE_RANGEMENT });
-    return;
-  }
-  if (req.method === 'GET') {
-    const cleSrv = !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY);
-    const proprio = String(process.env.VRM_OWNER_UID || '');
-    let pourLui = false;
-    if (cleSrv && proprio) { try { const u = await utilisateurDe(req); pourLui = !!u && u.id === proprio; } catch (_) { pourLui = false; } }
-    res.status(200).json({ ok: true, ready: cleSrv && pourLui, ...(cleSrv && pourLui ? {} : { raison: 'pas-active' }), model: MODEL });
-    return;
-  }
-  if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'POST' }); return; }
-
-  const b = req.body || {};
-  const cleServeur = process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-  // ⚠️⚠️ §2.9 (revue du 17 octobre, `audit-routes-revue.cjs` E) : la clé du
-  //    SERVEUR est celle de Julien, payée à l'usage. Elle servait à tout
-  //    vendeur connecté — et passait même DEVANT la clé que le vendeur
-  //    apportait. Désormais : la clé du vendeur d'abord ; la clé du serveur
-  //    pour le seul propriétaire de l'installation (`VRM_OWNER_UID`, la règle
-  //    du détourage) ; personne d'autre — « no-key », l'app retombe sur ses
-  //    suggestions calculées. Jamais un repli sur sa clé.
-  const cleVendeur = typeof b.key === 'string' && b.key.trim() ? b.key.trim() : '';
-  // ⚠️ (9 nov., revue sécurité) SESSION EXIGÉE POUR TOUT POST, clé du vendeur
-  //    comprise. Avec une clé dans le corps, la route appelait Anthropic SANS
-  //    rien vérifier : vrm.center servait de relais ouvert à n'importe qui (une
-  //    clé volée « blanchie » par notre adresse, chaque appel payé en temps de
-  //    fonction sur le plan de Julien). L'app envoie toujours sa session.
-  const u = await utilisateurDe(req);
-  if (u === undefined) { res.status(503).json({ ok: false, reason: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' }); return; }
-  if (!u) { res.status(401).json({ ok: false, reason: 'session', message: "Connecte-toi à VRM pour utiliser l'assistant." }); return; }
-  if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
-  if (cleVendeur.length > 300) { res.status(400).json({ ok: false, reason: 'cle' }); return; }
-  // (28 nov., agent-rangement) L'ASSISTANT DE RANGEMENT : la clé du VENDEUR rangée dans le coffre (api/_lib/ia-cle.js),
-  //    jamais une clé envoyée par le navigateur ; pas su ⇒ 503 (jamais un repli sur la clé du serveur) ; aucune ⇒ celle
-  //    du serveur pour le SEUL propriétaire de l'installation ; sinon « no-key » (l'assistant continue sans IA).
-  if (b.mode === 'rangement') {
-    const cleV = await lireCleIa(u.id);
-    if (cleV === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su', message: "Je n'ai pas pu lire ta clé IA : je continue sans IA." }); return; }
-    const proprio = String(process.env.VRM_OWNER_UID || '');
-    const k = cleV || (cleServeur && proprio && u.id === proprio ? cleServeur : '');
-    if (!k) { res.status(200).json({ ok: false, reason: 'no-key', message: "L'assistant IA a besoin de TA clé. VRM n'utilise pas la sienne pour toi." }); return; }
-    return handleRangement(res, k, b);
-  }
-  let key = cleVendeur;
-  if (!key && cleServeur) {
-    // LA CLÉ DU SERVEUR SE PAIE : pour le seul propriétaire de l'installation.
-    const proprio = String(process.env.VRM_OWNER_UID || '');
-    if (proprio && u.id === proprio) key = cleServeur;
-    else { res.status(200).json({ ok: false, reason: 'no-key', message: "L'assistant IA a besoin de TA clé. VRM n'utilise pas la sienne pour toi." }); return; }
-  }
-  if (!key) { res.status(200).json({ ok: false, reason: 'no-key' }); return; }
-
-  // ── MODE « aide à la réponse » (spec Messaging Intelligence) : on analyse le
-  //    message d'un ACHETEUR et on propose des réponses NATURELLES. L'humain
-  //    relit, modifie et envoie LUI-MÊME sur Vinted — aucune action automatique,
-  //    aucun auto-envoi : strictement conforme (assistance seule). ──
-  if (b.mode === 'reply') return handleReply(res, key, b);
-
-  const it = {
-    title: String(b.title || '').slice(0, 200),
-    brand: String(b.brand || '').slice(0, 80),
-    size: String(b.size || '').slice(0, 40),
-    condition: String(b.condition || '').slice(0, 60),
-    price: prixBorne(b.price),   // (11 nov., B117) un nombre, borné
-    desc: String(b.desc || '').slice(0, 1500),
-  };
-
-  const sys = `Tu es un expert de la revente de sneakers et de vêtements d'occasion sur Vinted (marché français). Tu réécris une annonce pour la rendre plus vendeuse SANS JAMAIS MENTIR : n'invente aucune caractéristique (état, matière, pointure, coloris) qui ne t'est pas explicitement donnée. Style Vinted : titre court et précis (marque + modèle + taille + état quand ils sont connus), description claire, honnête, chaleureuse, en français, avec au maximum 1 à 2 émojis. Tu réponds STRICTEMENT en JSON, rien d'autre.`;
-
-  const user = `Annonce actuelle :
-- Titre : ${it.title || '(vide)'}
-- Marque : ${it.brand || '(inconnue)'}
-- Taille : ${it.size || '(inconnue)'}
-- État : ${it.condition || '(inconnu)'}
-- Prix : ${it.price != null ? it.price + ' €' : '(inconnu)'}
-- Description actuelle : ${it.desc || '(vide)'}
-
-Réponds par un JSON de la forme :
-{"title": "...", "desc": "...", "why": "une phrase courte expliquant ce que tu as amélioré"}
-Contraintes : le titre fait au plus 70 caractères ; la description fait 2 à 4 lignes ; n'ajoute jamais une info non fournie ci-dessus.`;
-
-  try {
-    const r = await fetchAvecDelai('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 600, system: sys, messages: [{ role: 'user', content: user }] }),
-      signal: AbortSignal.timeout(25000),   // (11 nov., robustesse) jamais pendu jusqu'à la coupure
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { res.status(200).json({ ok: false, reason: 'api-error', detail: (j && j.error && j.error.message) || String(r.status) }); return; }
-    const text = (j.content || []).map(c => c.text || '').join('').trim();
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch {} } }
-    // `facture: true` : Anthropic a répondu 2xx, l'appel est PAYÉ même si sa sortie
-    // est inexploitable — l'appelant ne doit pas le redemander comme une panne.
-    if (!parsed || !parsed.title) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
-    res.status(200).json({
-      ok: true,
-      title: String(parsed.title).slice(0, 120),
-      desc: String(parsed.desc || '').slice(0, 1200),
-      why: String(parsed.why || '').slice(0, 200),
-    });
-  } catch (err) {
-    // (11 nov., B115) une panne réseau est un 502, et le détail est borné (jamais une pile).
-    res.status(502).json({ ok: false, reason: 'network', detail: String((err && err.name) || 'erreur').slice(0, 60) });
-  }
-}
-
-// Analyse d'un message d'acheteur → intention + réponses suggérées (le vendeur
-// choisit, adapte et envoie lui-même sur Vinted). RIEN n'est envoyé d'ici.
-async function handleReply(res, key, b) {
-  const article = String(b.article || '').slice(0, 160);
-  const price = prixBorne(b.price);
-  const msg = String(b.message || '').slice(0, 1000);
-  if (!msg.trim()) { res.status(200).json({ ok: false, reason: 'no-message' }); return; }
-
-  const sys = `Tu es un vendeur français de sneakers et vêtements d'occasion sur Vinted, sympathique et efficace. On te donne le message d'un ACHETEUR. Tu proposes des réponses que LE VENDEUR relira, pourra modifier, et enverra LUI-MÊME (tu n'envoies rien, tu ne fais aucune action). Les réponses doivent sonner HUMAINES : variées dans le ton et la formulation, avec de petites variations naturelles, JAMAIS des modèles répétés ni un ton robotique ou sur-optimisé. Français, courtes, 0 à 2 émojis maximum, toujours polies. Ne promets rien d'irréaliste, n'invente aucune info sur l'article. Tu réponds STRICTEMENT en JSON, rien d'autre.`;
-
-  const user = `Article concerné : ${article || '(inconnu)'}${price != null ? ` — prix affiché ${price} €` : ''}
-Message de l'acheteur : "${msg}"
-
-Réponds par un JSON de la forme :
-{"intent":"un seul mot parmi: interet|negociation|hesitation|offre_basse|question|autre","confidence":0-100,"suggestions":[{"tone":"court","text":"..."},{"tone":"chaleureux","text":"..."},{"tone":"pro","text":"..."}]}
-Donne 3 à 5 suggestions, chacune dans un ton DIFFÉRENT, prêtes à copier. Adapte-les au message : négociation → propose un petit geste sans brader ; question → réponds clairement ; offre trop basse → refuse poliment en gardant la porte ouverte ; simple intérêt → confirme la dispo chaleureusement.`;
-
-  try {
-    const r = await fetchAvecDelai('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 700, system: sys, messages: [{ role: 'user', content: user }] }),
-      signal: AbortSignal.timeout(25000),   // (11 nov., robustesse) jamais pendu jusqu'à la coupure
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { res.status(200).json({ ok: false, reason: 'api-error', detail: (j && j.error && j.error.message) || String(r.status) }); return; }
-    const text = (j.content || []).map(c => c.text || '').join('').trim();
-    let parsed = null;
-    try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]); } catch {} } }
-    // ⚠️⚠️ REVUE DU 11 OCTOBRE : à partir d'ici Anthropic a répondu 2xx — l'appel
-    //    est FACTURÉ. Une sortie illisible (JSON tronqué, texte libre, réponse
-    //    vide) répondait `{ok:false, reason:'parse'}` comme une panne, et
-    //    l'extension (`repondreAuxMessages`) la redemandait à chaque page Vinted :
-    //    la fuite qu'on venait de fermer restait ouverte. `facture: true` le DIT ;
-    //    les refus d'avant l'appel (no-key, session, abonnement, réseau,
-    //    api-error) ne le portent jamais.
-    if (!parsed || !Array.isArray(parsed.suggestions)) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
-    const suggestions = parsed.suggestions.filter(s => s && s.text).slice(0, 5)
-      .map(s => ({ tone: String(s.tone || '').slice(0, 20), text: String(s.text).slice(0, 400) }));
-    if (!suggestions.length) { res.status(200).json({ ok: false, reason: 'parse', facture: true }); return; }
-    res.status(200).json({
-      ok: true,
-      intent: String(parsed.intent || 'autre').slice(0, 20),
-      confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || 0)),
-      suggestions,
-    });
-  } catch (err) {
-    // (11 nov., B115) une panne réseau est un 502, et le détail est borné (jamais une pile).
-    res.status(502).json({ ok: false, reason: 'network', detail: String((err && err.name) || 'erreur').slice(0, 60) });
-  }
+  // Tout le reste : l'IA est dans le navigateur. Aucune clé lue, aucun appel sortant.
+  res.status(410).json({ ok: false, ready: false, reason: 'retire', moteur: 'navigateur',
+    message: "L'IA de VRM tourne maintenant dans ton navigateur, sans clé : recharge la page." });
 }

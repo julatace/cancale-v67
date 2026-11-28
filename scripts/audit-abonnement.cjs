@@ -616,13 +616,15 @@ const SUB = (owner, status = 'active', extra = {}) => ({ id: 'sub_' + owner.slic
   await essaie('ia', async () => {
     reset(); process.env.AI_API_KEY = 'cle-ia-banc';
     const sans = await appelIa('');
-    dit(sans.code === 401, 'sans session, la clé IA du serveur ne sert à personne', `HTTP ${sans.code}`);
+    // (28 nov., ia-sans-cle) l'IA du serveur est RETIRÉE (IA du navigateur, aucune clé) : personne ne la dépense plus,
+    // abonné ou non. Le contrôle d'abonnement de la route n'a donc plus d'objet ; on vérifie qu'elle ne sert personne.
+    dit(sans.code === 410, 'sans session, la clé IA du serveur ne sert à personne', `HTTP ${sans.code}`);
     obligatoire = true;
     const coupe = await appelIa('aa.bb.A');
-    dit(coupe.code === 402, 'un vendeur qui ne paie plus ne s’en sert plus non plus', `HTTP ${coupe.code}`);
+    dit(coupe.code === 410, 'un vendeur qui ne paie plus ne s’en sert pas non plus', `HTTP ${coupe.code}`);
     obligatoire = false; if (oublierAcces) oublierAcces();   // la mémoire d'une minute du serveur
     const avec = await appelIa('aa.bb.A');
-    dit(avec.code !== 401 && avec.code !== 402, 'autre sens : un vendeur connecté s’en sert', `HTTP ${avec.code}`);
+    dit(avec.code === 410 && avec.corps && avec.corps.reason === 'retire', 'ni un vendeur abonné : l’IA tourne dans son navigateur', `HTTP ${avec.code}`);
     delete process.env.AI_API_KEY;
   });
 

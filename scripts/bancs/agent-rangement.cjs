@@ -1,17 +1,22 @@
 // Banc : « L'ASSISTANT DE RANGEMENT » (28 nov. 2026, lot agent-rangement). Récit : docs/passation/2026-11-28-agent-rangement.md.
 // Julien : « je veux un vrai agent IA qui pose des questions, totalement intelligent, qui adapte les étages, les pièces ».
-// Données INVENTÉES (dépôt public). La route /api/ai est SIMULÉE (aucun appel réel, aucune clé).
-//   A  (sans IA, base de 2 meubles et 10 cartons) : l'entrée du Stock ouvre la feuille ; le moteur « sans IA » est DIT ;
+// Données INVENTÉES (dépôt public). (28 nov., ia-sans-cle) L'IA est celle du NAVIGATEUR : un FAUX `LanguageModel` (l'API
+// Prompt de Chrome) est injecté dans la page ; aucune clé, et toute requête vers /api/ai est comptée (attendu : 0).
+//   A  (sans `LanguageModel`, base de 2 meubles et 10 cartons) : l'entrée du Stock ouvre la feuille ; « l'assistant guidé,
+//      aucune clé » est DIT, aucune carte de clé ;
 //      une question à la fois, en boutons ; « modifier » → ajouter un meuble dans une nouvelle pièce « Cave » (tapée) → le
 //      plan dessiné ; « Appliquer ce plan » écrit `vrm_meubles` (3 meubles, pièces notées) ; AUCUN N° changé, aucune case
 //      bougée (`vrm_slots` identique, `vinted_annonce_numeros` identique) ; le Stock se range par pièce.
-//   B  (avec IA simulée) : le moteur « IA » est dit ; la question du modèle s'affiche avec SES boutons ; la réponse suivante
-//      (un plan valide) est dessinée ; « Recommencer » → une réponse INVALIDE est REFUSÉE et l'assistant passe SANS IA.
+//   B  (faux modèle « available ») : « l'IA de ton navigateur » est dite ; la question du modèle s'affiche avec SES boutons
+//      (sortie contrainte par le schéma) ; la réponse suivante (un plan valide) est dessinée ; « Recommencer » → une réponse
+//      INVALIDE est REFUSÉE et l'assistant guidé prend la suite ;
+//   D  (faux modèle « downloadable ») : l'assistant guidé répond, la rangée « Télécharger » est proposée ; son toucher ⇒
+//      progression, puis l'IA du navigateur pose sa question.
 //   C  (base vide) : l'entrée du vide ouvre l'assistant ; 1 pièce / 1 meuble ⇒ un meuble créé, rien d'autre.
 //   Q  sur chaque rendu : pas de défilement de côté, au plus UN plein dans la feuille, boutons de réponse ≥ 44 px, aucune
 //      erreur de page.
 // Rendus : 390 tactile clair, 390 tactile sombre, 1512 clair, 1512 sombre. `SHOT=prefixe` : les captures (jamais commitées).
-//   BANC_PORT=4851 SHOT=/tmp/rgt node scripts/bancs/agent-rangement.cjs
+//   BANC_PORT=4911 SHOT=/tmp/rgt node scripts/bancs/agent-rangement.cjs
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
@@ -43,13 +48,14 @@ const serveur = (dist) => http.createServer((q, r) => {
 const PORT = Number(process.env.BANC_PORT) || 0;
 const ecouter = (srv) => new Promise((ok) => srv.listen(PORT, () => ok(srv.address().port)));
 
-// L'IA simulée : `moteur` (ce que dit la sonde) et la FILE des réponses du modèle (une par POST).
-async function rendre(b, port, { tel, sombre, volume = true, moteur = null, reponses = [] }) {
+// Le modèle du navigateur SIMULÉ : `modele` (null = pas d'API, 'available', 'downloadable') et la FILE de ses sorties (une
+// par `prompt`). Ce que l'app lui passe est retenu dans `window.__lm`.
+async function rendre(b, port, { tel, sombre, volume = true, modele = null, reponses = [] }) {
   const B = base(volume);
   const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const posts = [];
+  const posts = [];   // toute requête vers /api/ai (attendu : aucune)
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -63,15 +69,25 @@ async function rendre(b, port, { tel, sombre, volume = true, moteur = null, repo
   });
   await pg.route('**/api/**', async (r) => {
     const u = r.request().url();
-    if (/\/api\/ai\?usage=rangement/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, moteur }) });
-    if (/\/api\/ai$/.test(u.split('?')[0]) && r.request().method() === 'POST') {
-      posts.push(JSON.parse(r.request().postData() || '{}'));
-      const rep = reponses.shift();
-      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rep ? { ok: true, reponse: rep } : { ok: false, reason: 'no-key' }) });
-    }
-    if (/mode=ia-cle/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, etat: moteur === 'vendeur' ? 'posee' : 'aucune', fin: moteur === 'vendeur' ? 'Ab12' : null, verif: 'ok' }) });
+    if (/\/api\/ai(\?|$)/.test(u) || /mode=ia-cle/.test(u)) { posts.push(u); return r.fulfill({ status: 410, contentType: 'application/json', body: '{"ok":false,"reason":"retire"}' }); }
     return r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' });
   });
+  await pg.addInitScript(({ modele, sorties }) => {
+    if (!modele) return;
+    const vu = window.__lm = { creations: [], prompts: [], etat: modele };
+    window.LanguageModel = {
+      availability: async () => vu.etat,
+      create: async (o = {}) => {
+        vu.creations.push({ system: (o.initialPrompts || []).map((x) => x.role + ':' + String(x.content).slice(0, 60)) });
+        if (vu.etat === 'downloadable') {
+          const cible = new EventTarget(); if (typeof o.monitor === 'function') o.monitor(cible);
+          for (const x of [0.25, 0.6, 1]) { await new Promise((ok) => setTimeout(ok, 350)); const e = new Event('downloadprogress'); e.loaded = x; cible.dispatchEvent(e); }
+          vu.etat = 'available';
+        }
+        return { prompt: async (t, opts) => { vu.prompts.push({ t: String(t), contrainte: !!(opts && opts.responseConstraint && opts.responseConstraint.anyOf) }); await new Promise((ok) => setTimeout(ok, 120)); return sorties.shift() || ''; }, destroy() {} };
+      },
+    };
+  }, { modele, sorties: reponses.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) });
   await pg.addInitScript(({ m, sombre }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.removeItem('vrm_stock_v2_vue'); localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} }, { m: B.main, sombre });
   await pg.goto(`http://localhost:${port}/?tab=garage`, { waitUntil: 'domcontentloaded' });
   return { ctx, pg, errs, B, posts };
@@ -101,15 +117,15 @@ const verifQ = async (pg, t, quoi) => { const g = await regles(pg); dit(g.sw <= 
 
 async function scenarioA(b, port, { tel, sombre, nom }) {
   const t = nom + ' A';
-  const r = await rendre(b, port, { tel, sombre, moteur: null });
+  const r = await rendre(b, port, { tel, sombre, modele: null });
   const { pg } = r;
   await pg.waitForSelector('[data-sm-tous]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(800);
   const avant = await lireLs(pg);
   await toucher(pg, tel, '[data-rgt-ouvrir=""]');
   await pg.waitForSelector('[data-rgt="regles"]', { timeout: 8000 }).catch(() => {});
-  const m = await pg.evaluate(() => { const e = document.querySelector('[data-rgt-moteur]'); return e ? { m: e.getAttribute('data-rgt-moteur'), t: e.textContent } : null; });
-  dit(m && m.m === 'regles' && /sans IA/.test(m.t) && /clé IA/.test(m.t), `${t} : le moteur SANS IA est dit, et comment ajouter sa clé`, JSON.stringify(m));
+  const m = await pg.evaluate(() => { const f = document.querySelector('[data-rgt]'); const e = document.querySelector('[data-rgt-moteur]'); return e ? { m: e.getAttribute('data-rgt-moteur'), t: e.textContent, cle: !!(f && (f.querySelector('input[type="password"], [data-rgt-cle], [data-rgt-cle-ouvrir]') || /clé IA|Anthropic/.test(f.textContent))), tele: !!document.querySelector('[data-rgt-telecharger]') } : null; });
+  dit(m && m.m === 'regles' && /assistant guidé/.test(m.t) && /aucune clé/.test(m.t) && !m.cle && !m.tele, `${t} : sans IA du navigateur, « l'assistant guidé (aucune clé) » est dit ; aucune carte ni champ de clé, rien à télécharger`, JSON.stringify(m));
   await pg.waitForSelector('[data-rgt-question="mode"]', { timeout: 6000 }).catch(() => {});
   await shot(pg, nom + '-A-debut');
   await verifQ(pg, t, 'la première question');
@@ -137,6 +153,7 @@ async function scenarioA(b, port, { tel, sombre, nom }) {
   const grp = await pg.evaluate(() => [...document.querySelectorAll('[data-sm-piece-titre]')].map((e) => e.textContent));
   dit(grp.length === 2 && grp.includes('Cave'), `${t} : le Stock se range par pièce`, grp.join(' | '));
   await shot(pg, nom + '-A-stock');
+  dit(!r.posts.length, `${t} : aucune requête vers l'IA du serveur`, r.posts.join(' '));
   dit(!r.errs.length, `${t} : Q — aucune erreur de page`, r.errs.slice(0, 2).join(' | '));
   await r.ctx.close();
 }
@@ -146,11 +163,11 @@ async function scenarioB(b, port, { tel, sombre, nom }) {
   const plan = { version: 1, pieces: [{ nom: 'Garage', meubles: [{ ref: 'mA', nom: 'Étagère entrée', type: 'etagere', etages: 3, casesParEtage: 4, porte: true }, { ref: 'mB', nom: 'Armoire', type: 'armoire', etages: 3, casesParEtage: 3 }] },
     { nom: 'Chambre', meubles: [{ ref: null, nom: 'Pile A', type: 'pile', etages: 6, casesParEtage: 2 }] }], etiquetage: null };
   const reponses = [
-    { type: 'question', texte: 'Ton étagère d’entrée a combien d’étages en vrai ? Sur ta photo j’en vois 3.', choix: ['2', '3', '4'], saisie: 'nombre', photo: true },
+    '```json\n' + JSON.stringify({ type: 'question', texte: 'Ton étagère d’entrée a combien d’étages en vrai ?', choix: ['2', '3', '4'], saisie: 'nombre' }) + '\n```',
     { type: 'plan', plan, explication: 'J’ai ajouté un étage à l’étagère près de la porte et une pile de 12 boîtes dans la chambre.' },
     { type: 'plan', plan: { ...plan, numeros: { 1: 99 } }, explication: 'Je renumérote.' },   // INVALIDE (clé inconnue) : refusée
   ];
-  const r = await rendre(b, port, { tel, sombre, moteur: 'vendeur', reponses });
+  const r = await rendre(b, port, { tel, sombre, modele: 'available', reponses });
   const { pg } = r;
   await pg.waitForSelector('[data-sm-tous]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(800);
@@ -158,35 +175,38 @@ async function scenarioB(b, port, { tel, sombre, nom }) {
   await toucher(pg, tel, '[data-rgt-ouvrir=""]');
   await pg.waitForSelector('[data-rgt-question="ia"]', { timeout: 8000 }).catch(() => {});
   const m = await pg.evaluate(() => { const e = document.querySelector('[data-rgt-moteur]'); return e ? { m: e.getAttribute('data-rgt-moteur'), t: e.textContent } : null; });
-  dit(m && m.m === 'ia' && /IA, avec ta clé/.test(m.t), `${t} : le moteur IA (sa clé) est dit`, JSON.stringify(m));
+  dit(m && m.m === 'ia' && /IA de ton navigateur/.test(m.t) && /aucune clé/.test(m.t), `${t} : « l'IA de ton navigateur, aucune clé » est dite`, JSON.stringify(m));
   const boutons = await pg.evaluate(() => [...document.querySelectorAll('.rgt-choix-b')].map((e) => e.textContent));
   dit(boutons.join() === '2,3,4', `${t} : la question du modèle s'affiche avec SES boutons`, boutons.join(','));
-  const corps = r.posts[0] || {};
-  dit(corps.mode === 'rangement' && !('key' in corps) && corps.contexte && Array.isArray(corps.contexte.meubles) && !/Paire de banc/.test(JSON.stringify(corps)), `${t} : la requête : aucune clé envoyée par le navigateur, ni titre d'annonce`, JSON.stringify(corps).slice(0, 200));
+  const lm = await pg.evaluate(() => window.__lm);
+  dit(lm && lm.creations.length === 1 && /^system:Tu es l'assistant de rangement/.test(lm.creations[0].system[0] || '') && lm.prompts[0] && lm.prompts[0].contrainte && /Contexte \(JSON\)/.test(lm.prompts[0].t) && !/Paire de banc/.test(lm.prompts[0].t),
+    `${t} : le modèle du navigateur reçoit la consigne (system), le contexte SANS titre d'annonce, la sortie contrainte par le schéma`, JSON.stringify(lm).slice(0, 240));
   await shot(pg, nom + '-B-question');
   await verifQ(pg, t, 'la question de l\'IA');
   await toucher(pg, tel, '[data-rgt-choix="3"]');
   await pg.waitForSelector('[data-rgt-apercu]', { timeout: 8000 }).catch(() => {});
   const ap = await pg.evaluate(() => ({ n: document.querySelectorAll('[data-rgt-meuble]').length, porte: document.querySelectorAll('[data-rgt-porte]').length, pieces: [...document.querySelectorAll('[data-rgt-piece]')].map((e) => e.getAttribute('data-rgt-piece')) }));
   dit(ap.n === 3 && ap.porte === 1 && ap.pieces.join() === 'Garage,Chambre', `${t} : le plan VALIDE de l'IA est dessiné (2 pièces, 3 meubles, la porte marquée)`, JSON.stringify(ap));
-  dit(r.posts[1] && r.posts[1].historique && r.posts[1].historique.slice(-1)[0].texte === '3', `${t} : SA réponse part au modèle avec l'historique`, JSON.stringify(r.posts[1] && r.posts[1].historique));
+  const lm2 = await pg.evaluate(() => window.__lm);
+  dit(lm2.prompts[1] && lm2.prompts[1].t === '3' && lm2.creations.length === 1, `${t} : SA réponse part au modèle (la même session garde l'entretien)`, JSON.stringify(lm2.prompts.map((x) => x.t.slice(0, 20))));
   await pg.evaluate(() => { const e = document.querySelector('[data-rgt-apercu]'); if (e) e.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(250);
   await shot(pg, nom + '-B-plan');
   await verifQ(pg, t, 'le plan de l\'IA');
   await toucher(pg, tel, '[data-rgt-recommencer]');
   await pg.waitForSelector('[data-rgt="regles"]', { timeout: 8000 }).catch(() => {});
   const apres = await pg.evaluate(() => ({ m: document.querySelector('[data-rgt-moteur]') && document.querySelector('[data-rgt-moteur]').getAttribute('data-rgt-moteur'), apercu: !!document.querySelector('[data-rgt-apercu]'), bulles: [...document.querySelectorAll('[data-rgt-bulle]')].map((e) => e.textContent).join(' | ') }));
-  dit(apres.m === 'regles' && !apres.apercu && /n’était pas valable/.test(apres.bulles), `${t} : une réponse INVALIDE de l'IA est refusée (jamais dessinée) ; l'assistant passe SANS IA et le dit`, JSON.stringify(apres).slice(0, 300));
+  dit(apres.m === 'regles' && !apres.apercu && /n’était pas valable/.test(apres.bulles), `${t} : une réponse INVALIDE du modèle est refusée (jamais dessinée) ; l'assistant guidé prend la suite et le dit`, JSON.stringify(apres).slice(0, 300));
   await shot(pg, nom + '-B-refus');
   const ls = await lireLs(pg);
   dit(JSON.stringify(ls.meubles) === JSON.stringify(avant.meubles) && JSON.stringify(ls.slots) === JSON.stringify(avant.slots), `${t} : rien n'a été écrit (aucun « Appliquer »)`, '');
+  dit(!r.posts.length, `${t} : aucune requête vers l'IA du serveur`, r.posts.join(' '));
   dit(!r.errs.length, `${t} : Q — aucune erreur de page`, r.errs.slice(0, 2).join(' | '));
   await r.ctx.close();
 }
 
 async function scenarioC(b, port, { tel, sombre, nom }) {
   const t = nom + ' C';
-  const r = await rendre(b, port, { tel, sombre, volume: false, moteur: null });
+  const r = await rendre(b, port, { tel, sombre, volume: false, modele: null });
   const { pg } = r;
   await pg.waitForSelector('[data-rgt-ouvrir="vide"]', { timeout: 40000 }).catch(() => {});
   await toucher(pg, tel, '[data-rgt-ouvrir="vide"]');
@@ -205,6 +225,32 @@ async function scenarioC(b, port, { tel, sombre, nom }) {
   await r.ctx.close();
 }
 
+async function scenarioD(b, port, { tel, sombre, nom }) {
+  const t = nom + ' D';
+  const r = await rendre(b, port, { tel, sombre, modele: 'downloadable', reponses: [{ type: 'question', texte: 'Combien de pièces utilises-tu pour ton stock ?', choix: ['1', '2', '3'], saisie: 'nombre' }] });
+  const { pg } = r;
+  await pg.waitForSelector('[data-sm-tous]', { timeout: 40000 }).catch(() => {});
+  await pg.waitForTimeout(800);
+  await toucher(pg, tel, '[data-rgt-ouvrir=""]');
+  await pg.waitForSelector('[data-rgt-telecharger]', { timeout: 8000 }).catch(() => {});
+  const a = await pg.evaluate(() => ({ m: (document.querySelector('[data-rgt-moteur]') || { getAttribute: () => null }).getAttribute('data-rgt-moteur'), tele: (document.querySelector('[data-rgt-telecharger]') || { getAttribute: () => null }).getAttribute('data-rgt-telecharger'), q: (document.querySelector('[data-rgt-question]') || { getAttribute: () => null }).getAttribute('data-rgt-question'), n: (window.__lm || {}).creations.length }));
+  dit(a.m === 'regles' && a.tele === 'telechargeable' && a.q === 'mode' && a.n === 0, `${t} : modèle à télécharger : l'assistant guidé répond, « Télécharger » est PROPOSÉ (rien lancé seul)`, JSON.stringify(a));
+  await shot(pg, nom + '-D-propose');
+  await verifQ(pg, t, 'la proposition de téléchargement');
+  await toucher(pg, tel, '[data-rgt-telecharger-b]');
+  // un geste « pendant » se juge sur l'état tenu, jamais sur un délai fixe (§6.5) : la barre a avancé, le modèle pas fini
+  const pr = await pg.waitForFunction(() => { const p = document.querySelector('[data-rgt-telecharger="en-cours"] .rgt-progres'); return p && Number(p.value) > 0 ? Number(p.value) : null; }, null, { timeout: 4000, polling: 50 }).then((h) => h.jsonValue()).catch(() => null);
+  dit(pr != null && pr > 0 && pr <= 1, `${t} : la progression du téléchargement est affichée`, String(pr));
+  await shot(pg, nom + '-D-progres');
+  await pg.waitForSelector('[data-rgt="ia"] [data-rgt-question="ia"]', { timeout: 8000 }).catch(() => {});
+  const c = await pg.evaluate(() => ({ m: (document.querySelector('[data-rgt-moteur]') || { getAttribute: () => null }).getAttribute('data-rgt-moteur'), boutons: [...document.querySelectorAll('.rgt-choix-b')].map((e) => e.textContent).join(','), tele: !!document.querySelector('[data-rgt-telecharger]') }));
+  dit(c.m === 'ia' && c.boutons === '1,2,3' && !c.tele, `${t} : téléchargé ⇒ l'IA du navigateur reprend l'entretien (sa question, ses boutons)`, JSON.stringify(c));
+  await shot(pg, nom + '-D-ia');
+  dit(!r.posts.length, `${t} : aucune requête vers l'IA du serveur`, r.posts.join(' '));
+  dit(!r.errs.length, `${t} : Q — aucune erreur de page`, r.errs.slice(0, 2).join(' | '));
+  await r.ctx.close();
+}
+
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.error('dist absent : npm run build'); process.exit(2); }
   const srv = serveur(DIST); const port = await ecouter(srv);
@@ -216,6 +262,7 @@ async function scenarioC(b, port, { tel, sombre, nom }) {
       await scenarioA(b, port, x);
       await scenarioB(b, port, x);
       await scenarioC(b, port, x);
+      await scenarioD(b, port, x);
     }
   } finally { await b.close(); srv.close(); }
   console.log(`\nagent-rangement : ${ko ? ko + ' rouge(s)' : 'tout vert'}`);
