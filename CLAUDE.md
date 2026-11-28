@@ -485,9 +485,9 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **28 nov. · Leboncoin, Vestiaire, eBay soignés « comme la connexion eBay » (sites-soignes)** : `src/sites/SiteSoigne.jsx` (`TeteSite`, `EtatSite` : tuile du logo, titre, étapes, UN plein) ; Comptes eBay reliés en liste native ; états vides des trois sites ; sections eBay en une colonne quand la place manque. `2026-11-28-sites-soignes.md`. Geste : aucun.
-- **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
-- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+- **28 nov. · Leboncoin, Vestiaire, eBay soignés « comme la connexion eBay » (sites-soignes)** : `src/sites/SiteSoigne.jsx` (`TeteSite`, `EtatSite`) ; Comptes eBay reliés en liste native ; états vides des trois sites. `2026-11-28-sites-soignes.md`. Geste : aucun.
+- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
+- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
