@@ -2479,8 +2479,13 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 - **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans compta-finitions, pour rester sous 60 Ko)
 - **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
 
+<<<<<<< HEAD
 (Déplacée telle quelle de CLAUDE.md §9 le 28 nov., lot ebay-livraison.)
+=======
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., agent-rangement, pour rester sous 60 Ko)
+>>>>>>> origin/main
 - **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.

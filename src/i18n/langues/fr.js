@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_textes_restes from './fr/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './fr/rangement.js';   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './fr/suiviVente.js';
@@ -146,6 +147,7 @@ import ecran_loupe_num from './fr/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
