@@ -130,8 +130,8 @@ export default {
   "rgt.appliquer": "Apply this plan",
   "rgt.place": "{nom} · r{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} room · {meubles} units · {places} slots",
-    "other": "{pieces} rooms · {meubles} units · {places} slots"
+    "one": "{n} room · {meubles} units · {places} slots",
+    "other": "{n} rooms · {meubles} units · {places} slots"
   },
   "rgt.resumeArticles": {
     "one": "for {n} item.",
