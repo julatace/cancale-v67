@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.455.7';
+const CODE_VERSION = '5.455.8';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -16676,6 +16676,13 @@ async function noterFaitFavori(uid, nid, quoi) {
     const cles = Object.keys(u); if (cles.length > 3000) for (const c of cles.slice(0, cles.length - 3000)) delete u[c];
     await chrome.storage.local.set({ [FAITS_FAVORIS]: m }); } catch (_) {}
 }
+// 5.455.8 (Julien, 28 nov. : « si Vinted refuse, montre son propre message ») : la phrase d'un REFUS de Vinted (`message`, sinon
+//    la 1re erreur de champ), texte seul, borné — rangée sur CE favori (`faits`), dite sur sa rangée du panneau.
+function messageRefusVinted(j) {
+  if (!j || typeof j !== 'object') return '';
+  const t = typeof j.message === 'string' ? j.message : Array.isArray(j.errors) && j.errors[0] && typeof j.errors[0].value === 'string' ? j.errors[0].value : typeof j.error === 'string' ? j.error : '';
+  return String(t).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
 async function faitsFavoris(uid) { try { const m = (await chrome.storage.local.get(FAITS_FAVORIS))[FAITS_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return {}; } }
 async function effacerRegistreFavori(uid, item, acheteur, quoi) {
   try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; const k = cleRegistreFavori(item, acheteur); if (!u || !u[k]) return; delete u[k][quoi]; if (!Object.keys(u[k]).length) delete u[k]; await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
@@ -22825,6 +22832,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       noterDiag(faite?'favori_offre_ok':'favori_offre_refusee_'+o.status);
       if(faite||o.status>=500)await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');   // 6b. faite (ou peut-être) : jamais une 2ᵉ
       if(faite)await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(op.prix)});
+      if(!faite&&(o.status>=400&&o.status<500||o.ok))await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(o.json)||'',refusAt:Date.now()});   // 5.455.8 : SA phrase de Vinted, sur la rangée
       if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       attente=jeton;
       const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
@@ -22844,7 +22852,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{})});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
     if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // refusé net : pas parti
     {const t=await telephone(r);if(t)return t;}
-    if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);return rep('refuse',r.status,'texte_refuse');}
+    if([400,422].includes(r.status)){await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(r.json)||'',refusAt:Date.now()});await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);return rep('refuse',r.status,'texte_refuse');}
     return rep(r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }
   // 5.410.8 (export de l'Observateur, 21 nov. : « Bleam appuie sur la cloche ») : avant CHAQUE favori, la LISTE de la cloche

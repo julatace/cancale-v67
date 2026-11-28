@@ -2399,7 +2399,9 @@ function vrmVerifVisible(sel) {
         + (vs.length > 1 && !favEnv.edition ? `<div class="et10-v" role="group" aria-label="${esc(TU('e10_versions'))}" data-fav-env-versions="${vs.length}"><span class="fl-lbl">${esc(TU('e10_versions'))}</span>${vs.map((v, i) => `<button type="button" class="pu6" data-fav-env-version="${esc(v.id)}" aria-pressed="${favEnv.version === v.id ? 'true' : 'false'}">${esc(TU('fp_message_n', { n: i + 1 }))}</button>`).join('')}${favEnv.version ? `<button type="button" class="vu-lien" data-fav-env-version="">${esc(TU('e10_version_auto'))}</button>` : ''}</div>` : '');
     } else {
       const t = favEnv.taux == null ? TU('fr_sans_offre') : TU('e10_r_taux', { t: favEnv.taux });
-      const msgCourt = (() => { const mm = favEnv.info && favEnv.info.ok && favEnv.info.message && favEnv.info.message.ok ? favEnv.info.message.texte : ''; return mm ? (mm.length > 90 ? mm.slice(0, 88) + '…' : mm) : '—'; })();
+      // 5.455.8 : le fond n'a pas (encore) répondu ⇒ le texte que le SERVEUR a préparé pour le 1er favori choisi (jamais « — »
+      //    quand un texte existe), comme la bulle de l'étape « Message ».
+      const msgCourt = (() => { const mm = favEnv.info && favEnv.info.ok && favEnv.info.message && favEnv.info.message.ok ? favEnv.info.message.texte : (favEnv.texte != null ? favEnv.texte : ((choisis[0] && choisis[0].texte) || '')); return mm ? (mm.length > 90 ? mm.slice(0, 88) + '…' : mm) : '—'; })();
       const plus = p.reste > 0 ? TU('e10_r_plafond', { k: n, r: p.reste, h: heureFl(Date.now() + 3600000) }) : TU('e10_r_tous', { k: n });
       corps = `<ul class="et10-r" data-fav-etape-recap>`
         + `<li data-fav-r="n"><span>${esc(TU('e10_r_favoris'))}</span><b>${esc(String(n))}</b></li>`
@@ -2631,6 +2633,8 @@ function vrmVerifVisible(sel) {
     const l = [];
     if (Number(f.o) > 0) l.push(Number(f.px) > 0 ? TU('f6_d_offre', { p: eurosFav(Number(f.px)), h: heure6(f.o) }) : TU('f6_d_offre_sans', { h: heure6(f.o) }));
     if (Number(f.m) > 0) l.push(Number.isInteger(f.v) && f.v > 0 ? TU('f6_d_message_v', { h: heure6(f.m), v: f.v }) : TU('f6_d_message', { h: heure6(f.m) }));
+    // 5.455.8 : le refus de Vinted, SA phrase, tant que le favori n'est pas parti depuis.
+    if (typeof f.refus === 'string' && f.refus && !(Number(f.m) > Number(f.refusAt))) l.push(TU('f6_d_refus', { t: f.refus, h: heure6(f.refusAt) }));
     return l;
   }
   function etatRaison6(raison, base) {
