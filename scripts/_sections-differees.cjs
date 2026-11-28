@@ -280,6 +280,18 @@ function decouper(R, fichier, src, sections = SECTIONS) {
         }
         parValeur.push(nom);
       }
+      // (28 nov.) Une ÉCRITURE faite au rendu de la section dans un objet du dehors (`ref.current = …`) arrive plus tard qu'avant
+      // (le morceau se rend après Comptabilite) : refusée si le reste du rendu la relit APRÈS la section (il lirait l'ancienne valeur).
+      for (const ch of [...(c.chemins || [c.cible]), ...aides]) ch.traverse({ AssignmentExpression(p) {
+        let o = p.node.left; if (o.type !== 'MemberExpression') return;
+        while (o.type === 'MemberExpression') o = o.object;
+        if (o.type !== 'Identifier') return;
+        const b = p.scope.getBinding(o.name); if (!b || plages.some((t) => dedans(b.identifier, t))) return;
+        // au rendu de la section seulement (pas dans un rappel)
+        for (let f = p.getFunctionParent(); f && plages.some((t) => dedans(f.node, t)); f = f.getFunctionParent()) if (!(f.parentPath && f.parentPath.isCallExpression() && f.parentPath.node.callee === f.node)) return;
+        const apres = b.referencePaths.filter((rp) => !plages.some((t) => dedans(rp.node, t)) && rp.node.start > c.t.end && auRendu(rp));
+        if (apres.length) raisons.push(`« ${o.name} » est écrit au rendu de la section et relu après elle (ligne ${apres[0].node.loc.start.line})`);
+      } });
       if (raisons.length) { refusesTour.push({ c, raison: { nom: c.nom, raison: [...new Set(raisons)].join(' ; ') } }); continue; }
       acceptees.push({ s: { ...c.s, nom: c.nom }, t: c.t, aides, parValeur: parValeur.sort(), deTete });
     }

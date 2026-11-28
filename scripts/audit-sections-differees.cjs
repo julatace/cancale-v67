@@ -68,11 +68,21 @@ const LIT = ['onClick={exportReportCsv}', 'onClick={natifVentes ? exportReportCs
 muter('crochet', [["{showReport && (", "{showReport && (useMemo(() => null, []) || "]], { section: 'Rapport', motif: /crochet/ });
 muter('rappel qui réaffecte', [[DECL, LET + " setTimeout(() => { natifVentes = false; }, 0);"], LIT], { section: 'Rapport', motif: /rappel/ });
 muter('réaffectée au rendu après', [[DECL, LET], LIT, ["{curSub!=='messages' && rendreConversation()}", "{(natifVentes = !natifVentes) && null}{curSub!=='messages' && rendreConversation()}"]], { section: 'Rapport', motif: /après la section/ });
+muter('ref écrite dans la section, relue après', [['onClick={exportReportCsv}', 'onClick={(vvHorsLotRef.current = [], exportReportCsv)}'], ["{curSub!=='messages' && rendreConversation()}", "{vvHorsLotRef.current.length ? null : null}{curSub!=='messages' && rendreConversation()}"]], { section: 'Rapport', motif: /relu après/ });
 muter('témoin (réaffectée AVANT, au rendu)', [[DECL, LET + " if (curSub === 'x') natifVentes = false;"], LIT], { section: 'Rapport', accepte: true });
 // F
 const PHRASES = { Rapport: /data-rapport-csv/, Annonces: /annSort==='selection'/ };
 for (const [n, re] of Object.entries(PHRASES)) dit(re.test(src) && !re.test(r.code.replace(/\/\*[\s\S]*?\*\//g, '')), `F. le JSX de « ${n} » a quitté le Comptabilite livré`);
 const j = r.faites.find((x) => x.nom === 'Journee');
 dit(!!(j && j.ouverture === 'journee'), "F. la section d'Aujourd'hui est préchargée à l'ouverture d'Aujourd'hui", j ? j.ouverture : 'absente');
+// G : les anciens noms d'onglets que public/demarrage-app.js ramène à Ventes / Achats sont bien ceux de l'app
+{
+  const dem = fs.readFileSync(path.join(R, 'public', 'demarrage-app.js'), 'utf8');
+  const app = require('./_source-app.cjs').sourceAppCode(R);
+  const alias = /var ALIAS = \{([^}]*)\}/.exec(dem);
+  const paires = alias ? [...alias[1].matchAll(/(\w+): '(\w+)'/g)].map((m) => [m[1], m[2]]) : [];
+  const faux = paires.filter(([a, e]) => !new RegExp(`\\b${a}: \\['${e}', null\\]`).test(app));
+  dit(paires.length >= 5 && !faux.length, 'G. les anciens noms ramenés à Ventes / Achats au démarrage sont ceux de l’app', faux.map((x) => x.join('→')).join(', ') || paires.length + ' noms');
+}
 console.log(`\n${ko ? '❌' : '✅'} audit-sections-differees : ${ok} vert(s), ${ko} rouge(s)`);
 process.exit(ko ? 1 : 0);

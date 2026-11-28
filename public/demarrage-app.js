@@ -37,6 +37,9 @@ try {
     // (27 nov., budget-vitesse) Les sections de Comptabilite que montre l'écran d'ouverture (`?tab=…`, Aujourd'hui sans
     // lien) : demandées avec lui, en basse priorité (vite.config.js, `data-js-ouverture` : « ecran=/a.js,/b.js;… »).
     var ecran = (/[?&]tab=([^&#]*)/.exec(q) || [])[1] || 'journee';
+    // (28 nov.) les anciens noms qui ouvrent Ventes ou Achats (src/App.jsx, table des onglets déplacés : cat_bord, colis…)
+    var ALIAS = { cat_bord: 'ventes', colis: 'ventes', cat_expedition: 'ventes', cat_achats: 'achats', retraits: 'achats' };
+    if (ALIAS[ecran]) ecran = ALIAS[ecran];
     (s.getAttribute('data-js-ouverture') || '').split(';').forEach(function (bloc) {
       var i = bloc.indexOf('=');
       if (i > 0 && bloc.slice(0, i) === ecran) bloc.slice(i + 1).split(',').forEach(function (u) { poser('modulepreload', u, null, true); });
