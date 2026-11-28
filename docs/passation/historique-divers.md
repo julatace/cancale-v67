@@ -2485,3 +2485,7 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., agent-rangement, pour rester sous 60 Ko)
 - **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., ebay-crm, pour rester sous 60 Ko)
+- **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
+- **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
