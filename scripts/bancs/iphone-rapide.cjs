@@ -51,7 +51,7 @@ const ETAPES = String(process.env.ETAPES || 'demarrage,onglets,defilement').spli
 const ORDI = Number(process.env.LARGEUR || 390) >= 1000;
 // Un toucher au téléphone, un clic à l'ordinateur ; un onglet est dans la barre du bas OU dans la barre latérale.
 const TAP = (loc, o) => (ORDI ? loc.click(o) : loc.tap(o));
-const SEL_ONGLET = (cle) => `[data-n-onglet="${cle}"], [data-n-laterale] [data-n-entree="${cle}"]`;
+const SEL_ONGLET = (cle) => [cle, cle === 'paires' ? 'annonces' : null].filter(Boolean).map((c) => `[data-n-onglet="${c}"], [data-n-laterale] [data-n-entree="${c}"], [data-n-laterale] [data-nav-entree="${c}"]`).join(', ');
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Les fichiers de l'app, comme Vercel : compressés, /assets immuables, index.html jamais en cache ──
@@ -83,7 +83,7 @@ function jalons() {
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.interactionId) J.evts.push({ n: e.name, d: Math.round(e.duration), t: Math.round(e.startTime), p: Math.round(e.processingEnd - e.processingStart) }); }).observe({ type: 'event', durationThreshold: 16, buffered: true }); } catch (_) {}
   const voir = () => {
     const t = Math.round(performance.now());
-    if (J.coque == null && document.querySelector('[data-n-onglets] [data-n-onglet]')) J.coque = t;
+    if (J.coque == null && document.querySelector('[data-n-onglets] [data-n-onglet], [data-n-laterale] .n-laterale-entree')) J.coque = t;
     if (J.utile == null && document.querySelector('[data-attente-ecran="journee"][data-attente="pret"], [data-attente-ecran="journee"][data-attente="plafond"]')) J.utile = t;
     if (J.chiffres == null && document.querySelector('[data-v2-chiffres="lu"], [data-vendu-mois]:not([data-vendu-mois=""])')) J.chiffres = t;
   };
@@ -412,8 +412,10 @@ async function gestes(pg, cdp) {
     await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === x; }, id, { timeout: 60000 }).catch(() => {});
     await calme(pg, 2000, 30000);
     // La recherche de l'écran : le premier champ visible.
-    const champ = pg.locator('.vrm-main input[type="search"]:visible').first();
-    if (await champ.count()) {
+    // (jamais celui d'un écran gardé caché, `[data-ecran-cache]` : il garde une boîte, Playwright le dit « visible »)
+    const trouve = await pg.evaluate(() => { for (const x of document.querySelectorAll('[data-banc-champ]')) x.removeAttribute('data-banc-champ'); for (const e of document.querySelectorAll('.vrm-main input[type="search"]')) { if (e.closest('[data-ecran-cache]')) continue; const r = e.getBoundingClientRect(); if (r.width < 20 || r.height < 10 || r.bottom < 0 || r.top > innerHeight) continue; const h = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + r.height / 2); if (!h || !(h === e || e.contains(h) || h.contains(e) || (e.parentElement && e.parentElement.contains(h)))) continue; e.setAttribute('data-banc-champ', ''); return true; } return false; });
+    const champ = pg.locator('[data-banc-champ]').first();
+    if (trouve) {
       await TAP(champ, { timeout: 10000 }).catch(() => {}); await attendre(400);
       const p0 = await pg.evaluate(() => performance.now());
       const m = await tracer(pg, cdp, async () => { await pg.keyboard.type('nike', { delay: 180 }); }, () => true);
@@ -425,7 +427,7 @@ async function gestes(pg, cdp) {
       await pg.keyboard.press('Escape').catch(() => {}); await calme(pg, 1500, 20000);
     } else console.log(`  ${id} : aucun champ de recherche visible`);
     // Une case : la première case visible de la liste (sélection d'un lot).
-    const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('.vrm-main input[type="checkbox"], .vrm-main [role="checkbox"]')) { const r = e.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.top < 60 || r.bottom > innerHeight - 90) continue; const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); if (h && (e === h || e.contains(h) || h.contains(e) || (h.closest && h.closest('label') && h.closest('label').contains(e)))) return { x, y }; } return null; });
+    const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('.vrm-main input[type="checkbox"], .vrm-main [role="checkbox"]')) { if (e.closest('[data-ecran-cache]')) continue; const r = e.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.top < 60 || r.bottom > innerHeight - 90) continue; const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); if (h && (e === h || e.contains(h) || h.contains(e) || (h.closest && h.closest('label') && h.closest('label').contains(e)))) return { x, y }; } return null; });
     if (cible) {
       const p0 = await pg.evaluate(() => performance.now());
       const m = await tracer(pg, cdp, () => (ORDI ? pg.mouse.click(cible.x, cible.y) : pg.touchscreen.tap(cible.x, cible.y)), () => true);
