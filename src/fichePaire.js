@@ -35,7 +35,9 @@ export function fusionEntreeVente(base, ov, buyByNum) {
   if (!ov) return avecPrixParNum(base);
   const m = { ...(base || {}) };
   if (ov.numero != null && ov.numero !== '') m.numero = ov.numero;
-  if (ov.buyPrice != null && ov.buyPrice !== '') m.buyPrice = ov.buyPrice;
+  // (27 nov., lot vrai-benefice) Un prix saisi sur la VENTE remplace celui de la fiche : sa source aussi (jamais « reçu »
+  // hérité de la fiche pour un prix tapé à la main).
+  if (ov.buyPrice != null && ov.buyPrice !== '') { m.buyPrice = ov.buyPrice; m.buyPriceSource = ov.buyPriceSource; m.buyPriceRecuTx = ov.buyPriceRecuTx; }
   if (ov.fees != null && ov.fees !== '') m.fees = ov.fees;
   for (const [k] of champsCharges) if (ov[k] != null && ov[k] !== '') m[k] = ov[k];
   if (ov.fraisComplets != null) m.fraisComplets = ov.fraisComplets;

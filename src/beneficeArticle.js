@@ -66,7 +66,7 @@ export function beneficeArticle({ plateforme = 'Vinted', vente = null, recu = nu
     .lignes.filter((l) => ['commission', 'boost', 'emballage', 'port', 'autres'].includes(l.cle) && !(l.cle === 'commission' && l.src !== 'saisi' && l.src !== 'illisible'));
   const base = {
     plateforme, vente: venteC, fraisSite, recu: recuC, saisis: ch.valid ? ch.cents : null, saisisConfirmes: !!ch.complet, detailFrais,
-    achat: achatC, benefice: null, manque: [], raisonRecu: recuC == null && !sansCommission ? (raisonRecu || 'versé pas lu') : '',
+    achat: achatC, portAchat: achatC == null ? null : (entree && (entree.buyPriceSource === 'recu' || entree.buyPriceSource === 'division') ? 'recu' : 'saisi'), benefice: null, manque: [], raisonRecu: recuC == null && !sansCommission ? (raisonRecu || 'versé pas lu') : '',
   };
   if (annulee) return { ...base, etat: 'annulee' };
   if (autreDevise) return { ...base, etat: 'prix', manque: ['devise'] };
@@ -114,7 +114,9 @@ export function lignesBeneficeArticle(b, T = (k) => k, { detail = false } = {}) 
     for (const l of b.detailFrais) L.push({ cle: 'cr-' + l.cle, nom: T('cr.' + l.cle), v: l.c, zero: l.c === 0,
       note: l.src === 'aucun' && l.cle === 'port' ? T('cr.src.portAucun') : T(SRC_COUT[l.src] || 'cr.src.aucun') });
   } else L.push({ cle: 'saisis', nom: T('argentPlus.ba.saisis'), v: b.saisis, note: b.saisis == null ? T('argentPlus.ba.illisible') : b.saisisConfirmes ? T('argentPlus.ba.confirmes') : T('argentPlus.ba.aConfirmer') });
-  L.push({ cle: 'achat', nom: T('argentPlus.ba.achat'), v: b.achat, note: b.achat == null ? T('argentPlus.ba.achatManque') : '' });
+  // (27 nov., lot vrai-benefice) Le port payé à l'achat : COMPRIS dans un prix posé depuis le reçu Vinted (dit) ; saisi à la main, rien
+  // n'est affirmé (src/vraiBenefice.js).
+  L.push({ cle: 'achat', nom: T('argentPlus.ba.achat'), v: b.achat, note: b.achat == null ? T('argentPlus.ba.achatManque') : b.portAchat === 'recu' ? T('vb.portRecu') : '' });
   L.push({ cle: 'reste', nom: T('argentPlus.ba.reste'), v: b.benefice, total: true, auPlus: b.etat === 'partiel' });
   return L;
 }

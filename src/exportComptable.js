@@ -28,7 +28,7 @@ import { mentionFacture, cleFactureLigne } from './factureAchat.js';
 import { PERIODE_OK, libellePeriode, moisDePeriode, jourFr, eurosTexte } from './registres.js';
 import { moisParis, moisRecents } from './dateParis.js';
 import { valeurSue } from './sommeConnue.js';
-import { margesPar } from './statsVentes.js';
+import { beneficeReleve } from './vraiBenefice.js';
 
 export { libellePeriode };
 export const TYPES_PERIODE = [['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
@@ -89,8 +89,9 @@ export function detailVenteReleve(r, plateforme) {
   const achat = nombreOuNull(r[5]);
   // eBay : le relevé porte ce que tu REÇOIS (`montantRecuEbay`), pas le prix payé par l'acheteur ⇒ « — ».
   const prixVente = plateforme === 'eBay' ? null : nombreOuNull(r[4]);
-  const g = nombreOuNull(r[4]) == null ? null : margesPar([{ ts: Number(r[3]) || 1, eur: r[4], achat, frais: fraisNotes }], () => 'v');
-  const benefice = g && g.groupes[0] && g.groupes[0].net != null ? g.groupes[0].net : null;
+  // (27 nov., lot vrai-benefice) Le bénéfice : LA règle de src/vraiBenefice.js (`margesPar` sur cette ligne) — la même que
+  // Statistiques › Gains (« Par mois », « Par compte ») : l'écran et l'export ne peuvent pas diverger.
+  const benefice = beneficeReleve(r);
   // Le port payé par lui : seulement quand la fiche le DÉTAILLE (src/coutPlateformes.js `detailFraisFiche`).
   const port = det && Number.isSafeInteger(det[1]) ? det[1] / 100 : null;
   return { prixVente, achat, fraisNotes, port, benefice };

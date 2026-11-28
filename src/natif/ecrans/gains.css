@@ -24,6 +24,12 @@
   .n-gr-barre-plein { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--n-graphe-barre-fort, var(--n-accent)); }
   .n-gr-barre-plein[data-negatif] { background: var(--n-encre-3); }
   .n-gr-barre-v { font: var(--n-t-second-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  /* (27 nov., lot vrai-benefice) cinq vues : au téléphone, « Par » est lu mais pas montré. */
+  .n-gr .n-gr-seg-court { display: none; }
+  @media (max-width: 520px) {
+    .n-gr .n-gr-seg-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .n-gr .n-gr-seg-court { display: inline; }
+  }
   @media (max-width: 520px) {
     .n-gr-barre { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom v" "piste piste"; row-gap: 4px; }
     .n-gr-barre-nom { grid-area: nom; } .n-gr-barre-v { grid-area: v; } .n-gr-barre-piste { grid-area: piste; }

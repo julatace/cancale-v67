@@ -406,6 +406,7 @@ import CarteMois, { GrandChiffre } from "../design/CarteMois.jsx";
 // ⟦← App.jsx #77⟧
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { detailFraisFiche } from "../coutPlateformes.js";
+import { drapeauxFiche } from "../vraiBenefice.js";   // (27 nov., lot vrai-benefice)
 import { PrevisionLigne } from "../ArgentPlus.jsx";
 // ⟦← App.jsx #78⟧   // (11 nov., lot stats-plus) la case « Valeur du stock »
 import { courtFusion, enArticles } from "../design/tacheCourte.js";
@@ -1734,9 +1735,12 @@ const jourBeneficeEnTableau = (b) => BENEF_CHAMPS.map((k) => b[k] || 0);
 // (11 nov., famille « une règle par notion ») `frais(fiche, plateforme)` : les frais SAISIS sur la fiche
 //    (emballage, port payé par le vendeur, autres…) — la règle de `beneficePaire` (src/beneficePaire.js),
 //    la même que Vinted ; sans ce paramètre, 0 (comportement d'avant).
-const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre, frais = null, main } = {}) => {
+const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, numEbayLigne, excluAutre, frais = null, main, drapeaux = null } = {}) => {
   const out = [], vus = new Set();
   const achatDuNum = (k) => { const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return null; const a = achat(f); return a != null && isFinite(Number(a)) ? Number(a) : null; };
+  // (27 nov., lot vrai-benefice) Les drapeaux de SA fiche (frais confirmés, prix du reçu) : [12] du relevé.
+  // `drapeaux` passé par l'appelant (`drapeauxFiche`) ; absent ⇒ aucun (frais pas confirmés : « au plus »).
+  const drDuNum = (k) => { if (typeof drapeaux !== 'function') return ''; const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); return f ? drapeaux(f) : ''; };
   const fraisDuNum = (k, pl) => { if (typeof frais !== 'function') return 0; const f = ficheUniqueDuNumero(numeros, k ? cleNum(k) : ''); if (!f) return 0; const x = Number(frais(f, pl)); return isFinite(x) ? x : 0; };
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v) || !lbcFinalisee(v)) continue;
@@ -1745,7 +1749,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     if (!isFinite(eur) || vus.has('lbc:' + v.txId)) continue;
     vus.add('lbc:' + v.txId);
     const nL = numLbc(v);
-    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(nL), frais: fraisDuNum(nL, 'Leboncoin'), num: nL ? String(nL) : '' });
+    out.push({ plateforme: 'Leboncoin', id: 'lbc:' + v.txId, ts: Date.parse(v.dateVente || ''), eur, achat: achatDuNum(nL), frais: fraisDuNum(nL, 'Leboncoin'), num: nL ? String(nL) : '', dr: drDuNum(nL) });
   }
   for (const o of (ebay || [])) {
     if (!o || !o.orderId || String(o.orderPaymentStatus || '').toUpperCase() !== 'PAID' || !commandeEbayEngagee(o)) continue;
@@ -1761,7 +1765,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     // (`ficheDeLaRegle` : JAMAIS le port, §2.8) — boost, emballage saisi ou forfait, autres ; avant : 0, alors que la fiche
     // de l'article les retirait (deux bénéfices pour la même vente).
     let fr = 0; for (const li of lignes) fr += fraisDuNum(numEbayLigne(o, li), 'eBay');
-    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: Math.round(fr * 100) / 100, num: nE.join(' + ') });
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: Math.round(fr * 100) / 100, num: nE.join(' + '), dr: lignes.length === 1 ? drDuNum(numEbayLigne(o, lignes[0])) : '' });
   }
   // (1er nov., audit A2) VESTIAIRE : une vente terminée ou versée, au montant
   // REÇU sûr (commission déjà retirée : frais = 0), reliée à SA paire par
@@ -1773,7 +1777,7 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const eur = montantRecuVc(v).eur;
     if (eur == null) continue;
     vus.add('vestiaire:' + v.id);
-    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: fraisDuNum(v.num, 'Vestiaire'), num: v.num ? String(v.num) : '' });
+    out.push({ plateforme: 'Vestiaire', id: 'vestiaire:' + v.id, ts: dateVenteVc(v) || NaN, eur, achat: achatDuNum(v.num), frais: fraisDuNum(v.num, 'Vestiaire'), num: v.num ? String(v.num) : '', dr: drDuNum(v.num) });
   }
   // (11 nov., saisie rapide) VENDU AILLEURS (main propre, entre amis, autre site) :
   // le montant SAISI, reliée à SA paire par son N° (src/venteAilleurs.js `ventesMainPropre`).
@@ -15769,7 +15773,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const fraisFicheAutres = (f, pl) => coutsVente(ficheDeLaRegle(pl, f)).total;   // (21 nov., lot rentabilite) eBay : jamais le port ; Vestiaire : jamais la commission notée (src/coutReel.js)
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
-        frais: fraisFicheAutres,
+        frais: fraisFicheAutres, drapeaux: drapeauxFiche,   // (27 nov.) [12] du relevé (src/vraiBenefice.js)
         numLbc: (v) => numeroLbcIdentite(v, lbcItemsBenef, liens),
         numEbayLigne: (o, li) => numLigneEbay(o, li), excluAutre, main: ventesAilleursDe(ventesComptees) });
     } catch (_) { return null; }
@@ -15986,6 +15990,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const releve = releveVentes({ vinted: sales.items, estMasquee: isHidden, estFinalisee: (o) => classifyOrderStatus(o.status) === 'completed', an0,
         montant: montantCommandeLu, achat: (o) => achatDe(entreeVenteLot(o, effEntry(o))), frais: (o) => chargesVente(effEntry(o)),
         fraisDetail: (o) => detailFraisFiche(effEntry(o)),   // (11 nov.) [11] : boost, port, commission (src/coutPlateformes.js)
+        drapeaux: (o) => drapeauxFiche(entreeVenteLot(o, effEntry(o))),   // (27 nov.) [12] : frais confirmés, prix du reçu (src/vraiBenefice.js)
         // (11 nov., lot ventes-lot) Les articles d'un lot, chacun à SA part du prix (src/venteLot.js).
         articles: (o) => { const l = lotDeVente(o); return l && l.lu ? l.articles.map((a) => [a.titre, a.num || '', a.part, a.achat, a.item || '']) : null; },
         compte: (o) => (o._acc && (o._acc.login || o._acc.vinted_user_id)) || '', autres: autresBenefice, titreDe,
@@ -25193,7 +25198,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-cr-ligne="emballage" data-cr-src={(ligneCr('emballage') || {}).src || ''} data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/><span className="vrm-cr-lib">{tr('ventes.emballage')}{cv.emballageForfait ? <small>{tr('cr.src.forfait')}</small> : null}</span></dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
                     {st !== 'cancelled' && !autreDevise && !hidden && !cv.emballageSaisi ? <ForfaitEmballage lire={() => load(CLE_FORFAIT_EMBALLAGE, null)} ecrire={(x) => save(CLE_FORFAIT_EMBALLAGE, x)}/> : null}
                     {st !== 'cancelled' && !autreDevise ? ['port', 'autres'].map((k) => <LigneCoutReel key={k} l={ligneCr(k)} site="Vinted"/>) : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>{tr('ventes.prixAchat')}</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''} data-vb-port-achat={lb.achat != null ? (e && (e.buyPriceSource === 'recu' || e.buyPriceSource === 'division') ? 'recu' : 'saisi') : ''}><dt><PointCout cle="achat"/><span className="vrm-cr-lib">{tr('ventes.prixAchat')}{lb.achat != null && e && (e.buyPriceSource === 'recu' || e.buyPriceSource === 'division') ? <small>{tr('vb.portRecu')}</small> : null}</span></dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined} data-cr-net={cr.net != null ? String(cr.net) : ''} data-cr-etat={cr.etat}><dt><PointCout cle="benefice"/>{tr('cr.net')}</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">{tr('ventes.plus')} </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                   </dl>
                 </section>
