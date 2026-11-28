@@ -148,7 +148,7 @@ const ecran=(pg)=>pg.evaluate(()=>{
 });
 const vue=async(pg,cle)=>{
   const r=pg.locator('[data-ps-bloc="gains"] [role="radio"]',{ hasText:{ mois:'Par mois', compte:'Par compte' }[cle] }).first();
-  if(await r.count()){ await r.click(); await pg.waitForTimeout(500); return true; }
+  if(await r.count()){ await r.click(); await pg.waitForFunction((cle)=>!!document.querySelector(cle==='mois'?'[data-vb-mois-liste], [data-vb-passu]':'[data-vb-comptes]'),cle,{timeout:30000}).catch(()=>{}); return true; }
   return false;
 };
 
@@ -170,7 +170,7 @@ const vue=async(pg,cle)=>{
         await ouvrirAvanceCompta(pg).catch(()=>{});
         // Le design natif : Argent › « Déclarer » (le segment, comme Julien).
         const decl=pg.locator('button[data-section="declarer"]').first();
-        if(await decl.count()){ await decl.click().catch(()=>{}); await pg.waitForTimeout(800); }
+        if(await decl.count()){ await decl.click().catch(()=>{}); await pg.waitForSelector('[data-export-comptable]',{state:'visible',timeout:30000}).catch(()=>{}); }
         const E1=await exportDe(pg,YM1), E2=await exportDe(pg,YM2);
         console.log('   export',JSON.stringify({ E1, E2 }));
         // ── L'ÉCRAN (Statistiques › Gains › Par mois) ──
@@ -210,31 +210,58 @@ const vue=async(pg,cle)=>{
         const cibles=await pg.evaluate(()=>[...document.querySelectorAll('[data-ps-bloc="gains"] [role="radio"]')].map(e=>Math.round(e.getBoundingClientRect().height)));
         dit(cibles.length>0&&cibles.every(h=>h>=44),'cibles ≥ 44 px (segments)',cibles.join(','));
         // ── PAR PAIRE : la fiche de la vente (Ventes › Toutes › la vente) ──
-        await aller(pg,'cat_ventes',null,1500);
+        // On attend des ÉTATS, jamais un délai (§6.5). Cause du rouge en CI (3 bancs à la fois, CPU 90 %) : une vente
+        // NUMÉROTÉE range son bénéfice détaillé sous « Tout voir » de l'histoire (src/FichePaire.jsx), et la fiche se
+        // reconstruit tant que les autres sites se lisent (« lecture en cours ») — « Tout voir » se replie, le détail
+        // disparaît ; l'ancien banc attendait 8 s puis lisait « rien ». Selon que le N° de la ligne est déjà lu au toucher,
+        // la fiche est celle de la vente (détail tout de suite) ou celle de la paire (détail sous « Tout voir ») : les
+        // deux chemins sont servis, et la lecture se fait d'un seul coup dans la page (aucune poignée qui se périme).
+        await aller(pg,'cat_ventes',null,0);
+        await pg.locator('[role="radio"]',{hasText:'Toutes'}).first().waitFor({timeout:30000}).catch(()=>{});
         await pg.locator('[role="radio"]',{hasText:'Toutes'}).first().click().catch(()=>{});
-        await pg.waitForTimeout(1200);
-        const portDe=async(tx)=>{
-          const t=pg.getByText('Baskets inventées '+tx,{exact:true}).first();
-          if(!(await t.count())) return null;
-          await t.scrollIntoViewIfNeeded().catch(()=>{});
-          // Un toucher qui tombe pendant un rendu peut ne rien ouvrir : un second essai, jamais plus.
-          for(let essai=0; essai<2; essai++){
-            await t.click().catch(()=>{});
-            const vu=await pg.locator('[data-ba-ligne="achat"]').first().waitFor({state:'visible',timeout:8000}).then(()=>true,()=>false);
-            if(vu) break;
+        await pg.locator('[role="radio"][aria-checked="true"]',{hasText:'Toutes'}).first().waitFor({timeout:30000}).catch(()=>{});
+        const etatFiche=(tx)=>pg.evaluate((tx)=>{
+          const f=[...document.querySelectorAll('.n-fiche')].find((x)=>x.innerText.includes('Baskets inventées '+tx));
+          if(!f) return { etat:document.querySelector('.n-fiche')?'autre-fiche':'sans-fiche' };
+          const e=f.querySelector('.vrm-ba');
+          if(e) return { etat:'ok', port:e.getAttribute('data-vb-port-achat'), total:e.getAttribute('data-benef-article-valeur'),
+            texte:e.innerText.replace(/[  ]/g,' ').replace(/\n/g,' | '), fiche:f.innerText.replace(/[  ]/g,' ') };
+          const tv=f.querySelector('[data-fd-tout-voir]');
+          return { etat:tv?(tv.getAttribute('aria-expanded')==='true'?'ouvert':'replie'):'attente' };
+        },tx);
+        const changement=(tx,avant,ms)=>pg.waitForFunction(([tx,avant])=>{
+          const f=[...document.querySelectorAll('.n-fiche')].find((x)=>x.innerText.includes('Baskets inventées '+tx));
+          const e=f?(f.querySelector('.vrm-ba')?'ok':(()=>{ const tv=f.querySelector('[data-fd-tout-voir]'); return tv?(tv.getAttribute('aria-expanded')==='true'?'ouvert':'replie'):'attente'; })()):(document.querySelector('.n-fiche')?'autre-fiche':'sans-fiche');
+          return e!==avant;
+        },[tx,avant],{timeout:ms,polling:100}).catch(()=>{});
+        const fermerFiches=async()=>{
+          for(let essai=0; essai<3 && await pg.locator('.n-fiche').count(); essai++){
+            await pg.keyboard.press('Escape').catch(()=>{});
+            await pg.waitForFunction(()=>!document.querySelector('.n-fiche'),null,{timeout:15000,polling:100}).catch(()=>{});
           }
-          const r=await pg.evaluate(()=>{ const e=[...document.querySelectorAll('[data-ba-ligne="achat"]')].pop(); return e?{ port:e.getAttribute('data-vb-port-achat'), achat:e.getAttribute('data-ba-valeur'), texte:e.innerText.replace(/[\u00a0\u202f]/g,' ').replace(/\n/g,' | '),
-            total:(()=>{ const t=[...document.querySelectorAll('.vrm-ba')].pop(); return t?t.getAttribute('data-benef-article-valeur'):null; })() }:null; });
-          return r;
+          return (await pg.locator('.n-fiche').count())===0;
         };
-        const fermer=async()=>{ await pg.keyboard.press('Escape').catch(()=>{}); await pg.waitForTimeout(500); };
+        const portDe=async(tx)=>{
+          if(!(await fermerFiches())) return { erreur:'une fiche reste ouverte' };
+          const ligne=pg.getByText('Baskets inventées '+tx,{exact:true}).first();
+          await ligne.waitFor({ state:'visible', timeout:30000 }).catch(()=>{});
+          await ligne.scrollIntoViewIfNeeded().catch(()=>{});
+          const fin=Date.now()+120000; let r=await etatFiche(tx), touchers=0;
+          while(r.etat!=='ok' && Date.now()<fin){
+            if(r.etat==='sans-fiche'&&touchers<3){ touchers++; await ligne.click({timeout:30000}).catch(()=>{}); }
+            else if(r.etat==='replie'){ await pg.locator('.n-fiche [data-fd-tout-voir][aria-expanded="false"]').first().click({timeout:10000}).catch(()=>{}); }
+            else if(r.etat==='autre-fiche'){ await fermerFiches(); }
+            await changement(tx,r.etat,15000);
+            r=await etatFiche(tx);
+          }
+          return r.etat==='ok'?r:{ erreur:'détail pas lu : '+r.etat };
+        };
         const p1=await portDe('91001');
-        dit(!!p1&&p1.port==='recu'&&/port de l’achat compris \(reçu\)/.test(p1.texte)&&p1.total==='1650','V6 · 91001 : la fiche dit « port de l’achat compris (reçu) », bénéfice 16,50 (= Par mois)',p1&&JSON.stringify(p1));
-                if(CAP&&p1){ await pg.waitForTimeout(900); await pg.screenshot({path:path.join(CAP,`vb-fiche-${nomCap}.png`)}).catch(()=>{}); await pg.locator('.vrm-ba').last().scrollIntoViewIfNeeded().catch(()=>{}); await pg.locator('.vrm-ba').last().screenshot({path:path.join(CAP,`vb-fiche-detail-${nomCap}.png`)}).catch(()=>{}); }
-        await fermer();
+        dit(!!p1&&p1.port==='recu'&&/port de l’achat compris \(reçu\)/.test(p1.texte)&&p1.total==='1650','V6 · 91001 : la fiche dit « port de l’achat compris (reçu) », bénéfice 16,50 (= Par mois)',p1&&JSON.stringify({ ...p1, fiche:undefined }));
+        if(CAP&&p1&&!p1.erreur){ await pg.screenshot({path:path.join(CAP,`vb-fiche-${nomCap}.png`)}).catch(()=>{}); }
         const p2=await portDe('91002');
-        dit(!!p2&&p2.port==='saisi'&&!/compris \(reçu\)/.test(p2.texte)&&p2.total==='3800','V6 · 91002 (prix saisi) : rien n’est affirmé sur le port ; bénéfice au plus 38,00',p2&&JSON.stringify(p2));
-        await fermer();
+        dit(!!p2&&p2.port==='saisi'&&!/compris \(reçu\)/.test(p2.fiche||'')&&p2.total==='3800','V6 · 91002 (prix saisi) : rien n’est affirmé sur le port ; bénéfice au plus 38,00',p2&&JSON.stringify({ ...p2, fiche:undefined }));
+        await fermerFiches();
         const deb=await pg.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
         dit(deb<=1,'aucun débordement horizontal',`${deb}px`);
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
