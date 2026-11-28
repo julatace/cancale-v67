@@ -87,7 +87,7 @@ function CarteSite({ c, ouvertDefaut, onPublier, Photo }) {
   );
 }
 
-export default function PublierAilleurs({ paire = null, paires, lecture = false, cartes = [], partout = [], siteDemande = null, avis = '', onChoisir, onChanger, onPublier, onFermer, Photo, Retour, chercher }) {
+export default function PublierAilleurs({ paire = null, paires, lecture = false, cartes = [], partout = [], siteDemande = null, avis = '', onChoisir, onChanger, onPublier, onFermer, Photo, Retour, chercher, avant = null }) {
   const [q, setQ] = React.useState('');
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
@@ -132,6 +132,8 @@ export default function PublierAilleurs({ paire = null, paires, lecture = false,
             {/* (11 nov., lot photos-comptes) Une photo de cet article déjà EN LIGNE sur un AUTRE compte Vinted :
                 l'encart ambre le dit (miniature, compte) ; publier reste possible (son choix). */}
             <EncartPhotosAutresComptes sources={[{ id: paire.id, compte: paire.uid || '' }]} photos={Array.isArray(paire.photos) ? paire.photos : []} Photo={Photo}/>
+            {/* (28 nov.) AVANT de publier : relier l'achat, dire le prix minimum accepté (les contre-offres en partent). */}
+            {avant ? <div className="vrm-pa-avant" data-pa-avant="">{avant}</div> : null}
             {lecture ? <p className="vrm-ao-vide" data-pa-lecture="">Je lis tes annonces sur chaque site…</p> : null}
             {ordre.map((c) => <CarteSite key={c.site + ':' + paire.id} c={c} ouvertDefaut={c.site === siteDemande} onPublier={onPublier} Photo={Photo}/>)}
           </>

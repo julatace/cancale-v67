@@ -5,6 +5,10 @@ import { publierLbcDepuisVrm } from '../agir/Agir.jsx';
 import { champsFacultatifs } from '../profilVendeur.js';
 import React from 'react';
 import { jourParis } from '../dateParis.js';
+// (28 nov.) « Relier à un achat » et « Prix minimum accepté » avant « Publier aussi sur… » (src/publier/AvantPublierHote.jsx).
+import { gesteVrm as gesteVrmAvant, emettreClesRelues as emettreAvant } from '../App.jsx';
+import { bleamDe as bleamDeAvant } from '../reglagesAutoLigne.js';
+const AvantPublierAnnonce = aLaDemande(() => import('../publier/AvantPublierHote.jsx'));
 import { Btn, C, DEMANDE_EBAY_PAIRE, FermeAuRetour, Icon, PhotoVinted, SUPABASE_URL, aLaDemande, askConfirm, cleNum, descriptionDeFaits, descriptionLbcDe, ebayTitre, familleArticle, lbcTitre, load, mpChoisi, prixAchatDe, sbAuth, toast, useEbayPaires, useExtVivante, vendActuel } from '../App.jsx';
 
 // ⟦← App.jsx #2⟧
@@ -85,7 +89,9 @@ function HotePublierAilleurs({ comptes, num, site, sitesVus, manquesLecture, lec
   const avis = num && Array.isArray(liste) && !paire ? `N°${num} n’est pas proposable ici (vendu, plus en ligne, ou à trancher).` : '';
   return <PublierAilleurs paire={paire} paires={liste} lecture={lecture} cartes={cartes} partout={lecture ? [] : partoutLeMeme(sitesVus)} siteDemande={site}
     avis={avis} chercher={(l, q) => chercherPaires(l, q, cleNum)} onChoisir={(p) => onChoisir(String(p.num))} onChanger={() => onChoisir(null)}
-    onPublier={publier} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}/>;
+    onPublier={publier} onFermer={onFermer} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy"/>} Retour={FermeAuRetour}
+    avant={paire ? <AvantPublierAnnonce itemId={String(paire.id)} prixC={(() => { const n = Number(paire.prix); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; })()}
+      app={{ load, gesteVrm: gesteVrmAvant, askConfirm, emettreClesRelues: emettreAvant, bleamDe: bleamDeAvant }}/> : null}/>;
 }
 // ⟦← App.jsx #4⟧
 // ⟦→ ecrans/Stock.jsx #8⟧

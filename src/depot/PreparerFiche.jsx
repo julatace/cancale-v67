@@ -12,6 +12,9 @@ import { tr } from '../i18n/index.js';
 import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import { ETATS_DEPOT, COLIS_DEPOT, CHAMPS_DEPOT, manquesDepot, ordrePhotos, descriptionProposee, couleursDe } from './regles.js';
 import './preparer.css';
+// (28 nov.) « Relier à un achat » et « Prix minimum accepté » AVANT de déposer (src/publier/AvantPublier.jsx).
+import { BlocAvantPublier, RelierAchatFeuille, useOutilsAchat, reglagesOffres } from '../publier/AvantPublier.jsx';
+import { champsLien, ecritureMini } from '../publier/avantPublier.js';
 
 const COULEURS_VINTED = ['Noir', 'Blanc', 'Gris', 'Gris clair', 'Gris foncé', 'Beige', 'Crème', 'Marron', 'Bleu', 'Bleu clair', 'Marine', 'Rouge', 'Bordeaux', 'Vert', 'Kaki', 'Jaune', 'Moutarde', 'Rose', 'Orange', 'Violet', 'Lila', 'Turquoise', 'Argenté', 'Doré', 'Multicolore'];
 const nomChamp = (k) => tr('depot.m.' + k);
@@ -19,8 +22,13 @@ const libChamp = (k) => tr('depot.l.' + k);
 
 // `fiche` : la fiche « À publier » ; `lireStudio()` ⇒ { photos:[{id,img}] } | null ; `modeles` : vrm_modeles_desc ;
 // `onEnregistrer(fiche)` : l'écriture (App.jsx) ; `onFermer`.
-export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnregistrer, onFermer, ouvrirStudio = null }) {
+export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnregistrer, onFermer, ouvrirStudio = null, onAvant = null, lireReglage = null, bleamDe = null, confirmer = null }) {
   const f0 = fiche || {};
+  // (28 nov.) Ce que le bloc « Avant de publier » a écrit pendant que la feuille est ouverte (gardé dans l'enregistrement).
+  const [extra, setExtra] = React.useState({});
+  const outils = useOutilsAchat();
+  const [relier, setRelier] = React.useState(false);
+  const avant = (patch) => { if (!onAvant || !patch) return false; const r = onAvant(patch); if (r === false) return false; setExtra((o) => ({ ...o, ...patch })); return true; };
   const d0 = f0.depot || {};
   const [v, setV] = React.useState(() => ({ titre: f0.titre || '', modele: f0.modele || '', marque: f0.marque || '', taille: f0.taille || '', etat: f0.etat || '',
     couleur: couleursDe(f0)[0] || '', couleur2: couleursDe(f0)[1] || '', colis: f0.colis || '', categorie: f0.categorie || '', prix: f0.prix != null ? String(f0.prix).replace('.', ',') : '', description: f0.description || '' }));
@@ -45,7 +53,7 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
   const deplacer = (de, vers) => { const l = vues.slice(); const [x] = l.splice(de, 1); l.splice(vers, 0, x); if (vers === 0 || de === 0) setCouv(l[0]); setOrdre(l); };
   const enregistrer = () => {
     const depot = { photos: vues, couverture: vues[0] || '', modele: propose ? propose.modeleId : '', prepareeAt: new Date().toISOString() };
-    const out = { ...f0, ...v, couleurs: [v.couleur, v.couleur2].filter(Boolean), prix: Number.isFinite(prixN) && prixN > 0 ? Math.round(prixN * 100) / 100 : null, depot };
+    const out = { ...f0, ...extra, ...v, couleurs: [v.couleur, v.couleur2].filter(Boolean), prix: Number.isFinite(prixN) && prixN > 0 ? Math.round(prixN * 100) / 100 : null, depot };
     delete out.couleur2;
     const r = onEnregistrer ? onEnregistrer(out) : false;
     if (r === false) { setDit(tr('depot.pasEnregistre')); return; }
@@ -81,6 +89,11 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
           {champ('prix', { inputMode: 'decimal', suffixe: '€' })}
         </div>
       </Groupe>
+      {onAvant ? <BlocAvantPublier fiche={{ ...f0, ...extra }} prixC={Number.isFinite(prixN) && prixN > 0 ? Math.round(prixN * 100) : null}
+        reglages={lireReglage ? reglagesOffres(lireReglage, bleamDe) : null} confirmer={confirmer}
+        onMini={(c) => avant(ecritureMini(c))} onRelier={outils ? () => setRelier(true) : null}/> : null}
+      {relier && outils ? <RelierAchatFeuille outils={outils} cible={{ titre: v.titre, marque: v.marque, taille: v.taille, couleur: v.couleur, dateRef: new Date().toISOString() }}
+        onFermer={() => setRelier(false)} onRelier={(lien) => avant(champsLien({ ...f0, ...extra }, lien))}/> : null}
       <Groupe titre={libChamp('etat')}>
         <div className="prep-choix" role="radiogroup" aria-label={libChamp('etat')}>
           {ETATS_DEPOT.map((e) => <button key={e} type="button" role="radio" aria-checked={v.etat === e} className="sb-touche" data-prep-etat={e} onClick={() => setV((o) => ({ ...o, etat: e }))}>{tr('depot.etat.' + ETATS_DEPOT.indexOf(e))}</button>)}

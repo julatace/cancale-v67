@@ -12,3 +12,22 @@
 .prep-desc { display: block; align-self: stretch; flex: 1 1 100%; width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 16px 14px; }
 [data-preparer] .prep-desc textarea.prep-texte { display: block; width: 100% !important; max-width: none; box-sizing: border-box; min-height: 160px; padding: 10px 12px; border-radius: 12px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: inherit; font-size: 16px; line-height: 1.4; resize: vertical; }
 .prep-utiliser { padding: 4px 16px 0; }
+/* ── (28 nov.) « Avant de publier » (src/publier/AvantPublier.jsx) et le dossier « À publier » (src/aPublier/) ── */
+.ap-mini { align-self: stretch; flex: 1 1 100%; display: flex; align-items: flex-end; gap: 10px; padding: 10px 16px 4px; }
+.ap-mini .n-champ { flex: 1 1 auto; min-width: 0; }
+.ap-mini > button { min-height: 44px; flex: 0 0 auto; }
+.ap-offres { align-self: stretch; flex: 1 1 100%; margin: 0; padding: 4px 16px 6px; font-size: 14px; color: var(--n-encre-2); }
+.ap-dit { align-self: stretch; flex: 1 1 100%; margin: 0; padding: 0 16px 6px; font-size: 14px; color: var(--n-encre); font-weight: 600; }
+.ap-pourquoi { align-self: stretch; flex: 1 1 100%; padding: 0 16px 10px; font-size: 14px; color: var(--n-encre-2); }
+.dap-actions { padding: 4px 16px 12px; }
+.dap-grille { align-self: stretch; flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; padding: 10px 16px; }
+@media (min-width: 900px) { .dap-grille { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); } }
+.dap-case { position: relative; appearance: none; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; border-radius: 10px; min-height: 44px; }
+.dap-case img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; background: var(--n-fond); }
+.dap-case[data-dap-debut] { box-shadow: -5px 0 0 0 var(--n-encre); }
+.dap-case[data-dap-propose]:not([data-dap-debut]) { box-shadow: -5px 0 0 0 var(--n-trait); }
+.dap-case .dap-n { position: absolute; left: 6px; top: 6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--n-carte); color: var(--n-encre); font-size: 13px; font-weight: 700; line-height: 22px; text-align: center; }
+.dap-case:focus-visible { outline: 2px solid var(--n-encre); outline-offset: 2px; }
+.dap-vig { width: 44px; height: 58px; object-fit: cover; border-radius: 8px; display: block; background: var(--n-fond); }
+.dap-fichier { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.dap-etat { margin: 0; padding: 0 16px 10px; font-size: 14px; color: var(--n-encre-2); }

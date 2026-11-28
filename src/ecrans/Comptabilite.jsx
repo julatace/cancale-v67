@@ -88,6 +88,8 @@ import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { GardeEcran } from '../composants/GardeEcran.jsx';
 import { L, Lbas, VERBES, PAS_SU } from '../libelles.js';
 import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from '../republieTelephone.js';
+// (28 nov., dossier « À publier ») la photo d'un brouillon reconnue sur la nouvelle annonce : son N°, son achat, son prix mini.
+import { decisionNumeroBrouillon, brouillonsOuverts, correspondance as correspondanceBrouillons, heritage as heritageBrouillon } from '../aPublier/dossier.js';
 import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, aEcrireNouveaux, listeNumeros, demandesNumero } from '../numerosNouvelles.js';
 import { ChiffreConseil } from '../Conseils.jsx';
 import { accompagner } from '../accompagnement.js';
@@ -595,6 +597,17 @@ const RelancesVentes = aLaDemandeDiscret(() => import('../natif/ecrans/RelancesV
 if (typeof window !== 'undefined') { try { setTimeout(() => RelancesVentes.precharger(), 0); } catch (_) {} }   // (21 nov., ext. 5.425) « À relancer », lu dans les lignes de l'extension
 const BoostAnnonce = aLaDemande(() => import('../BoostVerdict.jsx').then((m) => ({ default: m.BoostAnnonce })));   // (21 nov., ext. 5.429) « boost rentable ou pas »
 const PreparerFiche = aLaDemande(() => import('../depot/PreparerFiche.jsx'));   // (21 nov., ext. 5.429) une fiche préparée à l'avance
+// (28 nov.) Le dossier « À publier » (photos ⇒ brouillons, N° avant de publier, reconnu à la publication par la photo) et
+// « Relier à un achat » / « Prix minimum accepté » avant chaque publication (src/publier/).
+const HoteDossier = aLaDemande(() => import('../aPublier/HoteDossier.jsx'));
+import { poserOutilsAchat } from '../publier/outilsAchat.js';
+import { poserPrixMiniLigne, donnerNumerosBrouillons } from '../App.jsx';
+import { bleamDe as bleamDeAuto } from '../reglagesAutoLigne.js';
+import { imprimerEtiquettes as imprimerEtiquettesDossier } from '../etiquetage/impression.js';
+import { methodeDe as methodeEtiquetageDe, CLE_ETIQUETAGE as CLE_ETIQUETAGE_DOSSIER } from '../etiquetage/methode.js';
+const APP_DOSSIER = { load, save, gesteVrm, askConfirm, emettreClesRelues, toast, cleNum, donnerNumerosBrouillons, poserPrixMiniLigne, confirmerNumerosAVerifier,
+  imprimer: (etq) => { const m = methodeEtiquetageDe({ etiquetage: load(CLE_ETIQUETAGE_DOSSIER, null) }); return imprimerEtiquettesDossier(etq, { format: m.format, titre: m.titre }); },
+  STUDIO_BASE, SUPABASE_URL, sbAuth, bleamDe: bleamDeAuto, Icon, PreparerFiche, lireModelesRanges };
 // ⟦← App.jsx #39⟧
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('../OffresAuto.jsx'));
@@ -807,7 +820,7 @@ function FichesNeuves({ annonces = null }) {
   for (const [id, f] of Object.entries(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero && !draftsFiches.has(String(id))) portes.add(cleNum(f.numero));
   for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
-  const liste = fichesAPublier(toutes0, portes, cleNum).filter((f) => etatFicheVinted(f, annonces) !== 'en-ligne');
+  const liste = fichesAPublier(toutes0, portes, cleNum).filter((f) => etatFicheVinted(f, annonces) !== 'en-ligne' && !(f.dossier && typeof f.dossier === 'object'));   // (28 nov.) un brouillon du dossier : sa liste à lui
   if (!liste.length && !ouvert && !mainF) return null;
   // (15 nov.) La fiche ouverte « à la main » est VUE en ligne quand une annonce lue porte son N°
   // (la preuve qui la fait sortir de « À publier »), ou quand son brouillon VRM est publié.
@@ -843,6 +856,17 @@ function FichesNeuves({ annonces = null }) {
     emettreClesRelues(['vrm_fiches_neuves']); maj(); toast(tr('depot.enregistre'));
     return true;
   };
+  // (28 nov.) « Relier à un achat » / « Prix minimum accepté » dans « Préparer » : la fiche « À publier » (rangée tout de suite)
+  // et, pour le prix mini, la clé par N° de la ligne des réglages (lue par l'extension dès que l'annonce porte ce N°).
+  const avantPrep = (f, patch) => {
+    const t = load('vrm_fiches_neuves', {}) || {};
+    if (!f || !t[f.id] || !patch) return false;
+    save('vrm_fiches_neuves', { ...t, [f.id]: { ...t[f.id], ...patch } });
+    emettreClesRelues(['vrm_fiches_neuves']); maj();
+    if (Object.prototype.hasOwnProperty.call(patch, 'min') && String(f.numero || '').trim()) poserPrixMiniLigne({ num: String(f.numero), min: String(patch.min || '').trim() ? String(patch.min) : null });
+    toast(Object.prototype.hasOwnProperty.call(patch, 'min') ? tr('ap.mini.range') : tr('ap.achat.relie'));
+    return true;
+  };
   const basculer = (id) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // (20 nov., décision de Julien) « Créer sur Vinted » et « Publier » se font dans l'extension : le panneau s'ouvre
   // sur la fiche (son N°) ou sur le brouillon (son identifiant Vinted). L'app ne les envoie plus.
@@ -871,6 +895,7 @@ function FichesNeuves({ annonces = null }) {
       {/* 5.429 : « Déposer N sur Vinted » — les fiches préparées, cochées dans le panneau de l'extension (rien ne part d'ici). */}
       {aDeposer.length ? <div className="vrm-ao-neuve-serie" data-fiches-a-deposer={aDeposer.length}><BoutonExtension className="vrm-ao-second" action="deposer" ids={aDeposer.map((f) => String(f.id))} libelle={tr('depot.liste.deposerN', { n: aDeposer.length })} attrs={{ 'data-fiche-deposer': aDeposer.length }}/></div> : null}
       {prep && <PreparerFiche fiche={prep} modeles={lireModelesRanges()} onEnregistrer={enregistrerPrep} onFermer={() => setPrep(null)}
+        onAvant={(patch) => avantPrep(prep, patch)} lireReglage={load} bleamDe={bleamDeAuto} confirmer={({ titre, desc, ok }) => askConfirm({ title: titre, desc, ok })}
         lireStudio={() => import('../studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, cleNum(prep.numero)))}/>}
       {mainF && <PublierALaMain fiche={mainF} vue={vueMain} onClose={() => setMainF(null)}
         onFini={(w) => noterGesteFait({ sorte: w.sorte, titre: tr(w.cle, { num: w.article.num || '' }), article: w.article, texte: '' })}/>}
@@ -15196,6 +15221,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // ni sortie) ⇒ la nouvelle attend la comparaison des photos (24 h au plus) ; même photo ⇒ PROPOSÉE (son clic) ;
     // la photo que VRM a FABRIQUÉE pour un N° (registre `vrm_photos_vrm`, seuil sûr) ⇒ ce N° repris, dit une fois.
     const reconnusNum = [], republieAttente = [], republiePropositions = [];
+    // (28 nov.) Les brouillons OUVERTS du dossier « À publier » (`vrm_fiches_neuves` avec `dossier`) et les annonces de ce
+    // passage encore sans N° (deux nouvelles annonces pour un brouillon ⇒ aucune ne le prend seule).
+    const brouillonsDossier = typeof brouillonsOuverts === 'function' ? brouillonsOuverts(load('vrm_fiches_neuves', {}) || {}) : [];
+    const sansNumPassage = brouillonsDossier.length ? items.filter((x) => !String((nextNum[x.id] || {}).numero || '').trim()) : [];
+    let brouillonsMaj = null;
     const presentsRep = new Set([...items, ...(listings.aConfirmer || []), ...(listings.brouillons || [])].map((x) => String(x && x.id)));
     const vusRep = lireObjet(VUS_EN_LIGNE), decisionsRep = lireObjet(CYCLE_DECISIONS);
     const registreRep = lireObjet(CLE_PHOTOS_VRM), memRep = lireObjet(CLE_EMPREINTES_FICHES), reponsesRep = lireObjet(CLE_REPUB_REPONSES), attenteRep = lireObjet(CLE_REPUB_ATTENTE);
@@ -15300,6 +15330,23 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (neuf && !neufPermis(it)) continue;
       // (15 nov., <republie-telephone>) Avant un N° neuf : republiée dans l'app Vinted ?
       if (neuf) {
+        // (28 nov., dossier « À publier ») UN BROUILLON NUMÉROTÉ dont la photo est reconnue (src/aPublier/dossier.js :
+        // ≤ 8, aucun autre brouillon voisin, aucune autre nouvelle annonce) ⇒ l'annonce prend SON N° — jamais un second ;
+        // une annonce qui POURRAIT l'être (empreinte pas encore lue, ambiguë) attend 24 h au plus avant un N° neuf.
+        const db = typeof decisionNumeroBrouillon === 'function' && brouillonsDossier.length ? decisionNumeroBrouillon({ hexes: empreintesDe(empRep(String(it._acc?.vinted_user_id ?? ''), it.id)), brouillons: brouillonsDossier,
+          concurrents: sansNumPassage.filter((x) => String(x.id) !== String(it.id)).map((x) => empreintesDe(empRep(String(x._acc?.vinted_user_id ?? ''), x.id))),
+          creee: dateMiseEnLigneMs(it, listingDates), depuis: attenteRep[String(it.id)], cle: cleNum, numeroVendu: numVenduRep,
+          numeroPresentAilleurs: (k) => [...presentsRep].some((pid) => pid !== String(it.id) && nextNum[pid] && cleNum(nextNum[pid].numero) === k) }) : null;
+        if (db && db.action === 'attendre') { republieAttente.push(String(it.id)); continue; }
+        if (db && db.action === 'reprendre') {
+          const at = new Date().toISOString();
+          nextNum[it.id] = { ...(cur || {}), numero: String(db.numero), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: at, auto: true, brouillonDe: String(db.brouillon), brouillonAt: at, brouillonPar: 'photo' };
+          reconnusNum.push({ id: String(it.id), numero: String(db.numero), title: it.title || '', photo: it.photo || null });
+          { const ep = entreePool(db.numero); if (ep != null) nextUsed.add(ep); }
+          if (pk && !byPhoto[pk]) byPhoto[pk] = String(db.numero);
+          changed = true;
+          continue;
+        }
         const dr = republieDe(it);
         if (dr.action === 'attendre' || dr.action === 'proposer') {
           republieAttente.push(String(it.id));
@@ -15323,6 +15370,25 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (pk && !byPhoto[pk]) byPhoto[pk] = String(num);
       changed = true;
     }
+    // (28 nov., dossier « À publier ») LA CORRESPONDANCE : une annonce présente qui porte le N° d'un brouillon (déposée par
+    // VRM, reprise par sa photo), ou — brouillon sans N° — que sa photo désigne seule, dans les deux sens, créée après lui :
+    // elle HÉRITE (achat, prix mini ; un champ déjà posé n'est jamais écrasé) et le brouillon passe dans « Publiées ».
+    // Ambigu ⇒ rien (le dossier propose « Publiée ? Relie-la », SON toucher).
+    if (brouillonsDossier.length && typeof correspondanceBrouillons === 'function') {
+      const cB = correspondanceBrouillons({ brouillons: brouillonsDossier, cle: cleNum,
+        annonces: items.map((x) => ({ id: String(x.id), numero: (nextNum[x.id] || {}).numero, brouillonDe: (nextNum[x.id] || {}).brouillonDe, creee: dateMiseEnLigneMs(x, listingDates) || null,
+          hexes: empreintesDe(empRep(String(x._acc?.vinted_user_id ?? ''), x.id)) })) });
+      if (cB.liens.length) {
+        const atB = new Date().toISOString();
+        brouillonsMaj = {};
+        for (const l of cB.liens) {
+          const b = brouillonsDossier.find((f) => String(f.id) === l.brouillon); if (!b || !nextNum[l.annonce]) continue;
+          nextNum[l.annonce] = { ...nextNum[l.annonce], ...heritageBrouillon(b, nextNum[l.annonce], { de: l.de, maintenant: atB }) };
+          brouillonsMaj[l.brouillon] = { publiee: { id: l.annonce, at: atB, de: l.de, uid: String((items.find((x) => String(x.id) === l.annonce) || {})._acc?.vinted_user_id ?? '') } };
+          changed = true;
+        }
+      }
+    }
     // </numerotation-passage>
     // (15 nov.) L'attente « republiée ? » (la première fois vue sans N°, synchronisée : la borne de 24 h vaut
     // pour tous ses appareils) et les propositions de Ma journée.
@@ -15345,6 +15411,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     Object.values(saleOv).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
     Object.values(nextNum).forEach(e => { const n = entreePool(e && e.numero); if (n != null) nextUsed.add(n); });
     if (nextUsed.size !== beforeSize) changed = true;
+    // (28 nov.) Les brouillons publiés sortent du dossier (« Publiées », avec l'annonce qu'ils sont devenus).
+    if (brouillonsMaj && Object.keys(brouillonsMaj).length) { const T = { ...(load('vrm_fiches_neuves', {}) || {}) }; for (const [id, p] of Object.entries(brouillonsMaj)) if (T[id] && !T[id].publiee) T[id] = { ...T[id], ...p }; save('vrm_fiches_neuves', T); emettreClesRelues(['vrm_fiches_neuves']); }
     if (changed) {
       setNumeros(nextNum); save('vinted_annonce_numeros', nextNum);
       const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
@@ -17301,7 +17369,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       key: pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '_'),
       photo: (typeof pickerFor.photo === 'string' ? pickerFor.photo : '') || '' };
   }, [pickerFor, sales.items, numeros]);
-  const liensAchats = useMemo(() => liensAvecDivisions(liensParAchat(numeros, saleOv), divisionsAchats), [numeros, saleOv, divisionsAchats]);   // (22 nov., achats-lot) un achat divisé est complet
+  const liensAchats = useMemo(() => liensAvecDivisions(liensParAchat(numeros, saleOv), divisionsAchats), [numeros, saleOv, divisionsAchats]);
+  // (28 nov.) LES OUTILS D'ACHAT PARTAGÉS (src/publier/outilsAchat.js) : la feuille « Relier à un achat » d'avant la publication
+  // (dossier, Préparer, « Publier aussi sur… », la fiche de la paire) charge la MÊME liste (`chargerAchats`, une fois), voit les
+  // MÊMES liens et propose le prix du REÇU par la MÊME règle (`propositionPrixAchat`) ; un lot n'est jamais divisé.
+  const outilsAchatAvant = useMemo(() => ({ charger: chargerAchats, liens: liensAchats, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+    proposition: (a) => propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx, estLot: (x) => lotDe(x).lot || estLotApp(x) }),
+    accNom: (a) => (a && a._acc ? accNameOf(a._acc) || '' : ''), photoDe: orderPhoto, estLot: (a) => lotDe(a).lot || estLotApp(a) }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [chargerAchats, liensAchats, indexRecusAchat]);
+  useEffect(() => { poserOutilsAchat(outilsAchatAvant); return () => poserOutilsAchat(null); }, [outilsAchatAvant]);   // (22 nov., achats-lot) un achat divisé est complet
   const prixPayeAchat = (a) => {
     if (lotDe(a).lot) { const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null; }
     const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
@@ -27772,6 +27849,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             achat) en bas ; le reste dans « ⋯ ». Une seule couleur d'accent,
             rare (§7) : l'ambre ne sert qu'à « dort » et à une marge négative. */}
         <FichesNeuves annonces={listings.items}/>
+        {/* (28 nov.) Le dossier « À publier » : photos ⇒ brouillons, N° avant de publier, reconnu à la publication. */}
+        <HoteDossier app={APP_DOSSIER} annonces={listings.items} empreintes={empreintesVinted || null} dateDe={(it) => dateMiseEnLigneMs(it, listingDates)}/>
         {/* (11 nov., lot quoi-republier) « Quelles annonces republier ? » en tête de la vue Republier : un toucher COCHE
             l'annonce dans la liste ci-dessous (la même sélection `selAnn`, par compte + identifiant) ; rien ne part,
             c'est lui qui choisit ensuite « À la main » ou « Par VRM » et qui lance (§3). */}

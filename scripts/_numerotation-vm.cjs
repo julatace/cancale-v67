@@ -39,13 +39,14 @@ async function charger(racine) {
   const mods = {
     N: await imp('src/numerosNouvelles.js'), R: await imp('src/repriseNumero.js'), E: await imp('src/numeroEcrit.js'),
     C: await imp('src/accueilReste/cartonsNumeros.js'), RT: await imp('src/republieTelephone.js'), AA: await imp('src/annoncesActions.js'),
+    DP: await imp('src/aPublier/dossier.js'),   // (28 nov.) le dossier « À publier » (absent d'un arbre d'avant : null)
   };
   return { corps, manque, A: ctxA.__a || null, ...mods, APP };
 }
 
 // Un passage : ce que l'appareil sait + ce que la lecture rend ⇒ ce que la numérotation écrit.
 function passageAvec(L, x) {
-  const { N, R, E, C, RT, A } = L;
+  const { N, R, E, C, RT, A, DP } = L;
   const fiches = JSON.parse(JSON.stringify(x.fiches || {}));
   const pool = x.pool || [];
   const store = { vrm_numero_ecrit: x.moi ? { actif: true, depuis: '2026-11-01T00:00:00.000Z' } : { actif: false, choisi: '2026-11-01T00:00:00.000Z' }, ...(x.store || {}) };
@@ -69,13 +70,16 @@ function passageAvec(L, x) {
     CLE_PHOTOS_VRM: 'vrm_photos_vrm', CLE_EMPREINTES_FICHES: 'vrm_empreintes_fiches', CLE_REPUB_REPONSES: 'vrm_republie_reponses', CLE_REPUB_ATTENTE: 'vrm_republie_attente',
     empreintesVinted: x.empreintesPasLues ? undefined : (x.empreintes === undefined ? {} : x.empreintes), disparuesDuCompte: RT && RT.disparuesDuCompte, decisionRepublie: RT && RT.decisionRepublie, empreintesDe: RT && RT.empreintesDe,
     venduesVinted: new Set((x.venduesVinted || []).map(String)), pairsLost: x.pairsLost || {}, changed: false,
+    decisionNumeroBrouillon: DP ? DP.decisionNumeroBrouillon : undefined, brouillonsOuverts: DP ? DP.brouillonsOuverts : undefined,
+    correspondanceBrouillons: DP ? DP.correspondance : undefined, heritageBrouillon: DP ? DP.heritage : undefined,
     ...A,
   };
   vm.createContext(ctx);
   const code = `(() => { with (this) { ${L.corps}
     return { fiches: nextNum, pool: [...nextUsed], nouveaux: typeof nouveauxNum !== 'undefined' ? nouveauxNum : [],
       reconnus: typeof reconnusNum !== 'undefined' ? reconnusNum : [], attente: typeof republieAttente !== 'undefined' ? republieAttente : [],
-      propositions: typeof republiePropositions !== 'undefined' ? republiePropositions : [], changed }; } }).call(this)`;
+      propositions: typeof republiePropositions !== 'undefined' ? republiePropositions : [],
+      brouillons: typeof brouillonsMaj !== 'undefined' ? brouillonsMaj : null, changed }; } }).call(this)`;
   let r;
   try { r = vm.runInContext(code, ctx); } catch (e) { return { erreur: String(e && e.message || e) }; }
   return r || { fiches, pool, nouveaux: [], reconnus: [], attente: [], propositions: [], vide: true };

@@ -46,7 +46,7 @@ import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } fro
 // ⟦→ ecrans/Feuilles.jsx #1⟧
 import { automatisationsActives, AUTOMATISATIONS_COMPTEES } from './automatisationsEtat.js';   // (21 nov., lot journee-stats) « N sur 3 » dans Statistiques ; (onglets-menu) « N actives » sur la tuile du Menu
 import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage, bleamDe } from './reglagesAutoLigne.js';
-import { PM_CLE, pmAbsorber } from './prixMiniPose.js';
+import { PM_CLE, pmAbsorber, pmNormalise } from './prixMiniPose.js';
 // ⟦→ ecrans/Comptabilite.jsx #5⟧
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
 import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
@@ -522,6 +522,8 @@ function aLaDemandeDiscret(charger) {
   BlocALaDemande.precharger = Paresseux.precharger;
   return BlocALaDemande;
 }
+// (28 nov.) « Avant de publier » (relier l'achat, prix minimum accepté) sur la fiche de la paire — chargé à la demande, rien pendant.
+const AvantPublierAnnonceFiche = aLaDemandeDiscret(() => import('./publier/AvantPublierHote.jsx'));
 // (20 nov., intégration 20nov — budget de démarrage) Colis à retirer : une carte par point (src/natif/RetraitsPoints.jsx,
 // lot retraits-visuel), chargée quand Achats l'affiche (hors du démarrage, comme les tableaux du 19 nov.).
 const RetraitsPoints = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx').then((m) => ({ default: m.RetraitsPoints })));
@@ -4878,6 +4880,35 @@ const appliquerReglagesAutoLigne = async () => {
   }
   if (changees.length) emettreClesRelues(changees);
 };
+// (28 nov., « Prix minimum accepté » avant de publier) LE PRIX MINI D'UN ARTICLE SANS IDENTIFIANT VINTED (une fiche « À
+// publier », un brouillon du dossier) : rangé PAR SON N° dans la clé `vrm_prix_mini` de la ligne `vrm_reglages_auto` — la
+// même que le panneau (5.437, `prixMiniCarte · poser`), lue par `pmMiniDe` dans l'extension (moteur des offres, paliers,
+// Agent VRM, favoris) dès que l'annonce porte ce N°, et absorbée par l'app (`pmAbsorber`). Comparer-et-échanger sur `rev` ;
+// une lecture ratée n'écrit rien. `demande` : { num, item?, min (texte, ou null pour l'effacer), prix? }. Rend true / false.
+const poserPrixMiniLigne = async (demande) => {
+  const owner = AUTH.user?.id;
+  for (let n = 0; n < 5; n++) {
+    if (!owner || AUTH.user?.id !== owner || !AUTH.session?.access_token) return false;
+    let rows;
+    try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${REGLAGES_AUTO_ID}&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth(), cache: 'no-store' }); if (!res.ok) return false; rows = await res.json(); } catch (_) { return false; }
+    if (!Array.isArray(rows)) return false;
+    const d = rows[0] ? (rows[0].data || {}) : null;
+    const r = pmNormalise(demande, d && d.cles ? d.cles[PM_CLE] : null, Date.now(), cleNum);
+    if (!r.ok) return false;
+    const rev0 = d && Number.isSafeInteger(d.rev) && d.rev >= 0 ? d.rev : null;
+    const data = Object.assign(ligneAvecReglage(d, PM_CLE, r.valeur, 'app', Date.now()), { rev: (rev0 || 0) + 1 });
+    try {
+      const w = !rows[0]
+        ? await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify([{ id: REGLAGES_AUTO_ID, owner, data }]) })
+        : await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${REGLAGES_AUTO_ID}&owner=eq.${encodeURIComponent(owner)}&${rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`}&select=id`, { method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
+      if (!w.ok) return false;
+      const out = await w.json().catch(() => null);
+      if (Array.isArray(out) && out.length) return true;
+    } catch (_) { return false; }
+  }
+  return false;
+};
+export { poserPrixMiniLigne };
 const ecrireReglagesAutoLigne = async (owner, k, v) => {
   for (let n = 0; n < 5; n++) {
     if (!owner || AUTH.user?.id !== owner) return false;
@@ -17176,6 +17207,43 @@ async function numerosServisLus() {
   numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
   return { int: pris, cles: prisK };
 }
+// (28 nov., dossier « À publier » — Julien : « ça permet aussi de pouvoir étiqueter avant ») « DONNER UN N° » aux brouillons
+// choisis, sur SON toucher : la série `numerosEnSerie` sur TOUS les N° servis (`numerosServisLus`, réservés relus en base) —
+// le prochain libre, du plus haut, jamais un trou, la MÊME règle que « Rangé » et « Dupliquer » (aucun second compteur) ;
+// le pool append-only D'ABORD (un brouillon retiré garde son N° servi pour toujours), puis les fiches ; ses photos sont
+// recopiées dans la ligne du studio de ce N° (le dépôt de l'extension les lit là). Rend { ok, numeros } ou { ok:false, raison }.
+async function donnerNumerosBrouillons(ids) {
+  if (!isCloudReady()) return { ok: false, raison: 'lecture' };
+  if (numeroEcritActif()) return { ok: false, raison: 'moi' };
+  if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'numeros' };
+  const pris = await numerosServisLus();
+  if (!pris) return { ok: false, raison: 'numeros' };
+  const { numerosPourBrouillons } = await import('./aPublier/dossier.js');
+  const T = load('vrm_fiches_neuves', {}) || {};
+  const r = numerosPourBrouillons(ids, T, (n) => numerosEnSerie({ pris, pref: prefixeNumeros(), n, prochainLibre, cleNum }));
+  if (!r.ok) return r;
+  const lies = Object.entries(r.numeros);
+  if (!lies.length) return { ok: true, numeros: {} };
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  for (const [, n] of lies) { const ep = entreePool(n); if (ep != null && !pool.some((x) => cleNum(x) === cleNum(ep))) pool.push(ep); }
+  save('vinted_used_numeros', pool.sort(triPool));
+  const T2 = { ...(load('vrm_fiches_neuves', {}) || {}) };
+  const at = new Date().toISOString();
+  for (const [id, n] of lies) if (T2[id] && !String(T2[id].numero || '').trim()) T2[id] = { ...T2[id], numero: n, numeroDonneAt: at };
+  save('vrm_fiches_neuves', T2);
+  emettreClesRelues(['vinted_used_numeros', 'vrm_fiches_neuves']);
+  // Les photos du brouillon ⇒ la ligne du studio de SON N° (lire-fusionner-réécrire ; une lecture ratée n'écrit rien).
+  try {
+    const m = await import('./studioPhoto.js');
+    for (const [id, n] of lies) {
+      const cle = T2[id] && T2[id].dossier && T2[id].dossier.cle; if (!cle) continue;
+      const st = await m.lireStudio(STUDIO_BASE, cle); if (!st || !Array.isArray(st.photos) || !st.photos.length) continue;
+      await m.modifierStudio(STUDIO_BASE, cleNum(n), n, (lues) => { const ids0 = new Set(lues.map((p) => p && p.id)); const ajout = st.photos.filter((p) => p && !ids0.has(p.id)); return ajout.length ? lues.concat(ajout) : false; });
+    }
+  } catch (_) {}
+  return { ok: true, numeros: r.numeros };
+}
+export { donnerNumerosBrouillons };
 // ⟦→ ecrans/Comptabilite.jsx #201⟧
 // (15 nov., atelier d'arrivée) Le N° d'un achat arrivé : le prochain libre (jamais un trou), ou le sien tapé.
 async function preparerNumero(entree, n) {
@@ -36009,6 +36077,10 @@ function AppCoeur() {
           return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} forfait={forfaitF} sites={sitesFiche} sitesManques={sitesManquesFiche} sitesAutres={sitesAutresFiche} sitesPasLus={sitesPasLusFiche} sitesMontres={sitesMontresFiche}
             onPublierSur={(n, site)=>setPubAil({ num: String(n), site: ['leboncoin','vestiaire','ebay'].includes(site) ? site : null })} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
             retraits={p && p.num ? <RetraitsFiche num={String(p.num)} lire={lireItemsLigne} charger={chargerCleRetraits}/> : null}
+            // (28 nov.) « Relier à un achat » et « Prix minimum accepté », modifiables après coup — une annonce Vinted PAS vendue (sa fiche, par identité).
+            avant={p && p.idFiche && !p.double && !p.ancienNumero && !venteDeLaPaire(rn, venteAnnuleeFiche) ? <AvantPublierAnnonceFiche itemId={String(p.idFiche)}
+              prixC={(() => { const f = (load('vinted_annonce_numeros', {}) || {})[String(p.idFiche)] || {}; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)); const n = Number(a && a.price != null ? (typeof a.price === 'object' ? a.price.amount : a.price) : (f.price && typeof f.price === 'object' ? f.price.amount : f.price)); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; })()}
+              app={{ load, gesteVrm, askConfirm, emettreClesRelues, bleamDe }}/> : null}
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
             onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis || ficheDeLoupe.current !== String(numF) ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}

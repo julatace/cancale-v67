@@ -156,7 +156,7 @@ const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', prix: 'tag', publier: 'shop', republier: 'sync', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', numero: 'journal' };
 const ATTRS_TUILE = { prix: { 'data-fiche-prix': '' }, publier: { 'data-fiche-publier-ailleurs': '' }, republier: { 'data-fiche-republier': '' }, dupliquer: { 'data-fiche-dupliquer': '' } };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, sitesAutres = null, sitesPasLus = undefined, sitesMontres = null, onPublierSur = null, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null , forfait = null, coutVente = null, retraits = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, sitesAutres = null, sitesPasLus = undefined, sitesMontres = null, onPublierSur = null, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null , forfait = null, coutVente = null, retraits = null, avant = null }) {
   const [vueFiche, setVueFiche] = useVueFiche();
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
@@ -186,11 +186,14 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   } : {};
   // L'ARTICLE (src/ficheProduit.js, `articleFiche`) : tout ce que la fiche montre, rangé une fois — la vue ne calcule rien.
   // (16 nov.) Ouverte depuis une ligne de COLIS, la fiche porte déjà SON geste du bordereau (les actions de la ligne).
-  const A = p ? articleFiche(p, { sites: lignesSites, sitesManques: lecture ? [] : sitesManques, sitesAutres: Array.isArray(sitesAutres) ? sitesAutres : [],
+  const A0 = p ? articleFiche(p, { sites: lignesSites, sitesManques: lecture ? [] : sitesManques, sitesAutres: Array.isArray(sitesAutres) ? sitesAutres : [],
     sitesPasLus: lecture ? undefined : sitesPasLus, sitesMontres, peutPublier: !!onPublierSur && !neuve && !(p && p.ancienNumero), etat, taille, photos, neuve, achatParNum, siVendue, relie: !!achatRelie, dateCourte: dateFd,
     peut: { achat: !!portes.achat, relier: !!portes.relier, prix: !!portes.prix, mini: !!portes.mini, place: !!portes.place },
     action: { proposition: relier ? relier.proposition : undefined, peutRelier: !!(relier && (relier.onRelier || relier.onAutre)), peutBordereau: !!onBordereau, peutBaisser: !!onPrix && !neuve, peutSaisir: !!saisir },
     dispo: { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), onPrix, onPublierAilleurs, onRepublier, onDupliquer, outilsIdees, onBordereau: ctx === 'colis' ? null : onBordereau, histoNum } }) : null;
+  // (28 nov.) « Avant de publier » posé sur la fiche (achat relié + prix minimum accepté, src/publier/AvantPublierHote.jsx) :
+  // le prix mini y est montré et modifié — le fait « Prix mini » ne le répète pas (un nombre ne s'écrit qu'une fois).
+  const A = A0 && avant && !A0.double ? { ...A0, faits: A0.faits.filter((f) => f.cle !== 'mini') } : A0;
   const r = A ? A.p.resume : null;
   const faits = A ? A.faits : [];
   // (15 nov., rouges-connus) La paire lue sans titre prend celui de la LIGNE touchée (la même annonce, par identité).
@@ -323,6 +326,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         // ses seuils ; la vente : son récapitulatif) et ses gestes — SUR la fiche, toujours montés (la ligne y pose ses éléments).
         contexte: depuis ? <Herite ref={slotCtx} attrs={{ 'data-fiche-contexte': ctx, 'aria-label': tr(CLE_CTX[ctx] || 'fiche.ctx.vente') }}/> : null,
         actions: depuis ? <Herite attrs={{ 'data-fiche-actions': ctx, 'aria-label': tr('fiche.actions') }}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></Herite> : null,
+        avant: p && A && !A.double ? avant : null,   // (28 nov.) « Relier à un achat » · « Prix minimum accepté »
         retraits: p ? retraits : null,   // (21 nov., ext. 5.426) « Vendue → retirée sur » (src/RetraitsFiche.jsx)
         vendueAilleurs: p && plus && plus.gestes ? (React.isValidElement(plus.gestes) ? React.cloneElement(plus.gestes, { Bouton: BoutonRangeeGeste }) : plus.gestes) : null,
         toutVoir,

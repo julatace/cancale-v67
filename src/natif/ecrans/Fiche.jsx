@@ -246,6 +246,8 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               })}
             </div> : <p className="nf-vide">{T.aucunSite}</p>}
           </section>; })() : null}
+          {/* (28 nov.) « Relier à un achat » · « Prix minimum accepté » (src/publier/AvantPublierHote.jsx), modifiables après coup. */}
+          {A && !A.double && blocs.avant ? <section className="nf-section" data-fd-avant="">{blocs.avant}</section> : null}
           {A && !A.double && blocs.retraits ? blocs.retraits : null}
 
           {/* (21 nov., ext. 5.428, choix 58) la courbe vues / favoris de son annonce Vinted, jour après jour. */}

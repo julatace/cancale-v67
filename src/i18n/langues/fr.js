@@ -21,6 +21,7 @@ import ecran_v2_ventes from './fr/v2ventes.js';   // (17 nov.) Ventes, nouveau d
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_depot from './fr/depot.js';   // (21 nov., ext. 5.429) brouillons préparés, descriptions types, boost
+import ecran_avant_publier from './fr/avantPublier.js';   // (28 nov.) avant de publier, dossier « À publier »
 import ecran_avenir from './fr/avenir.js';
 import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
@@ -2403,6 +2404,7 @@ export default {
   ...ecran_v2_ventes,
   ...ecran_capte,
   ...ecran_depot,
+  ...ecran_avant_publier,
   ...ecran_retrait_ailleurs,
   ...ecran_retirer_partout,
   ...ecran_vcventes,
