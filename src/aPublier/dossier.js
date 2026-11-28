@@ -173,7 +173,7 @@ export function correspondance({ brouillons, annonces, cle = cleDefaut } = {}) {
   for (const f of B) {
     if (!str(f.numero)) continue;
     const k = cle(f.numero);
-    const l = A.filter((a) => str(a.numero) && cle(a.numero) === k && !prises.has(String(a.id)));
+    const l = A.filter((a) => str(a.numero) && cle(a.numero) === k && (!str(a.brouillonDe) || str(a.brouillonDe) === String(f.id)));
     if (l.length === 1) { liens.push({ brouillon: String(f.id), annonce: String(l[0].id), de: 'numero' }); prises.add(String(l[0].id)); }
     else if (l.length > 1) ambigus[String(f.id)] = l.map((a) => String(a.id));
   }
@@ -183,7 +183,7 @@ export function correspondance({ brouillons, annonces, cle = cleDefaut } = {}) {
   for (const a of A) {
     if (prises.has(String(a.id))) continue;
     const r = brouillonsParPhoto(a.hexes, B);
-    if (!r.proches.length) continue;
+    if (!r.voisins.length) continue;
     for (const v of r.voisins) { const l = parBrouillon.get(String(v.f.id)) || []; l.push({ a, sur: r.proches.length === 1 && r.voisins.length === 1 }); parBrouillon.set(String(v.f.id), l); }
   }
   for (const f of B) {
@@ -226,13 +226,27 @@ export function patchChoix(brouillon, ficheAnnonce, { cle = cleDefaut, numeroVen
 // LES N° DU DOSSIER (SON toucher « Donner un N° ») : les brouillons choisis SANS N° reçoivent la série `numerosEnSerie`
 // (src/rangementArrivee.js — le prochain libre, du plus haut, jamais un trou ; la MÊME règle que « Rangé » et
 // « Dupliquer »). Rend { ok, numeros: { [id]: N° } } ; un brouillon qui a déjà son N° le garde.
+export const SERIE_MAX = 40;
+// Les N° servis + ceux déjà donnés dans ce geste (le paquet suivant part au-dessus).
+export function prisAvec(pris, deja, cle = cleDefaut) {
+  const int = new Set(pris && pris.int ? pris.int : []), cles = new Set(pris && pris.cles ? pris.cles : []);
+  for (const n of deja || []) { const k = cle(n); if (!k) continue; cles.add(k); if (/^\d+$/.test(k)) int.add(Number(k)); }
+  return { int, cles };
+}
 export function numerosPourBrouillons(ids, neuves, serie) {
   const T = objet(neuves) || {};
   const sans = (ids || []).map(String).filter((id) => T[id] && estBrouillon(T[id]) && !str(T[id].numero) && !T[id].retireeAt);
   if (!sans.length) return { ok: true, numeros: {} };
   if (typeof serie !== 'function') return { ok: false, raison: 'numeros' };
-  const l = serie(sans.length);
-  if (!Array.isArray(l) || l.length !== sans.length || l.some((n) => !str(n))) return { ok: false, raison: 'numeros' };
+  // Par paquets de 40 (la borne de `numerosEnSerie`, LOT_MAX) ; chaque paquet repart des N° déjà donnés (`deja`).
+  const l = [];
+  while (l.length < sans.length) {
+    const k = Math.min(SERIE_MAX, sans.length - l.length);
+    const p = serie(k, l.slice());
+    if (!Array.isArray(p) || p.length !== k || p.some((n) => !str(n))) return { ok: false, raison: 'numeros' };
+    l.push(...p.map(String));
+  }
+  if (new Set(l.map(cleDefaut)).size !== l.length) return { ok: false, raison: 'numeros' };
   const out = {}; sans.forEach((id, i) => { out[id] = String(l[i]); });
   return { ok: true, numeros: out };
 }

@@ -17218,9 +17218,9 @@ async function donnerNumerosBrouillons(ids) {
   if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'numeros' };
   const pris = await numerosServisLus();
   if (!pris) return { ok: false, raison: 'numeros' };
-  const { numerosPourBrouillons } = await import('./aPublier/dossier.js');
+  const { numerosPourBrouillons, prisAvec } = await import('./aPublier/dossier.js');
   const T = load('vrm_fiches_neuves', {}) || {};
-  const r = numerosPourBrouillons(ids, T, (n) => numerosEnSerie({ pris, pref: prefixeNumeros(), n, prochainLibre, cleNum }));
+  const r = numerosPourBrouillons(ids, T, (n, deja) => numerosEnSerie({ pris: prisAvec(pris, deja, cleNum), pref: prefixeNumeros(), n, prochainLibre, cleNum }));
   if (!r.ok) return r;
   const lies = Object.entries(r.numeros);
   if (!lies.length) return { ok: true, numeros: {} };
