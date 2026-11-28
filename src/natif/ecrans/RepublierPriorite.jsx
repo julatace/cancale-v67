@@ -21,6 +21,7 @@ import { Plaque } from '../Plaque.jsx';
 import { Vide } from '../Vide.jsx';
 import { Attente } from '../Attente.jsx';
 import { Glyphe } from '../icones.jsx';
+import { Actions, Pourquoi } from '../Actions.jsx';
 import { raisonPriorite, selectionRepublier, SEUILS_AGE, PAR_JOUR_CHOIX, EXCLUSIONS } from '../../republierPriorite.js';
 import { PLUS_VUE_CHOIX } from '../../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import './republierPriorite.css';
@@ -55,10 +56,16 @@ export function PleinRepublier({ lignes, coches, onRepublier }) {
   );
 }
 
+// (28 nov.) « S'essouffle » : la phrase de la ligne (≤ 8 mots) et le gain estimé de SON compte, avec sa couverture ; pas su ⇒ « — ».
+export const texteEssouffle = (l) => (l && l.essouffle ? tr('ess.ligne', { n: l.essouffle.jours }) : '');
+// L'état de la lecture des courbes, au pied : en cours, pas su (« — » et pourquoi), ou des annonces dont la courbe ne dit rien.
+export const texteEtatEss = (e) => (!e ? '' : e.etat === 'lecture' ? tr('ess.lecture') : e.etat === 'passu' ? tr('ess.pasSu') : e.passu > 0 ? tr('ess.passuN', { n: e.passu }) : '');
+export const texteGain = (g) => (g && g.moyenne != null && g.n > 0 ? tr('ess.gain', { v: g.moyenne, n: g.n }) : tr('ess.gainPasSu'));
+
 // (22 nov., choix 27) plusVue : { jours, de(ligne) → jours mesurés | null, autres: [{ cle, article, annonce, jours }], republier(annonce) }
 //   — une ligne « plus vue » dit la raison et porte « Republier » (la feuille Avant | Après de CETTE paire, dans le panneau) ;
 //   `autres` : les annonces plus vues qui ne sont pas dans la liste du jour (pas encore « endormies »), dites une fois.
-export default function RepublierPriorite({ res, lignes, coches, onBasculer, onTout, onReglage, Photo = null, Logo = null, euros = (n) => String(n) + ' €', Icon = null, plusVue = null }) {
+export default function RepublierPriorite({ res, lignes, coches, onBasculer, onTout, onReglage, Photo = null, Logo = null, euros = (n) => String(n) + ' €', Icon = null, plusVue = null, onRepublierUne = null }) {
   const [reglages, setReglages] = React.useState(false);
   if (res === undefined) return <div data-prio-ecran="" data-prio-etat="lecture"><Attente forme="rangees" n={5} vignette={56} titre/></div>;
   if (res === null) return <div data-prio-ecran="" data-prio-etat="passu"><Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('prio.pasSu')}/></div>;
@@ -89,13 +96,21 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
                 {g.lignes.map((l) => {
                   const a = l.article;
                   const pv = plusVue && plusVue.de ? plusVue.de(l) : null;
+                  const es = !!l.essouffle;
+                  // (28 nov.) Une essoufflée : SA phrase, le gain dessous, « Republier » (l'atelier, CETTE annonce : rien ne part sans SON « Oui »).
+                  const piedEss = es ? (<div className="n-rp-ess" data-ess-pied="">
+                    <Actions elements={[onRepublierUne ? { cle: 'republier', icone: Icon ? <Icon name="sync" size={18}/> : null, libelle: tr('ess.republier'), onClick: () => onRepublierUne(l), attrs: { 'data-ess-republier': l.annonce.id } } : null]}/>
+                    <Pourquoi attrs={{ 'data-ess-pourquoi': '' }}>{tr('ess.pourquoi', { n: l.essouffle.jours })}</Pourquoi>
+                  </div>) : null;
                   return (
                     <Rangee key={l.cle} vignette={<Vignette src={a.photo || ''} alt="" image={Photo && a.photo ? Photo(a.photo) : null}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
-                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={texteRaisonPrio(l) + (pv != null ? ' · ' + tr('af.pv.raison', { n: pv }) : '')} sousLignes={2} valeur={a.prix != null ? euros(a.prix) : null}
+                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={es ? texteEssouffle(l) : texteRaisonPrio(l) + (pv != null ? ' · ' + tr('af.pv.raison', { n: pv }) : '')} sousLignes={2} valeur={a.prix != null ? euros(a.prix) : null}
+                      note={es ? texteGain(l.gain) : undefined}
                       selection={{ cochee: coches.has(l.cle), onChange: () => onBasculer(l), libelle: a.titre || tr('egalite.sansTitre') }}
-                      pied={pv != null && plusVue.republier ? <Bouton variante="texte" onClick={() => plusVue.republier(l.annonce)} attrs={{ 'data-pv-republier': l.annonce.id }}>{tr('actionsExt.republier')}</Bouton> : null}
+                      pied={es ? piedEss : pv != null && plusVue.republier ? <Bouton variante="texte" onClick={() => plusVue.republier(l.annonce)} attrs={{ 'data-pv-republier': l.annonce.id }}>{tr('actionsExt.republier')}</Bouton> : null}
                       attrs={{ 'data-prio-ligne': l.cle, 'data-prio-rang': String(l.rang), 'data-prio-annonce': l.annonce.id, 'data-prio-jours': String(l.jours), 'data-prio-vues': l.vues == null ? '' : String(l.vues),
-                        'data-prio-favoris': l.favoris == null ? '' : String(l.favoris), 'data-prio-baisse': l.baisse === true ? '1' : l.baisse === false ? '0' : '', 'data-prio-coche': coches.has(l.cle) ? '1' : '0', 'data-prio-score': String(l.score), 'data-prio-plusvue': pv != null ? String(pv) : undefined }}/>
+                        'data-prio-favoris': l.favoris == null ? '' : String(l.favoris), 'data-prio-baisse': l.baisse === true ? '1' : l.baisse === false ? '0' : '', 'data-prio-coche': coches.has(l.cle) ? '1' : '0', 'data-prio-score': String(l.score), 'data-prio-plusvue': pv != null ? String(pv) : undefined,
+                        'data-ess-jours': es ? String(l.essouffle.jours) : undefined, 'data-ess-gain': es ? (l.gain && l.gain.moyenne != null ? String(l.gain.moyenne) : '') : undefined, 'data-ess-gain-n': es ? String((l.gain && l.gain.n) || 0) : undefined }}/>
                   );
                 })}
               </div>
@@ -114,8 +129,8 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
                 attrs={{ 'data-pv-ligne': x.annonce.id, 'data-prio-plusvue': String(x.jours) }}/>); })}
           </div>
         </section>) : null}
-      <Groupe nu pied={[res.reste > 0 ? tr('prio.reste', { n: res.reste }) : '', exclues.length ? tr('prio.exclues', { liste: exclues.join(', ') }) : '', tr('prio.rienNePart')].filter(Boolean).join(' ')}
-        attrs={{ 'data-prio-pied': '', 'data-prio-exclues': EXCLUSIONS.map((k) => k + ':' + res.exclues[k]).join(',') }}/>
+      <Groupe nu pied={[res.reste > 0 ? tr('prio.reste', { n: res.reste }) : '', exclues.length ? tr('prio.exclues', { liste: exclues.join(', ') }) : '', texteEtatEss(res.essouffle), tr('prio.rienNePart')].filter(Boolean).join(' ')}
+        attrs={{ 'data-prio-pied': '', 'data-prio-exclues': EXCLUSIONS.map((k) => k + ':' + res.exclues[k]).join(','), 'data-ess-etat': res.essouffle ? res.essouffle.etat : '', 'data-ess-n': res.essouffle ? String(res.essouffle.n) : '' }}/>
       <Feuille ouverte={reglages} onFermer={() => setReglages(false)} titre={tr('prio.reglages.titre')} attrs={{ 'data-prio-feuille': '' }}>
         <Groupe nu>
           <p className="n-rp-label">{tr('prio.reglages.age')}</p>

@@ -486,8 +486,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **28 nov. · « S'essouffle »** en tête de « À republier » : `2026-11-28-republier-essouffle.md`.
 - **28 nov. · Vitesse (vitesse-fluide)** : lettre tapée peinte d'abord (`src/composants/saisieDifferee.jsx`), molette sans relecture du style, Annonces garde ses nombres, formateurs Intl gardés ; banc `iphone-rapide` `LARGEUR=1512`, `ETAPES=gestes`. `2026-11-28-vitesse-fluide.md`. Geste : aucun.
-- **28 nov. · CRM eBay (ebay-crm)** : Ventes · eBay → Clients : fiche par identifiant, messages et avis auto éteints, exclus (favoris Vinted, paliers eBay). `2026-11-28-ebay-crm.md`. Geste : reconnecter eBay si besoin.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

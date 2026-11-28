@@ -41,7 +41,7 @@ export async function notifierAlertesChiffres({ getRow, ecrire, pousser, active 
 // session (`contexteVendeur`), clé de service, lignes filtrées par `owner`.
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const cleService = () => process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
-async function getRowVendeur(id) {
+export async function getRowVendeur(id) {
   const owner = proprietaireCourant();
   if (!owner || !cleService()) return undefined;
   try {
@@ -52,7 +52,7 @@ async function getRowVendeur(id) {
     return (j[0] && j[0].data) || null;
   } catch (_) { return undefined; }
 }
-async function ecrireVendeur(id, data) {
+export async function ecrireVendeur(id, data) {
   const owner = proprietaireCourant();
   if (!owner || !cleService()) return false;
   try {

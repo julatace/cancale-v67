@@ -32,6 +32,8 @@ export function annoncesVinted(comptes) {
       favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
       // (27 nov.) « en vérification par Vinted » (`verifVinted`, LU dans le dressing — src/annoncesActions.js) : rien ne part dessus.
       verif: it.verifVinted ? str(it.verifVinted) : '',
+      // (28 nov., s'essouffle) réservée par Vinted pour un acheteur (`is_reserved`, LU) : jamais proposée à republier.
+      reservee: it.reserved === true || it.is_reserved === true,
       // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
       lu: Number.isFinite(c.lu) ? c.lu : null }); };
     const lus = c.ok ? c : {};

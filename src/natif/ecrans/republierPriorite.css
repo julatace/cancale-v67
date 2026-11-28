@@ -48,3 +48,18 @@
   .n-pdo-raison-tete { padding: 0 var(--n-marge) 12px; }
   .n-pdo-raison .n-glyphe { flex: none; margin-top: 1px; }
 }
+
+/* (28 nov.) « S'essouffle » : sous la rangée, « Republier » (le bouton commun) et « Pourquoi ? », alignés sur le texte. */
+@layer vrm-natif {
+  /* La case à gauche, le corps à droite, le pied SOUS le corps, aligné sur le texte (jamais la case seule sur sa ligne). */
+  .n-rp-liste .n-rangee[data-n-case][data-n-a-pied] { display: grid; grid-template-columns: 48px minmax(0, 1fr); }
+  .n-rp-liste .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-case { grid-column: 1; grid-row: 1; }
+  .n-rp-liste .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-corps { grid-column: 2; grid-row: 1; }
+  .n-rp-liste .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-pied { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .n-rp-ess { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+  .n-rp-ess .n-actions { display: flex; justify-content: flex-start; }
+  .n-rp-ess .n-bouton { min-height: var(--n-cible); }
+  .n-rp-ess .n-pourquoi { padding: 0 4px; }
+  .n-rp-ess .n-actions { padding: 0; }
+  .n-rp-ess .n-pourquoi[open] { flex: 1 0 100%; }
+}

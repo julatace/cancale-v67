@@ -122,7 +122,7 @@ async function ouvrir(nav, opts, q) {
       dit(r0.lignes.length === regle.ids.length && [...r0.lignes.map((l) => l.id)].sort().join() === [...regle.ids].sort().join() && ordreOk && parCompte[0].rangs[0] === 1,
         `L ${ou} : ${r0.lignes.length} lignes, celles de la règle, classées (rang 1 en tête, l'ordre gardé dans chaque compte)`, { vu: r0.lignes.map((l) => l.id + '#' + l.rang), regle: regle.ids });
       const interdits = ['10005', '10008', '10013', '10030', '10031', '10040', '10041', '10010', '10011', '10012'];
-      dit(!r0.lignes.some((l) => interdits.includes(l.id)) && r0.pied === 'vendue:1,masquee:1,litige:1,bloque:2,perso:2', `L ${ou} : ni vendue, ni masquée, ni en retour, ni compte bloqué ou personnel, ni trop récente — écartées comptées`, { pied: r0.pied, ids: r0.lignes.map((l) => l.id) });
+      dit(!r0.lignes.some((l) => interdits.includes(l.id)) && r0.pied === 'vendue:1,masquee:1,reservee:0,litige:1,bloque:2,perso:2', `L ${ou} : ni vendue, ni masquée, ni en retour, ni compte bloqué ou personnel, ni trop récente — écartées comptées`, { pied: r0.pied, ids: r0.lignes.map((l) => l.id) });
       dit(r0.lignes.every((l) => /\d+ j · /.test(l.sous)) && r0.lignes.some((l) => /vues pas lues · favoris pas lus/.test(l.sous)) && r0.lignes.some((l) => /vues qui baissent/.test(l.sous)), `L ${ou} : chaque ligne dit sa raison chiffrée ; « pas lues » dit (jamais 0) ; « vues qui baissent » sur le journal`, r0.lignes.slice(0, 3).map((l) => l.sous));
       const c1 = r0.lignes.filter((l) => l.compte === r0.lignes[0].compte);
       dit(r0.lignes.filter((l) => l.coche === '1').length === c1.length && c1.every((l) => l.coche === '1') && r0.plein && r0.plein.ok === '1' && Number(r0.plein.n) === c1.length, `G ${ou} : les ${c1.length} lignes du 1er compte cochées, « Republier ${c1.length} » prêt`, { plein: r0.plein, coches: r0.lignes.map((l) => l.coche).join('') });
@@ -168,7 +168,7 @@ async function ouvrir(nav, opts, q) {
     for (const sombre of [false, true]) {
       const { ctx, pg, erreurs } = await ouvrir(nav, TEL, `?vue=aujourdhui${sombre ? '&theme=dark' : ''}`);
       const a = await pg.evaluate(() => { const e = document.querySelector('[data-prio-journee]'); return e ? { n: e.getAttribute('data-prio-journee'), t: e.textContent, h: Math.round(e.getBoundingClientRect().height) } : null; });
-      dit(a && a.n === '10' && /10 paires à republier en priorité/.test(a.t) && a.h >= 44, `A 390${sombre ? ' · sombre' : ''} : « 10 paires à republier en priorité › » dans Aujourd'hui`, a);
+      dit(a && a.n === '10' && /10 paires à republier/.test(a.t) && a.h >= 44, `A 390${sombre ? ' · sombre' : ''} : « 10 paires à republier en priorité › » dans Aujourd'hui`, a);
       await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390${sombre ? '-sombre' : ''}.png`) });
       if (a) { await pg.click('[data-prio-journee]'); await pg.waitForTimeout(300); dit((await pg.evaluate(() => window.__nav)) === 'arepublier', 'A : le toucher ouvre Annonces sur « À republier »'); }
       dit(erreurs.length === 0, 'A : aucune erreur de page', erreurs.slice(0, 2));

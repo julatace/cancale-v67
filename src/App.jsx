@@ -32103,7 +32103,7 @@ function AppCoeur() {
       try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
       // (8 nov.) « Gérer mes e-mails » au pied des e-mails de VRM (api/_lib/mail-gabarit.js) : Réglages → Notifications.
       if(t==='settings'&&section==='notifications'){ DEMANDE_REGLAGE_SOUS.id='push'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }
-      if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier');
+      if(vue==='achats'){ demanderVue('achats'); } else if(vue==='retraits'){ demanderVue('retraits'); } else if(vue==='favoris') demanderVue('favoris'); else if(vue==='republier') demanderVue('republier'); else if(vue==='arepublier') demanderVue('arepublier');   /* (28 nov.) la notification « s'essoufflent » */
       // (9 nov., lot AL) Favoris & offres et Republier sont des vues de Vinted : sans `site`, le filtre retenu (Leboncoin…) ne les cache pas.
       if(!site&&((vue==='favoris'&&t==='messages')||(vue==='republier'&&t==='annonces'))) subVoulue.current='vinted';
       // (1er nov.) `cat_achats` mène aux colis à retirer (dans Colis) ; avec `vue=achats`, c'est l'écran Achats.
