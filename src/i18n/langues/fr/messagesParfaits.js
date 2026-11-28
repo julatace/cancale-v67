@@ -31,6 +31,7 @@ export default {
   "mparf.contre.ok": "Au-dessus de ton plancher ({plancher}, {de}).",
   "mparf.contre.sousPlancher": "Sous ton plancher ({plancher}, {de}) : tu perdrais de l’argent.",
   "mparf.contre.sansPlancher": "Aucun plancher connu pour cette paire (ni prix mini ni prix d’achat).",
+  "mparf.contre.sansPlancher.art": "Aucun plancher connu pour cet article (ni prix mini ni prix d’achat).",
   "mparf.contre.de.mini": "ton prix mini",
   "mparf.contre.de.achat": "achat + 10 %",
   "mparf.contre.de.aucun": "aucun",
@@ -38,5 +39,6 @@ export default {
   "mparf.contre.forcerSans": "Je veux proposer ce prix sans plancher connu",
   "mparf.contre.confirmerSous": "{prix} est sous ton plancher ({plancher}). La contre-offre part sur Vinted : l’acheteur peut l’accepter.",
   "mparf.contre.confirmerSans": "VRM ne connaît ni ton prix mini ni ton prix d’achat pour cette paire. Proposer {prix} sur Vinted ?",
+  "mparf.contre.confirmerSans.art": "VRM ne connaît ni ton prix mini ni ton prix d’achat pour cet article. Proposer {prix} sur Vinted ?",
   "mparf.contre.confirmerOui": "Oui, proposer"
 };

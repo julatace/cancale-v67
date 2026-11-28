@@ -31,6 +31,7 @@ export default {
   "mparf.contre.ok": "Über deiner Untergrenze ({plancher}, {de}).",
   "mparf.contre.sousPlancher": "Unter deiner Untergrenze ({plancher}, {de}): du würdest Geld verlieren.",
   "mparf.contre.sansPlancher": "Für dieses Paar ist keine Untergrenze bekannt (weder Mindestpreis noch Einkaufspreis).",
+  "mparf.contre.sansPlancher.art": "Für diesen Artikel ist keine Untergrenze bekannt (weder Mindestpreis noch Einkaufspreis).",
   "mparf.contre.de.mini": "dein Mindestpreis",
   "mparf.contre.de.achat": "Einkauf + 10 %",
   "mparf.contre.de.aucun": "keine",
@@ -38,5 +39,6 @@ export default {
   "mparf.contre.forcerSans": "Ich will diesen Preis ohne bekannte Untergrenze vorschlagen",
   "mparf.contre.confirmerSous": "{prix} liegt unter deiner Untergrenze ({plancher}). Das Gegenangebot geht an Vinted: der Käufer kann es annehmen.",
   "mparf.contre.confirmerSans": "VRM kennt für dieses Paar weder deinen Mindestpreis noch deinen Einkaufspreis. {prix} auf Vinted vorschlagen?",
+  "mparf.contre.confirmerSans.art": "VRM kennt für diesen Artikel weder deinen Mindestpreis noch deinen Einkaufspreis. {prix} auf Vinted vorschlagen?",
   "mparf.contre.confirmerOui": "Ja, vorschlagen"
 };

@@ -31,6 +31,7 @@ export default {
   "mparf.contre.ok": "Sopra il tuo minimo ({plancher}, {de}).",
   "mparf.contre.sousPlancher": "Sotto il tuo minimo ({plancher}, {de}): perderesti denaro.",
   "mparf.contre.sansPlancher": "Nessun minimo noto per questo paio (né prezzo minimo né prezzo d’acquisto).",
+  "mparf.contre.sansPlancher.art": "Nessun minimo noto per questo articolo (né prezzo minimo né prezzo d’acquisto).",
   "mparf.contre.de.mini": "il tuo prezzo minimo",
   "mparf.contre.de.achat": "acquisto + 10 %",
   "mparf.contre.de.aucun": "nessuno",
@@ -38,5 +39,6 @@ export default {
   "mparf.contre.forcerSans": "Voglio proporre questo prezzo senza minimo noto",
   "mparf.contre.confirmerSous": "{prix} è sotto il tuo minimo ({plancher}). La controfferta parte su Vinted: l’acquirente può accettarla.",
   "mparf.contre.confirmerSans": "VRM non conosce né il tuo prezzo minimo né il prezzo d’acquisto di questo paio. Proporre {prix} su Vinted?",
+  "mparf.contre.confirmerSans.art": "VRM non conosce né il tuo prezzo minimo né il prezzo d’acquisto di questo articolo. Proporre {prix} su Vinted?",
   "mparf.contre.confirmerOui": "Sì, proponi"
 };

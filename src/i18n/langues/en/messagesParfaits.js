@@ -31,6 +31,7 @@ export default {
   "mparf.contre.ok": "Above your floor ({plancher}, {de}).",
   "mparf.contre.sousPlancher": "Below your floor ({plancher}, {de}): you would lose money.",
   "mparf.contre.sansPlancher": "No floor known for this pair (no minimum price, no purchase price).",
+  "mparf.contre.sansPlancher.art": "No floor known for this item (no minimum price, no purchase price).",
   "mparf.contre.de.mini": "your minimum price",
   "mparf.contre.de.achat": "purchase + 10%",
   "mparf.contre.de.aucun": "none",
@@ -38,5 +39,6 @@ export default {
   "mparf.contre.forcerSans": "I want to propose this price with no known floor",
   "mparf.contre.confirmerSous": "{prix} is below your floor ({plancher}). The counter-offer goes to Vinted: the buyer can accept it.",
   "mparf.contre.confirmerSans": "VRM knows neither your minimum price nor your purchase price for this pair. Propose {prix} on Vinted?",
+  "mparf.contre.confirmerSans.art": "VRM knows neither your minimum price nor your purchase price for this item. Propose {prix} on Vinted?",
   "mparf.contre.confirmerOui": "Yes, propose"
 };
