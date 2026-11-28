@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., sites-soignes) src/sites/SiteSoigne.jsx : la recette de la connexion eBay sur eBay, Leboncoin, Vestiaire.
+  { id: 'sites-soignes', date: '2026-11-28', titre: 'eBay, Leboncoin, Vestiaire : pages plus soignées', phrase: 'Comptes eBay en liste, chaque état dit avec ses étapes.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.
   { id: 'expedie-sans-extension', date: '2026-11-28', titre: 'Colis parti : vu même sans l’extension', phrase: 'E-mail ou transporteur : il sort d’« à envoyer », réimprimer demande.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »

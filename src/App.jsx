@@ -35276,6 +35276,9 @@ function AppCoeur() {
             if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
             // (15 nov., eBay complet 2) Le tableau, l'argent, le trafic et la santé ont leur propre bande de chiffres.
             if (sec === 'tableau' || sec === 'argent' || sec === 'sante' || sec === 'trafic') return null;
+            // (28 nov., sites soignés) Ni sous la tête d'À traiter, des Offres, de la Promotion : le montant des ventes y redisait le
+            // Tableau et repoussait la page (une chose principale par écran) ; il reste sur le Tableau et dans Argent.
+            if (sec === 'agent' || sec === 'offres' || sec === 'promo') return null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés

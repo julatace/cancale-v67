@@ -2476,3 +2476,4 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
 
 - **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.

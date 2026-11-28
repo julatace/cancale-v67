@@ -6,7 +6,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 @layer vrm-natif {
   /* La teinte discrète de chaque site : jamais sur un texte, seulement le fond de la tuile et des pastilles. */
-  [data-ss-site="leboncoin"], .ss-tete[data-site-tete="leboncoin"] { --ss-teinte: rgb(236 90 19 / .12); }
+  [data-ss-site="leboncoin"], .ss-tete[data-site-tete="leboncoin"] { --ss-teinte: rgb(236 90 19 / .05); }
   [data-ss-site="ebay"], .ss-tete[data-site-tete="ebay"] { --ss-teinte: rgb(0 100 210 / .10); }
   [data-ss-site="vestiaire"], .ss-tete[data-site-tete="vestiaire"] { --ss-teinte: rgb(26 26 30 / .07); }
   :root[data-theme="dark"] [data-ss-site="leboncoin"], :root[data-theme="dark"] .ss-tete[data-site-tete="leboncoin"] { --ss-teinte: rgb(255 122 61 / .18); }
