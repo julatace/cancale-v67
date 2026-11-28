@@ -83,6 +83,10 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    Chrome, modèle local dans la page) ; sinon **la clé du vendeur**, collée par
    lui, rangée côté serveur, jamais relue par le navigateur. Une fonction qui
    n'a ni l'un ni l'autre se tait et dit pourquoi — jamais un repli sur sa clé.
+   ⚠️ **28 nov. (Julien : « je ne veux pas avoir à mettre de clé, ni pour moi ni pour les utilisateurs ») : AUCUNE clé
+   IA, pour personne** — l'IA du navigateur (`src/iaNavigateur.js`, modèle intégré à Chrome, sur l'appareil), sinon les
+   règles (assistant guidé, réponses rapides). `api/ai.js` ne fait plus que le détourage ; ne remettre ni clé ni IA
+   serveur (`audit-ia-sans-cle`, `2026-11-28-ia-sans-cle.md`).
 10. **« L'outil doit être pratique, pas chiant »** (19 nov.) : pas de carte de reproche récurrente, pas de
     confirmation sans risque, pas d'étape à la main que l'extension sait faire, ce qui est certain se remplit seul,
     1 à 2 touchers par geste courant.
@@ -485,9 +489,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
-- **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
-- **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
+- **28 nov. · L'IA sans aucune clé (ia-sans-cle)** : assistant de rangement sur l'IA du navigateur (Chrome `LanguageModel`, téléchargement sur son toucher) sinon assistant guidé ; « ✦ Proposer » dans les réponses ; traduction locale ; clé IA, coffre `ia-cle` et IA serveur retirés. `2026-11-28-ia-sans-cle.md`. Geste : aucun.
+- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA du navigateur depuis ia-sans-cle, sinon assistant guidé (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
