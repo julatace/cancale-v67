@@ -237,8 +237,10 @@ const PREUVES = {
   const pied = (/<footer className="av-pied">[\s\S]*?<\/footer>/.exec(acc) || [''])[0];
   dit(/href="\/confiance"/.test(pied), 'L1 le pied de page de l’accueil');
   dit(/id: 'securite', r: \(\) => \[[^\n]*href="\/confiance"/.test(acc), 'L2 la question « Mes données sont-elles en sécurité ? » de l’accueil');
-  const docs = (/const DOCS_LEGAUX = \[[\s\S]*?\n\];/.exec(lire('src/App.jsx')) || [''])[0];
-  dit(/docLegal\('\/confiance', 'legal\.confiance'\)/.test(docs) && /<LiensLegaux\/>/.test(lire('src/App.jsx')), 'L3 l’écran de connexion (et Réglages) : DOCS_LEGAUX');
+  // (27 nov., budget-vitesse) l'écran de connexion vit dans src/ecrans/Connexion.jsx : l'app se lit RECOLLÉE (scripts/_source-app.cjs)
+  const appRecollee = require('./_source-app.cjs').sourceAppCode(R);
+  const docs = (/const DOCS_LEGAUX = \[[\s\S]*?\n\];/.exec(appRecollee) || [''])[0];
+  dit(/docLegal\('\/confiance', 'legal\.confiance'\)/.test(docs) && /<LiensLegaux\/>/.test(appRecollee), 'L3 l’écran de connexion (et Réglages) : DOCS_LEGAUX');
   const langues = ['fr', 'en', 'es', 'it', 'de'].filter((l) => !/"legal\.confiance": "[^"]+"/.test(lire(`src/i18n/langues/${l}-accueil.js`)));
   dit(!langues.length, 'L4 le libellé existe dans les cinq langues', langues);
   dit(/href="\/confiance"/.test(lire('public/etat.html')) && /href="\/etat"/.test(html), 'L5 /etat ↔ /confiance');

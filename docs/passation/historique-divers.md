@@ -2468,3 +2468,9 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion favoris-suite, pour rester sous 60 Ko)
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
+### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., vrai-benefice, pour rester sous 60 Ko)
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion vrai-benefice, pour rester sous 60 Ko)
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., fusion favoris-suite, pour rester sous 60 Ko)
+- **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
+- **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.

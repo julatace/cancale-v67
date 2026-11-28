@@ -54,4 +54,16 @@ export default {
   "gr.pourquoi.racheter.art": "Nachkaufen: Ø Gewinn pro Artikel geteilt durch die Ø Verkaufsdauer, nur mit {n} oder mehr datierten Verkäufen mit bekanntem Einkaufspreis. Eine Tatsache über deine bisherigen Verkäufe, kein Versprechen.",
   "gr.pourquoi.modele": "Ein Modell ist nur eine Anzeigegruppe (Marke und Modellwörter): es verknüpft nie einen Verkauf mit einem Paar.",
   "gr.pourquoi.modele.art": "Ein Modell ist nur eine Anzeigegruppe (Marke und Modellwörter): es verknüpft nie einen Verkauf mit einem Artikel.",
+  // (27 nov., lot vrai-benefice) le vrai bénéfice par mois et par compte
+  "gr.vue.mois": "Pro Monat",
+  "vb.mois.tete": "Der Monat, in dem das Geld ankam",
+  "vb.comptes.tete": "Das Konto, das am besten verkauft",
+  "vb.total": "insgesamt",
+  "vb.aucune": "Keine Verkäufe",
+  "vb.sansAchat": {"one": "{n} ohne Einkaufspreis", "other": "{n} ohne Einkaufspreis"},
+  "vb.fraisPasConfirmes": {"one": "{n} mit unbestätigten Kosten", "other": "{n} mit unbestätigten Kosten"},
+  "vb.aDater": {"one": "{n} Verkauf noch nicht ausgezahlt: in keinem Monat", "other": "{n} Verkäufe noch nicht ausgezahlt: in keinem Monat"},
+  "vb.auPlusMot": "höchstens",
+  "vb.portRecu": "Versand des Einkaufs inklusive (Beleg)",
+  "vb.pourquoi": "Echter Gewinn = Verkaufspreis (eBay, Vestiaire: das erhaltene Geld) − Einkaufspreis − Plattformgebühren − Boosts und notierte Kosten. Der beim Einkauf bezahlte Versand steckt im Einkaufspreis: der Vinted-Beleg enthält ihn immer; von Hand eingegeben, rechne ihn ein. „Höchstens“: die Kosten eines Verkaufs sind nicht bestätigt, ein Boost kann fehlen. Ein Monat folgt dem Auszahlungsdatum, wie dein Export für die Buchhaltung: beide zeigen dieselbe Zahl. Nur deine ausgewählten Konten zählen.",
 };

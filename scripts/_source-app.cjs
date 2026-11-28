@@ -181,7 +181,8 @@ function sourceAppCode(racine) {
   }
   // Les racines paresseuses (`const Garage = aLaDemande(() => import('./ecrans/…'))`) : leur vraie
   // déclaration (la fonction) est recollée à sa place — la ligne paresseuse est retirée du texte.
-  let out = app.replace(/^const \w+ = aLaDemande\(\(\) => import\('\.\/ecrans\/[^\n]*\n/gm, '');
+  // (27 nov.) aussi `aLaDemandeDiscret` / `aLaDemandeFeuille` (un bloc posé dans un écran, une feuille)
+  let out = app.replace(/^const \w+ = aLaDemande(?:Discret|Feuille)?\(\(\) => import\('\.\/ecrans\/[^\n]*\n/gm, '');
   // Chaque balise `// ⟦→ ecrans/X.jsx #k⟧` reprend le morceau qui était là.
   // (Une balise peut voyager DANS un morceau parti plus tard vers un autre écran : on recommence
   // tant qu'une balise trouve son morceau.)

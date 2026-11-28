@@ -28,13 +28,16 @@ export function BeneficeArticleDetail({ b, seulement = null, detail = false }) {
   const L = lignesBeneficeArticle(b, tr, { detail }).filter((l) => !seulement || seulement.includes(l.cle) || (detail && seulement.includes('saisis') && /^cr-/.test(l.cle)));
   if (!L.length) return null;
   return (
-    <div className="vrm-ba" data-benef-article={b.etat} data-benef-article-valeur={b.benefice == null ? '' : String(b.benefice)} data-benef-article-manque={(b.manque || []).join(' ') || undefined}>
+    <div className="vrm-ba" data-vb-port-achat={b.portAchat || undefined} data-benef-article={b.etat} data-benef-article-valeur={b.benefice == null ? '' : String(b.benefice)} data-benef-article-manque={(b.manque || []).join(' ') || undefined}>
       {L.map((l) => (
-        <div key={l.cle} className={'vrm-ba-ligne' + (l.total ? ' vrm-ba-total' : '')} data-ba-ligne={l.cle} data-ba-valeur={l.v == null ? '' : String(l.v)}>
+        <div key={l.cle} className={'vrm-ba-ligne' + (l.total ? ' vrm-ba-total' : '')} data-ba-ligne={l.cle} data-ba-valeur={l.v == null ? '' : String(l.v)} data-vb-port-achat={l.cle === 'achat' && b.portAchat ? b.portAchat : undefined}>
           <span>{l.total ? NOM_APRES_FRAIS : l.nom}{l.note ? <small>{l.note}</small> : null}</span>
           <span className={'vrm-ba-v' + (l.v == null ? ' is-vide' : '')}>{l.total && l.auPlus && l.v != null ? `${tr('argentPlus.ba.auPlus')} ` : ''}{l.total ? eur(l.v) : l.v == null ? '—' : (l.cle === 'vente' || l.cle === 'recu' || l.zero || l.v === 0 ? eur(l.v) : `− ${eur(l.v)}`)}</span>
         </div>
       ))}
+      {/* (27 nov., lot vrai-benefice) La fiche d'une paire numérotée montre le prix d'achat ailleurs (ses faits) : le port de
+          l'achat compris dans le reçu se dit quand même, ici. */}
+      {b.portAchat === 'recu' && !L.some((l) => l.cle === 'achat') ? <div className="vrm-ba-ligne" data-ba-ligne="port-achat"><span><small>{tr('vb.portRecu')}</small></span><span/></div> : null}
     </div>
   );
 }

@@ -97,6 +97,7 @@ const listeHorsLigne = () => ({
 // le reste remplit src/i18n/langues/fr-reste.js, importé EN PREMIER par chaque module chargé
 // à la demande qui peut en lire une clé. Règle et prudences : scripts/_francais-differe.cjs ;
 // garde : scripts/audit-francais-differe.cjs. Le dépôt garde fr.js complet.
+const francaisSections = new Map();   // morceau d'une section de Comptabilite -> son français (sectionsDifferees)
 const francaisDiffere = () => {
   const FR = resoudreChemin(RACINE, 'src/i18n/langues/fr.js');
   const RESTE = resoudreChemin(RACINE, 'src/i18n/langues/fr-reste.js');
@@ -110,7 +111,15 @@ const francaisDiffere = () => {
     enforce: 'pre',
     async buildStart() {
       const F = exiger('./scripts/_francais-differe.cjs');
-      a = F.analyser(RACINE, await F.dictionnaire(RACINE));
+      const dico = await F.dictionnaire(RACINE);
+      // (27 nov., budget-vitesse) Le démarrage se juge sur le Comptabilite LIVRÉ (ses sections découpées,
+      // `sectionsDifferees`) : le français que seules les sections lisent part avec elles (`francaisSections`).
+      const COMPTA = resoudreChemin(RACINE, 'src/ecrans/Comptabilite.jsx');
+      const S = process.env.VRM_SANS_SECTIONS === '1' ? null : exiger('./scripts/_sections-differees.cjs');
+      const rs = S ? S.decouperUneFois(RACINE, COMPTA, readFileSync(COMPTA, 'utf8')) : null;
+      a = F.analyser(RACINE, dico, rs && rs.faites.length ? { [COMPTA]: rs.code } : undefined);
+      francaisSections.clear();
+      if (rs && rs.faites.length) for (const [f, d] of Object.entries(S.francaisDesMorceaux(RACINE, rs, dico, a.base))) francaisSections.set(f, d);
     },
     async resolveId(source, importer) {
       if (!a || !importer || resoudreChemin(importer.split('?')[0]) !== APP) return null;
@@ -126,6 +135,41 @@ const francaisDiffere = () => {
     transform(code, id) {
       if (!a || !a.injecter.has(id.split('?')[0])) return null;
       return { code: 'import ' + JSON.stringify(RESTE) + ';\n' + code, map: null };
+    },
+  };
+};
+// (27 nov., budget-vitesse) LES SECTIONS DE `Comptabilite`, CHARGÉES AVEC LEUR ÉCRAN. Au build seulement, le
+// fichier livré de src/ecrans/Comptabilite.jsx rend ses sections Ventes / Achats / Annonces / Messages / Rapport
+// par des morceaux à la demande (le même JSX) : Aujourd'hui ne les télécharge plus. Le dépôt ne change pas.
+// Règle, refus et preuves : scripts/_sections-differees.cjs ; garde : scripts/audit-sections-differees.cjs.
+// `VRM_SANS_SECTIONS=1` livre Comptabilite d'un seul tenant (mesure avant/après).
+const sectionsOuverture = new Map();   // morceau d'une section -> l'écran qui la montre à l'ouverture (prechargerApp)
+const sectionsDifferees = () => {
+  const COMPTA = resoudreChemin(RACINE, 'src/ecrans/Comptabilite.jsx');
+  const morceaux = new Map();
+  return {
+    name: 'vrm-sections-differees',
+    apply: 'build',
+    enforce: 'pre',
+    transform(code, id) {
+      if (process.env.VRM_SANS_SECTIONS === '1' || resoudreChemin(id.split('?')[0]) !== COMPTA) return null;
+      const r = exiger('./scripts/_sections-differees.cjs').decouperUneFois(RACINE, COMPTA, code);
+      for (const x of r.refus) this.warn(`section « ${x.nom} » gardée dans Comptabilite : ${x.raison}`);
+      for (const [f, c] of Object.entries(r.morceaux)) morceaux.set(join(r.dirMorceau, f), c);
+      // l'écran d'ouverture de chaque section (Aujourd'hui, Ventes) : index.html la précharge quand il s'ouvre sur lui
+      for (const f of r.faites) if (f.ouverture) sectionsOuverture.set(join(r.dirMorceau, f.fichier), f.ouverture);
+      return { code: r.code, map: null };
+    },
+    resolveId(source, importer) {
+      if (!importer || !source.startsWith('.')) return null;
+      const abs = resoudreChemin(importer.split('?')[0], '..', source);
+      return morceaux.has(abs) ? abs : null;
+    },
+    load(id) {
+      if (!morceaux.has(id)) return null;
+      const d = francaisSections.get(id);
+      // son français d'abord (avant que le morceau ne s'évalue), comme fr-reste pour un écran à la demande
+      return d ? `import { ajouterSourceSection as __vrmFr } from ${JSON.stringify(resoudreChemin(RACINE, 'src/i18n/index.js'))};\n__vrmFr(${JSON.stringify(d)});\n` + morceaux.get(id) : morceaux.get(id);
     },
   };
 };
@@ -176,7 +220,18 @@ const prechargerApp = () => ({
       // préchargé lui aussi, mais en BASSE priorité (`data-js-ensuite`) — le morceau App passe d'abord.
       const compta = Object.values(bundle).find((c) => c.type === 'chunk' && (c.moduleIds || Object.keys(c.modules || {})).some((m) => /[\\/]src[\\/]ecrans[\\/]Comptabilite\.jsx$/.test(m)));
       const ensuite = compta ? [compta.fileName, ...(compta.imports || [])].filter((f) => !deja.has(f) && !js.includes(f)) : [];
-      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(',') };
+      // (27 nov., budget-vitesse) Les sections de Comptabilite que l'écran d'OUVERTURE montre (Aujourd'hui : sa section ;
+      // Ventes : « À envoyer ») : préchargées comme Comptabilite, en basse priorité, seulement quand l'app s'ouvre sur cet
+      // écran (demarrage-app.js lit `?tab=`, Aujourd'hui sans lien) — jamais un aller-retour de plus au premier écran.
+      const parEcran = {};
+      for (const c of Object.values(bundle)) {
+        const e = c.type === 'chunk' && c.facadeModuleId && sectionsOuverture.get(c.facadeModuleId);
+        if (!e) continue;
+        const l = (parEcran[e] = parEcran[e] || []);
+        for (const f of [c.fileName, ...(c.imports || [])]) if (!deja.has(f) && !js.includes(f) && !ensuite.includes(f) && !l.includes(f)) l.push(f);
+      }
+      const ouverture = Object.entries(parEcran).map(([e, l]) => e + '=' + l.map(base).join(',')).join(';');
+      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(','), 'data-js-ouverture': ouverture };
       // ⚠️ (8 nov., CI verte) JAMAIS avant `<meta name="referrer">` : posée en
       // `head-prepend`, cette balise (et les préchargements qu'elle pose) partait
       // avant que la page ait lu sa politique de référent — avec l'en-tête de Vercel
@@ -194,7 +249,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
+  plugins: [francaisDiffere(), sectionsDifferees(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
   // (20 nov., affichage instantané) `VRM_COPIE_MUTATION=compte|panne` : la MUTATION des bancs copie-ecran (rouge attendu) ;
   // vide en production (le code mutant disparaît au build).
   define: { __BUILD__: JSON.stringify(BUILD), __VRM_COPIE_MUTATION__: JSON.stringify(process.env.VRM_COPIE_MUTATION || '') },
