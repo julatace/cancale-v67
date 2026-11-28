@@ -15,7 +15,7 @@
 /* ── (28 nov.) « Avant de publier » (src/publier/AvantPublier.jsx) et le dossier « À publier » (src/aPublier/) ── */
 .ap-mini { align-self: stretch; flex: 1 1 100%; display: flex; align-items: flex-end; gap: 10px; padding: 10px 16px 4px; }
 .ap-mini .n-champ { flex: 1 1 auto; min-width: 0; }
-.ap-mini > button { min-height: 44px; flex: 0 0 auto; }
+.ap-mini > button { min-height: 44px; min-width: 64px; flex: 0 0 auto; white-space: nowrap; }
 .ap-offres { align-self: stretch; flex: 1 1 100%; margin: 0; padding: 4px 16px 6px; font-size: 14px; color: var(--n-encre-2); }
 .ap-dit { align-self: stretch; flex: 1 1 100%; margin: 0; padding: 0 16px 6px; font-size: 14px; color: var(--n-encre); font-weight: 600; }
 .ap-pourquoi { align-self: stretch; flex: 1 1 100%; padding: 0 16px 10px; font-size: 14px; color: var(--n-encre-2); }
@@ -31,3 +31,4 @@
 .dap-vig { width: 44px; height: 58px; object-fit: cover; border-radius: 8px; display: block; background: var(--n-fond); }
 .dap-fichier { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .dap-etat { margin: 0; padding: 0 16px 10px; font-size: 14px; color: var(--n-encre-2); }
+.ap-cherche { margin: 0 16px 8px !important; width: auto !important; }

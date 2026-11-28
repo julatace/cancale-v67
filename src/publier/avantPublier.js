@@ -138,7 +138,7 @@ export function ligneOffres({ miniC = null, prixC = null, autoAccepte = false, p
     const f = plancherDe(prixC / 100, miniC / 100, R.remiseMax, { tranches: R.tranches });
     if (Number.isFinite(f) && f > 0) jusqua = Math.max(miniC, Math.round(f * 100));
   }
-  if (contre) return { cle: autoAccepte === true ? 'ap.offres.contreEtAccepte' : 'ap.offres.contre', vars: { c: jusqua, min: miniC } };
+  if (contre) return { cle: autoAccepte === true ? (jusqua === miniC ? 'ap.offres.contreEtAccepteMin' : 'ap.offres.contreEtAccepte') : 'ap.offres.contre', vars: { c: jusqua, min: miniC } };
   if (autoAccepte === true) return { cle: 'ap.offres.accepte', vars: { c: miniC } };
   return { cle: 'ap.offres.eteint', vars: { c: miniC } };
 }

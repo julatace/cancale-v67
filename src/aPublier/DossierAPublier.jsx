@@ -159,7 +159,7 @@ export default function DossierAPublier({ neuves, nouvelles = [], ambigus = {}, 
         {!ouverts.length ? <Rangee titre={tr('dap.vide')} attrs={{ 'data-dap-vide': '' }}/> : ouverts.map((f) => {
           const id = String(f.id); const amb = Array.isArray(ambigus[id]) && ambigus[id].length;
           const v = vignettes[(f.dossier || {}).cle];
-          return <Rangee key={id} titre={f.titre || tr('dap.sansTitre')} sousTitre={sous(f)} note={amb ? tr('dap.publieeRelie') : enDouble(f) ? tr('dap.memeFichier') : f.numero ? FA_SITES.map((st) => taches[faCle(st, f.numero, cleNum)]).filter(Boolean).map(texteTache).join(' · ') : ''}
+          return <Rangee key={id} titre={f.titre || tr('dap.sansTitre')} sousTitre={sous(f)} sousLignes={2} note={amb ? tr('dap.publieeRelie') : enDouble(f) ? tr('dap.memeFichier') : f.numero ? FA_SITES.map((st) => taches[faCle(st, f.numero, cleNum)]).filter(Boolean).map(texteTache).join(' · ') : ''}
             vignette={v ? <img className="dap-vig" src={v} alt=""/> : null} fin="chevron" onClick={() => setOuvert(id)}
             selection={{ cochee: sel.has(id), onChange: () => basculer(id), libelle: tr('dap.cocher', { t: f.titre || (f.numero ? 'N°' + f.numero : tr('dap.sansTitre')) }) }}
             attrs={{ 'data-dap-brouillon': id, 'data-dap-num': f.numero || '', 'data-dap-ambigu': amb ? String(ambigus[id].length) : undefined, 'data-dap-double': enDouble(f) ? '' : undefined }}/>;

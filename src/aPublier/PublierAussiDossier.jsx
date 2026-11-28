@@ -44,7 +44,7 @@ export default function PublierAussiDossier({ brouillon, photosN = 0, taches = {
   };
   return (
     <Feuille ouverte onFermer={onFermer} titre={tr('fa.titre', { n: String(b.numero || '') })} detente="pleine" attrs={{ 'data-fa-feuille': String(b.id || ''), 'data-fa-pret': pret ? '1' : '0' }}
-      pied={<Bouton variante="plein" large onClick={mettre} indisponible={!pret} raison={pret ? '' : tr('fa.pasPret')} attrs={{ 'data-fa-mettre': sites.join(',') }}>{tr('fa.mettre', { n: String(sites.length) })}</Bouton>}>
+      pied={<Bouton variante="plein" large onClick={mettre} indisponible={!pret} raison={pret ? '' : !libres.length ? tr('fa.toutEnFile') : tr('fa.pasPret')} attrs={{ 'data-fa-mettre': sites.join(',') }}>{tr('fa.mettre', { n: String(sites.length) })}</Bouton>}>
       <Groupe titre={tr('fa.sites')}>
         {FA_SITES.map((s) => { const j = taches[faCle(s, b.numero, cleNum)]; const libre = libres.includes(s);
           return <Rangee key={s} titre={NOM_SITE_AUSSI[s]} sousTitre={j ? texteTache(j) : ''} fin={libre && sites.includes(s) ? 'coche' : null}
@@ -56,7 +56,7 @@ export default function PublierAussiDossier({ brouillon, photosN = 0, taches = {
           {S.etat === 'refus' ? <Rangee titre={tr('fa.refus', { code: String((S.refus && S.refus.code) || '') })}/> : (S.lignes || []).map((l) => (
             <Rangee key={l.champ} titre={tr('fa.champ.' + (['titre', 'description', 'categorie', 'univers', 'type', 'marque', 'taille', 'etat', 'couleur', 'prix', 'photos'].includes(l.champ) ? l.champ : 'autre'))}
               sousTitre={l.etat === 'ok' ? String(l.site).slice(0, 80) : tr('fa.aChoisirCourt')} attrs={{ 'data-fa-ligne': l.champ, 'data-fa-ligne-etat': l.etat }}/>))}
-        </Groupe>; }) : null}
+        </Groupe>; }) : f ? <Groupe><Rangee titre={tr('fa.refus', { code: String(f.code || '') })} attrs={{ 'data-fa-apercu-refus': String(f.code || '') }}/></Groupe> : null}
       {f && f.ok ? (() => { const qs = []; const vus = new Set(); for (const s of sites) for (const q of ((f.sites[s] || {}).questions || [])) { const k = cleRep(q); if (vus.has(k) || q.raison === 'marques-vc-pas-lues') continue; vus.add(k); qs.push(q); }
         return qs.length ? <Groupe titre={tr('fa.questions')} attrs={{ 'data-fa-questions': String(qs.length) }}>
           {qs.map((q) => <label key={cleRep(q)} className="prep-desc" data-fa-question={cleRep(q)}>

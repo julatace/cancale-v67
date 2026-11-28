@@ -114,7 +114,7 @@ export function RelierAchatFeuille({ outils, cible = null, onRelier, onFermer, P
   return (
     <Feuille ouverte onFermer={onFermer} titre={tr('ap.feuille.titre')} detente="pleine" attrs={{ 'data-ap-feuille': achats === undefined ? 'lecture' : achats === null ? 'pas-su' : String(tous.length) }}
       pied={<Bouton variante="plein" large onClick={relier} indisponible={!a} raison={a ? '' : tr('ap.feuille.choisis')} attrs={{ 'data-ap-relier-ok': choisi }}>{tr('ap.feuille.relier')}</Bouton>}>
-      <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('ap.feuille.chercher')}/>
+      <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('ap.feuille.chercher')} className="ap-cherche"/>
       {achats === undefined ? <Groupe><Rangee titre={tr('ap.feuille.lecture')}/></Groupe>
         : achats === null ? <Groupe><Rangee titre={tr('ap.feuille.pasSu')}/></Groupe>
         : <>
