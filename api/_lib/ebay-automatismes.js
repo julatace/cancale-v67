@@ -111,7 +111,7 @@ export function fraisListing(xml) {
   const re = /<Fee>([\s\S]*?)<\/Fee>/g; let m;
   while ((m = re.exec(bloc))) {
     if (!/^ListingFee$/i.test(balise(m[1], 'Name'))) continue;
-    const v = (/<Fee\b[^>]*>([\d.]+)</.exec(m[1]) || [])[1];
+    const v = (/<Fee\b[^>]*>\s*([\d.]+)/.exec(m[1]) || [])[1];   // le montant (la balise intérieure ; la regex non gourmande s'arrête à sa fermeture)
     const n = Number(v);
     return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
   }
