@@ -3644,7 +3644,6 @@ CSS servi : conteneur retiré ⇒ O3 1008 rouge (T1, T2, T3) ; compte sans `min-
 remis sur `.sb-touche.vrm-rf-geste` ⇒ E12 rouge. `journee-1280` 12/12 vert. Captures regardées : 1008 clair, zoom 125 %,
 390 et 1512 clair/sombre.
 
-<<<<<<< HEAD
 ### « Tout va bien ? » — ce qui tourne, morceau par morceau (27 nov., branche `claude/tout-va-bien`)
 Retenu le 11 oct. (« page tout va bien ? »). La page existait (Paramètres → Aide et « Tout va bien ? », `src/ToutVaBien.jsx` :
 résumé, « À régler » par ordre d'importance, « Détails ») : elle est ÉTENDUE d'un groupe « Ce qui tourne », en tête, une
@@ -3670,7 +3669,7 @@ oublié, la borne des 24 h retirée, une réception pas lue rendue verte) rougis
 regardées : 390 et 1512, clair et sombre (tout vert ; bloqué ; Aujourd'hui). `scripts/bancs/tout-va-bien.cjs` et la partie T de
 `demarrage-parcours.cjs` étaient déjà rouges sur `origin/main` (clic « Voir » de la ligne de fraîcheur, clic « Détails ») :
 hors de ce lot, non touchés (ni l'un ni l'autre n'est en CI).
-=======
+
 ## 27 nov. — « Paires qui dorment », le plan (choix de Julien ; retenu le 11 oct. : « plan des paires qui dorment »)
 
 **Ce qui existait, gardé tel quel** : le segment « Dorment » d'Annonces (`filtrerArticles` etat 'dorment', seuil réglable =
@@ -3702,4 +3701,3 @@ R rouges ; tri par âge ⇒ L rouge). Ajouté à la CI (part 2 ; `ci-controles -
 entrée, plan, lecture seule à 390 et 1512, clair et sombre — « Baisser à 61 € » prend toute la largeur au téléphone (le prix
 coupé à trois colonnes), et un bouton éteint se voit enfin en clair (la règle de `finitions.css` le redessinait comme allumé :
 corrigé ici seulement, à regarder pour toute l'app).
->>>>>>> origin/main

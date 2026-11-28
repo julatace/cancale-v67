@@ -73,11 +73,8 @@ const DUREES_CI = {
   'barre-depuis-journee': 15,
   'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
   'compta-export': 240,   // (27 nov.) mesuré ici, seul : ~4 min (4 tailles × thèmes)
-<<<<<<< HEAD
   'tout-va-bien-sondes': 80,   // (27 nov.) mesuré ici : 77 s (la règle, ses 4 mutations, 8 contextes)
-=======
   'paires-dorment': 100,   // (27 nov.) mesuré ici, seul : ~1 min 30 (2 tailles × 2 thèmes × 3 scènes)
->>>>>>> origin/main
 };
 // Les bancs ROUGES CONNUS (scripts/audits-exceptions.json, clé `bancs`) : chacun dit
 // SES lignes rouges connues (`rouges`, une expression régulière sur la ligne). Le banc
