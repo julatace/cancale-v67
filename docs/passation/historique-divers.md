@@ -2481,3 +2481,6 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans compta-finitions, pour rester sous 60 Ko)
 - **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., messages-parfaits, pour rester sous 60 Ko)
+- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
