@@ -5510,7 +5510,9 @@ const lireComptaPourEcrire = () => {
   return p;
 };
 export { lireComptaPourEcrire };
-export { reverifierExtension, extensionVerifiee };   // (28 nov., messages-parfaits) le statut vrai de l'extension, dans Messages
+// (28 nov., messages-parfaits) le statut vrai de l'extension, dans Messages. Le commentaire reste AU-DESSUS : le test
+// isolation-comptes exécute ce bloc dans une vm et n'en retire que les lignes `export { … };` entières.
+export { reverifierExtension, extensionVerifiee };
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
