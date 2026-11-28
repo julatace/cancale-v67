@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., sneakers-cote) src/sneakers/ : référence fabricant, pointure, cote VRM (SES ventes), étiquettes, en masse.
+  { id: 'sneakers-cote', date: '2026-11-28', titre: 'Référence, pointure et cote de tes ventes', phrase: 'Valeur du stock, étiquettes et modification en masse, sans aucune clé.', tab: 'annonces', pour: 'sneakers', mode: 'tous' },
   // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.
   { id: 'ebay-livraison', date: '2026-11-28', titre: 'eBay : colis, étiquette et suivi dans Ventes', phrase: 'Date limite eBay, étiquette prépayée par l’acheteur, En route puis Livrée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
