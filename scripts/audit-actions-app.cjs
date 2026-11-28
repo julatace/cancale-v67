@@ -28,6 +28,13 @@
 //     seulement si la porte dit oui pour CE compte ; refusée ⇒ rien ne part, le panneau (lui-même gardé :
 //     src/ouvrirPanneau.js) ou la lecture seule. Lu (les gardes sont dans le code) ET exécuté (scripts/_porte-agir.cjs :
 //     connecté ⇒ SA confirmation puis UNE commande pour CET article ; pas connecté ⇒ rien, le panneau de CET article).
+//  M. (28 nov., décision de Julien, lot messages-parfaits) LA MESSAGERIE DEPUIS L'APP : accepter une offre, faire une
+//     contre-offre, envoyer un message (et « Refuser », la réponse d'offre déjà permise le 24 nov.) partent de l'app quand
+//     l'extension est connectée — EXACTEMENT ces gestes, et rien d'autre, par les composants de src/agir/Agir.jsx
+//     (`ComposerReponse`, `GestesOffreVinted`) : Accepter seulement après SA confirmation ; une contre-offre « Autre prix »
+//     sous le plancher (prix mini, sinon achat + 10 %) ou sans plancher connu seulement après SA case ET sa confirmation ;
+//     l'extension qui ne sait pas recevoir le geste ⇒ son panneau sur CETTE conversation ; la porte revérifie l'extension
+//     avant chaque geste. Les écrans de Messages (FilsTous, le fil de Comptabilite) ne déposent aucun geste eux-mêmes.
 //  Y. eBay reste dans l'app : la feuille « Changer le prix » coche et applique eBay
 //     seul (route `revise`), « Publier partout » garde la case eBay.
 //
@@ -192,6 +199,24 @@ function juger(t) {
   verif(!/automatisations\/Branchement|AutomatisationsLazy/.test(sansCommentaires(app)) && !/\?tab=automatisations/.test(sansCommentaires(t.src['src/ecrans/AnnoncesEgalite.jsx'] || '')),
     'A2 aucun écran Automatisations dans l\'app (ni Paramètres, ni Annonces)');
 
+  // M. la messagerie depuis l'app : exactement ces gestes, par la porte, confirmés
+  const agir = sansCommentaires(t.src['src/agir/Agir.jsx'] || '');
+  const iM = agir.indexOf('export function ComposerReponse'), jM = agir.indexOf('export function BoutonRepublierAgir');
+  const msg = iM >= 0 && jM > iM ? agir.slice(iM, jM) : '';
+  const gestesMsg = new Set([...msg.matchAll(/distGeste: '(\w+)'|partir\('(\w+)'/g)].map((m) => m[1] || m[2]));
+  const PERMIS_MSG = ['repondre', 'refuser', 'accepter', 'contreOffre'];
+  verif(msg && gestesMsg.size === PERMIS_MSG.length && PERMIS_MSG.every((g) => gestesMsg.has(g)), `M1 la messagerie de l'app dépose EXACTEMENT ${PERMIS_MSG.join(', ')} (vu : ${[...gestesMsg].join(', ') || 'rien'})`);
+  verif((msg.match(/partir\('accepter'/g) || []).length === 1 && /pied=\{<Bouton variante="plein" onClick=\{\(\) => \{ setConfirmer\(false\); partir\('accepter'/.test(msg) && /onClick=\{\(\) => setConfirmer\(true\)\} attrs=\{\{ 'data-agir-accepter'/.test(msg),
+    'M2 Accepter une offre ne part qu\'après SA confirmation (« accepter vend la paire »)');
+  verif(/const bloque = !j\.ok \|\| \(\(j\.sous \|\| j\.sansPlancher\) && !force\);/.test(msg) && /onClick=\{bloque \? undefined : \(\) => \{ if \(j\.sous \|\| j\.sansPlancher\) setConfirmerAutre\(true\); else partir\('contreOffre'/.test(msg)
+    && /prixContreOffre\(\{ saisi, offre: prix, affiche, plancher \}\)/.test(msg), 'M3 « Autre prix » : jamais sous le plancher sans SA case « je le veux quand même » ET sa confirmation');
+  verif(/vp\.ok && conv != null \? <BoutonPanneauConv/.test(msg) && /!vOffre\.ok && vPanneau\.ok && conv != null \? <BoutonPanneauConv/.test(msg) && /ouvrirPanneau\(\{ site, compte: String\(compte\), page: 'messages', ids: \[String\(conv\)\], action \}\)/.test(agir),
+    'M4 l\'extension qui ne sait pas recevoir le geste d\'ici ⇒ son panneau, sur CETTE conversation');
+  const porteSrc = sansCommentaires(t.src['src/agir/porte.js'] || '');
+  verif(/if \(reverif && site !== 'ebay'\) \{ try \{ await Promise\.race\(\[reverif\(\)/.test(porteSrc) && /poserReverifAgir\(async \(\) =>/.test(sansCommentaires(app)), 'M5 avant chaque geste, l\'état de l\'extension est revérifié (porte.js `poserReverifAgir`, posé par l\'app)');
+  const ecransMsg = ['src/ecrans/FilsTous.jsx'].map((f) => sansCommentaires(t.src[f] || '')).join('\n');
+  verif(!/envoyerGeste|agirOuPanneau|distGeste|vmrCmd\(|vmrExec\(/.test(ecransMsg), 'M6 l\'écran Messages · Tous ne dépose aucun geste lui-même (tout passe par src/agir/Agir.jsx)');
+
   // Y. eBay reste
   const pp = sansCommentaires(t.src['src/PrixPartout.jsx'] || '');
   // (24 nov., lot agir-tout) Les autres sites se cochent aussi quand la porte permet la file pour le compte de l'annonce
@@ -218,6 +243,13 @@ const MUTATIONS = {
   // (24 nov., lot agir-tout) les vacances se font depuis VRM (`VacancesAgir`) : la mutation retire ce chemin.
   'garde de la porte retirée (envoyerGeste)': (t) => { t.src['src/agir/porte.js'] = t.src['src/agir/porte.js'].replace(require('./_porte-agir.cjs').GARDES_PORTE[0][0], ''); },
   'garde du panneau retirée (ouvrirPanneau)': (t) => { t.src['src/ouvrirPanneau.js'] = t.src['src/ouvrirPanneau.js'].replace("if (!v.ok) { try { window.dispatchEvent(new CustomEvent('vrm:agir-refus', { detail: v })); } catch (_) {} return null; }", ''); },
+  // (28 nov., messages-parfaits) la messagerie depuis l'app
+  'messagerie : un geste de plus (masquer)': (t) => { t.src['src/agir/Agir.jsx'] = t.src['src/agir/Agir.jsx'].replace("partir('refuser', ids)", "partir('masquer', ids)"); },
+  'messagerie : Accepter sans confirmation': (t) => { t.src['src/agir/Agir.jsx'] = t.src['src/agir/Agir.jsx'].replace("onClick={() => setConfirmer(true)} attrs={{ 'data-agir-accepter'", "onClick={() => partir('accepter', { ...ids, prix }, true)} attrs={{ 'data-agir-accepter'"); },
+  'messagerie : contre-offre sous le plancher sans forcer': (t) => { t.src['src/agir/Agir.jsx'] = t.src['src/agir/Agir.jsx'].replace("const bloque = !j.ok || ((j.sous || j.sansPlancher) && !force);", 'const bloque = !j.ok;'); },
+  'messagerie : plus de panneau en repli': (t) => { t.src['src/agir/Agir.jsx'] = t.src['src/agir/Agir.jsx'].replace("{vp.ok && conv != null ? <BoutonPanneauConv", "{false ? <BoutonPanneauConv"); },
+  'messagerie : plus de revérification avant le geste': (t) => { t.src['src/agir/porte.js'] = t.src['src/agir/porte.js'].replace("if (reverif && site !== 'ebay')", 'if (false)'); },
+  'messagerie : l\'écran envoie lui-même': (t) => { t.src['src/ecrans/FilsTous.jsx'] += "\nconst x = () => envoyerGeste({ site: 'vinted', geste: 'repondre' });\n"; },
   'bouton manquant (vacances)': (t) => { t.src['src/ecrans/Reglages.jsx'] = t.src['src/ecrans/Reglages.jsx'].replace('<VacancesAgir comptes=', '<VacancesRetire comptes='); },
 };
 

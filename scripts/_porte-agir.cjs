@@ -133,7 +133,7 @@ async function regle({ code, porte, repli }) {
 function offreVinted(app, agir) {
   const corps = (t, debut) => { const i = t.indexOf(debut); if (i < 0) return ''; const j = t.indexOf('\nexport ', i + 1); return t.slice(i, j < 0 ? i + 3000 : j); };
   return regle({ code: (String(app).match(/<GestesOffreVinted compte=\{[^\n]*/) || [''])[0] + '\n' + corps(String(agir), 'export function GestesOffreVinted('),
-    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\} conv=\{openConv\.convId\} prix=\{off\.prix\} contre=\{contreMini!=null&&contreMini>=1\?contreMini:null\}(?: decrit=\{\w+\})?\/>[\s\S]*envoyerGeste\(\{ (?:\.\.\.base|site: 'vinted', compte, geste: 'offre'), distGeste, args, confirme \}\)[\s\S]*const ids = \{ tx: String\(tx\), oid: String\(oid\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
+    porte: /<GestesOffreVinted compte=\{String\(openConv\.acc\?\.vinted_user_id\|\|''\)\} tx=\{off\.tx\} oid=\{off\.oid\} conv=\{openConv\.convId\} prix=\{off\.prix\} contre=\{contreMini!=null&&contreMini>=1\?contreMini:null\}(?: decrit=\{\w+\})?(?: plancher=\{[^\n]*?)?\/>[\s\S]*envoyerGeste\(\{ (?:\.\.\.base|site: 'vinted', compte, geste: 'offre'), distGeste, args, confirme \}\)[\s\S]*const ids = \{ tx: String\(tx\), oid: String\(oid\)[\s\S]*onClick=\{\(\) => setConfirmer\(true\)\}[\s\S]*partir\('accepter', \{ \.\.\.ids, prix \}, true\)/,
     repli: /<BoutonAgir \{\.\.\.base\} par="file"/ });
 }
 
