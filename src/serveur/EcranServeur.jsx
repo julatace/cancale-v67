@@ -90,8 +90,8 @@ export default function EcranServeur({ onNav = null, base = `${SUPABASE_URL}/res
             const act = l.actions != null && l.cap ? tr('srv.l.actions', { n: l.actions, cap: l.cap }) : '';
             return (
               <React.Fragment key={l.appareil}>
-                <Rangee icone={<Icon name={l.code === 'pret' ? 'check' : 'alert'} size={22}/>} titre={ph.titre} sousTitre={[ph.sous, act].filter(Boolean).join(' · ')} sousLignes={2}
-                  valeur={nav(l)} fin={l.compte ? 'chevron' : null} onClick={l.compte && onNav ? () => { try { onNav('adistance'); } catch (_) {} } : null}
+                <Rangee icone={<Icon name={l.code === 'pret' ? 'check' : 'alert'} size={22}/>} titre={ph.titre} sousTitre={[ph.sous, act, nav(l)].filter(Boolean).join(' · ')} sousLignes={2}
+                  fin={l.compte ? 'chevron' : null} onClick={l.compte && onNav ? () => { try { onNav('adistance'); } catch (_) {} } : null}
                   attrs={{ 'data-srv-ligne': l.appareil, 'data-srv-code': l.code, 'data-srv-compte': l.compte || '', 'data-srv-prochain': l.prochain ? String(Math.max(0, Math.round((l.prochain - maintenant) / 1000))) : '', 'data-srv-actions': l.actions == null ? '' : String(l.actions), 'data-srv-cap': l.cap == null ? '' : String(l.cap) }}/>
                 {ph.geste ? <Pourquoi libelle={tr('srv.quoiFaire')} attrs={{ 'data-srv-geste': l.code }}><p>{ph.geste}</p></Pourquoi> : null}
               </React.Fragment>

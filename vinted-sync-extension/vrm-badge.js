@@ -378,6 +378,7 @@ function vrmVerifVisible(sel) {
   .panneau { margin-top: 8px; }
   .lu { font-size: 12px; color: var(--doux); margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
   .rangs { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; border-radius: 12px; }
+  .rangs[data-os-autres] { min-height: 0; }
   .os-etapes { margin: 8px 0; padding: 0 0 0 4px; list-style: none; display: grid; gap: 8px; }
   .os-etapes li { display: grid; gap: 2px; }
   .os-etapes small { color: var(--gris, inherit); opacity: .85; }
@@ -5306,7 +5307,7 @@ function vrmVerifVisible(sel) {
     const etapes = ['profil', 'extension', 'connecter', 'vinted', 'allumer', 'garder'];
     return `<section class="grp5" data-serveur-panneau data-os-on="${on ? '1' : '0'}"><h3>${esc(TU('os_titre'))}</h3><p class="note5">${esc(TU('os_note'))}</p>
       ${etat}
-      <div class="outils"><button type="button" class="vu-btn${on ? '' : ' vu-plein'}" data-os-basculer="${on ? 'eteindre' : 'allumer'}"${srvEnVol ? ' disabled' : ''}>${esc(TU(on ? 'os_eteindre' : 'os_allumer'))}</button></div>
+      <div class="outils"><button type="button" class="vu-btn" data-os-basculer="${on ? 'eteindre' : 'allumer'}"${srvEnVol ? ' disabled' : ''}>${esc(TU(on ? 'os_eteindre' : 'os_allumer'))}</button></div>
       ${lignesAutres ? `<p class="note5"><b>${esc(TU('os_autres'))}</b></p>${lignesAutres}` : ''}
       <details class="detail" data-os-guide><summary><span>${esc(TU('os_guide'))}</span></summary>
         <ol class="os-etapes">${etapes.map((k) => `<li data-os-etape="${k}"><b>${esc(TU('os_e_' + k))}</b><small>${esc(TU('os_e_' + k + '_sous'))}</small></li>`).join('')}</ol>
