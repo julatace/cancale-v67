@@ -105,8 +105,9 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
   const items = new Map((dressing && Array.isArray(dressing.items) ? dressing.items : []).filter((x) => x && x.id != null).map((x) => [String(x.id), x]));
   const lus = lusPourCarte(lignes, { statut, parNotif, items });
   if (!prefs) return { etat: 'bloque', raison: 'reglages', lus, totalLus: lignes.length, file };
-  const ed = etatDressingAuto(dressing, maintenant);
-  if (ed) return { etat: 'bloque', raison: ed, lus, totalLus: lignes.length, file };
+  // 5.455.6 (Julien, 27 nov. 22:50 : « comme Vintex, sans erreur ») : un dressing pas relu, ancien ou partiel ne BLOQUE plus
+  //    rien — il est dit (`avertissement`) ; l'extension lit le prix et l'état de l'annonce À L'ENVOI (transaction, article).
+  const ed = etatDressingAuto(dressing, maintenant), dressingSur = !ed;
   const offre = prefs.offreMode ? { mode: prefs.offreMode, valeur: prefs.offreMode === 'pct' ? prefs.pourcentage : prefs.offreValeur, arrondi: prefs.arrondi === true } : null;
   let ecartes = 0, nonProuves = 0, retires = 0;
   const prets = [];
@@ -126,22 +127,25 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
     const cochable = e.code === 'a_envoyer' && !raison;
     tous.push({ id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '',
       envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(e.code === 'pas_envoye' && e.raison ? { raisonEnvoi: String(e.raison) } : {}), ...(raison ? { raison } : {}), cochable,
-      ...(cochable && offre ? { offre: Number(prixOffre) } : {}),
+      ...(cochable && offre && prixOffre != null ? { offre: Number(prixOffre) } : {}),
       ...(cochable && textes++ < FAVORIS_CARTE_TEXTES ? { texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, FAVORIS_CARTE_TEXTE) } : {}) });
   };
   for (const l of lignes) {
     const itemId = itemIdFavori(l);
     if (!itemId) { ecartes++; continue; }
-    const annonce = etatAnnonceAuto(itemId, dressing, garde(itemId));
+    // Vendue (ici ou ailleurs, prouvée), réservée, en pause, fermée : écartée. « Absente » d'un dressing pas sûr : PAS SU ⇒ gardée.
+    const annonce0 = dressing && Array.isArray(dressing.items) ? etatAnnonceAuto(itemId, dressing, garde(itemId)) : (garde(itemId) === 'vendue-ailleurs' ? 'vendue' : null);
+    const annonce = annonce0 === 'annonce_absente' && !dressingSur ? null : annonce0;
     const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: annonce === 'vendue' });
     if (annonce) { retires++; if (e.code === 'a_envoyer') ecartes++; continue; }   // vendue, réservée, en pause, fermée, absente du dressing
     const it = items.get(String(itemId)), prix = prixItem(it);
     if (e.code !== 'a_envoyer') { ligneTous(l, itemId, it, prix, e, '', null); continue; }   // envoyé, en cours, à vérifier, pas envoyé : jamais reproposé
     // Une offre demandée dont le prix ne se calcule pas : le favori ne partirait pas
     // (l'extension le refuse, `offre_prix_inconnu`) — il n'est pas proposé.
+    //    5.455.6 : un prix pas connu ici n'écarte plus rien — l'extension le lit À L'ENVOI (transaction, article, page).
     const prixOffre = offre && prix != null ? prixOffreFavori(prix, offre) : null;
-    if (offre && prixOffre == null) { ecartes++; ligneTous(l, itemId, it, prix, e, 'offre_prix', null); continue; }
-    if (!prouve(String(l.id))) { nonProuves++; ligneTous(l, itemId, it, prix, e, 'non_prouve', null); continue; }
+    // 5.455.6 : `prouve` rend true, ou la raison (« sans_acheteur » : la notification ne porte pas de personne).
+    { const p = prouve(String(l.id)); if (p !== true) { nonProuves++; ligneTous(l, itemId, it, prix, e, p === 'sans_acheteur' ? 'sans_acheteur' : 'non_prouve', null); continue; } }
     prets.push({ l, itemId, it, prix, prixOffre });
     ligneTous(l, itemId, it, prix, e, '', prixOffre);
   }
@@ -151,13 +155,13 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
     // 5.377 : la date du favori (la carte trie du plus récent au plus ancien) et la photo de l'annonce.
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(it.photo.url) ? it.photo.url : '';
     return { id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: l.date || null, photo: l.photo || photoIt || '',
-      ...(offre ? { offre: Number(prixOffre) } : {}),
+      ...(offre && prixOffre != null ? { offre: Number(prixOffre) } : {}),
       texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, 2000) };
   });
   const plus = { tous, totalTous: lignes.length - retires, retires, max: FAVORIS_CARTE_MAX };
-  if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file, ...plus,
+  if (!liste.length) return { etat: 'rien', ...(ed ? { avertissement: ed } : {}), total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file, ...plus,
     message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null, intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' } };
-  return { etat: 'pret', total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes, ...plus,
+  return { etat: 'pret', ...(ed ? { avertissement: ed } : {}), total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes, ...plus,
     message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null,
       intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' },
     reglages: prefs, file };

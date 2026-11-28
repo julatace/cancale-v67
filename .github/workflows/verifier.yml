@@ -105,12 +105,13 @@ jobs:
           # seul) par SCENARIOS, accessibilite (~19 min) par BANC_LARGEUR, budget-vitesse (> 20 min,
           # arrêté à sa durée maximale le 24 nov. : ses derniers écrans n'étaient jamais jugés)
           # par ECRANS. Parts équilibrées à ~15 min (3 ouvriers), durées mesurées en CI le 24 nov.
+          # (27 nov., bancs-compta) + les dix bancs compta remis au vert (docs/passation/2026-11-27-bancs-compta.md).
           - part: 1
-            lot: budget-vitesse@ECRANS=journee,ventes,annonces,achats budget-vitesse@ECRANS=garage,messages,compta,emails accessibilite@BANC_LARGEUR=390 defilement-navigation imprimer-compte-exact annonces-actions barre-achats journee-coherence retraits-suivi ecran-pret-une-fois
+            lot: budget-vitesse@ECRANS=journee,ventes,annonces,achats budget-vitesse@ECRANS=garage,messages,compta,emails accessibilite@BANC_LARGEUR=390 defilement-navigation imprimer-compte-exact annonces-actions barre-achats journee-coherence retraits-suivi ecran-pret-une-fois declare-urssaf dac7-comptes urssaf export-donnees
           - part: 2
-            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans compta-export paires-dorment
+            lot: accessibilite@BANC_LARGEUR=1512 ventes-e2@SCENARIOS=annul,ko ventes-e2@SCENARIOS=egal,gros,vide accessibilite-clavier chiffres-coherents ventes-ligne-propre garde-ecrans compta-export paires-dorment achats-export suivi-urssaf compta-claire
           - part: 3
-            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules ce-matin retrait-contenu-code aujourdhui-portes-27nov vrai-benefice tout-va-bien-sondes
+            lot: navigation-tache ventes-e2@SCENARIOS=jeu,exclu argent-mois nouveau-vendeur iphone-reprise morceau-perime statut-colis colis-retirer-propre achats-annules ce-matin retrait-contenu-code aujourdhui-portes-27nov registres seuils-prevision statut-fiscal tout-va-bien-sondes vrai-benefice
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

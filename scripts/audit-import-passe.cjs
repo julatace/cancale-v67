@@ -8,11 +8,12 @@
 //
 //  On EXÉCUTE le vrai `background.js` (`_fond-vm.cjs`) et on COMPTE ce qui part
 //  chez Vinted, ce qui est rangé, ce qui est publié dans `import_vinted_{uid}` :
-//   A. 12 mois : 2 000 ventes sur ~4 ans ⇒ l'import s'arrête à la page qui passe
-//      l'horizon, n'en lit aucune au-delà, compte EXACTEMENT celles des 12 mois ;
-//      la ligne dit `horizonMois: 12` ; une date illisible n'arrête rien ;
-//   B. l'estimation « 400 / ~730 » : jamais sous ce qui est lu, jamais au-dessus
-//      du total de Vinted ; les pages estimées ;
+//   A. 5.455.7 (Julien : « l'extension doit tout récupérer dans tous les cas ») : un import NEUF lit TOUT l'historique
+//      (2 000 ventes, 20 pages, chacune une fois, « fini » sans horizon) ; un import de 12 mois d'AVANT finit ses 12 mois
+//      (horizon : EXACTEMENT les ventes des 12 mois), puis repart UNE fois à la page suivante, jamais une page relue ;
+//      une date illisible n'arrête rien ;
+//   B. l'estimation : jamais sous ce qui est lu, jamais au-dessus du total de Vinted (tout l'historique : le total) ;
+//      sur 12 mois, près du vrai ; les pages estimées ;
 //   C. étalé : 12 mois = 20 pages ⇒ 12 la 1re heure, pause « rythme » dite
 //      (reprise dans le futur), la suite l'heure d'après, à la page 13 ;
 //      les lectures jamais au-dessus de 20/h ;
@@ -74,27 +75,43 @@ async function controles(SRC, dit) {
   const fond = (o = {}) => { const v = o.v || {}; delete o.v; const f = faireFond(Object.assign({ src: SRC, vinted: vintedAvec(v), store: autresRien() }, o)); f.ctx.__vrmPausesVues = []; return f; };
   const jusquAuBout = async (f, heures = 6) => { for (let h = 0; h < heures && !(etat(f) && etat(f).fin); h++) { uneHeurePlusTard(f); for (let i = 0; i < 4; i++) await f.ctx.tickImport(); } };
 
-  await essaie('A. 12 mois', async () => {
+  // 5.455.7 (Julien, 27 nov. 23:00 : « l'extension doit tout récupérer dans tous les cas ») : l'import de départ lit TOUT
+  //    l'historique — plus d'horizon de 12 mois pour un import NEUF. Un import de 12 mois d'avant (en cours) finit ses 12 mois
+  //    (l'horizon tient), puis repart UNE fois pour le reste, à la page suivante (jamais deux fois la même page).
+  await essaie('A. tout l’historique', async () => {
     const f = fond({ lignes: { [`harvest_${UID}_orders_purchased`]: ACHATS_COMPLET, [`harvest_${UID}_listings`]: LISTINGS_COMPLET } });
-    await jusquAuBout(f);
+    await jusquAuBout(f, 10);
     const p = lues(f.j).filter((x) => /^sold:/.test(x));
-    const derniere = Math.ceil(DANS_12 / 100) + (DANS_12 % 100 === 0 ? 1 : 0);
-    dit(p.length === derniere && p[p.length - 1] === `sold:${derniere}`, `A. 12 mois (${DANS_12} ventes) : ${derniere} pages lues, pas une au-delà de l’horizon`, p.join(' '));
+    dit(p.length === 20 && new Set(p).size === 20 && p[19] === 'sold:20', `A. import neuf : les 20 pages de Vinted lues (2 000 ventes), chacune une fois`, p.join(' '));
     const v = rangees(f, 'orders_sold');
-    dit(VENTES.filter((o) => Date.parse(o.date) >= Date.now() - 365 * JOUR).every((o) => v.some((x) => String(x.transaction_id) === String(o.transaction_id))), 'A. toutes les ventes des 12 mois sont rangées');
+    dit(VENTES.every((o) => v.some((x) => String(x.transaction_id) === String(o.transaction_id))), 'A. toutes les ventes sont rangées (au-delà de 12 mois aussi)');
     const l = ligne(f);
-    dit(!!l && l.etat === 'fini' && l.horizonMois === 12, 'A. la ligne dit « fini » sur 12 mois', JSON.stringify(l && { e: l.etat, h: l.horizonMois }));
-    dit(!!l && l.ventes && l.ventes.lus === DANS_12 && l.ventes.horizon === true && l.ventes.fini === true, `A. ventes comptées EXACTEMENT sur 12 mois (${DANS_12}), pas le total de Vinted (2 000)`, JSON.stringify(l && l.ventes));
-    dit(f.j.journal.some((t) => /Ton passé Vinted importé \(12 mois\)/.test(t)), 'A. le journal le dit');
+    dit(!!l && l.etat === 'fini' && l.horizonMois === null, 'A. la ligne dit « fini », sans horizon', JSON.stringify(l && { e: l.etat, h: l.horizonMois }));
+    dit(!!l && l.ventes && l.ventes.lus === 2000 && l.ventes.horizon !== true && l.ventes.fini === true, 'A. ventes comptées EXACTEMENT : les 2 000 de Vinted', JSON.stringify(l && l.ventes));
+    dit(f.j.journal.some((t) => /Historique Vinted récupéré : 2000 ventes/.test(t.replace(/\u202f|\u00a0/g, ''))) && !f.j.journal.some((t) => /12 mois/.test(t)), 'A. le journal le dit (tout l’historique)', f.j.journal.filter((t) => /📥/.test(t)).join(' | '));
     const avant = f.j.vinted.length;
     uneHeurePlusTard(f); await f.ctx.tickImport();
     dit(f.j.vinted.length === avant, 'A. fini : plus aucune lecture', `${f.j.vinted.length - avant}`);
-    // Une date illisible n'arrête rien (pas su ≠ fini).
+    // Un import de 12 MOIS d'avant (en cours) : ses 12 mois d'abord (horizon), puis la suite d'un trait, sans relire une page.
+    const t0 = Date.now();
+    const ancien = { v: 2, debut: t0, demande: false, tout: false, at: t0, sold: { page: 1, lus: 0, total: null, pagesTotal: null, fini: false }, purchased: { page: null, lus: 150, total: 150, pagesTotal: null, fini: true, deja: true }, annonces: { lus: 49, total: 49, fini: true, deja: true } };
+    const h = fond({ lignes: { [`harvest_${UID}_orders_purchased`]: ACHATS_COMPLET, [`harvest_${UID}_listings`]: LISTINGS_COMPLET } });
+    h.store.vrmImport = { [UID]: ancien };
+    await jusquAuBout(h, 10);
+    const ph = lues(h.j).filter((x) => /^sold:/.test(x));
+    const derniere = Math.ceil(DANS_12 / 100) + (DANS_12 % 100 === 0 ? 1 : 0);
+    const j12 = h.j.journal.find((t) => /Ton passé Vinted importé \(12 mois\)/.test(t)) || '';
+    dit(new RegExp(`: ${DANS_12} vente`).test(j12.replace(/\u202f|\u00a0/g, '')), `A. import de 12 mois d’avant : ventes comptées EXACTEMENT sur 12 mois (${DANS_12}) à l’horizon (page ${derniere})`, j12);
+    dit(ph.length === 20 && new Set(ph).size === 20 && ph[derniere - 1] === `sold:${derniere}` && ph[derniere] === `sold:${derniere + 1}`, `A. puis la suite reprend à la page ${derniere + 1} : 20 pages en tout, aucune relue`, ph.join(' '));
+    const lh = ligne(h);
+    dit(!!lh && lh.etat === 'fini' && lh.horizonMois === null && lh.ventes && lh.ventes.lus === 2000, 'A. au bout : tout l’historique (2 000), « fini », sans horizon', JSON.stringify(lh && { e: lh.etat, h: lh.horizonMois, v: lh.ventes }));
+    // Une date illisible n'arrête rien (pas su ≠ fini), même sous l'horizon d'un import d'avant.
     const sansDate = VENTES.slice(0, 600).map((o) => Object.assign({}, o, { date: 'pas une date' }));
     const g = fond({ v: { ventes: sansDate }, lignes: { [`harvest_${UID}_orders_purchased`]: ACHATS_COMPLET, [`harvest_${UID}_listings`]: LISTINGS_COMPLET } });
-    await jusquAuBout(g);
+    g.store.vrmImport = { [UID]: JSON.parse(JSON.stringify(ancien)) };
+    await jusquAuBout(g, 10);
     const pg = lues(g.j).filter((x) => /^sold:/.test(x));
-    dit(pg.length === 6 && ligne(g) && ligne(g).ventes.horizon !== true && ligne(g).ventes.lus === 600, 'A. dates illisibles : lu jusqu’à la dernière page de Vinted (rien deviné)', `${pg.join(' ')} ${JSON.stringify(ligne(g) && ligne(g).ventes)}`);
+    dit(pg.length === 6 && new Set(pg).size === 6 && ligne(g) && ligne(g).ventes.horizon !== true && ligne(g).ventes.lus === 600 && g.j.journal.some((t) => /12 mois\) : 600 ventes/.test(t.replace(/\u202f|\u00a0/g, ''))), 'A. dates illisibles : lu jusqu’à la dernière page de Vinted (rien deviné)', `${pg.join(' ')} ${JSON.stringify(ligne(g) && ligne(g).ventes)}`);
   });
 
   await essaie('B. estimation', async () => {
@@ -103,9 +120,12 @@ async function controles(SRC, dit) {
     const l = ligne(f);
     const v = l && l.ventes;
     dit(!!v && v.lus === 400 && Number.isFinite(v.estime) && v.estime >= v.lus && v.estime <= 2000, 'B. « 400 / ~N » : estimation jamais sous le lu, jamais au-dessus du total', JSON.stringify(v));
-    dit(!!v && Math.abs(v.estime - DANS_12) <= DANS_12 * 0.25, `B. l’estimation tombe près du vrai (${DANS_12})`, String(v && v.estime));
-    dit(!!v && v.pages === 4 && v.pagesEstimees === Math.ceil(v.estime / 100), 'B. pages lues / estimées', JSON.stringify(v && { p: v.pages, pe: v.pagesEstimees }));
+    dit(!!v && v.estime === 2000, 'B. tout l’historique : l’estimation est le total de Vinted (2 000)', String(v && v.estime));
+    dit(!!v && v.pages === 4 && v.pagesEstimees === 20, 'B. pages lues / estimées (4 / 20)', JSON.stringify(v && { p: v.pages, pe: v.pagesEstimees }));
     dit(!!l && l.enCours === 'ventes' && Number(l.resteMin) > 0, 'B. le type en cours et la durée restante', JSON.stringify(l && { c: l.enCours, m: l.resteMin }));
+    // Sur 12 mois (import d'avant) : l'estimation tombe près du vrai.
+    const e12 = f.ctx.estimeTypeImport({ lus: 400, total: 2000, plusVieux: Date.now() - 300 * JOUR, fini: false }, false);
+    dit(Math.abs(e12 - DANS_12) <= DANS_12 * 0.25, `B. sur 12 mois (import d’avant) : l’estimation tombe près du vrai (${DANS_12})`, String(e12));
     // Un total de Vinted qui a baissé sous ce qui est déjà lu (ventes retirées de sa liste) : jamais « 500 / ~300 ».
     const e = f.ctx.estimeTypeImport({ lus: 500, total: 300, plusVieux: Date.now() - 10 * JOUR, fini: false }, false);
     dit(e === 500, 'B. un total qui baisse sous le lu : l’estimation reste au lu', String(e));
@@ -208,6 +228,9 @@ async function lancer(SRC) {
 
 const MUTATIONS = [
   ['horizon ignoré', 'const passeHorizon = horizon !== null && dates.length && Math.min(...dates) < horizon;', 'const passeHorizon = false;'],
+  ['import neuf sur 12 mois (comme avant)', "    neuf = { v: 2, debut: t, demande: false, tout: true, at: t };", "    neuf = { v: 2, debut: t, demande: false, tout: false, at: t };"],
+  ['import de 12 mois fini sans suite', "      if (st.tout) return 0;", "      return 0;"],
+  ['la suite relit depuis la page 1', "        const pg = Number(a.page) > 0 ? Number(a.page) : 1;", "        const pg = 1;"],
   ['horizon compte la page entière', 'ty.lus = Math.min(ty.lus, avant + dedans);', ''],
   ['date illisible prise pour ancienne', "const dates = lot.map((o) => Date.parse((o && o.date) || '')).filter(Number.isFinite);", "const dates = lot.map((o) => { const d = Date.parse((o && o.date) || ''); return Number.isFinite(d) ? d : 0; });"],
   ['estimation sans borne basse', 'return Math.max(e, lus);', 'return e;'],

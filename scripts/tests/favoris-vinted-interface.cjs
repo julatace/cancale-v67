@@ -22,7 +22,7 @@ const JUGES = { ...JUGES_FAVORIS,
 juger('favoris-vinted-interface', [
   { garantie: 'pas de lecture au montage', ou: [['file', /la lecture cible exactement une ligne et son propriétaire, sans écriture/]] },
   { garantie: 'l’écran ne garde qu’un résumé : la liste vit dans la fenêtre', retiree: ECRAN + ' : la liste est la page Favoris du panneau' },
-  { garantie: 'résumé : N favoris à contacter', ou: [['panneau', /segments Tous · Pas encore contactés · Envoyés · Ignorés, avec leurs nombres/]] },
+  { garantie: 'résumé : N favoris à contacter', ou: [['panneau', /segments Tous · Pas encore contactés · Envoyés · Vendus\/Vinted, avec leurs nombres/]] },
   { garantie: 'la fenêtre s’ouvre sur « 1. Choisir »', retiree: ECRAN + ' : plus d’étapes, un tableau (« Favoris est un TABLEAU (plus d’étapes 1 Choisir…) »)' },
   { garantie: 'seuls les favoris sont listés, pas une notification d’offre', ou: [['liste', /l’aperçu rend la liste `tous`/], ['file', /capture, compte, format, phrase, lien, doublons ou sélection incompatibles : aucun destinataire inventé/]] },
   { garantie: 'couverture partielle explicite', ou: [['file', /la structure est bornée et ne promet pas de liste complète/], ['liste', /réponse bornée : message rendu pour les 60 premiers seulement/]] },

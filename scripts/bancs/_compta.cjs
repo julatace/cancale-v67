@@ -50,4 +50,19 @@ async function ouvrirDetailCompta(pg, { attendre = 15000 } = {}) {
   await allerSegment(pg, 'resume', { attendre });
   return ouvrirReplis(pg, 'details[data-compta-repli]', attendre);
 }
-module.exports = { ouvrirAvanceCompta, ouvrirDetailCompta, allerSegment };
+// (27 nov., bancs-compta) Amène à l'écran la carte que désigne `sel` comme Julien : le segment d'Argent qui
+// la porte (un toucher), puis SES replis fermés seulement (un toucher sur chaque titre) — les autres replis
+// restent comme il les trouve. Rien trouvé ⇒ false (le contrôle qui suit le dira).
+async function ouvrirCarte(pg, sel, { attendre = 15000 } = {}) {
+  try { await pg.waitForSelector(sel, { state: 'attached', timeout: attendre }); } catch (_) { return false; }
+  const seg = await pg.evaluate((sel) => { const e = document.querySelector(sel); const v = e && e.closest('[data-argent-vue]'); return v ? v.getAttribute('data-argent-vue') : ''; }, sel);
+  if (seg) await allerSegment(pg, seg, { attendre });
+  for (let i = 0; i < 4; i++) {
+    const id = await pg.evaluate((sel) => { const e = document.querySelector(sel); let d = e && e.parentElement && e.parentElement.closest('details:not([open])'); if (!d) return ''; if (!d.id) d.id = 'banc-repli-' + Math.random().toString(36).slice(2, 8); return d.id; }, sel);
+    if (!id) break;
+    await pg.click(`#${id} > summary`, { timeout: 20000 });
+    await pg.waitForFunction((id) => { const d = document.getElementById(id); return !!(d && d.open); }, id, { timeout: 15000 }).catch(() => {});
+  }
+  return true;
+}
+module.exports = { ouvrirAvanceCompta, ouvrirDetailCompta, allerSegment, ouvrirCarte };

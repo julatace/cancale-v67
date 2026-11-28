@@ -2447,14 +2447,30 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 - **27 nov. · Aujourd'hui à 1008 px (Edge 150 %)** : les colonnes suivent la largeur de LA GRILLE (`@container sj-journee` : 3 dès 860 px, sinon 1 + 2, une sous 560) ; le compte d'« À envoyer » s'abrège. Bancs `iphone-reprise` O3 et `journee-coherence` E12 (`_journee-tient.cjs`). `historique-interface-stock.md`, fin. Geste : aucun.
 
+## Lignes de CLAUDE.md §9 déplacées telles quelles le 27 nov. nuit (place pour la 5.455.6, sous 60 Ko)
+
+- **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
+- **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., pour rester sous 60 Ko)
 - **27 nov. · Scan au relais ⇒ en stock ; « Ce matin »** : `2026-11-27-scan-ce-matin.md`.
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., paires-qui-dorment, pour rester sous 60 Ko)
 - **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
 
-### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., vrai-benefice, pour rester sous 60 Ko)
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. nuit (fusion, sous 60 Ko)
+
+- **27 nov. · « Vas-y fais tout »** : À retirer garde la conversation de SA commande à la réunion par code (713 080 : photo, titre) ; « N prix manquants » ; « pas lu depuis N jours » (« Compris ») ; « Ordinateur éteint » + « Pourquoi ? ». `historique-divers.md`, fin.
+
+## Ligne de CLAUDE.md §9 déplacée telle quelle le 27 nov. 23 h (place pour la 5.455.7, sous 60 Ko)
+
+- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
 - **27 nov. · « Fait la compta » + export URSSAF** : « Pour mon comptable » vente par vente (prix, achat, port, bénéfice, réf. achat, autre devise à part, fichier pour logiciel) ; nouvelle carte « Pour l'URSSAF » (rythme enregistré, jamais deviné ; registre des déclarations). `2026-11-27-compta-export.md`. Geste : aucun (3 décisions y sont posées).
 
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion favoris-suite, pour rester sous 60 Ko)
+- **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
+### Ligne de CLAUDE.md §9 déplacée telle quelle (27 nov., vrai-benefice, pour rester sous 60 Ko)
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion vrai-benefice, pour rester sous 60 Ko)
-- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., fusion favoris-suite, pour rester sous 60 Ko)
+- **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
+- **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
