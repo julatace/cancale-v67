@@ -88,7 +88,8 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
   const maxC = Math.max(0, vV || 0, bV || 0);
   const partDe = (x) => (x == null ? null : maxC > 0 && x > 0 ? x / maxC : 0);
   const kn = C && typeof C.cents === 'string' && /^\d+\/\d+$/.test(C.cents) ? C.cents.split('/').map(Number) : null;
-  const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : '';
+  // (28 nov., compta-finitions) `avantDepenses` : aucune dépense jamais notée ⇒ « avant tes dépenses » (règle du 22 oct.).
+  const sousBenef = B && !B.pasSu && B.auMoins ? tr('journee.moins') : B && B.pasSu ? (B.sous || tr('v2.ar.pasSu')) : B && B.avantDepenses ? tr('v2.stats.netAvantDepenses') : '';
   const lignesV = versements.etat === 'lu' ? (tout ? versements.lignes : versements.lignes.slice(0, MONTRES)) : [];
   // (23 nov., revue UX P2) À l'ordinateur, une colonne vide à 100 % (N°, Achat, Marge) n'est pas dessinée ; la couverture des prix
   // d'achat est dite au-dessus du tableau (« Prix d'achat connus : 0/27 · Saisir »), le chiffre faux étant la porte (§5).
@@ -140,7 +141,12 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                     data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-couvert={x.couvert === false ? '0' : '1'} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
                     <span className="n-arg-m6-nom">{x.long.replace(/\s+\d{4}$/, '')}</span>
                     <span className="n-arg-m6-piste" aria-hidden="true"><span className={'n-arg-m6-plein' + (neuf6 ? ' n-agv-pousse' : '')} style={{ width: h + '%', ...(neuf6 ? { animationDelay: retard(i) + 'ms' } : {}) }}/></span>
-                    <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
+                    {/* (28 nov., compta-finitions, point 2 — §7 « le même nombre ne s'écrit jamais deux fois sur un écran ») Le mois en
+                        cours EST l'affiche juste au-dessus (la même valeur) : sa barre ne redit pas le montant à l'œil (le lecteur
+                        d'écran l'entend toujours) ; les mois d'avant gardent le leur. */}
+                    <span className="n-arg-m6-v" data-arg-montant="" data-arg-m6-affiche={x.courant && x.v != null && valeur != null ? '1' : undefined}>{x.courant && x.v != null && valeur != null
+                      ? <span className="n-lu-seul">{(x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}</span>
+                      : <>{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}</>}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
                   </li>
                 );
               })}
@@ -158,7 +164,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             // de la barre ; sinon la barre du bénéfice, à l'échelle du vendu.
             visuel={geste && kn ? <CouvertureBarre k={kn[0]} n={kn[1]}/>
               : <BarreChiffre part={partDe(bV)} partiel={!!(B.auMoins || B.connu || B.brut)} ton="vert" neuf={neufL} rang={1} attrs={{ 'data-agv-barre': 'benefice' }}/>}
-            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
+            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-avant-depenses': B.avantDepenses ? '' : undefined, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
               'data-v2-argent-geste': geste ? String(geste.n) : undefined, 'data-v2-principal': geste ? geste.id : undefined }}/> : null}
           {fait(F.attente, tr('arn.aVenir'))}
           {fait(F.dispo)}

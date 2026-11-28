@@ -76,7 +76,7 @@
 .vrm-aa .vrm-aa-sous { fill: var(--vrm-muted, #6E6E73); font-weight: 400; font-size: 7.5px; }
 .vrm-aa-plein .vrm-aa-fond { fill: var(--vrm-ink, #1D1D1F); }
 .vrm-aa-plein text { fill: var(--vrm-surface, #fff); }
-.vrm-aa-ambre .vrm-aa-grand { fill: #B25000; }
+.vrm-aa-ambre .vrm-aa-grand { fill: var(--n-ambre); }
 .vrm-aa-double .vrm-aa-fond { fill: color-mix(in srgb, var(--vrm-doublon, #D70015) 16%, transparent); stroke: var(--vrm-doublon, #D70015); stroke-width: 1.2; }
 .vrm-aa-el { transform-box: fill-box; transform-origin: center; }
 .vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #16181D); stroke-width: 1.6; }
@@ -98,7 +98,7 @@
 }
 .vrm-aa-pause:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -6px; }
 :root[data-theme="dark"] .vrm-aa-bout { fill: rgba(255,255,255,.32); stroke: rgba(0,0,0,.6); }
-:root[data-theme="dark"] .vrm-aa-ambre .vrm-aa-grand { fill: #FF9F0A; }
+:root[data-theme="dark"] .vrm-aa-ambre .vrm-aa-grand { fill: var(--n-ambre); }
 @media (prefers-reduced-motion: reduce) {
   .vrm-aa-doigt, .vrm-aa-actif, .vrm-aa-onde, .vrm-aide-etapes > li { animation: none !important; transition: none !important; }
 }

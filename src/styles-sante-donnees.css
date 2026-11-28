@@ -7,10 +7,10 @@
 .vrm-sd {
   /* « deux articles sous le même N° » : le jeton du doublon (--vrm-doublon, posé par la coque, clair et sombre) */
   --sd-double: var(--vrm-doublon); --sd-double-fond: color-mix(in srgb, var(--vrm-doublon) 12%, transparent);
-  --sd-ambre-fond: rgba(255,149,0,.14);
+  --sd-ambre-fond: var(--n-ambre-fond);
   display: flex; flex-direction: column; gap: var(--d-e-6, 24px); color: var(--d-encre);
 }
-:root[data-theme="dark"] .vrm-sd, :root[data-theme="dark"] .vrm-sd-compacte { --sd-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent); --sd-ambre-fond: rgba(255,159,10,.20); }
+:root[data-theme="dark"] .vrm-sd, :root[data-theme="dark"] .vrm-sd-compacte { --sd-double-fond: color-mix(in srgb, var(--vrm-doublon) 20%, transparent); --sd-ambre-fond: var(--n-ambre-fond); }
 .vrm-sd-compacte { --sd-double: var(--vrm-doublon); }
 .vrm-sd .vrm-ios-groupe { margin: 0; }
 
@@ -28,7 +28,7 @@
 :root body .vrm-sd-revoir { border: 0; background: transparent; box-shadow: none; padding: 0 4px; color: var(--d-accent-texte); font-weight: 600; }
 
 .vrm-sd-pastille { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 999px; background: var(--d-gris); opacity: .45; }
-.vrm-sd-pastille[data-ton="geste"] { background: var(--d-point-ambre, #FF9500); opacity: 1; }
+.vrm-sd-pastille[data-ton="geste"] { background: var(--d-point-ambre, var(--n-ambre)); opacity: 1; }
 .vrm-sd-pastille[data-ton="rouge"] { background: var(--sd-double); opacity: 1; }
 .vrm-sd-pastille[data-ton="passu"], .vrm-sd-pastille[data-ton="lecture"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--d-gris); opacity: 1; }
 

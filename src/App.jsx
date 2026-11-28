@@ -2319,7 +2319,7 @@ const THEMES = {
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
     bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
     accent:"#16181D", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
-    danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
+    danger:"#C0392B", warn:"#3D4B5B", gold:"#7A6636",
     blue:"#16181D", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
@@ -2366,7 +2366,7 @@ const THEMES = {
     // rail (chrome) < page (bg) < cartes (card), marches bien écartées.
     bg:"#000000", surface:"#1C1C1E", card:"#1C1C1E", card2:"#1C1C1E", border:"#2C2C2E",
     accent:"#B5BDCA", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
-    danger:"#FF6B6B", warn:"#FFB23E", gold:"#C9AE78",
+    danger:"#FF6B6B", warn:"#F2F2F7", gold:"#C9AE78",
     blue:"#B5BDCA", purple:"#A99AF0", text:"#F2F2F7", muted:"#8E8E93",
     shadow:"0 1px 1px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.45)",
     shadowMd:"0 1px 2px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.5)",
@@ -4619,7 +4619,7 @@ function RepublieeHost() {
           <div style={{ fontSize: 19, fontWeight: 600, color: C.text, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{tr('rt.feuille.titre')}</div>
           {l.length > 1 ? <span data-rt-rang="" style={{ fontSize: 13, color: C.muted, flexShrink: 0 }}>{tr('rt.rang', { i: k + 1, n: l.length })}</span> : null}
         </div>
-        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, #E08A12) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, #E08A12) 45%, transparent)', color: 'var(--sb-ambre, #764300)' }}>
+        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'var(--n-ambre-fond)', border: '1px solid var(--n-ambre-bord)', color: 'var(--n-ambre)' }}>
           <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}><Icon name="box" size={20}/></span>
           <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 600 }}>{tr('rt.job.detail')}</span>
         </div>
@@ -9029,6 +9029,7 @@ const ecouterFenetreCsp = (w, nom) => {
 //   'home' → livraison à domicile : rien à présenter au comptoir (Colissimo).
 // (13 nov., logos des transporteurs) `bg`/`fg` = les couleurs des tuiles de src/transporteursVisuels.js (Chronopost bleu,
 // jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre : ni rouge ni violet, §3 et §7).
+// couleur-objet:debut (28 nov., S6) les couleurs de MARQUE des transporteurs (logo-marque)
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#16181D', fg: '#fff', retrait: 'qr'   },
@@ -9050,6 +9051,7 @@ const CARRIERS = {
   // préférence — donc aucune consigne au comptoir.
   autre:        { name: 'Transporteur',  short: '📦', bg: '#6E6E73', fg: '#fff', retrait: 'auto' },
 };
+// couleur-objet:fin
 // Ce qu'il faut présenter au comptoir pour CE colis, selon son transporteur ET
 // ce qu'on a réellement reçu. Une seule règle, utilisée partout (modale de
 // retrait, carte relais). Renvoie { mode:'qr'|'code'|'numero'|'home', ... }.
@@ -15741,10 +15743,13 @@ const DEMANDE_SAISIE_PRIX = { on: false };
 // Aucune copie du geste ailleurs (§11) : le registre retient l'IDENTITÉ des
 // ventes du mois, et seul le rapport les a. Le drapeau vieillit (30 s) : un
 // clic oublié ne rouvre pas le rapport à la prochaine visite de Ventes.
-const DEMANDE_DECLARATION = { ym: null, at: 0 };
-const demanderDeclaration = (ym, onNav) => {
+// (28 nov., compta-finitions, point 4) `{ rapport: true }` : le MÊME chemin ouvre le rapport comptable sur ce mois, SANS
+// le formulaire « Qu'as-tu déclaré ? » — « Rapport comptable » d'Argent → Déclarer (le menu « Outils » de l'ancien
+// Ventes, qui le portait, n'est plus rendu depuis Ventes natif).
+const DEMANDE_DECLARATION = { ym: null, at: 0, rapport: false };
+const demanderDeclaration = (ym, onNav, { rapport = false } = {}) => {
   if (!/^\d{4}-\d{2}$/.test(String(ym || ''))) return;
-  DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now();
+  DEMANDE_DECLARATION.ym = ym; DEMANDE_DECLARATION.at = Date.now(); DEMANDE_DECLARATION.rapport = !!rapport;
   if (onNav) onNav('cat_ventes');
 };
 // ── RATTRAPAGE EN SÉRIE (29 octobre) ── Julien a beaucoup de mois « Pas
@@ -15775,7 +15780,7 @@ const DEMANDE_DEPENSE = { on: false, at: 0 };
 // logo de marque, la seule raison d'un ton hors palette, et Julien l'a demandé
 // (21 sept.). Le teal #007782 ailleurs est « Vinted GO » le transporteur, une
 // autre notion — on n'y touche pas.
-const LBC_ORANGE = '#EC5A13';
+const LBC_ORANGE = '#EC5A13';   // logo-marque : l'orange de Leboncoin (sa marque, pas un accent de l'app)
 // LE MODE STREAM — cacher ce qu'il ne veut pas montrer quand il filme son écran.
 // (16 oct.) un flou sur `.vrm-sensible` ; (17 oct.) un flou sur tout texte qui
 // porte un pseudo de ses comptes ; (5 nov.) UNE RÈGLE PROGRAMMÉE, src/modeStream.js :
@@ -18671,14 +18676,14 @@ const BrandMark = ({ id }) => id === 'apple' ? (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{flexShrink:0}} data-marque="apple">
     <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.1 8.79.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.5zM14.18 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23z"/>
   </svg>
-) : id === 'google' ? (
+) : id === 'google' ? ( // couleur-objet:debut (logo-marque : le « G » de Google)
   <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}} data-marque="google">
     <path fill="#B5BDCA" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
   </svg>
-) : (
+) : ( // couleur-objet:fin
   <svg width="17" height="17" viewBox="0 0 24 24" fill="#F4F4F5" aria-hidden="true" style={{flexShrink:0}}>
     <path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/>
   </svg>
@@ -19354,7 +19359,7 @@ function GestesHorsLigneCoque({ tab, ongletDedie }) {
         {texte ? <span data-gestes-hl-texte="" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: etat === 'envoyes' ? C.text : C.muted, border: `1px solid ${C.border}`, background: C.card, borderRadius: 999, padding: '6px 12px' }}>
           <Icon name={horsLigne ? 'cloudOff' : 'sync'} size={14}/>{texte}</span> : null}
         {atrancher ? <button type="button" data-gestes-hl-trancher={atrancher} onClick={() => setOuvert(true)}
-          style={{ minHeight: 44, fontSize: 13, fontWeight: 600, color: C.text, border: `1px solid ${C.warn || '#B26B00'}`, background: C.card, borderRadius: 999, padding: '0 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ minHeight: 44, fontSize: 13, fontWeight: 600, color: C.text, border: `1px solid ${C.warn || 'var(--n-ambre)'}`, background: C.card, borderRadius: 999, padding: '0 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
           {tr('horsligne.coque.atrancher', { n: atrancher })} · {tr('horsligne.coque.voir')}</button>
           : attente ? <button type="button" data-gestes-hl-voir="" onClick={() => setOuvert(true)} style={{ minHeight: 44, fontSize: 13, color: C.muted, border: 'none', background: 'transparent', padding: '0 6px', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>{tr('horsligne.coque.voir')}</button> : null}
       </div>
@@ -23476,14 +23481,15 @@ const Box = React.memo(function Box({val,isSold,highlight}) {
       </svg>
     );
   }
+  // couleur-objet:debut (28 nov., S6) une case pleine est dessinée comme un CARTON (kraft, poignées) : la couleur d'un objet, pas un accent
   let front,side,top,textCol;
   if(isSold)      {front='#8a1a2a';side='#5a0e1a';top='#aa2535';textCol='#ffaaaa';}
   else if(hasVal) {front='#B25000';side='#B25000';top='#d09040';textCol='#B25000';}
   else            {front='#2C2C2E';side='#1D1D1F';top='#3A3A3C';textCol='transparent';}
   return (
     <svg width={W+SW} height={H+TH} style={{display:'block',overflow:'visible',
-      filter:highlight?'drop-shadow(0 0 8px #ffb830) drop-shadow(0 0 16px #ffb830) brightness(1.5)':'none'}}>
-      {highlight&&<rect x={-2} y={TH-2} width={W+4} height={H+4} rx={3} fill="none" stroke="#ffb830" strokeWidth="2.5"/>}      <polygon points={`0,${TH} ${SW},0 ${W+SW},0 ${W},${TH}`} fill={top} stroke="#111" strokeWidth="0.6"/>
+      filter:highlight?'drop-shadow(0 0 8px #FFFFFF) drop-shadow(0 0 16px #FFFFFF) brightness(1.5)':'none'}}>
+      {highlight&&<rect x={-2} y={TH-2} width={W+4} height={H+4} rx={3} fill="none" stroke="#FFFFFF" strokeWidth="2.5"/>}      <polygon points={`0,${TH} ${SW},0 ${W+SW},0 ${W},${TH}`} fill={top} stroke="#111" strokeWidth="0.6"/>
       <rect x={0} y={TH} width={W} height={H} rx={2} fill={front} stroke="#111" strokeWidth="0.6"/>
       <polygon points={`${W},${TH} ${W+SW},0 ${W+SW},${H} ${W},${H+TH}`} fill={side} stroke="#111" strokeWidth="0.6"/>
       {hasVal&&<rect x={8} y={TH+H/2-2} width={W-16} height={4} rx={1} fill={side} opacity="0.6"/>}
@@ -23508,6 +23514,7 @@ function Door({h}) {
       <rect x={0} y={H-6} width={W} height={6} fill="#1D1D1F"/>
     </svg>
   );
+  // couleur-objet:fin
 }
 // ⟦→ ecrans/Compta.jsx #20⟧
 
@@ -23816,6 +23823,7 @@ const FURN_TYPES = {
   velo:    { label: 'Vélo',    emoji: '🚲', w: 1.7, h: 0.6, rows: 1, cols: 1, color: '#48484A', h3d: 1.0,  build: 'velo',   deco: true },
   etabli:  { label: 'Établi',  emoji: '🛠️', w: 1.8, h: 0.8, rows: 1, cols: 1, color: '#6E6E73', h3d: 0.9,  build: 'etabli', deco: true },
 };
+// couleur-objet:debut (28 nov., S6) les couleurs des MEUBLES et des ambiances du garage 3D : bois, lumière d'un décor, pas un accent de l'app
 const FURN_COLORS = ['#c8935f','#8E8E93','#8E8E93','#8E8E93','#c9a24b','#8E8E93','#cf7b7b','#5fb0a3','#8E8E93','#3A3A3C','#E5E5EA','#d98a3d'];
 // ── AMBIANCES du garage 3D : « crée ton propre univers ». Chaque preset ne fait
 // que changer des COULEURS et des INTENSITÉS de lumière (0 risque de casser le
@@ -23828,6 +23836,7 @@ const GARAGE_AMBIANCES = [
   { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#1C1C1E', sky:'#FFF4E5', ground:'#1C1C1E', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#FFF4E5', fillI:0.30, wall:'#1D1D1F', floor:'#48484A', exposure:1.20 },
   { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#D1D1D6', sky:'#E5E5EA', ground:'#8E8E93', hemi:0.90, ambient:0.26, sun:'#F2F2F7', sunI:1.00, fill:'#E5E5EA', fillI:0.32, wall:'#C7C7CC', floor:'#C7C7CC', exposure:1.08 },
 ];
+// couleur-objet:fin
 // ⟦→ ecrans/Comptabilite.jsx #232⟧
 
 
@@ -26463,7 +26472,7 @@ const INV_STATUS = {
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
   pending_sale: { label: 'Vente en cours', color: '#16181D', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
-  stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
+  stock:        { label: 'Stock',         color: '#3D4B5B', icon: '📦' },
 };
 // Normalise un titre pour comparer une annonce et une commande vendue (Vinted
 // renvoie le titre exact de l'article dans les deux). Insensible casse/espaces.

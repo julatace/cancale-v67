@@ -277,7 +277,7 @@ const juge = (cs, quoi) => {
       // (27 nov., bancs-compta) E/F portés. Ma journée n'a plus sa case « Bénéfice » d'avant (`BeneficeJournee`,
       // App.jsx, n'est plus montée : Aujourd'hui a ses tuiles, src/ecrans/Comptabilite.jsx `chiffresMois`) ; le
       // choix des dépenses (`ChoixDepenses`) vit dans Argent → Résumé → « Ton bénéfice » (src/ecrans/Compta.jsx).
-      // Ce qui est exigé là où il vit. Aujourd'hui : RAPPORTÉ (voir « À DÉCIDER » plus bas), pas jugé.
+      // Ce qui est exigé là où il vit. Aujourd'hui et le choix natif : jugés par scripts/bancs/compta-finitions.cjs (28 nov.).
       const allerBenef = async (pg, repere) => {
         // Le bénéfice se PUBLIE en lisant les ventes (Aujourd'hui) ; Argent le consomme.
         await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 1500);
@@ -295,9 +295,9 @@ const juge = (cs, quoi) => {
         dit(!!c && c.depenses === 'jamais', `E ${T} : Argent sait que rien n'a jamais été noté (depenses=jamais)`, JSON.stringify(c && { etat: c.etat, depenses: c.depenses }));
         const titre = await pg.evaluate(() => { const e = document.querySelector('[data-benef-titre]'); return e ? e.getAttribute('title') || '' : ''; });
         dit(/^Net avant tes dépenses/.test(titre), `E ${T} : le chiffre se nomme « Net avant tes dépenses »`, titre);
-        // Le choix (« Je n'ai pas de dépenses à noter / Ajouter une dépense ») est RENDU une fois ; sa visibilité
-        // est rapportée plus bas (« À DÉCIDER ») : la maquette du 2 nov. (src/design/fusion.css, §15) cache
-        // `.vrm-compta-geste`, et la case de Ma journée qui le montrait n'est plus montée.
+        // Le choix (« Je n'ai pas de dépenses à noter / Ajouter une dépense ») est RENDU une fois ; à l'écran natif, c'est
+        // « Dépenses du mois » qui le MONTRE (jugé par compta-finitions.cjs, 28 nov.) — ici la maquette du 2 nov.
+        // (src/design/fusion.css, §15) cache `.vrm-compta-geste`, pour ne pas le doubler.
         dit(await pg.locator('[data-depenses-choix]').count() === 1, `E ${T} : le choix est rendu, une fois`);
         dit(errs.length === 0, `E ${T} : aucune erreur de page`, errs.join(' | ').slice(0, 200));
         await ctx.close();
@@ -331,18 +331,11 @@ const juge = (cs, quoi) => {
         await r2.ctx.close();
       });
 
-      // À DÉCIDER (rapporté, pas compté) : Aujourd'hui dit-il « avant tes dépenses » sur sa tuile Bénéfice ?
-      await essaie(`J ${T}`, async () => {
-        const { ctx, pg } = await rendre(b, vp, { main: mainDe() });
-        await aller(pg, 'journee', '[data-journee-benef-etat="lu"]', 2500);
-        const t = await pg.evaluate(() => { const e = document.querySelector('[data-journee-benef]'); return e ? e.innerText.replace(/\n/g, ' | ') : null; });
-        await aller(pg, 'compta', '[data-depenses-choix]', 1500);
-        await ouvrirDetailCompta(pg, { attendre: 8000 }).catch(() => {});
-        const vis = await pg.evaluate(() => [...document.querySelectorAll('[data-depenses-choix]')].some((e) => e.checkVisibility()));
-        console.log(`À DÉCIDER  J ${T} : Argent, le choix « pas de dépenses / ajouter » ${vis ? 'est visible' : 'est CACHÉ (fusion.css §15, .vrm-compta-geste)'}`);
-        console.log(`À DÉCIDER  J ${T} : Aujourd'hui, tuile Bénéfice, aucune dépense jamais notée — ${/avant tes dépenses/i.test(t || '') ? 'dit « avant tes dépenses »' : 'NE dit PAS « avant tes dépenses »'} (« ${String(t).slice(0, 80)} »)`);
-        await ctx.close();
-      });
+      // (28 nov., décidé par Julien : « fais tout le reste parfaitement ») Le point « À DÉCIDER » d'ici (Aujourd'hui et le choix
+      // des dépenses dans Argent) est TRANCHÉ et JUGÉ sur l'écran que Julien voit (le design natif) par scripts/bancs/compta-finitions.cjs
+      // (D : « avant tes dépenses » sur Aujourd'hui et Argent, « Je n'ai pas de dépenses » visible, écrit, plus redemandé). Ce banc
+      // garde le DOM d'avant le 17 nov., où le choix reste caché par la maquette du 2 nov. (src/design/fusion.css §15) : un doublon
+      // du choix natif s'il était montré sur le même écran.
     }
 
     console.log('── D. Le relevé du porte-monnaie : aucune promesse, quelle que soit l\'extension (1512 px)');

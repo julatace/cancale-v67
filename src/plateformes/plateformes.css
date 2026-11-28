@@ -84,7 +84,7 @@
   background: var(--d-glyphe, #AEAEB2) !important;
 }
 :root:root body .vrm-main .vrm-pf-textes [data-etat="active"]::before { background: var(--d-accent, #16181D) !important; }
-:root:root body .vrm-main .vrm-pf-textes :is([data-etat="pause"], [data-etat="plusvue"], [data-etat="aconfirmer"])::before { background: var(--d-point-ambre, #FF9F0A) !important; }
+:root:root body .vrm-main .vrm-pf-textes :is([data-etat="pause"], [data-etat="plusvue"], [data-etat="aconfirmer"])::before { background: var(--d-point-ambre, var(--n-ambre)) !important; }
 :root:root body .vrm-main .vrm-pf-textes [data-etat="vendue"]::before { background: var(--d-encre, #1D1D1F) !important; }
 /* Les gestes d'une rangée : « Gérer ↗ » en icône (44 au doigt), « Supprimer » en mot (confirmé ensuite). */
 :root:root body .vrm-main .vrm-pf-gestes { flex: none !important; display: flex !important; align-items: center !important; gap: 0 !important; }
@@ -242,7 +242,7 @@
   background: var(--d-carte, #fff) !important; border-radius: 12px !important; box-shadow: none !important;
 }
 :root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div + div { margin-top: 1px !important; }
-:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div::before { content: '' !important; flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, #FF9F0A) !important; }
+:root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div::before { content: '' !important; flex: none !important; width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--d-point-ambre, var(--n-ambre)) !important; }
 :root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div > span { font: 400 15px/1.3 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; }
 :root:root body .vrm-main .vrm-set .vrm-pf-set-afaire .vrm-settings-todo > div > span b { font-weight: 600 !important; }
 :root:root body .vrm-main .vrm-set .vrm-pf-set-afaire :is(.vrm-settings-todo > div > button, .vrm-pf-mfa-gestes > button) {
@@ -326,7 +326,7 @@
 /* (22 nov.) Vestiaire : la modération (en attente de validation · à corriger · refusée) et ses compteurs.
    Neutre partout ; l’ambre seulement quand il y a un geste (« à corriger », photos attendues) — §7. */
 .vrm-vc-mod { color: var(--n-encre-2, var(--vrm-muted)); }
-.vrm-vc-mod.vrm-vc-mod-geste { color: var(--n-ambre, #b25e09); font-weight: 600; }
+.vrm-vc-mod.vrm-vc-mod-geste { color: var(--n-ambre, var(--n-ambre)); font-weight: 600; }
 .vrm-vc-cpt { display: flex; flex-direction: column; margin: 0 0 8px; border-bottom: 1px solid var(--n-trait, var(--vrm-line)); }
 .vrm-vc-cpt-ligne { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-height: 44px; padding: 8px 0; box-sizing: border-box; font-size: 13px; line-height: 1.45; }
 .vrm-vc-cpt-ligne + .vrm-vc-cpt-ligne { border-top: 1px solid var(--n-trait, var(--vrm-line)); }

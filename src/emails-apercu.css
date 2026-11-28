@@ -12,12 +12,12 @@
 .vrm-apercu-reponse { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 18px 20px 16px; }
 .vrm-apercu-pastille { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--muted, #8E8E93); }
 [data-apercu-reponse=oui] .vrm-apercu-pastille { background: var(--vrm-accent, #16181D); }
-[data-apercu-reponse=verifier] .vrm-apercu-pastille { background: var(--email-ambre, #b25000); }
+[data-apercu-reponse=verifier] .vrm-apercu-pastille { background: var(--email-ambre, var(--n-ambre)); }
 .vrm-apercu-reponse h3 { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.01em; margin: 0 !important; line-height: 1.3; color: var(--text, inherit); }
-[data-apercu-reponse=verifier] h3 { color: var(--email-ambre, #b25000); }
+[data-apercu-reponse=verifier] h3 { color: var(--email-ambre, var(--n-ambre)); }
 .vrm-apercu-reponse p { margin: 4px 0 0 !important; font-size: 13px; color: var(--muted, #6e6e73); line-height: 1.45; }
 .vrm-reception .vrm-apercu-actualiser { min-height: 44px; font-size: 13px; padding: 0 12px; border-radius: 12px; }
-.vrm-apercu-alerte { margin: 0 20px 12px !important; font-size: 13px; color: var(--email-ambre, #b25000); }
+.vrm-apercu-alerte { margin: 0 20px 12px !important; font-size: 13px; color: var(--email-ambre, var(--n-ambre)); }
 .vrm-apercu-alerte button { min-height: 44px; font-size: 13px; margin-left: 6px; }
 
 .vrm-apercu-bloc { border-top: 1px solid var(--border, #e5e5ea); padding: 14px 20px 10px; }
@@ -26,7 +26,7 @@
 .vrm-apercu-lignes > li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; font-size: 15px; line-height: 1.4; }
 .vrm-apercu-lignes > li + li { border-top: 1px solid var(--border, #e5e5ea); }
 .vrm-reception .vrm-apercu-geste { min-height: 44px; min-width: 72px; font-size: 13px; font-weight: 600; border-radius: 12px; flex-shrink: 0;
-  color: var(--email-ambre, #b25000); border-color: color-mix(in srgb, var(--email-ambre, #b25000) 40%, transparent); }
+  color: var(--email-ambre, var(--n-ambre)); border-color: color-mix(in srgb, var(--email-ambre, var(--n-ambre)) 40%, transparent); }
 [data-apercu-gestes] > ul > li > span:first-child { color: var(--text, inherit); }
 .vrm-reception .vrm-apercu-lien { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; cursor: pointer; font-size: 15px; color: var(--text, inherit); }
 .vrm-reception .vrm-apercu-lien:hover { background: transparent; }

@@ -105,7 +105,7 @@
   font: 750 11.5px/1 Inter, system-ui, sans-serif !important; background: rgb(255 255 255 / .2) !important; color: inherit !important; opacity: 1 !important;
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(28 28 32 / .08) !important; }
-:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[data-vue-relancer] .vrm-of-n { background: #FFE2B8 !important; color: #5E3900 !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[data-vue-relancer] .vrm-of-n { background: var(--n-ambre-fond) !important; color: #5E3900 !important; }
 
 /* ── LA TÊTE : « Annonces » 26/750 (la maquette `.tete`), le sélecteur Annonces | Stock | Achats dessous ── */
 @media (max-width: 767px) {
