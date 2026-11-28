@@ -6160,7 +6160,9 @@ function vrmVerifVisible(sel) {
     ongletListe = avant;
     try { contenu.inert = true; } catch (_) {}
     contenu.setAttribute('inert', ''); contenu.setAttribute('aria-hidden', 'true'); contenu.setAttribute('data-floute', '');
-    poserFormulaire(true);
+    // Le formulaire (le cadre de l'extension, la vérification anti-robot) n'est posé que panneau OUVERT : rien ne se
+    //    charge en douce à chaque page vue (ni cadre, ni Cloudflare) tant qu'il ne l'a pas ouvert.
+    poserFormulaire(carte.classList.contains('on'));
   }
   function rendreCarte() {
     const e = etat;
@@ -6712,7 +6714,10 @@ function vrmVerifVisible(sel) {
   // CACHÉ tant qu'il n'a pas dit « prête », et se re-cache à chaque nouveau
   // chargement : une page qui ferait naviguer l'iframe vers SA page (une fausse
   // connexion) n'est jamais montrée — la carte retombe sur son formulaire.
-  const CADRE_DELAI_MS = 1500;
+  // 5.456 : 4 s (1,5 s avant). Mesuré au banc : le cadre (popup.html + vrm-ui.js + popup.js + vrm-badge.js) se dit prêt en
+  //    1,3 à 1,6 s sur une machine chargée — il retombait sur la carte dessinée, qui n'a PAS de mot de passe. Un cadre
+  //    vraiment muet attend « Connexion… » 4 s, puis la carte dessinée.
+  const CADRE_DELAI_MS = 4000;
   // ⚠️ 5.362 (revue, moyenne 69) — JAMAIS LE MOT DE PASSE DANS LA CARTE DESSINÉE.
   //    Dessinée (Orion, ou cadre muet), la carte vit dans le DOM de la page du site :
   //    un écouteur de touches posé par la page AVANT le nôtre recevait chaque lettre.
@@ -7044,7 +7049,7 @@ function vrmVerifVisible(sel) {
   // posée ici en cadre ; elle répond par `postMessage` à NOTRE origine seulement, avec le nonce de CE cadre. Le jeton part
   // une fois avec la demande (jamais rangé), puis le cadre en refait un neuf. Le mot de passe, l'e-mail, le code ne vont
   // JAMAIS vers ce cadre. Cadre muet, refusé ou bloqué ⇒ la demande part sans jeton et la réponse de VRM est dite.
-  let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null;
+  let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null, verifVu = false, verifMuet = null;
   const URL_VERIF = 'https://vrm.center/verif-extension.html';
   function nonceVerif() { try { const a = new Uint8Array(12); crypto.getRandomValues(a); return Array.from(a, (x) => x.toString(16).padStart(2, '0')).join(''); } catch (_) { return String(Date.now()) + Math.random().toString(36).slice(2, 10); } }
   function majVerif() {
@@ -7064,6 +7069,10 @@ function vrmVerifVisible(sel) {
     f.setAttribute('data-verif-cadre', '');
     f.setAttribute('allow', 'cross-origin-isolated');
     f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:8px 0 0;background:transparent;color-scheme:normal;overflow:hidden;';
+    // Un cadre qui ne dit RIEN 3 s après son chargement (page refusée, bloquée, introuvable) = en panne : la demande ne
+    //    l'attend pas (elle part sans jeton, VRM dira s'il le faut).
+    verifVu = false; clearTimeout(verifMuet);
+    f.addEventListener('load', () => { clearTimeout(verifMuet); verifMuet = setTimeout(() => { if (verifEl === f && !verifVu) { verifEtat = 'erreur'; majVerif(); if (verifSuite) verifSuite(); } }, 3000); });
     box.appendChild(f); verifEl = f;
     majVerif();
   }
@@ -7087,6 +7096,7 @@ function vrmVerifVisible(sel) {
       if (ev.origin !== 'https://vrm.center') return;
       const d = ev.data;
       if (!d || typeof d !== 'object' || typeof d.__vrmVerif !== 'string' || !verifN || d.n !== verifN) return;
+      verifVu = true;
       if (d.__vrmVerif === 'jeton' && typeof d.jeton === 'string' && d.jeton.length >= 20 && d.jeton.length <= 4096) { verifJeton = d.jeton; verifEtat = 'pret'; majVerif(); if (verifSuite) verifSuite(); }
       else if (d.__vrmVerif === 'etat' && ['charge', 'interactif', 'expire', 'erreur'].includes(d.etat)) {
         verifEtat = d.etat === 'expire' ? 'charge' : d.etat; verifJeton = '';
@@ -7218,7 +7228,7 @@ function vrmVerifVisible(sel) {
       return false;
     });
   } catch (_) {}
-  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-hors-ligne')) { carte.classList.remove('on'); poserFormulaire(false); } if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
   // ══ 5.410.2 — LE PANNEAU RESTE OUVERT, DANS LE MÊME ÉTAT, JUSQU'À SON × ═══════════════════════════════════════
   // Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ». Mesuré au banc
@@ -7725,5 +7735,9 @@ function vrmVerifVisible(sel) {
   }
 
   (CADRE || LISTES ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);
+  // 5.456 : dans le cadre de l'extension, le formulaire n'attend pas l'état du service worker (un réveil lent dépassait le
+  //    délai de la carte, qui retombait sur sa carte dessinée — SANS mot de passe) : il est posé et dit « prête » tout de
+  //    suite ; l'état, arrivé ensuite, ne le redessine pas (le texte tapé reste).
+  if (CADRE) { try { rendre(); } catch (_) {} }
   rafraichir();
 })();

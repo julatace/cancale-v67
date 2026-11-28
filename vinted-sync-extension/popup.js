@@ -336,7 +336,7 @@ async function ouvrirPanneauPuisFermer() {
 //    400 `captcha_failed`) : la petite page de VRM (`verif-extension.html`, clé de site de vrm.center) en cadre ; elle rend
 //    le jeton à CETTE page seulement (origine + nonce). Rien d'autre ne va vers ce cadre (ni e-mail ni mot de passe).
 const URL_VERIF = 'https://vrm.center/verif-extension.html';
-let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null;
+let verifEl = null, verifN = '', verifJeton = '', verifEtat = '', verifSuite = null, verifMinut = null, verifVu = false, verifMuet = null;
 function poserVerif(box) {
   const b = box.querySelector('#verifBox'); if (!b) return;
   try { const a = new Uint8Array(12); crypto.getRandomValues(a); verifN = Array.from(a, (x) => x.toString(16).padStart(2, '0')).join(''); } catch (_) { verifN = String(Date.now()) + Math.random().toString(36).slice(2, 10); }
@@ -346,6 +346,9 @@ function poserVerif(box) {
   f.src = URL_VERIF + '?parent=' + encodeURIComponent(location.origin) + '&n=' + verifN + '&theme=' + (sombre ? 'sombre' : 'clair');
   f.title = T('v_titre'); f.setAttribute('data-verif-cadre', '');
   f.style.cssText = 'display:block;width:100%;height:0;border:0;margin:12px 0 0;background:transparent;color-scheme:normal;overflow:hidden;';
+  // Un cadre muet 3 s après son chargement (refusé, bloqué) = en panne : la demande part sans l'attendre.
+  verifVu = false; clearTimeout(verifMuet);
+  f.addEventListener('load', () => { clearTimeout(verifMuet); verifMuet = setTimeout(() => { if (verifEl === f && !verifVu) { verifEtat = 'erreur'; if (verifSuite) verifSuite(); } }, 3000); });
   b.replaceChildren(f); verifEl = f;
 }
 function remettreVerif() { verifJeton = ''; verifEtat = 'charge'; try { if (verifEl && verifEl.contentWindow) verifEl.contentWindow.postMessage({ __vrmVerif: 'reset', n: verifN }, 'https://vrm.center'); } catch (_) {} }
@@ -362,6 +365,7 @@ try {
     if (ev.origin !== 'https://vrm.center') return;
     const d = ev.data;
     if (!d || typeof d !== 'object' || typeof d.__vrmVerif !== 'string' || !verifN || d.n !== verifN) return;
+    verifVu = true;
     if (d.__vrmVerif === 'jeton' && typeof d.jeton === 'string' && d.jeton.length >= 20 && d.jeton.length <= 4096) { verifJeton = d.jeton; verifEtat = 'pret'; if (verifSuite) verifSuite(); }
     else if (d.__vrmVerif === 'etat' && ['charge', 'interactif', 'expire', 'erreur'].includes(d.etat)) { verifEtat = d.etat === 'expire' ? 'charge' : d.etat; verifJeton = ''; if (d.etat === 'erreur' && verifSuite) verifSuite(); }
     else if (d.__vrmVerif === 'hauteur' && verifEl) verifEl.style.height = Math.max(0, Math.min(140, Math.ceil(Number(d.h) || 0))) + 'px';
