@@ -33,7 +33,7 @@ export default {
   "rgt.q.etagesBac": "{nom}: ¿cuántas filas de cubetas?",
   "rgt.q.cases": "{nom}: ¿cuántas cajas caben una al lado de otra en un nivel?",
   "rgt.q.casesPile": "{nom}: ¿cuántas pilas una al lado de otra?",
-  "rgt.q.porte": "¿Qué mueble está más cerca de la puerta? Los pares nuevos se propondrán ahí primero: suelen venderse rápido.",
+  "rgt.q.porte": "¿Qué mueble está más cerca de la puerta? Los artículos nuevos se propondrán ahí primero: suelen venderse rápido.",
   "rgt.c.aucunPorte": "Ninguno en especial",
   "rgt.choix.meuble": "{nom} · {piece}",
   "rgt.q.numero": "¿Cómo numeras tus cajas?",
@@ -112,8 +112,8 @@ export default {
   "rgt.appliquer": "Aplicar este plan",
   "rgt.place": "{nom} · f{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} habitación · {meubles} muebles · {places} casillas",
-    "other": "{pieces} habitaciones · {meubles} muebles · {places} casillas"
+    "one": "{n} habitación · {meubles} muebles · {places} casillas",
+    "other": "{n} habitaciones · {meubles} muebles · {places} casillas"
   },
   "rgt.resumeArticles": {
     "one": "para {n} artículo.",

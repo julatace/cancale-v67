@@ -33,10 +33,10 @@ export default {
   "rgt.q.etagesBac": "{nom}: Wie viele Reihen Boxen?",
   "rgt.q.cases": "{nom}: Wie viele Kartons passen nebeneinander auf eine Ebene?",
   "rgt.q.casesPile": "{nom}: Wie viele Stapel nebeneinander?",
-  "rgt.q.porte": "Welches Möbelstück steht der Tür am nächsten? Neue Paare werden zuerst dort vorgeschlagen: Sie verkaufen sich oft schnell.",
+  "rgt.q.porte": "Welches Möbelstück steht der Tür am nächsten? Neue Artikel werden zuerst dort vorgeschlagen: Sie verkaufen sich oft schnell.",
   "rgt.c.aucunPorte": "Keines besonders",
   "rgt.choix.meuble": "{nom} · {piece}",
-  "rgt.q.numero": "Wie nummerierst du deine Kartons?",
+  "rgt.q.numero": "Wie nummerierst du deine Boxen?",
   "rgt.c.numGarder": "Wie bisher",
   "rgt.c.numVrm": "VRM nummeriert (1, 2, 3…)",
   "rgt.c.numLettre": "VRM, mit einem Buchstaben davor",
@@ -112,8 +112,8 @@ export default {
   "rgt.appliquer": "Plan übernehmen",
   "rgt.place": "{nom} · R{r} S{c}",
   "rgt.resume": {
-    "one": "{pieces} Raum · {meubles} Möbel · {places} Fächer",
-    "other": "{pieces} Räume · {meubles} Möbel · {places} Fächer"
+    "one": "{n} Raum · {meubles} Möbel · {places} Fächer",
+    "other": "{n} Räume · {meubles} Möbel · {places} Fächer"
   },
   "rgt.resumeArticles": {
     "one": "für {n} Artikel.",

@@ -33,10 +33,10 @@ export default {
   "rgt.q.etagesBac": "{nom} : combien de rangées de bacs ?",
   "rgt.q.cases": "{nom} : combien de boîtes tiennent côte à côte sur un étage ?",
   "rgt.q.casesPile": "{nom} : combien de piles côte à côte ?",
-  "rgt.q.porte": "Quel meuble est le plus près de la porte ? Les nouvelles paires y seront proposées en premier : elles partent souvent vite.",
+  "rgt.q.porte": "Quel meuble est le plus près de la porte ? Les nouveaux articles y seront proposés en premier : ils partent souvent vite.",
   "rgt.c.aucunPorte": "Aucun en particulier",
   "rgt.choix.meuble": "{nom} · {piece}",
-  "rgt.q.numero": "Comment numérotes-tu tes cartons ?",
+  "rgt.q.numero": "Comment numérotes-tu tes boîtes ?",
   "rgt.c.numGarder": "Comme maintenant",
   "rgt.c.numVrm": "VRM numérote (1, 2, 3…)",
   "rgt.c.numLettre": "VRM, avec une lettre devant",
@@ -112,8 +112,8 @@ export default {
   "rgt.appliquer": "Appliquer ce plan",
   "rgt.place": "{nom} · r{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} pièce · {meubles} meubles · {places} cases",
-    "other": "{pieces} pièces · {meubles} meubles · {places} cases"
+    "one": "{n} pièce · {meubles} meubles · {places} cases",
+    "other": "{n} pièces · {meubles} meubles · {places} cases"
   },
   "rgt.resumeArticles": {
     "one": "pour {n} article.",

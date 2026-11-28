@@ -59,8 +59,8 @@ function Apercu({ plan, resultat, existants, articles }) {
   const place = (x) => { const m = parId.get(String(x.m)) || existants.find((y) => String(y.id) === String(x.m)); const p = placeDe(x.i, m); return tr('rgt.place', { nom: nomDe(x.m), r: p.rangee, c: p.colonne }); };
   return (
     <div className="rgt-apercu" data-rgt-apercu={resultat.meubles.length} data-rgt-places={cap.places}>
-      <p className="rgt-resume" data-rgt-resume="">{tr('rgt.resume', { n: cap.pieces, pieces: cap.pieces, meubles: cap.meubles, places: nombre(cap.places) })}{Number.isFinite(articles) ? ' ' + tr('rgt.resumeArticles', { n: nombre(articles) }) : ''}</p>
-      {inco.map((x, k) => <p key={k} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
+      <p className="rgt-resume" data-rgt-resume="">{tr('rgt.resume', { n: cap.pieces, meubles: cap.meubles, places: nombre(cap.places) })}{Number.isFinite(articles) ? ' ' + tr('rgt.resumeArticles', { n: nombre(articles) }) : ''}</p>
+      {inco.map((x) => <p key={x.k + ':' + (x.piece || '') + ':' + (x.meuble || '')} className="rgt-alerte" role="status" data-rgt-incoherence={x.k}>{tr('rgt.inco.' + x.k, { n: x.n, piece: x.piece || '', meuble: x.meuble || '' })}</p>)}
       {groupes.map((g) => (
         <Groupe key={g.nom} titre={g.nom} attrs={{ 'data-rgt-piece': g.nom }}>
           <div className="rgt-meubles">
@@ -96,7 +96,10 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
   const [modele, setModele] = React.useState(undefined);          // l'état du modèle du navigateur (src/iaNavigateur.js)
   const [progres, setProgres] = React.useState(null);             // 0…1 pendant le téléchargement
   const session = React.useRef(null);
-  const [fil, setFil] = React.useState([]);                       // [{ de: 'vrm'|'moi', texte, photo? , note? }]
+  const [fil, setFilBrut] = React.useState([]);                       // [{ de: 'vrm'|'moi', texte, photo? , note? }]
+  // Chaque bulle reçoit un identifiant stable à son arrivée (jamais une clé d'index).
+  const idBulle = React.useRef(0);
+  const setFil = React.useCallback((v) => setFilBrut((f) => { const n = typeof v === 'function' ? v(f) : v; return n.map((b) => (b.id ? b : { ...b, id: 'b' + (++idBulle.current) })); }), []);
   const [etat, setEtat] = React.useState(null);                   // l'entretien sans IA
   const [qIA, setQIA] = React.useState(null);                     // la question en cours de l'IA
   const [attente, setAttente] = React.useState(false);
@@ -220,8 +223,8 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
         </Groupe>) : null}
       {!lu ? <p className="rgt-alerte" role="status" data-rgt-pas-lu="">{tr('rgt.pasLu')}</p> : null}
       <ol className="rgt-fil" aria-live="polite" data-rgt-fil={fil.length}>
-        {fil.map((b, k) => (
-          <li key={k} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
+        {fil.map((b) => (
+          <li key={b.id} className={'rgt-bulle' + (b.de === 'moi' ? ' is-moi' : '') + (b.note ? ' is-note' : '')} data-rgt-bulle={b.de}>
             {b.photo ? <img className="rgt-bulle-photo" src={b.photo} alt={tr('rgt.photoJointe')}/> : null}
             {b.texte ? <span>{b.texte}</span> : null}
           </li>))}
@@ -229,7 +232,7 @@ export default function AssistantRangement({ ouverte, fermer, meubles, slots, ar
       </ol>
       {enQuestion ? (
         <div className="rgt-reponses" data-rgt-question={qR ? qR.id : 'ia'}>
-          {choix.length ? <div className="rgt-choix">{choix.map((c, k) => <button key={k} type="button" className="rgt-choix-b" data-rgt-choix={c.v !== undefined ? String(c.v) : c.libelle} onClick={() => envoyer(c)}>{c.libelle}</button>)}</div> : null}
+          {choix.length ? <div className="rgt-choix">{choix.map((c) => <button key={c.v !== undefined ? String(c.v) : c.libelle} type="button" className="rgt-choix-b" data-rgt-choix={c.v !== undefined ? String(c.v) : c.libelle} onClick={() => envoyer(c)}>{c.libelle}</button>)}</div> : null}
           <form className="rgt-saisie" onSubmit={(e) => { e.preventDefault(); if (texte.trim() || photo) envoyer({ texte: texte.trim() || tr('rgt.photoSeule') }); }}>
             {photoPermise ? <>
               <BoutonIcone libelle={tr('rgt.joindrePhoto')} icone={Icon ? <Icon name="camera" size={20}/> : '📷'} actif={!!photo} onClick={() => refPhoto.current && refPhoto.current.click()} attrs={{ 'data-rgt-photo': photo ? 'jointe' : '' }}/>

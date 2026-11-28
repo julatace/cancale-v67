@@ -52,4 +52,4 @@
 .rgt-moteur, .rgt-fil, .rgt-reponses, .rgt-resume, .rgt-alerte, .n-feuille-corps > .rgt-note, .rgt-gestes, .rgt-apercu > .rgt-note { margin-left: 16px; margin-right: 16px; }
 .rgt-resume { margin-left: 20px; }
 /* (28 nov., ia-sans-cle) la progression du téléchargement du modèle du navigateur */
-.rgt-progres { display: block; width: calc(100% - 32px); margin: 0 16px 12px; height: 4px; accent-color: var(--n-accent, #0068D6); }
+.rgt-progres { display: block; width: calc(100% - 32px); margin: 0 16px 12px; height: 4px; accent-color: var(--n-accent); }

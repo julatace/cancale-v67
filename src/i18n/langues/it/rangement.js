@@ -33,7 +33,7 @@ export default {
   "rgt.q.etagesBac": "{nom}: quante file di contenitori?",
   "rgt.q.cases": "{nom}: quante scatole stanno affiancate su un ripiano?",
   "rgt.q.casesPile": "{nom}: quante pile affiancate?",
-  "rgt.q.porte": "Quale mobile è più vicino alla porta? Le nuove paia saranno proposte lì per prime: spesso si vendono in fretta.",
+  "rgt.q.porte": "Quale mobile è più vicino alla porta? I nuovi articoli saranno proposti lì per primi: spesso si vendono in fretta.",
   "rgt.c.aucunPorte": "Nessuno in particolare",
   "rgt.choix.meuble": "{nom} · {piece}",
   "rgt.q.numero": "Come numeri le tue scatole?",
@@ -112,8 +112,8 @@ export default {
   "rgt.appliquer": "Applica questo piano",
   "rgt.place": "{nom} · r{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} stanza · {meubles} mobili · {places} caselle",
-    "other": "{pieces} stanze · {meubles} mobili · {places} caselle"
+    "one": "{n} stanza · {meubles} mobili · {places} caselle",
+    "other": "{n} stanze · {meubles} mobili · {places} caselle"
   },
   "rgt.resumeArticles": {
     "one": "per {n} articolo.",

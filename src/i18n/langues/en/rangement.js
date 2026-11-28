@@ -33,7 +33,7 @@ export default {
   "rgt.q.etagesBac": "{nom}: how many rows of bins?",
   "rgt.q.cases": "{nom}: how many boxes fit side by side on one level?",
   "rgt.q.casesPile": "{nom}: how many stacks side by side?",
-  "rgt.q.porte": "Which unit is closest to the door? New pairs will be suggested there first: they often sell fast.",
+  "rgt.q.porte": "Which unit is closest to the door? New items will be suggested there first: they often sell fast.",
   "rgt.c.aucunPorte": "None in particular",
   "rgt.choix.meuble": "{nom} · {piece}",
   "rgt.q.numero": "How do you number your boxes?",
@@ -112,8 +112,8 @@ export default {
   "rgt.appliquer": "Apply this plan",
   "rgt.place": "{nom} · r{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} room · {meubles} units · {places} slots",
-    "other": "{pieces} rooms · {meubles} units · {places} slots"
+    "one": "{n} room · {meubles} units · {places} slots",
+    "other": "{n} rooms · {meubles} units · {places} slots"
   },
   "rgt.resumeArticles": {
     "one": "for {n} item.",
