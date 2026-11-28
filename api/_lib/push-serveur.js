@@ -25,7 +25,7 @@ import { sbCle } from './cle.js';
 import { fetchAvecDelai } from './fetch-delai.js';
 import { DESTINATIONS, lienNotif } from './lien-notif.js';
 import { decisionNotif } from './notif-textes.js';
-import { montantClair } from './notif-redaction.js';
+import { montantClair, CORPS_MAX } from './notif-redaction.js';
 import { srvTexte, srvMs, SRV_EMAIL_FENETRE_MS } from '../../src/ordinateurServeur.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
@@ -85,7 +85,7 @@ export async function relireServeur(e, comptes, memo = new Map()) {
     const en = m && m.entity;
     if (!en) return { rien: 'pas-dans-le-fil' };
     if (!de(en) || de(en) === e.c || (opp && de(en) !== opp)) return { rien: 'de-moi' };
-    const texte = srvTexte(en.body);
+    const texte = srvTexte(en.body, 600);   // le texte entier (≤ 600) : `texteServeur` le coupe à la place qui reste
     if (!texte) return { rien: 'vide' };
     return { d: { ...base, texte, at: srvMs(m.created_at_ts != null ? m.created_at_ts : en.created_at_ts) } };
   }
@@ -116,7 +116,11 @@ export function texteServeur(e, d = {}, langue = 'fr', plusieurs = true) {
     const prix = montantClair(d.prix, lng(langue));
     return { title: [`${t.offre} ${prix}`, d.titre ? `${t.sur} ${d.titre}` : ''].filter(Boolean).join(' '), body: [compte, pseudo, t.repondre].filter(Boolean).join(' · ') };
   }
-  return { title: pseudo ? `${t.msg} ${pseudo}` : t.nouveau, body: [d.texte || '', compte, d.titre || '', e.n > 1 ? t.autres(e.n - 1) : ''].filter(Boolean).join(' · ') };
+  // Le corps d'une notification tient en CORPS_MAX (90) caractères (api/_lib/notif-belle.js) : le compte et l'article
+  // d'abord comptés, le TEXTE coupé proprement dans ce qui reste (jamais le compte ni l'article coupés).
+  const suite = [compte, d.titre ? propre(d.titre, 34) : '', e.n > 1 ? t.autres(e.n - 1) : ''].filter(Boolean).join(' · ');
+  const place = Math.max(24, CORPS_MAX - (suite ? Array.from(suite).length + 3 : 0));
+  return { title: pseudo ? `${t.msg} ${pseudo}` : t.nouveau, body: [srvTexte(d.texte || '', place), suite].filter(Boolean).join(' · ') };
 }
 export function urlServeur(e) {
   if (e.s === 'offre') return DESTINATIONS.offre({ conv: e.conv, compte: e.c });
@@ -129,7 +133,7 @@ export function urlServeur(e) {
 // sonne : une notification de trop se répare, un message avalé non).
 export async function serveurDejaSonne(conv, maintenant = Date.now()) {
   if (!RE_N.test(str(conv))) return false;
-  const rows = await lire(`app_data?id=eq.push_serveur_vu&select=v:data->c->%22${encodeURIComponent(str(conv))}%22`);
+  const rows = await lire(`app_data?id=eq.push_serveur_vu&select=v:data->c->k${str(conv)}`);   // une clé « k{conv} » : jamais un indice de tableau
   const v = rows && rows[0] && rows[0].v;
   if (!v || typeof v !== 'object') return false;
   const at = Number(v.msgAt) || Number(v.at) || 0;
@@ -139,7 +143,7 @@ async function noterSonne(liste, maintenant) {
   if (!liste.length) return true;
   const r = await modifierCas('push_serveur_vu', (d) => {
     const c = Object.assign({}, d && d.c && typeof d.c === 'object' ? d.c : {});
-    for (const x of liste) c[x.conv] = { at: maintenant, msgAt: Number(x.at) || maintenant, compte: x.c };
+    for (const x of liste) c['k' + x.conv] = { at: maintenant, msgAt: Number(x.at) || maintenant, compte: x.c };
     const ks = Object.keys(c).sort((a, b) => (Number(c[b].at) || 0) - (Number(c[a].at) || 0));
     for (const k of ks.slice(300)) delete c[k];
     return { ...(d || {}), c };
@@ -187,7 +191,9 @@ export async function notifierServeur(body, maintenant = Date.now()) {
   // UNE notification par conversation (et par compte déconnecté) : chacune dit SA question, SON compte.
   for (const { e, d } of neufs) {
     const t = texteServeur(e, d, langue, plusieurs);
-    const envoi = await sendPushToAll({ cat: e.s === 'offre' ? 'offre' : e.s === 'message' ? 'message' : 'capture', title: t.title, body: t.body, tag: cleServeur(e), cle: cleServeur(e), url: urlServeur(e) });
+    // Le `tag` n'est d'aucun genre regroupé (`msg-`, `offer-`, api/_lib/notif-belle.js) : deux messages proches ne deviennent
+    // jamais « 2 nouveaux messages » sans texte — chacun dit SA question.
+    const envoi = await sendPushToAll({ cat: e.s === 'offre' ? 'offre' : e.s === 'message' ? 'message' : 'capture', title: t.title, body: t.body, tag: 'vrm-srv-' + cleServeur(e), cle: cleServeur(e), url: urlServeur(e) });
     if (envoi && (envoi.sent > 0 || envoi.calme || envoi.attente)) envoyes++;
   }
   return { status: 200, envoye: envoyes > 0, n: neufs.length, coupe, rien, deja };
