@@ -57,6 +57,37 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       await cap(P2, o.T + '-4-refus');
       dit(!P.erreurs.length && !P2.erreurs.length, `${o.T} : aucune erreur de page`, JSON.stringify(P.erreurs.concat(P2.erreurs)));
       await P2.ctx.close(); m2.fin();
+      // L'AGENT (5.455.8) : l'interrupteur éteint, SON « Allumer », puis la ligne en direct et le journal après des envois seuls.
+      const MIN = 60000;
+      const m3 = await monde(RACINE, { n: 3, notifAt: (i, T0) => T0 - (20 - i) * MIN });
+      const P3 = await ouvrirPanneau(nav, m3, RACINE, o);
+      await P3.ouvrirFavoris();
+      const agent = () => P3.R(() => { const r = document.getElementById('vrm-badge').shadowRoot; const a = r.querySelector('.ag6'); const sw = r.querySelector('[data-ag-switch]');
+        return a ? { etat: a.getAttribute('data-fav-auto-etat'), sw: sw && sw.getAttribute('aria-checked'), h: sw ? Math.round(sw.getBoundingClientRect().height) : 0, texte: a.innerText.replace(/\s+/g, ' '), conf: !!r.querySelector('[data-ag-confirme]'), ligne: (r.querySelector('[data-ag-ligne]') || {}).textContent || '', journal: Number((r.querySelector('[data-ag-journal]') || { getAttribute: () => -1 }).getAttribute('data-ag-journal')) } : null; });
+      let g = await agent();
+      dit(g && g.etat === 'off' && g.sw === 'false' && /Envoyer automatiquement aux nouveaux favoris/.test(g.texte) && /il te plaît toujours/.test(g.texte) && /−10 %/.test(g.texte) && /prix mini/.test(g.texte) && g.h >= 44, `${o.T} : l’interrupteur de l’agent, éteint, dit le message, l’offre −10 % et le plancher`, JSON.stringify(g));
+      await cap(P3, o.T + '-5-agent-eteint');
+      await P3.clic('[data-ag-switch]'); g = await agent();
+      dit(g && g.conf && g.sw === 'false', `${o.T} : toucher l’interrupteur ⇒ SON « Allumer » est demandé (rien n’est allumé avant)`, JSON.stringify(g));
+      await cap(P3, o.T + '-6-agent-confirmer');
+      await P3.clic('[data-ag-oui]'); await P3.pg.waitForTimeout(800);
+      m3.h.t -= 0;   // les favoris sont arrivés APRÈS l'allumage ? non : allumé maintenant, ils sont d'avant ⇒ seuls les nouveaux partent.
+      g = await agent();
+      dit(g && g.etat === 'on' && g.sw === 'true' && /Agent favoris : actif · 0 envoyés aujourd’hui/.test(g.ligne), `${o.T} : allumé ⇒ « Agent favoris : actif · 0 envoyés aujourd’hui », Pause / Arrêter`, JSON.stringify(g));
+      await cap(P3, o.T + '-7-agent-actif');
+      await P3.ctx.close(); m3.fin();
+      // Allumé AVANT 3 nouveaux favoris : l'agent les envoie seul (le vrai pilote), puis le panneau montre la ligne et le journal.
+      const m4 = await monde(RACINE, { n: 3, notifAt: (i, T0) => T0 - (20 - i) * MIN, avant: async ({ call, h }) => { const t = h.t; h.t = t - 30 * MIN; await call('auto_regler', { reglages: { actif: true, attenteMin: 10, attenteMax: 15, heureDebut: 0, heureFin: 24, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 15 }, confirme: true }); h.t = t; } });
+      for (let k = 0; k < 30; k++) { const st = m4.f.store.vrmPiloteFavoris || {}; if (Number(st.prochain) > m4.h.t) m4.h.t = Number(st.prochain) + 1; await m4.f.ctx.piloteFavorisTick(m4.h.t); if (m4.f.j.vinted.filter((v) => v.methode === 'POST' && /replies$/.test(v.chemin)).length >= 3) break; m4.h.t += 1000; }
+      { const st = m4.f.store.vrmPiloteFavoris; st.prochain = new Date().getTime() + 42000; }   // l'heure de la PAGE (le panneau compte en vrai)
+      const P4 = await ouvrirPanneau(nav, m4, RACINE, o);
+      await P4.ouvrirFavoris();
+      await P4.R(() => { const d = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ag-journal]'); if (d) d.open = true; });
+      const g4 = await P4.R(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { ligne: (r.querySelector('[data-ag-ligne]') || {}).textContent || '', j: Array.from(r.querySelectorAll('[data-ag-journal] li')).map((x) => x.textContent), pause: !!r.querySelector('[data-ag-pause]'), arreter: !!r.querySelector('[data-ag-arreter]') }; });
+      dit(/Agent favoris : actif · 3 envoyés aujourd’hui · prochain dans \d+ s/.test(g4.ligne) && g4.j.length === 3 && g4.j.every((x) => /offre 49,50 €/.test(x) && /il te plaît toujours/.test(x)) && g4.pause && g4.arreter, `${o.T} : « Agent favoris : actif · 3 envoyés aujourd’hui · prochain dans 42 s », le journal (heure, personne, article, offre, message), Pause / Arrêter`, JSON.stringify(g4));
+      await cap(P4, o.T + '-8-agent-journal');
+      dit(!P3.erreurs.length && !P4.erreurs.length, `${o.T} : agent : aucune erreur de page`, JSON.stringify(P3.erreurs.concat(P4.erreurs)));
+      await P4.ctx.close(); m4.fin();
     } catch (e) { ko++; console.log('  ❌ ' + o.T + ' a levé : ' + String(e && e.stack || e).slice(0, 400)); }
   }
   await nav.close();

@@ -69,7 +69,9 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     `D5 les 3 écritures (demande, offre, message) passent par la file Vinted (une requête à la fois) depuis l’onglet du compte, la garde de l’onglet relue avant chacune, liste blanche`, JSON.stringify({ ecritures, autres }));
   // D6 : un compte à la fois (une seule file menée par ce navigateur)
   const lancer = src.slice(src.indexOf("if (quoi === 'lancer') {"), src.indexOf("if (quoi === 'arreter') {"));
-  dit(/if \(avant && avant\.actif\) return refuse\('deja'/.test(lancer) && /if \(carte && carte\.actif\) return fin\('occupe'\)/.test(src), 'D6 un compte à la fois : un 2ᵉ envoi est refusé tant qu’une file est menée ; le mode auto attend');
+  // 5.455.8 : une 2ᵉ sélection du MÊME compte s'AJOUTE à la file menée (une seule file, une requête à la fois) ; un AUTRE compte
+  //    est refusé tant qu'une file est menée ; le mode auto attend.
+  dit(/if \(avant && avant\.actif && avant\.uid !== o\.uid\) return refuse\('deja'/.test(lancer) && /if \(carte && carte\.actif\) return fin\('occupe'\)/.test(src), 'D6 un compte à la fois : une file menée sur un compte refuse un envoi d’un autre compte (le même compte s’y ajoute) ; le mode auto attend');
   // D7 : rien de ce que le §3 refuse
   const man = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
   const tous = fs.readdirSync(path.join(RACINE, 'vinted-sync-extension')).filter((x) => x.endsWith('.js') && !/pdf-lib/.test(x)).map((x) => fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', x), 'utf8')).join('\n');

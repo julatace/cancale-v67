@@ -27,7 +27,7 @@ export const QUOTA_ATTENTES_MAX=12;
 // continue. Seule la liste de Vinted lue jusqu'à sa dernière page dit « trop ancien » (côté extension).
 export const NOTIF_ATTENTE_MS=3*60000;
 // 5.455.8 : ce qui ARRÊTE une file (son geste, ou la vérification de Vinted) ; ce qui la fait ATTENDRE (rien d'écrit, le favori repart).
-export const ARRETS_FILE=Object.freeze(['tout_arrete','vinted_robot']);
+export const ARRETS_FILE=Object.freeze(['tout_arrete','vinted_robot','texte_refuse','texte_interdit']);   // un texte que Vinted refuse : chaque favori suivant le serait aussi (après son offre) ⇒ arrêt, le geste dit
 export const ATTENTES_FILE=Object.freeze(['pause_vinted','vinted_frein','onglet_vinted','compte_vinted_absent','compte_vinted_different','session_extension','autorisation_expiree','extension_indisponible','trop_tard']);
 export const ATTENTE_FILE_MS=60000;
 export const NOTIF_ATTENTES_MAX=1;
@@ -99,7 +99,7 @@ export function ordreRecents(targets,dateDe){
   l.sort((a,b)=>a.v!=null&&b.v!=null?(b.v-a.v)||(a.i-b.i):a.v!=null?-1:b.v!=null?1:a.i-b.i);
   return l.map(x=>x.t);
 }
-export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null,plage=null}){
+export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null,plage=null,ajouter=false}){
   const ry=RYTHMES_FAVORIS[rythme]?rythme:null;
   const pl=ry==='prudent'?null:plageValide(plage);
   d=initialiserFile(d);
@@ -111,10 +111,11 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   const g=d.groupes[owner]||{jobs:[],active:false,prochain:0};
   // 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer […] tu ouvres la conversation, tu fais une offre et un message ») :
   //    une file restée active (un Chrome fermé, un envoi d'avant) ou un envoi « à vérifier » ne REFUSE plus un nouvel envoi. Le
-  //    nouveau lot remplace ce qui attendait encore (« annulé », donc à nouveau proposable) ; une tentative en vol (`reserve`)
+  //    nouveau lot remplace ce qui attendait encore (« annulé », donc à nouveau proposable) — sauf `ajouter` : l'extension MÈNE
+  //    cette file en ce moment (son envoi d'il y a un instant), la sélection s'y AJOUTE ; une tentative en vol (`reserve`)
   //    garde son état et son jeton ; un favori « à vérifier » reste écarté pour LUI seul (jamais deux fois : `connus`).
   // A new launch is exactly its new selection, never an old paused remainder.
-  for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
+  if(!(ajouter===true&&g.active))for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   // (16 nov., lot favoris-offres-irreprochable) Un favori REFUSÉ après qu'une écriture est
   // partie chez Vinted (`ecrits` ≥ 1 : la conversation ouverte, l'offre faite) reste CONNU :
   // une nouvelle file ne le recontacte jamais (avant : « refusé » le rendait à nouveau

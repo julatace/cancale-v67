@@ -33,9 +33,10 @@ export const AUTO_PAUSE_MS = 24 * 3600 * 1000;
 export const AUTO_FAVORI_MAX_MS = 72 * 3600 * 1000;
 // 30 jours : une personne déjà contactée (tous articles) n'est pas recontactée.
 export const AUTO_RECONTACT_MS = 30 * 24 * 3600 * 1000;
-// Entre deux messages automatiques d'un même compte : 3 à 12 min, tiré au hasard
-// (déterministe sur le jeton : un comparer-et-échanger rejoué tire le même).
-export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];
+// Entre deux messages automatiques d'un même compte : tiré au hasard (déterministe sur le jeton : un comparer-et-échanger
+// rejoué tire le même). 5.455.8 (Julien, 28 nov. : « un vrai agent autonome ») : 20 à 60 s, la MÊME pause que ses envois à
+// la main (sa cadence par défaut) — avant 3 à 12 min. Plafonds inchangés (15 favoris/h de l'extension, 50 actions/h, jour).
+export const AUTO_ECART_MS = [20000, 60000];
 // Les réponses qui disent « ralentis » ou « robot » : le mode auto se met en
 // pause 24 h sur ce compte (dite dans l'app avec l'heure de reprise).
 export const AUTO_FREINS = ['pause_vinted', 'vinted_frein', 'vinted_robot'];

@@ -4249,6 +4249,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisAuto') { favorisAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'agentFavoris') { agentFavorisGeste(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.455.8
     if (msg && msg.from === 'vrm-badge' && msg.action === 'supprimerLbcCarte') { supprimerLbcCarte(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
     // 5.410.3 (`repubformulaire`) : la méthode de republication, le message « lot » et le délai de l'offre (Paramètres
     // du panneau, SON toucher) ; l'onglet qui travaille (nommé dans le panneau, « Voir l'onglet » l'affiche).
@@ -22849,7 +22850,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
     {const f=fin(r);if(f)return f;}
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
-    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{})});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{}),t:String(texteV||'').slice(0,160)});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
     if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // refusé net : pas parti
     {const t=await telephone(r);if(t)return t;}
     if([400,422].includes(r.status)){await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(r.json)||'',refusAt:Date.now()});await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);return rep('refuse',r.status,'texte_refuse');}
@@ -23386,7 +23387,7 @@ async function favorisCarte(msg, sender) {
     //    hasard par le serveur, jamais deux fois la même ; « Plus prudent » garde ses 2 à 4 min.
     let plage = null;
     try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && cad.pauseMax > cad.pauseMin) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(ajout ? { ajouter: true } : {}), ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return refuse('serveur', (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.');
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
@@ -25239,7 +25240,31 @@ function bilanPiloteFavoris(b0, uid, quoi, raison, t) {
   return b;
 }
 const PILOTE_ECART_MS = [2 * 60000, 5 * 60000], PILOTE_RELECTURE_MS = 30 * 60000;
-let _piloteEnVol = false;
+let _piloteEnVol = false, _piloteMinuteur = null;
+// 5.455.8 : le prochain tour de l'agent à l'heure dite (≤ 5 min ; au-delà, le réveil de Chrome le porte).
+function planifierPilote(ms) {
+  try { if (_piloteMinuteur) clearTimeout(_piloteMinuteur); } catch (_) {}
+  _piloteMinuteur = setTimeout(() => { _piloteMinuteur = null; sansRejet(piloteFavorisTick(), 'pilotefavoris'); }, Math.max(1000, Math.min(PILOTE_ECART_MS[1], Number(ms) || 0)));
+}
+// 5.455.8 — L'AGENT DES FAVORIS, VU DU PANNEAU (compte de l'onglet) : allumé (relu chez VRM), en pause (son toucher), envoyés
+//    aujourd'hui, prochain tour, dernier état, le journal. Lecture locale, aucune requête.
+async function agentFavorisPour(uid) {
+  let st = {}; try { st = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; } catch (_) { return null; }
+  const u = String(uid || ''), r = st.relu && st.relu[u], b = st.bilan && st.bilan[u], j = new Date().toISOString().slice(0, 10);
+  return { actif: r ? r.actif === true : null, pause: !!(st.pause && st.pause[u]), envoyes: b && b.j === j ? Number(b.envoyes) || 0 : 0,
+    prochain: Number(st.prochain) || null, dernier: st.dernier && String(st.dernier.uid || '') === u ? { etat: String(st.dernier.etat || ''), at: Number(st.dernier.at) || 0, ...(st.dernier.jusqua ? { jusqua: Number(st.dernier.jusqua) } : {}) } : null,
+    journal: st.journal && Array.isArray(st.journal[u]) ? st.journal[u].slice(0, 20) : [] };
+}
+// « Pause » / « Reprendre » de l'agent (SON toucher, compte de l'onglet seulement).
+async function agentFavorisGeste(msg, sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  if (!['pause', 'reprendre'].includes(String(msg && msg.quoi))) return { ok: false, code: 'inconnu' };
+  try { const st = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; st.pause = Object.assign({}, st.pause || {}); if (msg.quoi === 'pause') st.pause[o.uid] = Date.now(); else { delete st.pause[o.uid]; st.prochain = 0; } await chrome.storage.local.set({ [PILOTE_FAV]: st }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  if (msg.quoi === 'reprendre') planifierPilote(1000);
+  logActivity(msg.quoi === 'pause' ? '⏸ Agent des favoris en pause (ton toucher).' : '▶️ Agent des favoris repris (ton toucher).');
+  return { ok: true, pause: msg.quoi === 'pause' };
+}
 // ══ 5.437 (Julien, 22 nov.) — LA NUIT AUSSI : L'ORDINATEUR GARDÉ ÉVEILLÉ TANT QU'UNE AUTOMATISATION EST ALLUMÉE ═══════
 // Le blocage automatique la nuit est REFUSÉ (CLAUDE.md §3 Discrétion) : les automatisations tournent la nuit dès que
 // l'extension est connectée, avec les MÊMES plafonds et le même rythme que le jour (aucune rafale de rattrapage : chaque
@@ -25295,6 +25320,9 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     if (carte && carte.actif) return fin('occupe');
     const uid = await compteOngletPourAuto();
     if (!uid) return fin('onglet');
+    // 5.455.8 (Julien, 28 nov. : « un vrai agent autonome ») : « Pause » sur le panneau, par compte — rien ne part, l'interrupteur
+    //    reste allumé ; « Reprendre » le relance. (« Arrêter » éteint l'interrupteur chez VRM : `favorisAuto`.)
+    if (st.pause && st.pause[uid]) return fin('pause_agent', { uid });
     st.relu = st.relu && typeof st.relu === 'object' ? st.relu : {};
     let r = st.relu[uid];
     if (!r || !(maintenant - Number(r.at) < PILOTE_RELECTURE_MS)) {
@@ -25309,7 +25337,13 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     if (av && av.ms > 0) return fin('garde', { uid, quoi: av.quoi });
     const t = await apiFavorisCarte(uid, 'auto', { extension: { disponible: true } });
     if (!t.ok || !t.json) return fin('vrm', { uid });
-    if (!t.json.ajoute) return fin(String(t.json.etat || 'rien').slice(0, 30), { uid });
+    // 5.455.8 : l'heure que le SERVEUR donne (espacement 20–60 s, plafond de l'heure, pause de 24 h après un frein) devient le
+    //    prochain tour de l'agent — il repart seul à l'heure dite, sans attendre le réveil suivant de 2 à 5 min.
+    if (!t.json.ajoute) {
+      const jq = Number(t.json.jusqua) - (Number(t.json.serveur) || maintenant) + maintenant;
+      if (Number.isFinite(jq) && jq > maintenant && jq - maintenant < PILOTE_ECART_MS[1]) { st.prochain = jq + 500; planifierPilote(jq + 500 - maintenant); }
+      return fin(String(t.json.etat || 'rien').slice(0, 30), { uid, ...(Number.isFinite(jq) && jq > maintenant ? { jusqua: jq } : {}) });
+    }
     if (!(await rejouerTerminers())) return fin('vrm', { uid });
     const s2 = await apiFavorisCarte(uid, 'suivant');
     const tr = s2.ok && s2.json && s2.json.travail;
@@ -25322,8 +25356,18 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     const res = x ? ((x.data && typeof x.data === 'object' && (x.data.json || x.data)) || x.json || {}) : {};
     const raison = String(res.raison || (x && x.code) || '').replace(/[^a-z_]/g, '').slice(0, 30);
     const envoye = !!(x && x.ok && res.resultat !== 'ignore');
+    // 5.455.8 : une ATTENTE de l'extension (plafond, discrétion, onglet…), rien d'écrit : le favori repart plus tard (le serveur
+    //    le remet en file) — ni « sauté » au bilan ni au journal ; le prochain tour demande aux gardes le vrai temps.
+    if (!envoye && ['onglet_vinted', 'compte_vinted_absent', 'compte_vinted_different', 'quota_extension', 'extension_indisponible', 'session_extension', 'autorisation_expiree'].includes(raison)) { st.prochain = maintenant + 5000; planifierPilote(5000); return fin('attente_garde', { uid, raison }); }
     st.bilan = bilanPiloteFavoris(st.bilan, uid, envoye ? 'envoye' : 'saute', raison, maintenant);
     if (!envoye) { try { await noterJournal(uid, 'favori_auto_saute', { auto: true }); } catch (_) {} }
+    // 5.455.8 : LE JOURNAL de l'agent (par compte, 50 au plus) : l'heure, la personne, l'article, l'offre, le message parti —
+    //    lus de CE qui a été fait (le registre écrit au geste), jamais deviné.
+    { const fa = (await faitsFavoris(uid))[String(tr.notificationId || '')] || {};
+      st.journal = st.journal && typeof st.journal === 'object' ? st.journal : {};
+      st.journal[uid] = [{ at: maintenant, n: String(tr.notificationId || '').slice(0, 160), item: String(tr.itemId || ''), qui: String(tr.recipientId || ''), etat: envoye ? 'envoye' : 'saute', ...(raison && !envoye ? { r: raison } : {}), ...(Number(fa.px) > 0 ? { px: Number(fa.px) } : {}), ...(typeof fa.t === 'string' && fa.t ? { t: fa.t } : {}) }, ...(Array.isArray(st.journal[uid]) ? st.journal[uid] : [])].slice(0, 50); }
+    // Le favori suivant : demandé tout de suite au serveur (qui rend l'espacement tiré au hasard, 20–60 s).
+    st.prochain = maintenant + 3000; planifierPilote(3000);
     return fin(envoye ? 'envoye' : 'refuse', { uid, raison });
   } finally { _piloteEnVol = false; }
 }
@@ -25593,7 +25637,7 @@ async function favorisPourCarte(uid, relire) {
       finally { _favorisCarteApercuEnVol = false; }
     })().catch(() => {});
   }
-  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file, faits: await faitsFavoris(uid) };
+  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file, faits: await faitsFavoris(uid), agent: await agentFavorisPour(uid) };
 }
 
 // ══ 5.376 : LES LIENS DE LA CARTE OUVRENT LE SITE, JAMAIS VRM ═══════════════════
@@ -36923,7 +36967,6 @@ ${lettre[1]}`;
   var AUTO_PAUSE_MS = 24 * 3600 * 1e3;
   var AUTO_FAVORI_MAX_MS = 72 * 3600 * 1e3;
   var AUTO_RECONTACT_MS = 30 * 24 * 3600 * 1e3;
-  var AUTO_ECART_MS = [3 * 6e4, 12 * 6e4];
   var entier = (v2, min, max, msg) => {
     const s = String(v2 ?? "").trim();
     if (!/^\d{1,5}$/.test(s) || Number(s) < min || Number(s) > max) throw Error(msg);

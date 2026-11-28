@@ -944,6 +944,23 @@ function vrmVerifVisible(sel) {
   .st10 .seg6 button { min-height: 44px; }
   .auto10 { margin: 0 0 8px; padding: 6px 16px; }
   .auto10 .vu-btn, .sa10 .vu-btn { min-height: 44px; }
+  /* 5.455.8 : l'agent des favoris — un interrupteur (la rangée entière se touche), la ligne en direct, le journal. */
+  .rg6.ag6, .carte .rg6.ag6 { display: block !important; padding: 8px 16px; }
+  .ag6-int { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 0; background: none; border: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+  .ag6-t { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .ag6-t small { color: var(--n-encre-2, #6C6C70); overflow-wrap: anywhere; }
+  .ag6-i { flex: none; position: relative; width: 51px; height: 31px; border-radius: 16px; background: var(--n-neutre, rgb(118 118 128/.24)); transition: background .2s; }
+  .ag6-i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgb(0 0 0/.2); transition: transform .2s; }
+  .ag6-int[aria-checked="true"] .ag6-i { background: var(--n-accent, #0F6B4C); }
+  .ag6-int[aria-checked="true"] .ag6-i::after { transform: translateX(20px); }
+  .ag6-conf { margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2, #F2F2F7); }
+  .ag6-conf p { margin: 0 0 8px; }
+  .ag6-b { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+  .ag6-l { margin: 6px 0 2px; } .ag6-l b { display: inline; }
+  .ag6-j summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+  .ag6-j ul { margin: 0; padding-left: 18px; }
+  .ag6-j li { margin: 4px 0; overflow-wrap: anywhere; }
+  @media (prefers-reduced-motion: reduce) { .ag6-i, .ag6-i::after { transition: none; } }
   .conf5 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .conf5 span { flex: 1 1 200px; }
   .conf5 .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -2613,7 +2630,7 @@ function vrmVerifVisible(sel) {
     non_prouve: 'non_prouve', sans_acheteur: 'sans_acheteur', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
   const raison6 = (c) => mot6('f6_r_' + (RAISON_F6[c] || c || 'autre'), 'f6_r_autre');
   // La file qui compte pour les rangées : en cours, ou finie depuis moins de 6 h (la même borne que la ligne d'envoi).
-  const fileVue6 = (e) => { favFaits6 = (e && e.site && e.site.favoris && e.site.favoris.faits && typeof e.site.favoris.faits === 'object') ? e.site.favoris.faits : {}; const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };
+  const fileVue6 = (e) => { favAgent6 = (e && e.site && e.site.favoris && e.site.favoris.agent) || null; favFaits6 = (e && e.site && e.site.favoris && e.site.favoris.faits && typeof e.site.favoris.faits === 'object') ? e.site.favoris.faits : {}; const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };
   // ══ 5.455.7 (Julien, 27 nov. 23:00 : « l'extension ne doit pas refuser d'elle-même », il ne comprend pas « Ignoré / Refusé ») ══
   //  SIX états, pas un de plus : Pas encore contacté · En attente (compte à rebours, la raison) · Envoi en cours · Message envoyé
   //  (+ l'offre ; « déjà contacté avant » compte comme envoyé) · Vendu / réservé · une erreur PRÉCISE seulement quand VINTED a
@@ -2719,12 +2736,35 @@ function vrmVerifVisible(sel) {
     const taux = f.offre && f.offre.mode === 'pct' && Number(f.offre.pct) > 0 ? Number(f.offre.pct) : null;
     return { on: fa ? fa.actif === true : null, taux, versions: Number(f.versions) || (Array.isArray(f.textes) ? f.textes.length : 0), parHeure: fa && Number(fa.parHeure) > 0 ? Number(fa.parHeure) : null, textes: Array.isArray(f.textes) ? f.textes : [], arrondi: !!(f.offre && f.offre.arrondi) };
   }
+  // ══ 5.455.8 (Julien, 28 nov. : « je veux un vrai agent autonome qui envoie des messages aux favoris ») — L'AGENT ═══════════
+  //  UN interrupteur par compte, éteint tant qu'IL ne l'allume pas (son « Allumer » est l'autorisation) : il dit le message, le
+  //  taux de l'offre et le plancher qu'il utilisera. Allumé : la ligne en direct (« Agent favoris : actif · N envoyés
+  //  aujourd'hui · prochain dans 42 s »), « Pause » / « Reprendre », « Arrêter », et le journal de chaque envoi (heure, personne,
+  //  article, offre, message) — lus de l'état du fond (`agentFavorisPour`), jamais devinés. Le chemin d'envoi est celui de la main.
+  let favAgent6 = null, agConfirme = false, agEnVol = false;
   function autoFavLigneHtml() {
     const r = autoFavResume();
-    if (!r || r.on == null) return '';
-    const parts = [TU(r.on ? 'e10_auto_on' : 'e10_auto_off')];
-    if (r.on) { parts.push(r.taux != null ? TU('e10_r_taux', { t: r.taux }) : TU('fr_sans_offre')); parts.push(r.versions === 1 ? TU('fp_message_n', { n: 1 }) : TU('e10_n_versions', { n: r.versions })); if (r.parHeure) parts.push(TU('e10_par_h', { n: r.parHeure })); }
-    return `<div class="rg6 auto10" data-fav-auto-etat="${r.on ? 'on' : 'off'}"${r.taux != null ? ` data-taux="${r.taux}"` : ''}><span><b>${esc(parts.join(' · '))}</b><small>${esc(TU(r.on ? 'e10_auto_note_on' : 'e10_auto_note_off'))}</small></span>${r.on ? `<button type="button" class="vu-btn" data-fav-auto-modifier>${esc(TU('e10_modifier'))}</button>` : ''}</div>`;
+    if (!r) return '';
+    const on = r.on === true, ag = favAgent6 || {};
+    const texte = (r.textes[0] || '').replace(/\s+/g, ' ').trim();
+    const desc = [texte ? TU('afv_message', { t: texte.length > 80 ? texte.slice(0, 78) + '…' : texte }) : '', r.taux != null ? TU('afv_offre', { t: r.taux }) : TU('fr_sans_offre'), TU('afv_plancher')].filter(Boolean).join(' · ');
+    const inter = `<button type="button" class="ag6-int" role="switch" aria-checked="${on}" data-ag-switch="${on ? 'on' : 'off'}"${agEnVol ? ' disabled' : ''}><span class="ag6-t"><b>${esc(TU('afv_titre'))}</b><small>${esc(desc)}</small></span><i class="ag6-i" aria-hidden="true"></i></button>`;
+    const conf = !on && agConfirme ? `<div class="ag6-conf" data-ag-confirme role="alertdialog"><p>${esc(TU('afv_conf'))}</p><div class="ag6-b"><button type="button" class="vu-btn" data-ag-non>${esc(TU('ra_annuler'))}</button><button type="button" class="vu-btn vu-plein" data-ag-oui${agEnVol ? ' disabled' : ''}>${esc(TU('afv_allumer'))}</button></div></div>` : '';
+    let vivant = '';
+    if (on) {
+      const dans = !ag.pause && Number(ag.prochain) > Date.now() ? ` · ${esc(TU('afv_prochain'))} <span data-fav-dans="${Number(ag.prochain)}">${esc(dansFav(ag.prochain))}</span>` : '';
+      const etat = ag.pause ? TU('afv_en_pause') : TU('afv_actif');
+      const tete = `<p class="ag6-l" data-ag-ligne="${ag.pause ? 'pause' : 'actif'}" role="status"><b>${esc(TU('afv_ligne', { etat, n: Number(ag.envoyes) || 0 }))}</b>${dans}</p>`;
+      const bout = `<div class="ag6-b">${ag.pause ? `<button type="button" class="vu-btn" data-ag-reprendre>${esc(TU('afv_reprendre'))}</button>` : `<button type="button" class="vu-btn" data-ag-pause>${esc(TU('afv_pause'))}</button>`}<button type="button" class="vu-btn" data-ag-arreter>${esc(TU('afv_arreter'))}</button><button type="button" class="vu-btn" data-fav-auto-modifier>${esc(TU('e10_modifier'))}</button></div>`;
+      const tous = apercuFav ? favTous(apercuFav) : [];
+      const jr = Array.isArray(ag.journal) ? ag.journal : [];
+      const ligneJ = (x) => { const fv = tous.find((y) => y.id === x.n) || null;
+        const quoi = [heure6(x.at), (fv && fv.pseudo) || TU('fl_acheteur'), (fv && fv.titre) || ('#' + x.item), Number(x.px) > 0 ? TU('afv_j_offre', { p: eurosFav(Number(x.px)) }) : '', x.etat === 'envoye' ? (x.t ? '« ' + x.t + ' »' : TU('f6_e_envoye')) : TU('afv_j_saute', { r: raison6(x.r || '') })].filter(Boolean).join(' · ');
+        return `<li data-ag-j="${esc(x.etat)}">${esc(quoi)}</li>`; };
+      const journal = `<details class="ag6-j" data-ag-journal="${jr.length}"><summary>${esc(TU('afv_journal', { n: jr.length }))}</summary>${jr.length ? `<ul>${jr.map(ligneJ).join('')}</ul>` : `<p class="note5">${esc(TU('afv_journal_vide'))}</p>`}</details>`;
+      vivant = tete + bout + journal;
+    }
+    return `<div class="rg6 auto10 ag6" data-fav-auto-etat="${on ? 'on' : 'off'}"${r.taux != null ? ` data-taux="${r.taux}"` : ''}>${inter}${conf}${vivant}</div>`;
   }
   function ouvrirAutoEtapes(a) {
     const r = autoFavResume(); if (!r) return;
@@ -3117,6 +3157,15 @@ function vrmVerifVisible(sel) {
     { const sb = racine.querySelector('[data-fav6-stats]'); if (sb) sb.addEventListener('click', () => { favFeuille = 'stats'; lireStatsFav(true); rendre(); }); }
     carte.querySelectorAll('[data-fav-st-jours]').forEach((b) => b.addEventListener('click', () => { favStJours = Number(b.getAttribute('data-fav-st-jours')); lireStatsFav(true); rendre(); }));
     { const am = racine.querySelector('[data-fav-auto-modifier]'); if (am) am.addEventListener('click', () => ouvrirAutoEtapes(apercuFav)); }   // 5.420
+    // 5.455.8 : l'agent — l'interrupteur (allumer demande SON « Allumer »), Pause / Reprendre, Arrêter.
+    { const envAuto = (actif) => { if (agEnVol) return; agEnVol = true; rendre(); try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisAuto', actif, ...(actif ? { confirme: true } : {}) }, (x) => { void chrome.runtime.lastError; agEnVol = false; agConfirme = false; favErreur = x && x.ok ? '' : ((x && x.raison) || TU('ra_ko')); chargerListes(true); rafraichir(); }); } catch (_) { agEnVol = false; rendre(); } };
+      const sw = racine.querySelector('[data-ag-switch]'); if (sw) sw.addEventListener('click', () => { if (sw.getAttribute('data-ag-switch') === 'on') envAuto(false); else { agConfirme = true; rendre(); } });
+      const oui = racine.querySelector('[data-ag-oui]'); if (oui) oui.addEventListener('click', () => envAuto(true));
+      const non = racine.querySelector('[data-ag-non]'); if (non) non.addEventListener('click', () => { agConfirme = false; rendre(); });
+      const ar = racine.querySelector('[data-ag-arreter]'); if (ar) ar.addEventListener('click', () => envAuto(false));
+      const geste = (quoi) => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'agentFavoris', quoi }, () => { void chrome.runtime.lastError; rafraichir(); }); } catch (_) {} };
+      const pa = racine.querySelector('[data-ag-pause]'); if (pa) pa.addEventListener('click', () => geste('pause'));
+      const re = racine.querySelector('[data-ag-reprendre]'); if (re) re.addEventListener('click', () => geste('reprendre')); }
     const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };   // 5.455.8 : la liste reste, relue sur place

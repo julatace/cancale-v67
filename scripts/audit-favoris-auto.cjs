@@ -263,7 +263,7 @@ async function scenarios() {
       const envoyer = async () => { const t = await call('auto'); if (!t.body.ajoute) return t.body; const s = await call('suivant'); await call('consommer', { jeton: s.body.travail.jeton, version: '5.309.0' }); await call('terminer', { jeton: s.body.travail.jeton, resultat: 'envoye', ecrits: 3 }); return { envoye: true }; };
       monde(b, { maintenant: horloge, favoris: favs.map((f) => [f[0], f[1], f[2], 70 * MIN]) });
       const r1 = await envoyer(); const r2 = await envoyer();
-      dit(r1.envoye && r2.etat === 'espacement', 'entre deux messages : un écart tiré au hasard (3 à 12 min)', JSON.stringify(r2));
+      dit(r1.envoye && r2.etat === 'espacement', 'entre deux messages : un écart tiré au hasard (20 à 60 s depuis la 5.455.8)', JSON.stringify(r2));
       horloge += 13 * MIN; const r3 = await envoyer(); horloge += 13 * MIN; const r4 = await envoyer();
       dit(r3.envoye && r4.etat === 'quota_heure', 'limite par heure (2 réglés) : le 3e attend', JSON.stringify(r4));
       const f = file(b);

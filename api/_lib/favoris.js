@@ -289,7 +289,7 @@ export async function routeFavoris(req,res){
           // absent (réglages d'avant) ⇒ « normal » (40–90 s au hasard, sa décision) ; `perso` ⇒ ses minutes.
           rythme:['normal','prudent'].includes(c.rythme)?c.rythme:p.rythme==='perso'?null:p.rythme==='prudent'?'prudent':'normal',
           // (20 nov., ext. 5.410) SA cadence : la plage de pause du compte (bornée par `plageValide`, 20 s à 4 min).
-          plage:c.plage&&typeof c.plage==='object'?{min:c.plage.min,max:c.plage.max}:null});
+          plage:c.plage&&typeof c.plage==='object'?{min:c.plage.min,max:c.plage.max}:null,ajouter:c.ajouter===true});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){

@@ -49,7 +49,7 @@ export function etatAuto(d,owner,maintenant){
   if(!a?.reglages?.actif)return {etat:'eteint'};
   const pause=Number(d.pauseAutoJusqua)||0;
   if(pause>maintenant)return {etat:'pause',jusqua:pause};
-  if(Object.values(d.groupes).some(x=>(x.jobs||[]).some(j=>j.etat==='incertain')))return {etat:'a_verifier'};
+  // 5.455.8 : un envoi « à vérifier » n'arrête plus l'agent (il bloquait tout, sans fin) ; il reste écarté pour SON favori seul.
   if(d.enCours||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
   if(!dansPlageAuto(a.reglages,maintenant))return {etat:'hors_horaires'};
   const env=(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(t=>t>maintenant-AUTO_JOUR_MS);

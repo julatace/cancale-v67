@@ -116,7 +116,7 @@ async function serveur(apercu) {
         s.lancers.push(c.selection.slice());
         const parId = new Map(notifs.map((x) => [x.id, x]));
         const targets = c.selection.map((id) => { const x = parId.get(id); return { itemId: String(/items\/(\d+)/.exec(x.link)[1]), recipientId: String(x.user_id), notificationId: id, initiator: 'favourite' }; });
-        r = F.lancerFile(d, { owner: OWNER, targets, message: PREFS.message, intervalleMinutes: 0, maintenant: now, lot: 'lot' + s.lancers.length });
+        r = F.lancerFile(d, { owner: OWNER, targets, message: PREFS.message, intervalleMinutes: 0, maintenant: now, lot: 'lot' + s.lancers.length, ajouter: c.ajouter === true });   // 5.455.8 : comme la route (`ajouter`)
       } else if (c.action === 'suivant') { r = F.reserverFile(d, { owner: OWNER, maintenant: now, jeton: jeton(), suivi: 's' }); if (r.valeur.travail) s.reserves.push(r.valeur.travail.notificationId || r.valeur.travail.itemId); }
       else if (c.action === 'consommer') r = F.consommerFile(d, { owner: OWNER, jeton: c.jeton, maintenant: now });
       else if (c.action === 'verifier') r = F.verifierReservation(d, { owner: OWNER, jeton: c.jeton, maintenant: now });
@@ -187,22 +187,29 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     const memo = ((f.store.vrmFavorisApercu || {})[UID] || {}).cochables || [];
     dit(JSON.stringify(memo.slice().sort()) === JSON.stringify(cochables.slice().sort()), 'l’extension garde les favoris cochables de l’aperçu montré', JSON.stringify(memo));
     for (const [nom, sel] of [['un favori VENDU (n1)', [cochables[0], 'n1']], ['un favori vendu AILLEURS (n2)', ['n2']], ['une OFFRE déjà faite (n3)', [cochables[0], 'n3']], ['un message déjà envoyé (n4)', ['n4']], ['un destinataire pas prouvé (n5)', ['n5']], ['un favori inconnu', ['n999']]]) {
+      // 5.455.8 (Julien : « un envoi ne peut pas échouer ») : le favori qui n'est plus à contacter est ÉCARTÉ (dit sur sa rangée,
+      //    `ecartes`), les autres partent ; seul, il est refusé — rien ne part pour lui.
+      const n0 = sv.lancers.length;
       const r = await f.envoyer(badge('lancer', { selection: sel, reglages: PREFS, confirme: true, items: [] }), ONGLET);
-      dit(r && r.ok === false && r.code === 'selection', `${nom} ⇒ refusé, rien ne part`, JSON.stringify(r).slice(0, 200));
+      const mauvais = sel.filter((id) => !cochables.includes(id));
+      const parti = sv.lancers.slice(n0).flat();
+      dit(sel.length > 1 ? (r && r.ok === true && mauvais.every((id) => (r.ecartes || []).includes(id)) && !parti.some((id) => mauvais.includes(id))) : (r && r.ok === false && r.code === 'selection' && !parti.length), `${nom} ⇒ écarté (dit), jamais envoyé${sel.length > 1 ? ' ; l’autre part' : ''}`, JSON.stringify({ r, parti }).slice(0, 240));
+      try { f.store.vrmFavorisCarte = null; } catch (_) {}
     }
-    dit(sv.lancers.length === 0, 'aucun lancement n’a atteint VRM', JSON.stringify(sv.lancers));
+    dit(sv.lancers.flat().every((id) => cochables.includes(id)), 'aucun favori non cochable n’a atteint VRM', JSON.stringify(sv.lancers));
   }
   {
     const { f, sv } = await monde(a);
     await f.envoyer(badge('apercu'), ONGLET);
     const m = f.store.vrmFavorisApercu; m[UID].at = Date.now() - 31 * MIN;
     const r = await f.envoyer(badge('lancer', { selection: [cochables[0]], reglages: PREFS, confirme: true, items: [] }), ONGLET);
-    dit(r && r.ok === false && sv.lancers.length === 0, 'un aperçu de plus de 30 min ⇒ relire d’abord, rien ne part', JSON.stringify(r).slice(0, 200));
+    // 5.455.8 : un aperçu trop ancien est RELU chez VRM au moment d'envoyer (plus de refus) ; seuls ses cochables partent.
+    dit(r && r.ok === true && sv.lancers.length === 1 && sv.lancers[0].every((id) => cochables.includes(id)) && Date.now() - Number(f.store.vrmFavorisApercu[UID].at) < MIN, 'un aperçu de plus de 30 min ⇒ relu d’abord chez VRM, puis l’envoi part', JSON.stringify(r).slice(0, 200));
   }
   {
     const { f, sv } = await monde(a);
     const r = await f.envoyer(badge('lancer', { selection: [cochables[0]], reglages: PREFS, confirme: true, items: [] }), ONGLET);
-    dit(r && r.ok === false && sv.lancers.length === 0, 'aucun aperçu lu sur ce navigateur ⇒ rien ne part', JSON.stringify(r).slice(0, 200));
+    dit(r && r.ok === true && sv.lancers.length === 1 && sv.lancers[0].every((id) => cochables.includes(id)), 'aucun aperçu lu sur ce navigateur ⇒ relu chez VRM au moment d’envoyer, puis l’envoi part', JSON.stringify(r).slice(0, 200));
   }
   // ── B2 : confirmation, plafond par envoi, compte de l'onglet ─────────────────
   console.log('\nB2. Rien sans « Confirmer l’envoi », 15 au plus, le compte de l’onglet seulement');
@@ -239,7 +246,8 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     const memo = ((f.store.vrmFavorisApercu || {})[UID] || {}).cochables || [];
     dit(memo.length === 0, 'après le lancement, l’aperçu gardé est vidé : un second envoi exige une liste relue', JSON.stringify(memo));
     const r2 = await f.envoyer(badge('lancer', { selection: choisis, reglages: PREFS, confirme: true, items: [] }), ONGLET);
-    dit(r2 && r2.ok === false && sv.lancers.length === 1, 'renvoyer les mêmes favoris ⇒ refusé (chacun contacté une fois)', JSON.stringify(r2).slice(0, 200));
+    // 5.455.8 : renvoyer les mêmes pendant leur envoi ⇒ le serveur les connaît (`connus`) : refusé, jamais deux fois.
+    dit(r2 && r2.ok === false, 'renvoyer les mêmes favoris ⇒ refusé (chacun contacté une fois)', JSON.stringify(r2).slice(0, 200));
   }
   // ── B4 : les plafonds tiennent après le clic ─────────────────────────────────
   console.log('\nB4. Après le clic, les plafonds tiennent (15/h favoris, 50/h, « Tout arrêter »)');

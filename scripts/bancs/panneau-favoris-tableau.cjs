@@ -197,13 +197,15 @@ const etapes = async (pg) => {
   const lire = () => pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot, f = r.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'), q = (s) => (f ? f.querySelector(s) : null);
     const sec = q('[data-fav-etape]');
     return { k: sec ? Number(sec.getAttribute('data-fav-etape')) : null, taux: q('[data-fav-env-taux]') ? q('[data-fav-env-taux]').getAttribute('data-fav-env-taux') : (q('[data-fav-r="taux"]') ? q('[data-fav-r="taux"]').getAttribute('data-taux') : null),
-      msg: q('[data-fav-message]') ? q('[data-fav-message]').textContent : '', rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
+      msg: q('[data-fav-message]') ? q('[data-fav-message]').textContent : (q('[data-fav-r="message"] b') ? q('[data-fav-r="message"] b').textContent : ''), rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
       lancer: q('[data-fav-lancer]') ? !q('[data-fav-lancer]').disabled : null, suivant: q('[data-fav-etape-suivant]') ? !q('[data-fav-etape-suivant]').disabled : null,
       partis: window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer').length }; });
   const vu = [];
   let e = await lire(); vu.push(e);
   for (let i = 0; i < 4 && e.k != null && e.k < 4 && e.suivant; i++) { await clic(pg, '.fav6-feuille [data-fav-etape-suivant]'); await pg.waitForTimeout(500); e = await lire(); vu.push(e); }
-  return { vu, fin: e, taux: (vu.find((x) => x.k === 2) || {}).taux, msg: (vu.find((x) => x.k === 3) || {}).msg || '', partis: Math.max(...vu.map((x) => x.partis)) };
+  // 5.455.8 (Julien, 28 nov.) : « Envoyer » ouvre DIRECTEMENT le récapitulatif (étape 4 : taux, message, rythme, « Lancer ») ;
+  //    le taux et le message se lisent là quand les étapes 2 et 3 ne sont pas traversées.
+  return { vu, fin: e, taux: (vu.find((x) => x.k === 2) || vu.find((x) => x.k === 4) || {}).taux, msg: (vu.find((x) => x.k === 3) || vu.find((x) => x.k === 4) || {}).msg || '', partis: Math.max(...vu.map((x) => x.partis)) };
 };
 const montrer = async (pg, mobile) => {
   const b = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('.btn').getBoundingClientRect(); return { x: x.left + x.width / 2, y: x.top + x.height / 2 }; });
@@ -277,7 +279,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       // T6 : confirmation — le parcours en étapes (5.420) : 1 → 2 (le taux réglé) → 3 (le message pré-rempli) → 4 (« Lancer »)
       await clic(t.pg, '[data-fav-envoyer]');
       const P = await etapes(t.pg); a = await lireF(t.pg);
-      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && P.vu[0].k === 1 && P.fin.k === 4 && P.fin.lancer === true && /acheteur_/.test(P.msg) && P.taux === '10' && P.fin.rythme === 'normal', `${T} : la feuille de confirmation (5.419) : message pré-rempli, taux réglé (10 %), rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(P.vu));
+      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && P.vu[0].k === 4 && P.fin.k === 4 && P.fin.lancer === true && /acheteur_/.test(P.msg) && P.taux === '10' && P.fin.rythme === 'normal', `${T} : la feuille de confirmation (5.419) : message pré-rempli, taux réglé (10 %), rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(P.vu));
       dit(a.envoyes.length === 0 && P.partis === 0, `${T} : rien n’est parti avant « Confirmer l’envoi »`, JSON.stringify(a.envoyes));
       dit(!a.petits.length, `${T} : feuille : cibles ≥ 44 px`, JSON.stringify(a.petits.slice(0, 6)));
       await cap(t.pg, N('3-confirmer'));
@@ -315,7 +317,8 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       let a = await lireF(t2.pg);
       dit(a.coches.join(',') === 'f0,f1' && a.bas && a.bas.n === '2', `${T} : cocher la case, puis toucher la rangée entière : 2 cochés`, JSON.stringify({ c: a.coches, b: a.bas }));
       await clic(t2.pg, '[data-fav-envoyer]'); await etapes(t2.pg); await clic(t2.pg, '.fav6-feuille [data-fav-lancer]'); await t2.pg.waitForTimeout(300); a = await lireF(t2.pg);
-      dit(!a.feuille && /^attente\|En attente\|Ces destinataires ont déjà été préparés/.test(a.etats.f0) && /^attente\|/.test(a.etats.f1) && /^nouveau\|/.test(a.etats.f5) && /déjà été préparés/.test(a.erreur), `${T} : refus du serveur ⇒ dit SUR les deux rangées (et en haut), la feuille fermée, les autres intactes`, JSON.stringify({ f0: a.etats.f0, f5: a.etats.f5, e: a.erreur, fe: a.feuille }));
+      // 5.455.8 : le refus se dit SUR la rangée, qui reste envoyable (« Pas encore contacté » + la raison, « Envoyer »).
+      dit(!a.feuille && /^nouveau\|Pas encore contacté\|Ces destinataires ont déjà été préparés/.test(a.etats.f0) && /^nouveau\|Pas encore contacté\|Ces destinataires/.test(a.etats.f1) && /^nouveau\|/.test(a.etats.f5) && /déjà été préparés/.test(a.erreur), `${T} : refus du serveur ⇒ dit SUR les deux rangées (et en haut), la feuille fermée, les autres intactes`, JSON.stringify({ f0: a.etats.f0, f5: a.etats.f5, e: a.erreur, fe: a.feuille }));
       await cap(t2.pg, N('5-refus'));
       await clic(t2.pg, '[data-fav6-reglages]'); a = await lireF(t2.pg);
       dit(a.feuille && a.feuille.k === 'reglages' && a.feuille.textes >= 3, `${T} : « Réglages » ouvre une feuille (versions du message, rythme)`, JSON.stringify(a.feuille));
@@ -349,7 +352,8 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       await cap(t.pg, N('2-remplacer'));
       await clic(t.pg, '[data-fav-envoyer]'); await etapes(t.pg); await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(300); a = await lireF(t.pg);
       const L = a.envoyes[0] || {};
-      dit(a.envoyes.length === 1 && L.remplacer === true && L.confirme === true && L.selection.slice().sort().join(',') === 'n0,n31', `${T} : « Confirmer l’envoi » ⇒ \`lancer\` des 2 favoris avec \`remplacer\` (l’ancienne file annulée d’abord)`, JSON.stringify(L).slice(0, 240));
+      // 5.455.8 : plus de `remplacer` — la sélection s'AJOUTE à la file restée active (jamais deux fois la même personne).
+      dit(a.envoyes.length === 1 && L.remplacer !== true && L.confirme === true && L.selection.slice().sort().join(',') === 'n0,n31', `${T} : « Confirmer l’envoi » ⇒ \`lancer\` des 2 favoris, sans annuler l’ancienne file (ils s’y ajoutent)`, JSON.stringify(L).slice(0, 240));
     });
     await t.ctx.close();
     const t2 = await ouvrir(nav, Object.assign({}, o, { AP: APJ }));

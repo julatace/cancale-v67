@@ -43,7 +43,7 @@ async function monde(racine, opts = {}) {
   const faireBase = faireBaseServeur(S);
   const b = faireBase();
   const n = opts.n || 2;
-  const notif = (i) => ({ id: 'jn' + i, user_id: 9000000001, body: 'Quelqu’un a ajouté ton article à ses favoris.', link: `/items/${ITEMS[i]}/want_it/new?offering_id=${ACH[i]}`, created_at: new Date(T0 - (i + 1) * H).toISOString() });
+  const notif = (i) => ({ id: 'jn' + i, user_id: 9000000001, body: 'Quelqu’un a ajouté ton article à ses favoris.', link: `/items/${ITEMS[i]}/want_it/new?offering_id=${ACH[i]}`, created_at: new Date(opts.notifAt ? opts.notifAt(i, T0) : T0 - (i + 1) * H).toISOString() });
   b.poser(`harvest_${UID}_notifications`, { uid: UID, type: 'notifications', domain: 'www.vinted.fr', payload: { notifications: Array.from({ length: n }, (_, i) => notif(i)) } });
   b.poser(`vrm_favoris_reglages_${UID}`, { version: 1, envoisActifs: false, message: 'Bonjour, il te plaît toujours ?', pourcentage: 10, offreMode: 'pct', offreValeur: null, arrondi: false, intervalleMinutes: 0, intervalleMaxMinutes: null });
   b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(T0 - (opts.dressingAncien ? 30 * H : H)).toISOString(), payload: { pagination: { total_entries: n }, items: ITEMS.slice(0, n).map((id) => ({ id: Number(id), title: 'salomon XT-6 ' + id.slice(-3), price: { amount: '55.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, is_reserved: false })) } });
@@ -64,8 +64,15 @@ async function monde(racine, opts = {}) {
     return { status: 404, body: {} };
   };
   const f = faireFond({ src: path.join(racine, 'vinted-sync-extension', 'background.js'), connecte: UID, comptes: [ACC],
-    lignes: { main: { vinted_annonce_numeros: Object.fromEntries(ITEMS.map((id, i) => [id, { numero: String(180 + i), min: '40' }])) } },
-    store: { __commeBleamDefaut: true, __favorisVintex: true, vrmChoixComptes: { [UID]: { choix: 'oui', login: 'jujuf38', at: 1 } } },
+    // La MÊME base pour le fond et le serveur (comme Supabase) : ce que le fond ne porte pas lui-même (réglages des favoris,
+    //    file du serveur…) se lit dans la base du serveur.
+    lignes: new Proxy({ main: { vinted_annonce_numeros: Object.fromEntries(ITEMS.map((id, i) => [id, { numero: String(180 + i), min: '40' }])) } }, {
+      get: (t, k) => (k in t ? t[k] : typeof k === 'string' ? ([...b.lignes.values()].find((r) => r.id === k) || {}).data : undefined),
+      has: (t, k) => k in t || (typeof k === 'string' && [...b.lignes.values()].some((r) => r.id === k)),
+      ownKeys: (t) => [...new Set([...Reflect.ownKeys(t), ...[...b.lignes.values()].map((r) => r.id)])],
+      getOwnPropertyDescriptor: (t, k) => (k in t ? Reflect.getOwnPropertyDescriptor(t, k) : [...b.lignes.values()].some((r) => r.id === k) ? { configurable: true, enumerable: true, writable: true, value: ([...b.lignes.values()].find((r) => r.id === k) || {}).data } : undefined),
+    }),
+    store: { __commeBleamDefaut: true, __favorisVintex: true, vrmChoixComptes: { [UID]: { choix: 'oui', login: 'jujuf38', at: 1 } }, vrmSession: { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'banc@vrm.test', expires_at: Date.now() + 365 * 864e5 } },
     vinted: (e) => (opts.vinted && opts.vinted(e)) || vintedDefaut(e) });
   vm.runInContext('Date.now = () => __h();', Object.assign(f.ctx, { __h: () => h.t }));
   const fetchFond = f.ctx.fetch;
