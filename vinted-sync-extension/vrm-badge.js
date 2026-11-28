@@ -5308,6 +5308,8 @@ function vrmVerifVisible(sel) {
     return `<section class="grp5" data-serveur-panneau data-os-on="${on ? '1' : '0'}"><h3>${esc(TU('os_titre'))}</h3><p class="note5">${esc(TU('os_note'))}</p>
       ${etat}
       <div class="outils"><button type="button" class="vu-btn" data-os-basculer="${on ? 'eteindre' : 'allumer'}"${srvEnVol ? ' disabled' : ''}>${esc(TU(on ? 'os_eteindre' : 'os_allumer'))}</button></div>
+      ${on ? `<div class="rg6" data-os-rapide="${s0.rapide === false ? '0' : '1'}"><span><b>${esc(TU(s0.rapide === false ? 'os_rapide_off' : 'os_rapide_on'))}</b><small>${esc(TU(s0.rapide === false ? 'os_rapide_off_sous' : 'os_rapide_on_sous'))}</small></span></div>
+      <div class="outils"><button type="button" class="vu-btn" data-os-basculer="${s0.rapide === false ? 'rapide' : 'lente'}"${srvEnVol ? ' disabled' : ''}>${esc(TU(s0.rapide === false ? 'os_rapide_allumer' : 'os_rapide_eteindre'))}</button></div>` : ''}
       ${lignesAutres ? `<p class="note5"><b>${esc(TU('os_autres'))}</b></p>${lignesAutres}` : ''}
       <details class="detail" data-os-guide><summary><span>${esc(TU('os_guide'))}</span></summary>
         <ol class="os-etapes">${etapes.map((k) => `<li data-os-etape="${k}"><b>${esc(TU('os_e_' + k))}</b><small>${esc(TU('os_e_' + k + '_sous'))}</small></li>`).join('')}</ol>
@@ -5316,11 +5318,11 @@ function vrmVerifVisible(sel) {
     </section>`;
   }
   function brancherServeur(R) {
-    const b = R.querySelector('[data-os-basculer]'); if (b) b.addEventListener('click', () => {
+    R.querySelectorAll('[data-os-basculer]').forEach((b) => b.addEventListener('click', () => {
       const quoi = b.getAttribute('data-os-basculer');
       srvEnVol = true; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'serveur', quoi }, (r) => { void chrome.runtime.lastError; srvEnVol = false; if (r && r.ok) srvVue = r; srvLu = Date.now(); rendre(); }); } catch (_) { srvEnVol = false; rendre(); }
-    });
+    }));
   }
   function sauvegardeHtml() {
     const a = srAp;

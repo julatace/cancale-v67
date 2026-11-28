@@ -29,6 +29,13 @@ const SRV_INTERVALLE_MIN_MS = 4 * 60000;      // la veille relit la boîte entre
 const SRV_INTERVALLE_MAX_MS = 7 * 60000;
 const SRV_ECART_MIN_MS = 7000;                // deux intervalles de suite diffèrent d'au moins 7 s (« jamais deux fois le même temps »)
 const SRV_PLAFOND_LECTURES = 14;              // la veille s'arrête à 14 des 20 lectures/h du compte (6 restent à l'argent, aux colis, aux photos)
+// « VEILLE RAPIDE » (décision de Julien du 28 nov. : « vas-y veille rapide ») : 1 min 30 à 3 min au hasard ; le budget de
+// LECTURE de CE compte monte à 40/h, SEULEMENT en mode ordinateur allumé avec la veille rapide (ailleurs : 20/h) ; la veille
+// s'arrête à 34 des 40 (6 restent aux autres lectures). Allumée par défaut avec le mode ; éteinte ⇒ 4–7 min et 20/h.
+const SRV_RAPIDE_MIN_MS = 90000;
+const SRV_RAPIDE_MAX_MS = 3 * 60000;
+const SRV_RAPIDE_LECTURES_HEURE = 40;
+const SRV_RAPIDE_PLAFOND = 34;
 const SRV_FILS_PAR_TOUR = 3;                  // au plus 3 conversations neuves ouvertes par relecture (chacune = 1 lecture)
 const SRV_CONVS_LUES = 20;                    // la 1re page de la boîte (20 conversations)
 const SRV_VUS_MAX = 3000;
@@ -41,16 +48,23 @@ const SRV_ALLUME_MS = 3 * 60000;              // même seuil que la présence «
 const SRV_RE_UID = /^\d{1,20}$/;
 const SRV_RE_APPAREIL = /^[a-f0-9]{16}$/;
 
-// L'intervalle suivant, tiré au hasard dans [4 ; 7] min, jamais à moins de 7 s du précédent. `alea` : un nombre [0 ; 1[.
-function srvIntervalle(alea, precedent) {
-  const a = Number(alea), span = SRV_INTERVALLE_MAX_MS - SRV_INTERVALLE_MIN_MS;
-  let ms = SRV_INTERVALLE_MIN_MS + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
+// L'intervalle suivant, tiré au hasard dans [4 ; 7] min ([1 min 30 ; 3 min] en veille rapide), jamais à moins de 7 s du
+// précédent. `alea` : un nombre [0 ; 1[.
+function srvBornes(rapide) { return rapide === true ? [SRV_RAPIDE_MIN_MS, SRV_RAPIDE_MAX_MS] : [SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS]; }
+function srvIntervalle(alea, precedent, rapide) {
+  const [MIN, MAX] = srvBornes(rapide);
+  const a = Number(alea), span = MAX - MIN;
+  let ms = MIN + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
   const p = Number(precedent);
-  if (Number.isFinite(p) && p > 0 && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
-    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (3 min) laisse toujours l'un des deux
-    ms = haut <= SRV_INTERVALLE_MAX_MS && (ms >= p || bas < SRV_INTERVALLE_MIN_MS) ? haut : bas >= SRV_INTERVALLE_MIN_MS ? bas : haut;
+  if (Number.isFinite(p) && p >= MIN && p <= MAX && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
+    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (90 s au moins) laisse toujours l'un des deux
+    ms = haut <= MAX && (ms >= p || bas < MIN) ? haut : bas >= MIN ? bas : haut;
   }
   return ms;
+}
+// Le budget de LECTURE d'un compte par heure : 40 en veille rapide du mode ordinateur allumé (CE compte), sinon 20.
+function srvLecturesHeure(reglage, uidVeille, uid) {
+  return reglage && reglage.on === true && reglage.rapide !== false && String(uidVeille || '') !== '' && String(uidVeille) === String(uid) ? SRV_RAPIDE_LECTURES_HEURE : 20;
 }
 // Une date Vinted (secondes, millisecondes, ISO) en millisecondes ; illisible ⇒ 0 (« pas su » : rien ne sonne).
 function srvMs(v) {
@@ -160,7 +174,7 @@ function srvLigne(p, maintenant) {
   const n = (x) => { const v = Number(x); return Number.isFinite(v) && v > 0 ? v : null; };
   const base = { appareil: String(p.id || ''), compte: s && SRV_RE_UID.test(String(s.uid || '')) ? String(s.uid) : '', nom: s ? String(s.nom || '').slice(0, 60) : '',
     lu: s ? n(s.lu) : null, prochain: s ? n(s.prochain) : null, actions: s && Number.isInteger(Number(s.actions)) ? Number(s.actions) : null,
-    cap: s ? n(s.cap) : null, jusqua: s ? n(s.jusqua) : null, atMs: n(p.atMs) };
+    cap: s ? n(s.cap) : null, jusqua: s ? n(s.jusqua) : null, atMs: n(p.atMs), rapide: !!(s && s.rapide === true) };
   if (!allume) return Object.assign(base, { code: 'eteint' });
   if (!s || s.on !== true) return Object.assign(base, { code: 'off' });
   if (s.deconnecte === true || !base.compte) return Object.assign(base, { code: 'deconnecte' });
@@ -174,8 +188,8 @@ function srvLigne(p, maintenant) {
 
 export {
   SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS, SRV_ECART_MIN_MS, SRV_PLAFOND_LECTURES, SRV_FILS_PAR_TOUR, SRV_CONVS_LUES, SRV_VUS_MAX, SRV_TOUR_MS, SRV_DECALAGE_MS,
-  SRV_TOUR_MARGE_MS, SRV_TEXTE_MAX, SRV_EMAIL_FENETRE_MS, SRV_ALLUME_MS,
-  srvIntervalle, srvMs, srvChangees, srvCle, srvNeufsDuFil, srvTexte, srvTour, srvLigne,
+  SRV_TOUR_MARGE_MS, SRV_TEXTE_MAX, SRV_EMAIL_FENETRE_MS, SRV_ALLUME_MS, SRV_RAPIDE_MIN_MS, SRV_RAPIDE_MAX_MS, SRV_RAPIDE_LECTURES_HEURE, SRV_RAPIDE_PLAFOND,
+  srvBornes, srvLecturesHeure, srvIntervalle, srvMs, srvChangees, srvCle, srvNeufsDuFil, srvTexte, srvTour, srvLigne,
 };
 
 // ── CÔTÉ APP ────────────────────────────────────────────────────────────────
@@ -185,6 +199,11 @@ export const SRV_LATENCE = Object.freeze({
   moyenneMs: Math.round((SRV_INTERVALLE_MIN_MS + SRV_INTERVALLE_MAX_MS) / 4),
   pireMs: SRV_INTERVALLE_MAX_MS,
   lecturesHeure: Math.round(3600000 / ((SRV_INTERVALLE_MIN_MS + SRV_INTERVALLE_MAX_MS) / 2) * 10) / 10,
+});
+export const SRV_LATENCE_RAPIDE = Object.freeze({
+  moyenneMs: Math.round((SRV_RAPIDE_MIN_MS + SRV_RAPIDE_MAX_MS) / 4),
+  pireMs: SRV_RAPIDE_MAX_MS,
+  lecturesHeure: Math.round(3600000 / ((SRV_RAPIDE_MIN_MS + SRV_RAPIDE_MAX_MS) / 2) * 10) / 10,
 });
 // Les lignes de la page « Ordinateur serveur » : une par profil (= un compte), le plus récent d'abord ; les profils
 // muets depuis plus de 7 jours ne sont plus montrés. `presences` : undefined (on lit) · null (pas su) · lignes brutes.

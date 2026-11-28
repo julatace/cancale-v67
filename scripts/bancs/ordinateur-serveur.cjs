@@ -106,7 +106,7 @@ async function app(nav, o) {
     dit(!!par('captcha') && /shop_c · vérification/.test(par('captcha').texte), `${o.nom} · « shop_c · vérification Vinted »`, JSON.stringify(par('captcha')));
     dit(!!par('eteint') && /shop_d · ne répond plus/.test(par('eteint').texte) && /Edge · Mac/.test(par('eteint').texte), `${o.nom} · le profil muet depuis 2 h : « ne répond plus », son navigateur`, JSON.stringify(par('eteint')));
     dit(!!e && ['deconnecte', 'captcha', 'eteint'].every((c) => e.gestes.includes(c)) && !e.gestes.includes('pret'), `${o.nom} · chaque arrêt a SON geste (« Que faire ? »), rien sur le prêt`, JSON.stringify(e && e.gestes));
-    dit(!!e && e.etapes === 6 && e.latence === '165', `${o.nom} · l’installation guidée (6 étapes) et la vitesse mesurée (2 min 45 s en moyenne)`, JSON.stringify(e && [e.etapes, e.latence]));
+    dit(!!e && e.etapes === 6 && e.latence === '68' && /Veille rapide : 1 min 8 s en moyenne/.test(e.texte) && /Veille normale : 2 min 45 s en moyenne/.test(e.texte), `${o.nom} · l’installation guidée (6 étapes) et la vitesse mesurée par mode (rapide 1 min 8 s, normale 2 min 45 s en moyenne)`, JSON.stringify(e && [e.etapes, e.latence]));
     dit(!!e && e.deborde <= 0 && (!o.mobile || !e.petites.length), `${o.nom} · aucun débordement ; cibles ≥ 44 px`, JSON.stringify(e && [e.deborde, e.petites.slice(0, 4)]));
     dit(!!e && !TECH.test(e.texte), `${o.nom} · aucun mot technique dans le texte`, e && (e.texte.match(TECH) || [])[0]);
     // « Que faire ? » s'ouvre (le geste du déconnecté), et « Comment faire ? » de l'installation.
@@ -137,12 +137,12 @@ async function panneau(nav, o) {
     window.__envoyes = []; window.__on = false;
     const copie = (x) => JSON.parse(JSON.stringify(x));
     const orig = Element.prototype.attachShadow; Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
-    const srv = () => ({ ok: true, appareil: 'a1a1a1a1a1a1a1a1', serveur: window.__on ? { on: true, uid: '111', nom: 'shop_a', lu: Date.now() - 95000, prochain: Date.now() + 192000, actions: 4, cap: 50, pause: false, captcha: false, prudence: false, budget: false, deconnecte: false, code: 'pret' } : { on: false },
+    const srv = () => ({ ok: true, appareil: 'a1a1a1a1a1a1a1a1', serveur: window.__on ? { on: true, rapide: window.__rapide !== false, uid: '111', nom: 'shop_a', lu: Date.now() - 95000, prochain: Date.now() + 192000, actions: 4, cap: 50, pause: false, captcha: false, prudence: false, budget: false, deconnecte: false, code: 'pret' } : { on: false },
       autres: [{ appareil: 'b2b2b2b2b2b2b2b2', code: 'deconnecte', compte: '', nom: 'shop_b' }, { appareil: 'c3c3c3c3c3c3c3c3', code: 'pret', compte: '222', nom: 'shop_c' }] });
     window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
       sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true };
         if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null };
-        else if (msg.action === 'serveur') { if (msg.quoi === 'allumer') window.__on = true; if (msg.quoi === 'eteindre') window.__on = false; rep = srv(); }
+        else if (msg.action === 'serveur') { if (msg.quoi === 'allumer') window.__on = true; if (msg.quoi === 'eteindre') window.__on = false; if (msg.quoi === 'lente') window.__rapide = false; if (msg.quoi === 'rapide') window.__rapide = true; rep = srv(); }
         setTimeout(() => cb && cb(rep), 0); } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
     const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u);
@@ -172,7 +172,13 @@ async function panneau(nav, o) {
   dit(!!v && v.on === '1' && v.etat === 'pret' && /shop_a · prêt/.test(v.texte) && /prochaine lecture dans 3 min/.test(v.texte) && /4\/50 actions/.test(v.texte) && env.includes('allumer'), `${o.nom} · « Allumer » (SON toucher) ⇒ « shop_a · prêt », prochaine lecture, actions`, JSON.stringify([v && v.texte.slice(0, 160), env]));
   dit(!!v && v.autres === 2 && /shop_b · déconnecté de Vinted/.test(v.texte), `${o.nom} · les autres profils de l’ordinateur`, v && v.texte.slice(0, 300));
   dit(!!v && !v.petits.length && !v.deborde && !erreurs.length, `${o.nom} · cibles ≥ 44 px, aucun débordement, aucune erreur`, JSON.stringify([v && v.petits, erreurs]));
+  dit(/Veille rapide : 1 min 30 à 3 min/.test(v.texte) && /40 lectures par heure pour ce compte/.test(v.texte), `${o.nom} · « Veille rapide » allumée par défaut avec le mode`, v && v.texte.slice(0, 300));
   await capture(pg, `panneau-${o.nom}-allume`);
+  await clic('[data-os-basculer="lente"]'); await attendre(400);
+  const v2 = await voir();
+  const env2 = await pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'serveur').map((m) => m.quoi));
+  dit(!!v2 && /Veille normale : 4 à 7 min/.test(v2.texte) && /20 lectures par heure/.test(v2.texte) && env2.includes('lente') && !v2.petits.length, `${o.nom} · « Veille normale » (SON toucher, ce compte) ⇒ 4 à 7 min, 20 lectures/h`, v2 && v2.texte.slice(0, 300));
+  await capture(pg, `panneau-${o.nom}-normale`);
   await ctx.close().catch(() => {});
 }
 

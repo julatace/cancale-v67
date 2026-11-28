@@ -34,7 +34,7 @@ const { faireFond } = require('./_fond-vm.cjs');
 const args = process.argv.slice(2);
 const RACINE = path.join(__dirname, '..');
 const BG = path.join(RACINE, 'vinted-sync-extension', 'background.js');
-const REGLE = path.join(RACINE, 'src', 'ordinateurServeur.js');
+let REGLE = path.join(RACINE, 'src', 'ordinateurServeur.js');
 const BLOC_RE = /\/\/ <serveur-regle>[^\n]*\n([\s\S]*?)\/\/ <\/serveur-regle>/;
 if (args.includes('--recopie')) {
   const m = BLOC_RE.exec(fs.readFileSync(REGLE, 'utf8'));
@@ -46,14 +46,20 @@ if (args.includes('--recopie')) {
 const iSrc = args.indexOf('--src');
 const SRC0 = iSrc >= 0 ? path.resolve(args[iSrc + 1]) : BG;
 const MUTATIONS = {
+  rapidemax: ['const SRV_RAPIDE_MAX_MS = 3 * 60000;', 'const SRV_RAPIDE_MAX_MS = 4 * 60000;'],
+  rapidemin: ['const SRV_RAPIDE_MIN_MS = 90000;', 'const SRV_RAPIDE_MIN_MS = 60000;'],
+  quarante: ['const SRV_RAPIDE_LECTURES_HEURE = 40;', 'const SRV_RAPIDE_LECTURES_HEURE = 20;'],
+  quarantepartout: ["  return reglage && reglage.on === true && reglage.rapide !== false && String(uidVeille || '') !== '' && String(uidVeille) === String(uid) ? SRV_RAPIDE_LECTURES_HEURE : 20;", '  return SRV_RAPIDE_LECTURES_HEURE;'],
+  eteinte: ['  const rapide = reglage.rapide !== false;', '  const rapide = true;'],
+  plafondveille: ['  const plafondVeille = rapide ? SRV_RAPIDE_PLAFOND : SRV_PLAFOND_LECTURES;', '  const plafondVeille = rapide ? 40 : SRV_PLAFOND_LECTURES;'],
   premiere: ["  if (!b) return { base: { depuis: Number(maintenant) || 0, convs }, changees: [], premiere: true };", "  if (!b) return { base: { depuis: 1, convs }, changees: l.filter((c) => c.unread === true).map((c) => String(c.id)), premiere: true };"],
   vus: ['    if (!e || v[srvCle(e)]) continue;', '    if (!e) continue;'],
   demoi: ["    if (!de || de === moi || (opp && de !== opp)) continue;", "    if (!de) continue;"],
-  hasard: ['  const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0);', '  const ecart = SRV_INTERVALLE_MIN_MS;'],
+  hasard: ['  const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0, rapide);', '  const ecart = rapide ? SRV_RAPIDE_MIN_MS : SRV_INTERVALLE_MIN_MS;'],
   prudence: ["  if (await prudenceDe(u)) { await serveurNoterEtat({ code: 'prudence' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'prudence' }; }", ''],
   pause: ["  if (p) { await serveurNoterEtat({ code: 'pause', jusqua: Number(p.jusqua) || 0 }); await publierPresence(moi, false).catch(() => {}); return { saute: 'pause' }; }", ''],
   captcha: ["  if (ar && ar.quoi === 'captcha') { await serveurNoterEtat({ code: 'captcha' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'captcha' }; }", ''],
-  budget: ['  const L = await compterLecture(u, SRV_PLAFOND_LECTURES);\n  if (!L || !L.ok)', '  const L = { ok: true };\n  if (!L || !L.ok)'],
+  budget: ['  const L = await compterLecture(u, plafondVeille);\n  if (!L || !L.ok)', '  const L = { ok: true };\n  if (!L || !L.ok)'],
   range: ["    if (!range) { delete bases[u].convs[conv]; noterDiag('serveur_fil_pas_range'); continue; }", ''],
   deco: ['        if (r && (r.etat === \'envoye\' || r.etat === \'refuse\')) d.signale = true;', ''],
   tourdist: ["  if (tourPris && tourPris.refus) {", "  if (false) {"],
@@ -81,6 +87,10 @@ if (mut) {
   const [a, b] = MUTATIONS[mut]; const s = fs.readFileSync(SRC0, 'utf8');
   if (!s.includes(a)) { console.log('mutation introuvable : ' + mut); process.exit(2); }
   SRC = path.join(os.tmpdir(), `bg-serveur-${mut}-${process.pid}.js`); fs.writeFileSync(SRC, s.split(a).join(b));
+  // Une mutation de la RÈGLE (le bloc recopié) touche aussi src/ordinateurServeur.js : la copie reste exacte (S0i ne
+  // rougit pas « pour rien »), ce sont les comportements qui doivent rougir.
+  const r0 = fs.readFileSync(REGLE, 'utf8');
+  if (r0.includes(a)) { REGLE = path.join(os.tmpdir(), `regle-serveur-${mut}-${process.pid}.mjs`); fs.writeFileSync(REGLE, r0.split(a).join(b)); }
 }
 let ko = 0, ok = 0;
 const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}`); } else { ko++; console.log(`  ❌ ${quoi}${detail ? ' — ' + String(detail).slice(0, 600) : ''}`); } };
@@ -152,9 +162,9 @@ const H = 3600000;
   const lignesPartagees = {};
   const ecritures = [];          // les écritures « chez Vinted » (le geste), avec leur intervalle
   let enVolEcritures = 0, maxEnVolEcritures = 0;
-  function profil({ uid, on = true, onglets = null, lignes = null, ecritureKO = () => false } = {}) {
+  function profil({ uid, on = true, rapide, onglets = null, lignes = null, ecritureKO = () => false } = {}) {
     const st = { vrmCloisonne: true, vrmSession: { access_token: 'jeton.vrm.' + uid, refresh_token: 'rt', expires_at: Date.now() + H, user_id: MOI, email: 'banc@exemple.fr' } };
-    if (on) st.vrmServeur = { on: true, at: Date.now() };
+    if (on) st.vrmServeur = Object.assign({ on: true, at: Date.now() }, rapide === undefined ? {} : { rapide });
     const etat = { connecte: uid };
     const f = faireFond({ src: SRC, lignes: lignes || lignesPartagees, store: st, connecte: uid, vrm, ecritureKO,
       comptes: [{ vinted_user_id: A, login: 'shop_a', domain: 'www.vinted.fr', access_token: 'j1' }, { vinted_user_id: B, login: 'shop_b', domain: 'www.vinted.fr', access_token: 'j2' }],
@@ -230,7 +240,12 @@ const H = 3600000;
     dit(lectures(pa) === n0, 'S5a avant l’heure tirée : aucune lecture', JSON.stringify([n0, lectures(pa)]));
     forcer(pa); await tick(pa); const ecart2 = Number((pa.store.vrmServeurEtat || {}).precedent);
     forcer(pa); await tick(pa); const ecart3 = Number((pa.store.vrmServeurEtat || {}).precedent);
-    dit([ecart1, ecart2, ecart3].every((x) => x >= 4 * 60000 && x <= 7 * 60000) && ecart1 !== ecart2 && ecart2 !== ecart3, 'S5b l’intervalle tiré dans [4 ; 7] min, jamais deux fois le même', JSON.stringify([ecart1, ecart2, ecart3])); }
+    dit([ecart1, ecart2, ecart3].every((x) => x >= 90000 && x <= 3 * 60000) && ecart1 !== ecart2 && ecart2 !== ecart3, 'S5b veille rapide (par défaut, décision du 28 nov.) : l’intervalle tiré dans [1 min 30 ; 3 min], jamais deux fois le même', JSON.stringify([ecart1, ecart2, ecart3])); }
+  { const f = profil({ uid: A, rapide: false, lignes: {} }); const ec = [];
+    for (let i = 0; i < 4; i++) { forcer(f); await tick(f); ec.push(Number((f.store.vrmServeurEtat || {}).precedent)); }
+    dit(ec.every((x) => x >= 4 * 60000 && x <= 7 * 60000) && ec.every((x, i) => !i || x !== ec[i - 1]), 'S5c veille rapide ÉTEINTE ⇒ retour à [4 ; 7] min, jamais deux fois le même', JSON.stringify(ec)); }
+  { const vs = []; let p = 0; for (let i = 0; i < 400; i++) { const v = srvIntervalle(Math.random(), p, true); vs.push([v, p]); p = v; }
+    dit(vs.every(([v]) => v >= 90000 && v <= 180000) && vs.every(([v, q]) => !q || Math.abs(v - q) >= 7000), 'S5d la règle : [1 min 30 ; 3 min] en rapide, deux de suite à 7 s au moins'); }
 
   console.log('\nS6. 429, captcha, prudence');
   { const f = profil({ uid: A, lignes: {} }); await tick(f); boite(A).statut = 429; forcer(f); await tick(f);
@@ -244,8 +259,18 @@ const H = 3600000;
     dit(lectures(h) === 0 && rh && rh.saute === 'prudence', 'S6d en prudence (lectures de fond suspendues) ⇒ rien ne part, et c’est dit', JSON.stringify(rh)); }
 
   console.log('\nS7. Le budget de lecture');
-  { const f = profil({ uid: A, lignes: {} }); f.store.vrmLectures = { [A]: Array.from({ length: 14 }, () => Date.now() - 1000) }; r = await tick(f);
-    dit(lectures(f) === 0 && r && r.saute === 'budget', 'S7 14 lectures déjà faites dans l’heure ⇒ la veille ne lit pas (6 restent à l’argent et aux colis)', JSON.stringify(r)); }
+  { const f = profil({ uid: A, lignes: {} }); await tick(f); f.store.vrmLectures = { [A]: Array.from({ length: 25 }, () => Date.now() - 1000) }; forcer(f); const nf = lectures(f); r = await tick(f);
+    dit(lectures(f) > nf && r && r.lu === true, 'S7a veille rapide : 25 lectures dans l’heure ⇒ elle lit encore (budget de CE compte 40/h)', JSON.stringify(r));
+    const g = profil({ uid: A, lignes: {} }); g.store.vrmLectures = { [A]: Array.from({ length: 34 }, () => Date.now() - 1000) }; const rg = await tick(g);
+    dit(lectures(g) === 0 && rg && rg.saute === 'budget', 'S7b veille rapide : 34 lectures ⇒ elle s’arrête (6 des 40 restent à l’argent et aux colis)', JSON.stringify(rg));
+    const h = profil({ uid: A, lignes: {} }); await tick(h); h.store.vrmLectures = { [A]: Array.from({ length: 20 }, () => Date.now() - 1000) };
+    const autre = await h.ctx.compterLecture(A);
+    dit(autre && autre.ok === false, 'S7c veille rapide : une AUTRE lecture (photos, argent) reste plafonnée à 20/h — seule la veille va à 40', JSON.stringify(autre));
+    const k = profil({ uid: A, rapide: false, lignes: {} }); k.store.vrmLectures = { [A]: Array.from({ length: 14 }, () => Date.now() - 1000) }; const rk = await tick(k);
+    dit(lectures(k) === 0 && rk && rk.saute === 'budget', 'S7d veille rapide ÉTEINTE : 14 lectures ⇒ la veille ne lit pas (retour à 20/h, 14 pour elle)', JSON.stringify(rk));
+    const m = profil({ uid: A, on: false, lignes: {} }); m.store.vrmLectures = { [A]: Array.from({ length: 25 }, () => Date.now() - 1000) };
+    const lm = await m.ctx.compterLecture(A, 40);
+    dit(lm && lm.ok === false, 'S7e mode éteint : le budget du compte reste 20/h, même demandé plus haut', JSON.stringify(lm)); }
 
   console.log('\nS8. Déconnecté');
   { const n0 = serveur.annonces.length; const f = profil({ uid: A, lignes: {} }); await tick(f); f.etat.connecte = null; await tick(f);

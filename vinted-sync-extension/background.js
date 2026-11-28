@@ -21335,7 +21335,11 @@ async function compterLectureUn(uid, plafond) {
     const vinted = /^\d{1,20}$/.test(String(uid));
     const autres = vinted ? await actionsAutresNavigateurs(uid) : { lectures: [] };
     if (autres === null) noterDiag('lectures_partagees_pas_lues');
-    const maxL = Math.min(LECTURES_MAX_HEURE, plafond, autres === null ? LECTURES_SANS_AUTRES : LECTURES_MAX_HEURE);
+    // 5.457 (28 nov., décision de Julien « vas-y veille rapide ») : 40/h pour CE compte en veille rapide du mode ordinateur
+    //    allumé (`srvLecturesHeure`), 20/h partout ailleurs ; autres Chrome illisibles ⇒ la moitié, comme avant.
+    let maxCompte = LECTURES_MAX_HEURE;
+    try { const rg = (await chrome.storage.local.get([SRV_REGLAGE, SRV_ETAT])); maxCompte = srvLecturesHeure(rg[SRV_REGLAGE], rg[SRV_ETAT] && rg[SRV_ETAT].uid, uid); } catch (_) { maxCompte = LECTURES_MAX_HEURE; }
+    const maxL = Math.min(maxCompte, plafond, autres === null ? Math.floor(maxCompte / 2) : maxCompte);
     const n0 = list.length + ((autres && autres.lectures) || []).length;
     if (n0 >= maxL) return { ok: false, n: n0 };
     list.push(t); cur[uid] = list;
@@ -30245,6 +30249,13 @@ const SRV_INTERVALLE_MIN_MS = 4 * 60000;      // la veille relit la boîte entre
 const SRV_INTERVALLE_MAX_MS = 7 * 60000;
 const SRV_ECART_MIN_MS = 7000;                // deux intervalles de suite diffèrent d'au moins 7 s (« jamais deux fois le même temps »)
 const SRV_PLAFOND_LECTURES = 14;              // la veille s'arrête à 14 des 20 lectures/h du compte (6 restent à l'argent, aux colis, aux photos)
+// « VEILLE RAPIDE » (décision de Julien du 28 nov. : « vas-y veille rapide ») : 1 min 30 à 3 min au hasard ; le budget de
+// LECTURE de CE compte monte à 40/h, SEULEMENT en mode ordinateur allumé avec la veille rapide (ailleurs : 20/h) ; la veille
+// s'arrête à 34 des 40 (6 restent aux autres lectures). Allumée par défaut avec le mode ; éteinte ⇒ 4–7 min et 20/h.
+const SRV_RAPIDE_MIN_MS = 90000;
+const SRV_RAPIDE_MAX_MS = 3 * 60000;
+const SRV_RAPIDE_LECTURES_HEURE = 40;
+const SRV_RAPIDE_PLAFOND = 34;
 const SRV_FILS_PAR_TOUR = 3;                  // au plus 3 conversations neuves ouvertes par relecture (chacune = 1 lecture)
 const SRV_CONVS_LUES = 20;                    // la 1re page de la boîte (20 conversations)
 const SRV_VUS_MAX = 3000;
@@ -30257,16 +30268,23 @@ const SRV_ALLUME_MS = 3 * 60000;              // même seuil que la présence «
 const SRV_RE_UID = /^\d{1,20}$/;
 const SRV_RE_APPAREIL = /^[a-f0-9]{16}$/;
 
-// L'intervalle suivant, tiré au hasard dans [4 ; 7] min, jamais à moins de 7 s du précédent. `alea` : un nombre [0 ; 1[.
-function srvIntervalle(alea, precedent) {
-  const a = Number(alea), span = SRV_INTERVALLE_MAX_MS - SRV_INTERVALLE_MIN_MS;
-  let ms = SRV_INTERVALLE_MIN_MS + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
+// L'intervalle suivant, tiré au hasard dans [4 ; 7] min ([1 min 30 ; 3 min] en veille rapide), jamais à moins de 7 s du
+// précédent. `alea` : un nombre [0 ; 1[.
+function srvBornes(rapide) { return rapide === true ? [SRV_RAPIDE_MIN_MS, SRV_RAPIDE_MAX_MS] : [SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS]; }
+function srvIntervalle(alea, precedent, rapide) {
+  const [MIN, MAX] = srvBornes(rapide);
+  const a = Number(alea), span = MAX - MIN;
+  let ms = MIN + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
   const p = Number(precedent);
-  if (Number.isFinite(p) && p > 0 && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
-    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (3 min) laisse toujours l'un des deux
-    ms = haut <= SRV_INTERVALLE_MAX_MS && (ms >= p || bas < SRV_INTERVALLE_MIN_MS) ? haut : bas >= SRV_INTERVALLE_MIN_MS ? bas : haut;
+  if (Number.isFinite(p) && p >= MIN && p <= MAX && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
+    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (90 s au moins) laisse toujours l'un des deux
+    ms = haut <= MAX && (ms >= p || bas < MIN) ? haut : bas >= MIN ? bas : haut;
   }
   return ms;
+}
+// Le budget de LECTURE d'un compte par heure : 40 en veille rapide du mode ordinateur allumé (CE compte), sinon 20.
+function srvLecturesHeure(reglage, uidVeille, uid) {
+  return reglage && reglage.on === true && reglage.rapide !== false && String(uidVeille || '') !== '' && String(uidVeille) === String(uid) ? SRV_RAPIDE_LECTURES_HEURE : 20;
 }
 // Une date Vinted (secondes, millisecondes, ISO) en millisecondes ; illisible ⇒ 0 (« pas su » : rien ne sonne).
 function srvMs(v) {
@@ -30376,7 +30394,7 @@ function srvLigne(p, maintenant) {
   const n = (x) => { const v = Number(x); return Number.isFinite(v) && v > 0 ? v : null; };
   const base = { appareil: String(p.id || ''), compte: s && SRV_RE_UID.test(String(s.uid || '')) ? String(s.uid) : '', nom: s ? String(s.nom || '').slice(0, 60) : '',
     lu: s ? n(s.lu) : null, prochain: s ? n(s.prochain) : null, actions: s && Number.isInteger(Number(s.actions)) ? Number(s.actions) : null,
-    cap: s ? n(s.cap) : null, jusqua: s ? n(s.jusqua) : null, atMs: n(p.atMs) };
+    cap: s ? n(s.cap) : null, jusqua: s ? n(s.jusqua) : null, atMs: n(p.atMs), rapide: !!(s && s.rapide === true) };
   if (!allume) return Object.assign(base, { code: 'eteint' });
   if (!s || s.on !== true) return Object.assign(base, { code: 'off' });
   if (s.deconnecte === true || !base.compte) return Object.assign(base, { code: 'deconnecte' });
@@ -30539,9 +30557,11 @@ async function serveurTickUn(source) {
     if (autre) { await serveurNoterEtat({ prochain: t + 20000 + Math.floor(Math.random() * 25000) }); noterDiag('serveur_lecture_decalee'); return { saute: 'decale' }; }
   }
   // L'intervalle suivant est tiré AVANT la lecture (une lecture ratée ne fait jamais relire en rafale).
-  const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0);
+  const rapide = reglage.rapide !== false;            // « Veille rapide » (28 nov.) : allumée par défaut avec le mode
+  const plafondVeille = rapide ? SRV_RAPIDE_PLAFOND : SRV_PLAFOND_LECTURES;
+  const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0, rapide);
   await serveurNoterEtat({ prochain: t + ecart, precedent: ecart });
-  const L = await compterLecture(u, SRV_PLAFOND_LECTURES);
+  const L = await compterLecture(u, plafondVeille);
   if (!L || !L.ok) { await serveurNoterEtat({ code: 'budget', prochain: t + 60000 + Math.floor(Math.random() * 60000) }); await publierPresence(moi, true).catch(() => {}); return { saute: 'budget' }; }
   const r = await vintedGetCookie('www.vinted.fr', `/api/v2/inbox?page=1&per_page=${SRV_CONVS_LUES}`);
   if (!r || !r.ok || !r.json || !Array.isArray(r.json.conversations)) {
@@ -30562,7 +30582,7 @@ async function serveurTickUn(source) {
   const evs = [];
   let ouverts = 0;
   for (const conv of ch.changees.slice(0, SRV_FILS_PAR_TOUR)) {
-    const L2 = await compterLecture(u, SRV_PLAFOND_LECTURES);
+    const L2 = await compterLecture(u, plafondVeille);
     if (!L2 || !L2.ok) { delete bases[u].convs[conv]; continue; }        // relue au prochain passage
     const f = await vintedGetCookie('www.vinted.fr', `/api/v2/conversations/${conv}`);
     ouverts++;
@@ -30602,16 +30622,24 @@ async function serveurPourPresence() {
     try { cap = (await cadenceEffective(uid)).actionsHeure; } catch (_) { cap = null; }
   }
   const p = await pauseVinted();
-  return { on: true, uid, nom: String(e.nom || '').slice(0, 60), lu: Number(e.lu) || 0, prochain: Number(e.prochain) || 0, actions, cap,
+  return { on: true, rapide: r.rapide !== false, uid, nom: String(e.nom || '').slice(0, 60), lu: Number(e.lu) || 0, prochain: Number(e.prochain) || 0, actions, cap,
     pause: !!p || e.code === 'pause', jusqua: p ? Number(p.jusqua) || 0 : 0, captcha: e.code === 'captcha', prudence: e.code === 'prudence', budget: e.code === 'budget',
     deconnecte: e.code === 'deconnecte', code: String(e.code || '') };
 }
 // Le panneau : l'état, l'interrupteur (SON toucher).
 async function serveurCarte(msg) {
   const q = String((msg && msg.quoi) || 'etat');
+  if (q === 'rapide' || q === 'lente') {
+    const r0 = (await serveurReglage()) || {};
+    if (!(await serveurEcrire({ [SRV_REGLAGE]: Object.assign({}, r0, { rapide: q === 'rapide', at: Date.now() }) }))) return { ok: false, raison: 'Rien n’a changé (stockage du navigateur muet).' };
+    const e0 = (await serveurLire(SRV_ETAT)) || {};
+    await serveurEcrire({ [SRV_ETAT]: Object.assign({}, e0, { prochain: 0, precedent: 0 }) });   // le nouveau rythme part tout de suite
+    const moi0 = await relaisSessionOwner().catch(() => null); if (moi0) publierPresence(moi0, true).catch(() => {});
+  }
   if (q === 'allumer' || q === 'eteindre') {
     const on = q === 'allumer';
-    if (!(await serveurEcrire({ [SRV_REGLAGE]: { on, at: Date.now() } }))) return { ok: false, raison: 'Rien n’a changé (stockage du navigateur muet).' };
+    const r0 = (await serveurReglage()) || {};
+    if (!(await serveurEcrire({ [SRV_REGLAGE]: { on, rapide: r0.rapide !== false, at: Date.now() } }))) return { ok: false, raison: 'Rien n’a changé (stockage du navigateur muet).' };
     if (!on) { await tourRendre().catch(() => false); await serveurEcrire({ [SRV_BASE]: {} }); }   // éteint puis rallumé : le point de départ repart (jamais l'historique)
     if (on) setTimeout(() => { serveurTick('forcer').catch(() => {}); }, 0);
     const moi = await relaisSessionOwner().catch(() => null); if (moi) publierPresence(moi, true).catch(() => {});

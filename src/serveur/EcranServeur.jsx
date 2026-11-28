@@ -15,7 +15,7 @@ import { Page, Groupe, Rangee, Attente, poserIcone, iconePosee } from '../natif/
 import { Pourquoi } from '../natif/Actions.jsx';
 import { Icon, SUPABASE_URL, sbAuth } from '../App.jsx';
 import { signalFrais } from '../aDistance.js';
-import { lignesServeur, SRV_LATENCE, SRV_PLAFOND_LECTURES } from '../ordinateurServeur.js';
+import { lignesServeur, SRV_LATENCE, SRV_LATENCE_RAPIDE, SRV_PLAFOND_LECTURES, SRV_RAPIDE_PLAFOND } from '../ordinateurServeur.js';
 
 export const SELECT_SERVEUR = 'id,atMs:meta->>atMs,ver:meta->>ver,appareil:data->appareil,serveur:data->serveur';
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion', brave: 'Brave' };
@@ -59,7 +59,7 @@ export function phraseLigne(l, maintenant) {
   const nom = l.nom || l.compte || tr('srv.compteInconnu');
   if (l.code === 'pret') {
     const prochain = l.prochain ? l.prochain - maintenant : null;
-    return { titre: tr('srv.l.pret', { nom }), sous: [l.lu ? tr('srv.l.lu', { age: duree(maintenant - l.lu) }) : tr('srv.l.luPasEncore'), prochain == null ? '' : prochain > 0 ? tr('srv.l.prochain', { dans: duree(prochain) }) : tr('srv.l.maintenant')].filter(Boolean).join(' · '), geste: '' };
+    return { titre: tr('srv.l.pret', { nom }), sous: [tr(l.rapide ? 'srv.l.modeRapide' : 'srv.l.modeNormale'), l.lu ? tr('srv.l.lu', { age: duree(maintenant - l.lu) }) : tr('srv.l.luPasEncore'), prochain == null ? '' : prochain > 0 ? tr('srv.l.prochain', { dans: duree(prochain) }) : tr('srv.l.maintenant')].filter(Boolean).join(' · '), geste: '' };
   }
   if (l.code === 'deconnecte') return { titre: tr('srv.l.deconnecte', { nom }), sous: tr('srv.l.deconnecteSous'), geste: tr('srv.g.deconnecte') };
   if (l.code === 'captcha') return { titre: tr('srv.l.captcha', { nom }), sous: tr('srv.l.captchaSous'), geste: tr('srv.g.captcha') };
@@ -99,10 +99,15 @@ export default function EcranServeur({ onNav = null, base = `${SUPABASE_URL}/res
           }) : <Rangee titre={tr('srv.aucun')} sousTitre={tr('srv.aucunSous')} sousLignes={2} attrs={{ 'data-srv-aucun': '' }}/>}
         </Groupe>
       ) : null}
-      <Groupe titre={tr('srv.g.vitesse')} attrs={{ 'data-srv-latence': String(Math.round(SRV_LATENCE.moyenneMs / 1000)), 'data-srv-pire': String(Math.round(SRV_LATENCE.pireMs / 1000)) }}>
-        <Rangee icone={<Icon name="clock" size={22}/>} titre={tr('srv.v.titre', { moy: duree(SRV_LATENCE.moyenneMs) })} sousTitre={tr('srv.v.sous', { pire: duree(SRV_LATENCE.pireMs) })} sousLignes={2}/>
+      {/* (28 nov., décision de Julien « vas-y veille rapide ») La vitesse MESURÉE sur la règle, par mode : la veille rapide (par
+          défaut) et, si un compte l'a éteinte, la veille normale. */}
+      <Groupe titre={tr('srv.g.vitesse')} attrs={{ 'data-srv-latence': String(Math.round(SRV_LATENCE_RAPIDE.moyenneMs / 1000)), 'data-srv-pire': String(Math.round(SRV_LATENCE_RAPIDE.pireMs / 1000)) }}>
+        <Rangee icone={<Icon name="clock" size={22}/>} titre={tr('srv.v.rapide', { moy: duree(SRV_LATENCE_RAPIDE.moyenneMs) })} sousTitre={tr('srv.v.rapideSous', { pire: duree(SRV_LATENCE_RAPIDE.pireMs) })} sousLignes={2} attrs={{ 'data-srv-mode': 'rapide' }}/>
+        {Array.isArray(servis) && servis.some((l) => l.code !== 'eteint' && l.code !== 'off' && !l.rapide)
+          ? <Rangee icone={<Icon name="clock" size={22}/>} titre={tr('srv.v.normale', { moy: duree(SRV_LATENCE.moyenneMs) })} sousTitre={tr('srv.v.sous', { pire: duree(SRV_LATENCE.pireMs) })} sousLignes={2} attrs={{ 'data-srv-mode': 'normale' }}/> : null}
         <Pourquoi attrs={{ 'data-srv-pourquoi': 'vitesse' }}>
-          <p>{tr('srv.v.p1', { n: SRV_PLAFOND_LECTURES })}</p>
+          <p>{tr('srv.v.p1', { n: SRV_RAPIDE_PLAFOND })}</p>
+          <p>{tr('srv.v.p3', { n: SRV_PLAFOND_LECTURES })}</p>
           <p>{tr('srv.v.p2')}</p>
         </Pourquoi>
       </Groupe>

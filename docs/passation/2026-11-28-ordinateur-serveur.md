@@ -134,3 +134,19 @@ le texte de l'acheteur part, nettoyé (sans balise, sans lien, sans caractère d
 4. Empêcher la mise en veille (Mac : Réglages → Écran ; Windows : Alimentation → Jamais), laisser Chrome ouvert.
 5. Sur l'iPhone : VRM → Menu → **Ordinateur serveur** : chaque compte doit dire « prêt ».
 6. Décider : veux-tu la « veille rapide » (1 min 30 à 3 min, budget de lecture 40/h) ? VRM ne la met pas sans toi.
+
+## 8. Suite du 28 nov. — « Veille rapide » (décision de Julien : « vas-y veille rapide »)
+
+- **Rythme** : 1 min 30 à 3 min au hasard (jamais deux fois le même intervalle, 7 s d'écart au moins) — **moyenne 1 min 8 s,
+  pire 3 min** (calculé sur la règle, `SRV_LATENCE_RAPIDE`). Allumée PAR DÉFAUT avec « Mode ordinateur allumé » ; éteinte
+  par compte dans les Paramètres du panneau (« Veille normale ») ⇒ retour à 4–7 min et 20/h.
+- **Budget de LECTURE** : 40/h pour CE compte seulement (mode allumé + veille rapide + le compte de la veille de ce profil :
+  `srvLecturesHeure`, appliqué dans `compterLectureUn`) ; la veille s'arrête à 34 (6 restent aux autres lectures). Les autres
+  lectures (photos, argent, colis) gardent leur plafond de 20/h ; tous les autres usages restent à 20/h. Autres Chrome
+  illisibles ⇒ la moitié, comme avant.
+- Gardes inchangées : pause 403/429, arrêt au captcha, prudence, tour d'écriture entre profils, lectures décalées.
+- Page « Ordinateur serveur » : le mode sur chaque rangée (« veille rapide » / « veille normale ») et la vitesse mesurée par
+  mode ; panneau : l'état et l'interrupteur, 5 langues. CLAUDE.md §3 (Plafond d'actions) dit la décision.
+- Preuves : `audit-ordinateur-serveur` 52 verts (S5b/S5c/S5d bornes, S7a–S7e budget 40/34, autres lectures à 20, éteinte ⇒
+  20/h, mode éteint ⇒ 20/h) ; `--prouve` : mutations des bornes, du 40, du plafond de la veille, « éteinte ⇒ retour »,
+  et du 40 appliqué partout, toutes rouges. Banc `ordinateur-serveur` : le panneau bascule rapide ⇒ normale.
