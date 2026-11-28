@@ -270,7 +270,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root:root:root:root body .vrm-fp .vrm-fp-num:not(.is-sans)::before { color: #3F5468 !important; }
 /* Le doublon de N° : le seul rouge (§5, §7), sur la même plaque ; « à vérifier sur son carton » : l'ambre. */
 :root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque.is-double, .vrm-num[data-num-etat="doublon"], .vrm-fp-num.is-double, .vrm-emb-num.is-double, .vrm-emb-recap-num.is-double) { color: #B42020 !important; border-color: #B42020 !important; }
-:root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) .vrm-num[data-num-etat="aVerifier"] { color: #764300 !important; border-color: #E08A12 !important; }
+:root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) .vrm-num[data-num-etat="aVerifier"] { color: var(--n-ambre) !important; border-color: var(--n-ambre) !important; }
 
 /* Les FEUILLES : un verre presque opaque (.95), flouté, bordé de blanc en haut, une ombre qui monte ; le voile bleu nuit. */
 :root:root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) {

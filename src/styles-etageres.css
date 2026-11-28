@@ -169,20 +169,20 @@
 :root {
   --etag-plaque: rgb(255 255 255 / .95); --etag-plaque-encre: #0C1D30;
   --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);   /* (23 nov.) noir encre : une paire à sortir est un geste ⇒ ambre (§7) */
-  --etag-plaque-hors: #8F4200; --etag-plaque-hors-encre: #FFFFFF;
+  --etag-plaque-hors: var(--n-ambre); --etag-plaque-hors-encre: #FFFFFF;
   --etag-vide: rgb(120 132 148 / .10); --etag-vide-bord: rgb(120 132 148 / .22);
 }
 :root[data-theme="dark"] {
   --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
   --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);
-  --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
+  --etag-plaque-hors: var(--n-ambre); --etag-plaque-hors-encre: #1D1200;
   --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
     --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);
-    --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
+    --etag-plaque-hors: var(--n-ambre); --etag-plaque-hors-encre: #1D1200;
     --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
   }
 }

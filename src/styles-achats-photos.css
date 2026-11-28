@@ -271,7 +271,7 @@
 }
 :root:root:root[data-theme="dark"] body .vrm-achats-retirer-ligne { box-shadow: none !important; }
 :root:root:root body .vrm-achats-retirer-ligne:active { transform: scale(.985); }
-:root:root:root body .vrm-achats-retirer-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); flex: none; }
+:root:root:root body .vrm-achats-retirer-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, var(--n-ambre)); flex: none; }
 :root:root:root body .vrm-achats-retirer-titre { flex: 1; min-width: 0; }
 :root:root:root body .vrm-achats-retirer-n { color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
 /* (14 nov., soir) Fermée sans colis à retirer : les colis « à vérifier » restent nommés sur la ligne (§5). */

@@ -14,7 +14,7 @@
   --id-creux: var(--sb-creux, #EBEDF0);
   --id-diode: var(--sb-diode, #16181D);
   --id-lien: var(--sb-lien, #16181D);
-  --id-ambre: var(--sb-ambre, #764300);
+  --id-ambre: var(--sb-ambre, var(--n-ambre));
   --id-o: var(--sb-o, 18 52 96);
   --id-ombre-tuile: var(--sb-ombre-pose, inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--id-o) / .07), 0 1px 2px rgb(var(--id-o) / .07), 0 12px 26px -14px rgb(var(--id-o) / .30));
   --id-police-affiche: var(--sb-police-affiche, "Urbanist", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif);
@@ -28,7 +28,7 @@
   --id-creux: var(--sb-creux, #131316);
   --id-diode: var(--sb-diode, #F4F4F5);
   --id-lien: var(--sb-lien, #F4F4F5);
-  --id-ambre: var(--sb-ambre, #F2B65E);
+  --id-ambre: var(--sb-ambre, var(--n-ambre));
   --id-o: var(--sb-o, 0 0 0);
   --id-ombre-tuile: var(--sb-ombre-pose, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
 }
@@ -37,7 +37,7 @@
     --id-encre: var(--sb-encre, #F1F2F4); --id-encre-2: var(--sb-encre-2, #9CB0C6);
     --id-porcelaine: var(--sb-porcelaine, #27272B); --id-porcelaine-2: var(--sb-porcelaine-2, #212126);
     --id-creux: var(--sb-creux, #131316); --id-diode: var(--sb-diode, #F4F4F5); --id-lien: var(--sb-lien, #F4F4F5);
-    --id-ambre: var(--sb-ambre, #F2B65E); --id-o: var(--sb-o, 0 0 0);
+    --id-ambre: var(--sb-ambre, var(--n-ambre)); --id-o: var(--sb-o, 0 0 0);
   }
 }
 

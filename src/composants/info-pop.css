@@ -18,7 +18,7 @@
 :root body .vrm-pop-resume b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
 :root body .vrm-pop-i { flex: 0 0 auto; display: inline-flex; color: var(--vrm-muted, #6E6E73); opacity: .75; }
 :root body .vrm-pop-ligne.is-ambre .vrm-pop-declencheur,
-:root body .vrm-pop-ligne.is-ambre .vrm-pop-i { color: var(--vrm-warn, #B25000); opacity: 1; }
+:root body .vrm-pop-ligne.is-ambre .vrm-pop-i { color: var(--vrm-warn, var(--n-ambre)); opacity: 1; }
 :root body .vrm-pop-ligne.is-ambre .vrm-pop-resume b { color: inherit; }
 :root body .vrm-pop-declencheur:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { :root body .vrm-pop-declencheur:hover .vrm-pop-i { opacity: 1; } }
@@ -36,7 +36,7 @@
 :root body .vrm-pop-puce:active { transform: scale(.97); }
 :root body .vrm-pop-puce-n {
   display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 8px; box-sizing: border-box;
-  border-radius: 999px; background: var(--vrm-warn, #B25000); color: #fff; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+  border-radius: 999px; background: var(--vrm-warn, var(--n-ambre)); color: var(--n-sur-ambre); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 :root body .vrm-pop-puce-chev { color: var(--vrm-muted, #6E6E73); opacity: .7; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-pop-puce { transition: none; } :root body .vrm-pop-puce:active { transform: none; } }
@@ -71,7 +71,7 @@
   font: inherit; font-size: 14px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; cursor: pointer;
   font-variant-numeric: tabular-nums; -webkit-tap-highlight-color: transparent; transition: transform 160ms ease-out;
 }
-:root body .vrm-pop-chip.is-ambre { color: var(--vrm-warn, #B25000); background: color-mix(in srgb, var(--vrm-warn, #B25000) 12%, transparent); }
+:root body .vrm-pop-chip.is-ambre { color: var(--n-ambre) ; background: color-mix(in srgb, var(--vrm-warn, var(--n-ambre-fond)) 12%, transparent); }
 :root body .vrm-pop-chip:active { transform: scale(.97); }
 :root body .vrm-pop-chip:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-pop-chip { transition: none; } :root body .vrm-pop-chip:active { transform: none; } }
@@ -99,4 +99,4 @@
 
 /* (11 nov., lot accessibilité) L’ambre sur son fond teinté à 12 % : #B25000 = 4,40:1 ⇒ en
    clair un ambre un cran plus sombre (#A14800 : 5,2:1). Le sombre passe déjà. */
-:root:not([data-theme="dark"]) body .vrm-pop-chip.is-ambre { color: #A14800; }
+:root:not([data-theme="dark"]) body .vrm-pop-chip.is-ambre { color: var(--n-ambre); }

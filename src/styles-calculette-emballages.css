@@ -34,7 +34,7 @@
 .vrm-calc-tete { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-calc-montant { margin: 2px 0 10px; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .vrm-calc-montant b { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-accent, #16181D); }
-.vrm-calc-res.is-perte .vrm-calc-montant b { color: var(--vrm-warn, #B25000); }
+.vrm-calc-res.is-perte .vrm-calc-montant b { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-calc-borne { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-calc-lignes { margin: 0; display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
 .vrm-calc-lignes > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px; }
@@ -68,16 +68,16 @@
 .vrm-emb2-nom b { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-emb2-nom small { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb2-n { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.vrm-emb2-l.is-alerte .vrm-emb2-n { color: var(--vrm-warn, #B25000); }
+.vrm-emb2-l.is-alerte .vrm-emb2-n { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-emb2-chevron { font-size: 22px; color: var(--vrm-muted, #6E6E73); }
-.vrm-emb2-alerte { margin: -4px 0 8px; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #B25000); }
+.vrm-emb2-alerte { margin: -4px 0 8px; font-size: 13px; font-weight: 600; color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-emb2-defaut, .vrm-emb2-choix { margin-top: 8px; }
 .vrm-emb2-defaut > span, .vrm-emb2-choix > span { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb2-choix { margin: 6px 0 10px; }
 .vrm-emb2-form { display: flex; flex-direction: column; gap: 12px; }
 .vrm-emb2-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb2-form input { font-size: 17px; }
-.vrm-emb2-err { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #B25000); }
+.vrm-emb2-err { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-emb2-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .vrm-emb2-b {
   appearance: none; min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; font: 600 15px var(--vrm-police, inherit);

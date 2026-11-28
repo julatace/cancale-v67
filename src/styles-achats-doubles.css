@@ -4,12 +4,12 @@
    (deux colonnes même à 390 px), le geste en pilule ambre (le geste à faire, §7).
    ════════════════════════════════════════════════════════════════════════════ */
 .vrm-doubles {
-  --dbl-ambre: #B25000; --dbl-sur-ambre: #FFFFFF;
+  --dbl-ambre: var(--n-ambre); --dbl-sur-ambre: #FFFFFF;
   background: var(--w-carte, #fff); color: var(--w-encre, #1D1D1F); border-radius: 20px;
   box-shadow: var(--w-ombre, 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10));
   padding: 14px 14px 12px; margin: 0 0 14px; display: flex; flex-direction: column; gap: 12px;
 }
-:root[data-theme="dark"] .vrm-doubles { box-shadow: none; --dbl-ambre: #FFB340; --dbl-sur-ambre: #1D1D1F; }
+:root[data-theme="dark"] .vrm-doubles { box-shadow: none; --dbl-ambre: var(--n-ambre); --dbl-sur-ambre: #1D1D1F; }
 .vrm-doubles-tete { display: flex; align-items: center; gap: 10px; }
 .vrm-doubles-pastille {
   min-width: 28px; height: 28px; padding: 0 8px; box-sizing: border-box; border-radius: 999px;

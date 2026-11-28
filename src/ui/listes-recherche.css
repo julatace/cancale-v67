@@ -62,5 +62,5 @@
 :root:root:root body .vrm-ui-comparer-ligne + .vrm-ui-comparer-ligne { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
 :root:root:root body .vrm-ui-comparer-ligne dt { font: 400 13px/1.25 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; margin: 0 !important; }
 :root:root:root body .vrm-ui-comparer-ligne dd { margin: 0 !important; font: 600 15px/1.25 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important; font-variant-numeric: tabular-nums !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
-:root:root:root body .vrm-ui-comparer-ligne dd.is-ambre { color: var(--d-ambre, #B25000) !important; }
+:root:root:root body .vrm-ui-comparer-ligne dd.is-ambre { color: var(--d-ambre, var(--n-ambre)) !important; }
 :root:root:root body .vrm-ui-comparer-pied { margin: 0 !important; font: 400 13px/1.35 var(--vrm-police) !important; color: var(--d-gris, #6E6E73) !important; }

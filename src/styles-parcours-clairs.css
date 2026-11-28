@@ -6,7 +6,7 @@
 .vrm-sync-claire .vrm-sync-lignes article { border:0; border-top:1px solid var(--d-filet,rgba(60,60,67,.18)); border-radius:0; background:transparent; padding:16px 0; }
 .vrm-sync-claire article header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
 .vrm-sync-claire article header>span { font-size:12px; color:var(--d-gris,#6e6e73); }
-.vrm-sync-claire [data-sync-probleme="1"]::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--d-ambre-point,#ff9f0a); margin-right:6px; }
+.vrm-sync-claire [data-sync-probleme="1"]::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--d-ambre-point,var(--n-ambre)); margin-right:6px; }
 .vrm-sync-claire dl { margin:8px 0 0; }
 .vrm-sync-claire dl>div { display:grid; grid-template-columns:72px minmax(0,1fr) auto; gap:6px 10px; padding:10px 0; align-items:center; }
 .vrm-sync-claire :is(dt,dd) { margin:0; font-size:13px; }
@@ -84,7 +84,7 @@
 }
 /* Un repère de négociation, sans suggérer une acceptation automatique. */
 .vrm-offre-repere { margin:8px 0 0; color:var(--d-gris,#6e6e73); font-size:12px; line-height:1.4; }
-.vrm-offre-repere[data-offre-niveau="sous-minimum"] { color:var(--d-ambre,#b25000); }
+.vrm-offre-repere[data-offre-niveau="sous-minimum"] { color:var(--d-ambre,var(--n-ambre)); }
 .vrm-b-indicateur { animation:vrm-action-attente .9s linear infinite; }
 @keyframes vrm-action-attente { to { transform:rotate(360deg); } }
 @media(prefers-reduced-motion:reduce) { .vrm-b-indicateur { animation:none; } }

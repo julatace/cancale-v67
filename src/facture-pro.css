@@ -7,7 +7,7 @@
 .vrm-fp-etat { display: grid; gap: 3px; padding: 12px 14px; border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line); color: var(--vrm-ink); }
 .vrm-fp-etat b { font-size: 15px; font-weight: 600; }
 .vrm-fp-etat span { font-size: 13px; line-height: 1.45; color: var(--vrm-muted); overflow-wrap: anywhere; }
-.vrm-fp-etat.is-manque { border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 45%, var(--vrm-line)); }
+.vrm-fp-etat.is-manque { border-color: color-mix(in srgb, var(--vrm-warn, var(--n-ambre)) 45%, var(--vrm-line)); }
 .vrm-fp-etat.is-manque .vrm-b { margin-top: 8px; justify-self: start; }
 
 .vrm-fp-section { display: grid; gap: 10px; padding: 14px; border-radius: 12px; background: var(--vrm-surface); border: 1px solid var(--vrm-line); min-width: 0; }
@@ -23,7 +23,7 @@
 .vrm-fp-champ textarea { resize: vertical; line-height: 1.4; }
 .vrm-fp-champ input:focus, .vrm-fp-champ select:focus, .vrm-fp-champ textarea:focus { border-color: var(--vrm-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vrm-accent) 18%, transparent); }
 .vrm-fp-champ small { font-size: 12px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: anywhere; }
-.vrm-fp-champ[data-fp-manque="1"] input, .vrm-fp-champ[data-fp-manque="1"] select { border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 60%, var(--vrm-line)); }
+.vrm-fp-champ[data-fp-manque="1"] input, .vrm-fp-champ[data-fp-manque="1"] select { border-color: color-mix(in srgb, var(--vrm-warn, var(--n-ambre)) 60%, var(--vrm-line)); }
 .vrm-fp-rangee { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; min-width: 0; }
 
 .vrm-fp-choix { display: grid; gap: 8px; }
@@ -50,14 +50,14 @@
 .vrm-fp-plus summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted); }
 .vrm-fp-plus[open] { display: grid; gap: 8px; }
 .vrm-fp-retour-msg { margin: 0; font-size: 15px; color: var(--vrm-ink); padding: 10px 12px; border-radius: 12px; background: var(--vrm-bg); }
-.vrm-fp-retour-msg.is-ko { color: var(--vrm-warn, #b25000); }
+.vrm-fp-retour-msg.is-ko { color: var(--vrm-warn, var(--n-ambre)); }
 
 /* ── La ligne sur une vente ── */
 .vrm-fp-vente { display: grid; gap: 6px; min-width: 0; }
 .vrm-fp-vente-ligne { display: grid; gap: 2px; text-align: left; width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line); background: var(--vrm-surface); color: var(--vrm-ink); font: inherit; cursor: pointer; }
 .vrm-fp-vente-ligne b { font-size: 15px; font-weight: 600; }
 .vrm-fp-vente-ligne span { font-size: 13px; color: var(--vrm-muted); overflow-wrap: anywhere; }
-.vrm-fp-vente-ligne[data-fp-vente="refusee"] span, .vrm-fp-vente-ligne[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
+.vrm-fp-vente-ligne[data-fp-vente="refusee"] span, .vrm-fp-vente-ligne[data-fp-vente="incertaine"] span { color: var(--vrm-warn, var(--n-ambre)); }
 
 /* ── La feuille (6 nov. : SheetShell) ── */
 .vrm-fs.vrm-fp-fs .vrm-fs-corps { padding: 0; display: flex; flex-direction: column; }
@@ -114,10 +114,10 @@
 .vrm-fp-feuille-corps .vrm-fp-apercu-col { position: static; max-height: none; overflow: visible; }
 .vrm-fp-feuille-corps .vrm-fp-ma-facture .vrm-fp-voir-apercu { display: block; }
 /* Un trou : une mention obligatoire pas encore remplie (ambre, jamais rouge). */
-.vrm-fp-a-trou { color: #9a4a00; background: #fff4e5; border-radius: 4px; padding: 0 4px; font-weight: 600; justify-self: start; }
+.vrm-fp-a-trou { color: var(--n-ambre); background: var(--n-ambre-fond); border-radius: 4px; padding: 0 4px; font-weight: 600; justify-self: start; }
 .vrm-fp-mentions summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--vrm-muted); }
 .vrm-fp-mentions ul { margin: 0; padding: 0 0 0 2px; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--vrm-ink); }
-.vrm-fp-mentions li[data-ok="0"] { color: var(--vrm-warn, #b25000); }
+.vrm-fp-mentions li[data-ok="0"] { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-fp-chiffre { font-variant-numeric: tabular-nums; }
 .vrm-fp-boite { display: grid; gap: 10px; min-width: 0; }
 .vrm-fp-mail { display: grid; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--vrm-bg); border: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-ink); }
@@ -134,7 +134,7 @@
 .vrm-fp-journal li + li { border-top: 1px solid var(--vrm-line); }
 .vrm-fp-journal b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--vrm-ink); }
 .vrm-fp-journal span { color: var(--vrm-muted); overflow-wrap: anywhere; }
-.vrm-fp-journal li[data-fp-journal-etat="refusee"] > span, .vrm-fp-journal li[data-fp-journal-etat="incertaine"] > span { color: var(--vrm-warn, #b25000); }
+.vrm-fp-journal li[data-fp-journal-etat="refusee"] > span, .vrm-fp-journal li[data-fp-journal-etat="incertaine"] > span { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-fp-raison { overflow-wrap: anywhere; }
 
 /* ── Sur la LIGNE de la vente (à côté de la vente, dans la liste) ── */
@@ -144,7 +144,7 @@
 .vrm-fp-ligne-etat { display: grid; gap: 1px; text-align: left; min-height: 44px; padding: 4px 0; background: transparent; border: 0; color: var(--vrm-ink); font: inherit; cursor: pointer; min-width: 0; }
 .vrm-fp-ligne-etat b { font-size: 13px; font-weight: 600; }
 .vrm-fp-ligne-etat span { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.vrm-fp-ligne-etat[data-fp-vente="refusee"] span, .vrm-fp-ligne-etat[data-fp-vente="incertaine"] span { color: var(--vrm-warn, #b25000); }
+.vrm-fp-ligne-etat[data-fp-vente="refusee"] span, .vrm-fp-ligne-etat[data-fp-vente="incertaine"] span { color: var(--vrm-warn, var(--n-ambre)); }
 
 /* (6 nov.) L'aperçu garde SA taille de texte (la page blanche de la facture), quelle
    que soit la règle des tableaux de l'app ; les montants ne se coupent jamais. */
@@ -179,7 +179,7 @@ html body .vrm-fp-apercu .vrm-fp-a-totaux dt { min-width: 0; }
 .vrm-fp-a-envoyer, .vrm-fp-registre { border-radius: var(--w-r, 20px); border: 0; background: var(--w-carte, var(--vrm-surface)); box-shadow: var(--w-ombre, 0 1px 3px rgba(0,0,0,.06)); padding: 16px; }
 .vrm-fp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .vrm-fp-tete-ligne > h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); }
-.vrm-fp-muet.is-ambre { color: var(--vrm-warn, #b25000); }
+.vrm-fp-muet.is-ambre { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-fp-rangees { list-style: none; margin: 0 -16px; padding: 0; display: grid; }
 .vrm-fp-rangees > li + li { border-top: 1px solid var(--vrm-line); margin-left: 16px; }
 .vrm-fp-rangees > li + li > .vrm-fp-rangee { padding-left: 0; }
@@ -192,7 +192,7 @@ button.vrm-fp-rangee:active { background: var(--w-remplir, rgba(120,120,128,.12)
 .vrm-fp-rangee > .vrm-b { flex: none; }
 .vrm-fp-rangee.is-chevron::after { content: ""; flex: none; width: 7px; height: 12px; margin-left: 4px; background: var(--w-gris-2, #C7C7CC);
   -webkit-mask: var(--w-chevron) center / contain no-repeat; mask: var(--w-chevron) center / contain no-repeat; }
-li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--vrm-warn, #b25000); }
+li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--vrm-warn, var(--n-ambre)); }
 .vrm-fp-periode { min-height: 44px; max-width: 100%; padding: 8px 14px; border-radius: 999px; border: 0; background: var(--w-remplir, rgba(120,120,128,.12)); color: var(--vrm-ink); font: inherit; font-size: 15px; font-weight: 600; }
 .vrm-fp-registre-pied { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--vrm-line); font-size: 13px; color: var(--vrm-muted); }
 .vrm-fp-registre-pied b { font-size: 17px; color: var(--vrm-ink); }

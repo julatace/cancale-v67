@@ -15,7 +15,7 @@
 .vrm-sc-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-sc-confirme { display: flex; flex-direction: column; gap: 8px; background: var(--fu-case, #f2f2f7); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
 .vrm-sc-essai { font-size: 13px; line-height: 1.45; font-weight: 600; }
-.vrm-sc-essai.is-ambre { color: var(--fu-ambre-txt, var(--vrm-warn, #b25000)); }
+.vrm-sc-essai.is-ambre { color: var(--fu-ambre-txt, var(--vrm-warn, var(--n-ambre))); }
 .vrm-sc-sous { margin: 0; font-size: 13px; line-height: 1.45; color: var(--fu-gris, #6e6e73); }
 
 .vrm-sc-etapes { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }

@@ -26,4 +26,4 @@ html body .v2-passe[data-v2-passe] .v2r-haut[data-v2-en-grand], html body .v2-pa
    d'arriver, jusqu'à ce qu'il l'ouvre (ambre : un geste à faire — aller le chercher). */
 .v2-passe-lieu small.v2-passe-sorte { font-weight: 600; }
 .v2r-nouveau { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 9px; font-size: 12px; font-weight: 700; line-height: 18px;
-  vertical-align: 1px; color: inherit; background: rgb(255 179 64 / .28); }
+  vertical-align: 1px; color: inherit; background: var(--n-ambre-fond); }
