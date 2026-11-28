@@ -62,6 +62,7 @@ function origine(e) {
   const ids = [].concat(e.extPile || [], e.extId ? [e.extId] : []);
   for (const id of new Set(ids)) { const x = extensions.find((y) => y.id === id); morceaux.push('extension ' + (x ? x.name : id)); }
   if (e.initiator && !/vestiairecollective\./.test(e.initiator)) morceaux.push(e.initiator);
+  if (e.origine === 'exploration') morceaux.push('EXPLORATION');
   morceaux.push(e.src === 'reseau' ? (e.vuParPage ? 'réseau + page' : 'réseau') : e.src);
   return morceaux.join(' · ');
 }

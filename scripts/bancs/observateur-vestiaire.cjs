@@ -31,9 +31,21 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 // MUTATION=1 : une copie de l'extension dont le masquage est cassé (les clés sensibles ne sont plus reconnues,
 // le texte libre n'est plus masqué). Le banc DOIT alors rougir — sinon il ne prouve rien.
 function preparerExtension() {
-  if (!process.env.MUTATION) return EXT_SRC;
+  const mut = process.env.MUTATION;
+  if (!mut) return EXT_SRC;
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'obsvc-mut-'));
   for (const f of fs.readdirSync(EXT_SRC)) fs.copyFileSync(path.join(EXT_SRC, f), path.join(d, f));
+  if (mut === 'liste') {
+    // MUTATION=liste : la liste noire de l'exploration retirée (plus aucun libellé interdit).
+    const p = path.join(d, 'regles.js');
+    const s = fs.readFileSync(p, 'utf8');
+    const s2 = s.replace(/const CLIC_INTERDIT = \/.*\/;/, 'const CLIC_INTERDIT = /(?!)/;');
+    if (s2 === s) throw new Error('mutation « liste » non posée');
+    fs.writeFileSync(p, s2);
+    console.log('MUTATION : liste noire de l\'exploration retirée dans ' + d);
+    return d;
+  }
+  // MUTATION=1 (ou « masquage ») : les clés sensibles ne sont plus reconnues, le texte libre n'est plus masqué.
   for (const f of ['regles.js', 'capteur-page.js']) {
     const p = path.join(d, f);
     let s = fs.readFileSync(p, 'utf8');
@@ -87,6 +99,11 @@ function statique() {
   verifier(R.reconnaitre({ src: 'reseau', methode: 'POST', chemin: '/negotiations' }).id === 'offre_faite' && R.reconnaitre({ src: 'reseau', methode: 'POST', chemin: '/products/12/like' }).id === 'aime', 'POST negotiations ⇒ offre ; POST like ⇒ j\'aime');
   verifier(R.normChemin('/channels/chat_channel/987654-111222333/message') === '/channels/chat_channel/{n}-{n}/message' && R.normChemin('/products/111222333/likes') === '/products/{n}/likes', 'routes sans identifiants');
   verifier(R.reconnaitre({ src: 'geste', geste: 'clic', isTrusted: false }).id === 'geste_clic_auto', 'clic isTrusted faux ⇒ geste simulé');
+  verifier(/const EXPL_DEFAUT = \{ min: 3000, max: 9000, maxPages: 200, profMax: 3,/.test(fond), 'exploration : 3 à 9 s entre deux pages, 200 pages, profondeur 3 par défaut');
+  verifier(['Envoyer', 'J\'aime', 'Acheter', 'Payer', 'Faire une offre', 'Accepter', 'Refuser', 'Ne plus aimer', 'Suivre', 'Supprimer', 'Modifier', 'Enregistrer', 'Signaler', 'Se déconnecter', 'Publier'].every((t) => !R.clicPermis({ texte: t }).ok)
+    && ['Voir plus', 'Description', 'Messages', 'Offres reçues', 'Mes commandes', 'Voir qui a aimé (3)'].every((t) => R.clicPermis({ texte: t }).ok)
+    && !R.clicPermis({ texte: '12', testid: 'like-button' }).ok, 'liste noire : ce qui écrit refusé, ce qui ouvre permis');
+  verifier(!R.lienPermis('/logout', 'https://fr.vestiairecollective.com/', '').ok && !R.lienPermis('/checkout/1', 'https://fr.vestiairecollective.com/', '').ok && !R.lienPermis('https://exemple.org/', 'https://fr.vestiairecollective.com/', '').ok && R.lienPermis('/chat/1-2', 'https://fr.vestiairecollective.com/', '').compte, 'liens : déconnexion, panier, autre site refusés ; messagerie suivie');
 }
 
 // ── 2. Le navigateur ─────────────────────────────────────────────────────────
@@ -118,6 +135,75 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Faux Vesti
 </body></html>`;
 
 const recus = [];   // ce que les faux serveurs ont reçu
+
+// ── La fausse Vestiaire à explorer (plusieurs pages, chargement infini, boutons piégés) ──
+const SITE = { mode: 'test', documents: [], pieges: [] };
+const ENTETE = `<header style="height:60px">
+<button id="menu" aria-haspopup="menu" aria-expanded="false">Mon compte</button>
+<nav id="menu-liste" hidden>
+  <a href="/members/profile-123456.shtml">Mon profil</a> <a href="/notifications/">Notifications</a> <a href="/chat/">Messagerie</a>
+  <a href="/my-account/orders/">Mes commandes</a> <a href="/my-account/negotiations/">Mes offres</a> <a href="/my-account/favorites/">Mes favoris</a>
+  <a href="/my-account/settings/">Réglages</a> <a href="/logout">Se déconnecter</a> <a href="/checkout/">Panier</a>
+</nav>
+<a href="/women/bags/">Sacs</a> <a href="https://exemple.org/">Ailleurs</a> <a href="https://faq.vestiairecollective.com/aide">Aide</a>
+<button aria-haspopup="dialog" data-testid="sell-button">Vendre</button>
+</header>`;
+// Chaque piège écrit vers /piege/… : si l'exploration en touchait un, le faux serveur le verrait.
+const SCRIPT = `<script>
+  const API = 'https://apiv2.vestiairecollective.com';
+  const piege = (n) => fetch(API + '/piege/' + n, { method: 'POST', credentials: 'include', body: '{}' });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'menu') { document.getElementById('menu-liste').hidden = false; b.setAttribute('aria-expanded', 'true'); }
+    if (b.dataset.piege) piege(b.dataset.piege);
+    if (b.dataset.get) fetch(API + b.dataset.get, { credentials: 'include' }).then((r) => r.text()).then((t) => { const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.textContent = t.slice(0, 80); if (b.dataset.lien) d.innerHTML += '<a href="' + b.dataset.lien + '">profil</a>'; document.body.appendChild(d); });
+    if (b.getAttribute('role') === 'tab') { b.parentNode.querySelectorAll('[role=tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b))); }
+  });
+</script>`;
+const PIEGE = (n, texte, attr) => `<button ${attr || 'aria-expanded="false"'} data-testid="${n}-button" data-piege="${n}">${texte}</button>`;
+function pageSite(p) {
+  const html = (corps, extra) => `<!doctype html><html><head><meta charset="utf-8"><title>Vestiaire ${p}</title></head><body>${ENTETE}<main>${corps}</main>${SCRIPT}${extra || ''}</body></html>`;
+  const art = (id) => `<a class="article" href="/sac-article-${id}.shtml" style="display:block;height:420px">Article ${id}</a>`;
+  if (p === '/') return html(`<h1>Accueil</h1><details><summary>À propos</summary><p>texte</p></details>
+    <form method="post" action="/recherche"><input name="q"><button>Voir plus</button></form>`);
+  if (p === '/members/profile-123456.shtml') return html(`<h1>Mon dressing</h1>${PIEGE('follow', 'Suivre')}<div id="liste">${[1, 2, 3].map((i) => art(111000000 + i)).join('')}</div><a href="/members/profile-987654.shtml">Marie</a>`,
+    `<script>let page = 1, charge = false;
+      addEventListener('scroll', async () => {
+        if (charge || page >= 3 || innerHeight + scrollY < document.documentElement.scrollHeight - 100) return;
+        charge = true; page++;
+        const j = await (await fetch('https://apiv2.vestiairecollective.com/users/123456/products?page=' + page, { credentials: 'include' })).json();
+        for (const x of j.data) document.getElementById('liste').insertAdjacentHTML('beforeend', '<a class="article" href="/sac-article-' + x.id + '.shtml" style="display:block;height:420px">Article ' + x.id + '</a>');
+        charge = false;
+      });</script>`);
+  let m = /^\/sac-article-(\d+)\.shtml$/.exec(p);
+  if (m && Number(m[1]) > 111000000 && Number(m[1]) <= 111000009) return html(`<h1>Article ${m[1]}</h1>
+    ${PIEGE('like', 'J\'aime')} ${PIEGE('buy', 'Acheter', 'aria-haspopup="dialog"')} ${PIEGE('offer', 'Faire une offre', 'aria-haspopup="dialog"')} ${PIEGE('send', 'Envoyer')}
+    <button aria-haspopup="dialog" data-testid="likers-open" data-get="/products/${m[1]}/likes" data-lien="/members/profile-987654.shtml">Voir qui a aimé (2)</button>
+    <details><summary>Description</summary><p>Un sac.</p></details>
+    <div role="tablist"><button role="tab" aria-selected="true">Détails</button><button role="tab" aria-selected="false" data-get="/products/${m[1]}/shipping">Livraison</button></div>`);
+  if (p === '/notifications/') return html(`<h1>Notifications</h1><div role="tablist"><button role="tab" aria-selected="false" data-get="/notification-feed?category=messages">Messages</button><button role="tab" aria-selected="false" data-get="/notification-feed?category=updates">Activité</button></div>
+    <button data-get="/notification-feed?page=2">Voir plus</button> ${PIEGE('lu', 'Tout marquer comme lu')}`);
+  if (p === '/chat/') return html(`<h1>Messagerie</h1>${[1, 2, 3].map((i) => `<a href="/chat/987654-11100000${i}">Conversation ${i}</a>`).join(' ')}`,
+    `<script>fetch('https://chat.stream-io-api.com/channels?api_key=CLESTREAMSECRETE', { method: 'POST', body: '{"filter_conditions":{}}' });</script>`);
+  m = /^\/chat\/(987654-11100000\d)$/.exec(p);
+  if (m) return html(`<h1>Conversation</h1><textarea name="message"></textarea>${PIEGE('message', 'Envoyer')}`,
+    `<script>fetch('https://chat.stream-io-api.com/channels/chat_channel/${m[1]}/query?api_key=CLESTREAMSECRETE', { method: 'POST', body: '{"state":true}' });</script>`);
+  if (p === '/my-account/orders/') return html(`<h1>Commandes</h1><a href="/my-account/orders/1">Commande 1</a>`);
+  if (p === '/my-account/orders/1') return html(`<h1>Commande 1</h1><a href="/my-account/orders/1/detail">Détail</a>${PIEGE('annuler', 'Annuler la commande')}`);
+  if (p === '/my-account/orders/1/detail') return html(`<h1>Détail</h1><a href="/my-account/orders/1/detail/plus">Plus loin</a>`);
+  if (p === '/my-account/orders/1/detail/plus') return html('<h1>Trop profond</h1>');
+  if (p === '/my-account/negotiations/') return html(`<h1>Offres</h1><div role="tablist"><button role="tab" aria-selected="false" data-get="/negotiations?role=seller">Offres reçues</button><button role="tab" aria-selected="false" data-get="/negotiations?role=buyer">Envoyées</button></div>
+    ${PIEGE('accepter', 'Accepter', 'aria-haspopup="dialog"')} ${PIEGE('refuser', 'Refuser', 'aria-haspopup="dialog"')}`);
+  if (p === '/my-account/favorites/') return html(`<h1>Favoris</h1>${PIEGE('retirer', 'Retirer des favoris')}`);
+  if (p === '/my-account/settings/') return html(`<h1>Réglages</h1><details><summary>Préférences</summary><p>…</p></details>
+    <form method="post" action="/my-account/settings/"><input name="pseudo"><button>Enregistrer</button></form>${PIEGE('logout', 'Se déconnecter')}`);
+  if (p === '/women/bags/' || p === '/members/profile-987654.shtml') return html('<h1>Hors compte</h1>');
+  return null;
+}
+const ATTENDUES = ['/', '/members/profile-123456.shtml', '/notifications/', '/chat/', '/chat/987654-111000001', '/chat/987654-111000002', '/chat/987654-111000003',
+  '/my-account/orders/', '/my-account/orders/1', '/my-account/orders/1/detail', '/my-account/negotiations/', '/my-account/favorites/', '/my-account/settings/']
+  .concat([1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => '/sac-article-' + (111000000 + i) + '.shtml'));
+const JAMAIS_VUES = ['/women/bags/', '/logout', '/checkout/', '/members/profile-987654.shtml', '/my-account/orders/1/detail/plus'];
 const vus = [];     // toute requête vue par le navigateur
 const CORS = (req) => ({ 'access-control-allow-origin': req.headers().origin || 'https://fr.vestiairecollective.com', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': 'content-type,authorization,x-csrf-token,stream-auth-type,x-stream-client', 'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS', 'access-control-expose-headers': 'x-request-id' });
 
@@ -129,7 +215,18 @@ async function router(ctx) {
     recus.push({ hote: u.host, methode: req.method(), chemin: u.pathname, recherche: u.search, corps: req.postData(), entetes: req.headers() });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS(req) });
     const json = (status, o) => route.fulfill({ status, contentType: 'application/json', headers: Object.assign({ 'set-cookie': 'vc_session=COOKIESECRET; Path=/', 'x-request-id': 'r-1' }, CORS(req)), body: JSON.stringify(o) });
+    if (u.host === 'fr.vestiairecollective.com' && SITE.mode !== 'test' && req.resourceType() === 'document') {
+      SITE.documents.push(u.pathname);
+      if (SITE.mode === 'captcha') return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Un instant…</title><div class="cf-turnstile"></div><p>Vérifiez que vous êtes humain pour continuer.</p>' });
+      if (SITE.mode === '429' && u.pathname === '/notifications/') return route.fulfill({ status: 429, contentType: 'text/html', body: '<!doctype html><p>Too many requests</p>' });
+      const h = pageSite(u.pathname);
+      if (!h) return route.fulfill({ status: 404, contentType: 'text/html', body: '<!doctype html><title>404</title><p>Introuvable</p>' });
+      return route.fulfill({ status: 200, contentType: 'text/html', body: h });
+    }
+    if (u.host === 'fr.vestiairecollective.com' && req.method() !== 'GET') return json(200, { ok: true });
     if (u.host === 'fr.vestiairecollective.com') return route.fulfill({ status: 200, contentType: 'text/html', headers: { 'set-cookie': 'vc_session=COOKIESECRET; Path=/' }, body: HTML });
+    if (/^\/piege\//.test(u.pathname)) { SITE.pieges.push(req.method() + ' ' + u.pathname); return json(200, { ok: true }); }
+    if (/\/users\/123456\/products/.test(u.pathname)) return json(200, { data: [1, 2, 3].map((i) => ({ id: 111000000 + (Number(u.searchParams.get('page')) - 1) * 3 + i })) });
     if (u.pathname === '/users/me') return json(200, { meta: {}, data: { id: '123456', firstName: 'Pseudotest', email: 'julien@exemple.fr', phone: '0600000000' } });
     if (/notification-feed-counter/.test(u.pathname)) return json(200, { data: { unseen: { messages: 2, notifications: 5 } } });
     if (/notification-feed/.test(u.pathname)) return json(200, { data: [{ id: 'n1', eventType: 'custom_community', textBody: 'Marie vient d\'aimer votre pièce, envoyez-lui un message !', date: '2026-11-27T10:00:00Z', productLink: { deeplink: 'vc://like_item/111222333', meta: { type: 'chat', data: { id: '987654-111222333' } } } }] });
@@ -359,6 +456,8 @@ async function scenario() {
     const html = fs.readFileSync(await dlh.path(), 'utf8');
     verifier(/Routes vues/.test(html) && !/<script/i.test(html) && sansSecret(html).length === 0, 'résumé HTML : routes, sans script, sans secret');
 
+    await explorationBanc(ctx, sw, id, pageExt, v);
+
     console.log('Rien ne sort');
     const hotes = new Set(vus.map((u) => { try { const x = new URL(u); return x.protocol === 'chrome-extension:' ? 'extension' : x.host; } catch (_) { return u; } }));
     const permis = /^(fr|apiv2)\.vestiairecollective\.com$|^chat\.stream-io-api\.com$|^extension$/;
@@ -392,6 +491,102 @@ async function scenario() {
     fs.rmSync(dossier, { recursive: true, force: true });
     fs.rmSync(autre, { recursive: true, force: true });
   }
+}
+
+async function etatExpl(pageExt) { return (await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_etat' }))).etat; }
+async function attendreExpl(pageExt, cond, ms) { const fin = Date.now() + ms; let s; while (Date.now() < fin) { s = await etatExpl(pageExt); if (cond(s)) return s; await attendre(250); } return s; }
+
+async function explorationBanc(ctx, sw, id, pageExt, v) {
+  console.log('Exploration du site');
+  await pageExt.evaluate(() => chrome.storage.local.set({ obs_expl_essai: { min: 150, max: 400 } }));
+  SITE.mode = 'exploration'; SITE.documents = []; SITE.pieges = [];
+  const recusAvant = recus.length;
+  const pop = await ctx.newPage();
+  await pop.goto('chrome-extension://' + id + '/popup.html');
+  await attendre(300);
+  await pop.click('#expl-lancer');
+  // pendant ce temps, l'utilisateur clique dans SON onglet
+  await attendre(1500);
+  await v.click('h1');
+  let progression = 0;
+  // pendant : le popup compte les pages
+  const enCours = await attendreExpl(pageExt, (x) => x && x.n >= 3, 60000);
+  await attendre(1300);
+  const pendantTxt = await pop.evaluate(() => document.getElementById('expl-etat').textContent);
+  verifier(enCours && /^\d+ pages vues · \d+ en attente · exploration en cours$/.test(pendantTxt) && !(await pop.evaluate(() => document.getElementById('expl-arreter').hidden)), 'pendant : « N pages vues · … · exploration en cours », bouton Arrêter actif', pendantTxt);
+  const s = await attendreExpl(pageExt, (x) => { return x && !x.actif; }, 180000);
+  await attendre(1300);
+  progression = Number(await pop.evaluate(() => document.getElementById('expl-etat').dataset.n));
+  const texteEtat = await pop.evaluate(() => document.getElementById('expl-etat').textContent);
+  verifier(s && s.arret && s.arret.fini && /tout ce qui était à voir/.test(s.arret.raison), 'l\'exploration va au bout d\'elle-même', s && s.arret);
+  verifier(progression === s.n && new RegExp('^' + s.n + ' pages vues · 0 en attente · terminée').test(texteEtat), 'à la fin : « ' + texteEtat + ' »');
+  const docs = new Set(SITE.documents);
+  const manque = ATTENDUES.filter((p) => !docs.has(p));
+  verifier(!manque.length, 'toutes les pages du compte visitées : accueil, profil, les 9 articles (chargement infini), notifications, messagerie et chaque conversation, commandes, offres, favoris, réglages', { manque, vues: [...docs] });
+  const interdites = JAMAIS_VUES.filter((p) => docs.has(p));
+  verifier(!interdites.length, 'jamais ouvertes : catalogue hors compte, déconnexion, panier, profil d\'une autre personne, 4ᵉ niveau de profondeur', interdites);
+  const pendant = recus.slice(recusAvant);
+  verifier(pendant.some((x) => /products/.test(x.chemin || '') && /page=3/.test(x.recherche || '')), 'chargement infini : les pages 2 et 3 du dressing demandées en défilant');
+  const likers = new Set(pendant.filter((x) => /\/products\/1110000\d\d\/likes$/.test(x.chemin || '')).map((x) => x.chemin));
+  verifier(likers.size === 9, '« Voir qui a aimé » ouvert sur chacun des 9 articles', [...likers]);
+  verifier(pendant.some((x) => /shipping$/.test(x.chemin || '')) && pendant.some((x) => /page=2/.test(x.recherche || '') && /notification-feed/.test(x.chemin || '')) && pendant.some((x) => /role=buyer/.test(x.recherche || '')) && pendant.some((x) => /category=messages/.test(x.recherche || '')), 'onglets, accordéons, « Voir plus » ouverts (livraison, notifications page 2, offres envoyées, onglet Messages)');
+  verifier(SITE.pieges.length === 0, 'AUCUN bouton piégé cliqué (Envoyer, J\'aime, Acheter, Faire une offre, Suivre, Vendre, Accepter, Refuser, Annuler, Tout marquer comme lu, Retirer des favoris, Se déconnecter)', SITE.pieges);
+  const nonGet = pendant.filter((x) => x.methode && !/^(GET|OPTIONS|WS|WS-msg)$/.test(x.methode));
+  const propres = nonGet.filter((x) => x.hote === 'chat.stream-io-api.com' && /^\/channels(\/chat_channel\/[\d-]+\/query)?$/.test(x.chemin));
+  verifier(nonGet.length === propres.length && propres.length === 4, 'aucune requête non-GET provoquée : seules celles que les pages de messagerie font d\'elles-mêmes au chargement (4)', nonGet.map((x) => x.methode + ' ' + x.chemin));
+  verifier(!pendant.some((x) => /recherche|settings/.test(x.chemin || '') && x.methode === 'POST'), 'aucun formulaire soumis');
+  const delais = s.delais || [];
+  verifier(delais.length >= 20 && new Set(delais).size === delais.length && delais.every((d) => d >= 150 && d <= 400), 'rythme au hasard, jamais deux fois le même temps', delais.slice(0, 10));
+  const tout = await lireTout(pageExt);
+  const R = regles();
+  const ex = R.exploration(tout);
+  verifier(ex.pages.length === s.n && ex.nonGet.length >= 4 && ex.nonGet.every((x) => !x.apresClic), 'résumé : pages vues, requêtes non-GET notées, aucune après un clic de l\'exploration', ex.nonGet);
+  const refus = ex.refus.map((r) => r.libelle);
+  verifier(['J\'aime', 'Acheter', 'Faire une offre', 'Envoyer', 'Suivre', 'Vendre', 'Tout marquer comme lu', 'Accepter', 'Refuser', 'Se déconnecter'].every((x) => refus.includes(x)), 'liste noire : chaque piège vu et refusé, avec sa raison', [...new Set(refus)]);
+  verifier(ex.parTheme.aimes.some((r) => /likes/.test(r.route)) && ex.parTheme.notifications.some((r) => /notification-feed/.test(r.route)) && ex.parTheme.messages.some((r) => /stream-io-api/.test(r.route)) && ex.parTheme.offres.some((r) => /negotiations/.test(r.route)), 'résumé : routes découvertes par thème (likes, notifications, messagerie Stream, offres)', ex.parTheme);
+  const exT = tout.filter((e) => e.origine === 'exploration');
+  verifier(exT.some((e) => e.src === 'reseau') && exT.some((e) => e.src === 'page') && exT.some((e) => e.src === 'geste' && e.isTrusted === false), 'ce que l\'exploration provoque est capté (fond, page, ses clics), marqué « exploration »');
+  verifier(tout.some((e) => e.src === 'geste' && e.isTrusted === true && e.origine !== 'exploration' && e.t > s.debut), 'les gestes de l\'utilisateur restent captés dans son onglet, pendant l\'exploration, à part');
+  const o = R.outil(R.attribuer(R.fusionner(tout)), []);
+  verifier(o.exploration > 0 && !Object.keys(o.autoParType).some((k) => /exploration/.test(k)), '« Ce que l\'outil a fait » ne mélange pas l\'exploration aux gestes de l\'utilisateur');
+  const pages = ctx.pages().map((p) => p.url());
+  verifier(!pages.some((u) => /my-account\/settings/.test(u)), 'fini : la fenêtre d\'exploration est refermée', pages);
+
+  console.log('Limite, arrêt, reprise');
+  await pageExt.evaluate(() => chrome.storage.local.set({ obs_expl_essai: { min: 150, max: 400, maxPages: 5 } }));
+  SITE.documents = [];
+  await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_lancer' }));
+  const s2 = await attendreExpl(pageExt, (x) => x && !x.actif, 60000);
+  verifier(s2.n === 5 && /limite de 5 pages/.test(s2.arret.raison) && SITE.documents.length === 5, 'limite de pages respectée (5)', { n: s2.n, docs: SITE.documents });
+  await pageExt.evaluate(() => chrome.storage.local.set({ obs_expl_essai: { min: 150, max: 400 } }));
+  await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_lancer' }));
+  await attendreExpl(pageExt, (x) => x && x.n >= 2, 30000);
+  await pop.reload(); await attendre(400);
+  await pop.click('#expl-arreter');
+  const s3 = await attendreExpl(pageExt, (x) => x && !x.actif, 3000);
+  await attendre(1500);
+  const s3b = await etatExpl(pageExt);
+  verifier(s3 && !s3.actif && /arrêtée par toi/.test(s3.arret.raison) && s3b.n === s3.n, '« Arrêter » arrête tout de suite, plus rien ne bouge', { n: s3 && s3.n, apres: s3b.n });
+  await pop.reload(); await attendre(1200);
+  verifier(!(await pop.evaluate(() => document.getElementById('expl-reprendre').hidden)), 'bouton « Reprendre » proposé');
+  await pop.click('#expl-reprendre');
+  const s4 = await attendreExpl(pageExt, (x) => x && x.n >= s3.n + 2, 30000);
+  verifier(s4 && s4.n >= s3.n + 2 && !s4.vus.slice(0, s3.vus.length).some((u, i) => u !== s3.vus[i]), 'reprise : continue là où elle s\'était arrêtée', { avant: s3.n, apres: s4 && s4.n });
+  await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_arreter' }));
+  await attendreExpl(pageExt, (x) => x && !x.actif, 5000);
+
+  console.log('Arrêt sur vérification, sur 429');
+  SITE.mode = 'captcha'; SITE.documents = [];
+  await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_lancer' }));
+  const s5 = await attendreExpl(pageExt, (x) => x && !x.actif, 30000);
+  verifier(s5 && /vérification affichée/.test(s5.arret.raison) && s5.n === 1 && SITE.documents.length === 1, 'faux captcha : arrêt immédiat à la première page', s5 && { n: s5.n, raison: s5.arret.raison, docs: SITE.documents, vus: s5.vus });
+  verifier(ctx.pages().some((p) => /fr\.vestiairecollective\.com\/$/.test(p.url())), 'l\'onglet reste ouvert pour que tu voies la vérification');
+  SITE.mode = '429'; SITE.documents = [];
+  await pageExt.evaluate(() => chrome.runtime.sendMessage({ quoi: 'expl_lancer' }));
+  const s6 = await attendreExpl(pageExt, (x) => x && !x.actif, 60000);
+  verifier(s6 && /429/.test(s6.arret.raison) && SITE.documents[SITE.documents.length - 1] === '/notifications/', '429 : arrêt immédiat', s6 && { raison: s6.arret.raison, docs: SITE.documents });
+  await pop.close();
+  SITE.mode = 'test';
 }
 
 (async () => {

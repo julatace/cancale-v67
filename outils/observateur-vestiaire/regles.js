@@ -166,12 +166,14 @@
     websocket: 'WebSocket (temps réel)', sse: 'Flux serveur (EventSource)', navigation: 'Navigation dans la page (sans rechargement)',
     dom: 'Élément ajouté à la page par une extension', extension: 'Extension installée / activée / désactivée', extensions_liste: 'Liste des extensions',
     debut: 'Enregistrement allumé / éteint', console: 'Message de la console de la page', debogueur: 'Capture complète (débogueur) attachée / détachée',
-    onglet: 'Onglet Vestiaire ouvert / fermé / actualisé', compte: 'Compte Vestiaire vu dans la page', trop: 'Trop d\'événements (une partie non notée)',
+    onglet: 'Onglet Vestiaire ouvert / fermé / actualisé', exploration: 'Exploration (page vue, arrêt, reprise)', compte: 'Compte Vestiaire vu dans la page', trop: 'Trop d\'événements (une partie non notée)',
   };
 
   function estReseau(e) { return e.src === 'reseau' || (e.src === 'cdp' && e.api === 'net') || (e.src === 'page' && (e.api === 'fetch' || e.api === 'xhr' || e.api === 'beacon')); }
 
   function reconnaitre(e) {
+    if (e.src === 'geste' && e.origine === 'exploration') return { id: 'exploration_' + e.geste, nom: (NOMS_GESTE[e.geste] || e.geste) + ' de l\'exploration', cat: 'geste', humain: false, exploration: true };
+    if (e.src === 'exploration') return { id: 'exploration', nom: NOMS_FIXES.exploration, cat: 'contexte' };
     if (e.src === 'geste') {
       const humain = e.isTrusted === true;
       const base = NOMS_GESTE[e.geste] || ('Geste ' + e.geste);
@@ -247,7 +249,7 @@
   // dans les 3 secondes avant : sans doute partie d'un programme.
   const FENETRE_GESTE = 3000;
   function attribuer(evs) {
-    const gestes = evs.filter((e) => e.src === 'geste' && e.isTrusted === true && (e.geste === 'clic' || e.geste === 'touche' || e.geste === 'soumission'));
+    const gestes = evs.filter((e) => e.src === 'geste' && e.origine !== 'exploration' && e.isTrusted === true && (e.geste === 'clic' || e.geste === 'touche' || e.geste === 'soumission'));
     for (const e of evs) {
       const a = reconnaitre(e);
       e._action = a;
@@ -307,7 +309,7 @@
       if (!m.has(k)) m.set(k, { periode: k, ecritures: 0, gestesHumains: 0, gestesAuto: 0, lectures: 0, refus: 0 });
       const r = m.get(k);
       if (a.cat === 'ecriture') r.ecritures++;
-      else if (a.cat === 'geste') { if (a.humain) r.gestesHumains++; else r.gestesAuto++; }
+      else if (a.cat === 'geste') { if (a.humain) r.gestesHumains++; else if (!a.exploration) r.gestesAuto++; }
       else if (a.cat === 'lecture') r.lectures++;
       if ((e.statut || 0) >= 400) r.refus++;
     }
@@ -318,9 +320,10 @@
   // requêtes dont la pile d'appel passe par le script d'une extension.
   function outil(entrees, extensions) {
     const noms = new Map((extensions || []).map((x) => [x.id, x.name]));
-    const r = { gestesHumains: 0, gestesAuto: 0, ecrituresAvecGeste: 0, ecrituresSansGeste: 0, parExtension: {}, autoParType: {}, sansGesteParType: {} };
+    const r = { gestesHumains: 0, gestesAuto: 0, ecrituresAvecGeste: 0, ecrituresSansGeste: 0, parExtension: {}, autoParType: {}, sansGesteParType: {}, exploration: 0 };
     for (const e of entrees) {
       const a = e._action || reconnaitre(e);
+      if (e.origine === 'exploration') { r.exploration++; continue; }   // ce que l'exploration provoque est compté à part
       if (a.cat === 'geste') {
         if (a.humain) r.gestesHumains++; else { r.gestesAuto++; r.autoParType[a.nom] = (r.autoParType[a.nom] || 0) + 1; }
       }
@@ -439,6 +442,25 @@
     return out;
   }
 
+  // Ce que l'exploration a vu et provoqué : pages, routes découvertes par thème, requêtes non-GET (et si un de SES clics
+  // les précède de moins de 2,5 s), clics refusés, arrêts.
+  function exploration(entrees) {
+    const ex = entrees.filter((e) => e.origine === 'exploration');
+    const pages = entrees.filter((e) => e.src === 'exploration' && e.etape === 'page').map((e) => ({ t: new Date(e.t).toISOString(), url: e.chemin, profondeur: e.profondeur, statut: e.statutPage, clics: e.clics, liens: e.liens }));
+    const refus = [].concat(...entrees.filter((e) => e.src === 'exploration' && e.etape === 'page').map((e) => (e.refuses || []).map((r) => Object.assign({ page: e.chemin }, r))));
+    const arrets = entrees.filter((e) => e.src === 'exploration' && e.etape === 'arret').map((e) => e.detail);
+    // Un clic de l'exploration « provoque » une requête non-GET qui part moins de 2,5 s après lui, SUR LA MÊME PAGE
+    // (aucun chargement de page entre les deux) ; ce qu'une page fait à son chargement est seulement noté.
+    const clics = ex.filter((e) => e.src === 'geste').map((e) => e.t);
+    const chargements = ex.filter((e) => e.src === 'reseau' && e.type === 'main_frame').map((e) => e.t);
+    const nonGet = ex.filter((e) => e.methode && !/^(GET|HEAD|OPTIONS|WS|SSE)$/i.test(e.methode) && (e.src === 'reseau' || e.src === 'page' || e.src === 'cdp'))
+      .map((e) => ({ t: new Date(e.t).toISOString(), route: (cleRoute(e) || {}).cle, apresClic: clics.some((t) => t <= e.t && e.t - t < 2500 && !chargements.some((c) => c > t && c <= e.t)) }));
+    const rs = routes(ex);
+    const parTheme = {};
+    for (const k of Object.keys(THEMES)) parTheme[k] = rs.filter((r) => r.themes.includes(k)).map((r) => ({ route: r.cle, n: r.n, statuts: r.statuts }));
+    return { pages, parTheme, nonGet, refus, arrets, routes: rs.map((r) => r.cle) };
+  }
+
   const THEMES = { aimes: 'Likes / favoris (« a aimé votre pièce »)', notifications: 'Notifications', messages: 'Conversations / messages', offres: 'Offres / contre-offres / négociations', compte: 'Compte connecté' };
   function resumeExport(entrees) {
     const rs = routes(entrees);
@@ -465,10 +487,62 @@
       texte.push('   Envoi du ' + s.t + ' (' + s.route + ')' + (s.apresGesteHumain === false ? ' — sans geste humain juste avant' : ''));
       for (const et of s.etapes) texte.push('     ' + (et.dt_ms >= 0 ? '+' : '') + (et.dt_ms / 1000).toFixed(1) + ' s  ' + et.quoi + (et.cetEnvoi ? '   ⇐ CET ENVOI' : ''));
     }
-    return { texte, hotes, parTheme, sequencesMessage: seq, routes: rs };
+    const ex = exploration(entrees);
+    texte.push('— Exploration du site par l\'Observateur : ' + (ex.pages.length ? ex.pages.length + ' page(s) vue(s)' + (ex.arrets.length ? ' · arrêt : ' + ex.arrets[ex.arrets.length - 1] : '') : 'pas lancée'));
+    if (ex.pages.length) {
+      for (const [k, nom] of Object.entries(THEMES)) texte.push('   ' + nom + ' découvert(es) : ' + (ex.parTheme[k].length ? ex.parTheme[k].map((r) => r.route + ' × ' + r.n).slice(0, 30).join(' ; ') : 'rien'));
+      texte.push('   Requêtes non-GET dans l\'onglet exploré : ' + ex.nonGet.length + ' (provoquées par un clic de l\'exploration : ' + ex.nonGet.filter((x) => x.apresClic).length + ')');
+      texte.push('   Clics refusés par la liste noire : ' + ex.refus.length);
+    }
+    return { texte, hotes, parTheme, sequencesMessage: seq, exploration: ex, routes: rs };
   }
 
-  const COLONNES_CSV = ['t_iso', 't_ms', 'source', 'action', 'categorie', 'themes', 'route', 'operation', 'methode', 'hote', 'chemin', 'recherche', 'type', 'api', 'initiator', 'tabId', 'statut', 'duree_ms', 'taille', 'erreur', 'isTrusted', 'geste', 'cible', 'champ', 'longueur', 'valeur', 'apres_geste_humain', 'extensions_vues', 'frame', 'entetes_requete', 'entetes_reponse', 'detail', 'corps', 'reponse'];
+  // ─── Exploration : ce qu'elle a le droit de toucher ────────────────────────────────────────
+  // L'exploration LIT. Un clic n'est fait que sur un élément qui ouvre (onglet, accordéon, menu, fenêtre d'information,
+  // « voir plus ») et JAMAIS sur ce qui écrit ou engage : la liste noire ci-dessous est jugée sur le libellé
+  // (texte, aria-label, title, data-testid, id, name, value), accents retirés. Le banc la teste et la retire (mutation).
+  const CLIC_INTERDIT = /\benvoyer\b|\bsend\b|\bpublier\b|\bpublish\b|\bpost\b|\bacheter\b|\bbuy\b|checkout|\bpanier\b|\bcart\b|\bpayer\b|\bpay\b|paiement|payment|commander\b|passer (la |a la )?commande|place order|order now|faire une offre|make (an )?offer|\bproposer\b|\bpropose\b|contre-?offre|counter-?offer|negocier|\baccepter\b|\baccept\b|\brefuser\b|\bdecline\b|\breject\b|j.aime|\baimer\b|\blike\b|unlike|\blove\b|\bheart\b|\bcoeur\b|\bcœur\b|ajouter aux favoris|retirer des favoris|add to (favou?rites|wishlist)|remove from|\bsuivre\b|\bfollow\b|unfollow|s.abonner|subscribe|supprim|\bdelete\b|\bremove\b|\bretirer\b|effacer|\bmodifier\b|\bedit\b|enregistrer|\bsave\b|sauvegard|signaler|\breport\b|bloquer|\bblock\b|deconnect|deconnexion|logout|log ?out|sign ?out|se connecter|connexion|log ?in|sign ?in|s.inscrire|sign ?up|register|\bvendre\b|\bsell\b|deposer|deposit|repondre|\breply\b|ecrire|\bwrite\b|contacter|\bcontact\b|discuter|annuler|\bcancel\b|rembours|refund|\bretour\b|\breturn\b|baisser|lower|boost|promouvoir|promote|archiver|archive|partager|\bshare\b|copier|\bcopy\b|imprimer|\bprint\b|telecharger|download|upload|importer|ajouter|\badd\b|valider|confirmer|confirm|submit|soumettre|marquer|mark as|desactiver|\bactiver\b|enable|disable|vacances|vacation|\bnoter\b|evaluer|laisser un avis|\brate\b|review|\bvider\b|\bclear\b|masquer|\bhide\b|\bmute\b|reserver|reserve|\bchanger\b|\bchange\b|installer|install|quitter|\bleave\b/;
+  // Exception unique : OUVRIR la liste de ceux qui ont aimé (« Voir qui a aimé »), jamais le bouton qui aime.
+  const VOIR_AIMES = /qui (a|ont) aime|who liked|voir les (j.aime|likes)|liste des (j.aime|likes)|\blikers?\b/;
+  const BASCULE_AIME = /like-?(button|btn|toggle)|btn-?like|(add|remove)-?(to-?)?(favou?rite|wishlist)|\bheart\b|ne plus|unlike|retirer/;
+  const VOIR_PLUS = /voir plus|afficher plus|plus de resultats|charger plus|load more|show more|see more|en savoir plus|lire la suite|tout voir|voir tout|see all|view all|\bdetails?\b|\binfos?\b|information|\bsuivant\b|\bnext\b|page suivante|^\s*\d{1,3}\s*$|^\s*plus\s*$/;
+  const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘`]/g, "'").toLowerCase();
+  function libelleDe(d) { return sansAccents([d.texte, d.aria, d.titre, d.testid, d.id, d.nom, d.valeur].filter(Boolean).join(' | ')); }
+  function clicPermis(d) {
+    const lib = libelleDe(d || {});
+    if (VOIR_AIMES.test(lib) && !BASCULE_AIME.test(lib)) return { ok: true, raison: 'liste des j\'aime' };
+    const m = CLIC_INTERDIT.exec(lib);
+    if (m) return { ok: false, raison: 'interdit : « ' + m[0] + ' »' };
+    return { ok: true, raison: '' };
+  }
+  function voirPlus(d) { return VOIR_PLUS.test(libelleDe(d || {})); }
+
+  // Un lien que l'exploration peut OUVRIR (GET d'une page) : même hôte, rien qui déconnecte, paie, vend ou écrit.
+  const LIEN_INTERDIT = /logout|log-out|signout|sign-out|deconnexion|disconnect|\/login|signin|sign-in|connexion|register|inscription|checkout|\/cart\b|panier|payment|paiement|\/pay\b|\/buy\b|acheter|\/sell\b|vendre|deposit|\/depot|\/delete|supprim|\/edit\b|modifier|\/report|signaler|unsubscribe|desabonn|\/remove|\/cancel|annul|\/new\b|\/create|\/upload|\/(like|unlike|follow|unfollow)(\/|$)|[?&](action|do)=/i;
+  const LIE_COMPTE = /\/(profile|members?|users?|me|account|mon-compte|my-account|dressing|closet|chat|messages?|messagerie|inbox|notifications?|orders?|commandes?|sales|ventes|purchases|achats|offers?|offres|negotiations?|favorites?|favoris|wishlist|likes?|liked|settings|parametres|reglages|alerts?|wallet|porte-monnaie)(\/|-|\b)/i;
+  function urlPropre(href, base) {
+    try {
+      const u = new URL(href, base);
+      u.hash = '';
+      for (const k of Array.from(u.searchParams.keys())) if (/^(utm_|fbclid|gclid|ref$|from$|tracking|_ga)/i.test(k)) u.searchParams.delete(k);
+      return u.href;
+    } catch (_) { return ''; }
+  }
+  // { ok, raison, compte } — `compte` : la page touche au compte (profil, messagerie, offres…), donc on la suit.
+  function lienPermis(href, base, libelle, moiId) {
+    const p = urlPropre(href, base);
+    if (!p) return { ok: false, raison: 'adresse illisible' };
+    const u = new URL(p); const b = new URL(base);
+    if (!/^https:$/.test(u.protocol)) return { ok: false, raison: 'pas https' };
+    if (u.host !== b.host) return { ok: false, raison: 'autre hôte' };
+    if (LIEN_INTERDIT.test(u.pathname + u.search)) return { ok: false, raison: 'adresse interdite' };
+    if (libelle && CLIC_INTERDIT.test(sansAccents(libelle)) && !VOIR_AIMES.test(sansAccents(libelle))) return { ok: false, raison: 'libellé interdit' };
+    const prof = /profile-(\d+)/i.exec(u.pathname);
+    if (prof && moiId && prof[1] !== String(moiId)) return { ok: false, raison: 'profil d\'une autre personne' };
+    return { ok: true, url: p, compte: LIE_COMPTE.test(u.pathname), article: /\.shtml$/i.test(u.pathname) && !prof };
+  }
+
+  const COLONNES_CSV = ['t_iso', 't_ms', 'source', 'origine', 'action', 'categorie', 'themes', 'route', 'operation', 'methode', 'hote', 'chemin', 'recherche', 'type', 'api', 'initiator', 'tabId', 'statut', 'duree_ms', 'taille', 'erreur', 'isTrusted', 'geste', 'cible', 'champ', 'longueur', 'valeur', 'apres_geste_humain', 'extensions_vues', 'frame', 'entetes_requete', 'entetes_reponse', 'detail', 'corps', 'reponse'];
   function celluleCsv(v) {
     const s = v == null ? '' : String(v);
     return /[";\n\r,]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -482,7 +556,7 @@
     for (const e of entrees) {
       const a = e._action || reconnaitre(e);
       lignes.push([
-        new Date(e.t).toISOString(), e.t, e.src, a.nom, a.cat, themesDe(e).join(' '), (cleRoute(e) || {}).cle || '', operationGraphql(e), e.methode, e.hote, e.chemin, e.recherche, e.type, e.api, e.initiator, e.tabId, e.statut, e.duree, e.taille, e.erreur,
+        new Date(e.t).toISOString(), e.t, e.src, e.origine || 'utilisateur', a.nom, a.cat, themesDe(e).join(' '), (cleRoute(e) || {}).cle || '', operationGraphql(e), e.methode, e.hote, e.chemin, e.recherche, e.type, e.api, e.initiator, e.tabId, e.statut, e.duree, e.taille, e.erreur,
         e.isTrusted == null ? '' : (e.isTrusted ? 'oui' : 'non'), e.geste, descCible(e.cible), e.champ, e.longueur, e.valeur,
         e.apresGesteHumain == null ? '' : (e.apresGesteHumain ? 'oui' : 'non'), [].concat(e.extPile || [], e.extId ? [e.extId] : []).join(' '), e.frame == null ? e.frameId : e.frame, (e.entetesRequete || []).join(' '), (e.entetesReponse || []).join(' '), e.detail,
         e.corps ? e.corps.texte : '', e.reponse ? e.reponse.texte : '',
@@ -528,7 +602,7 @@
       + '</body></html>';
   }
 
-  const api = { MASQUE, CORPS_MAX, CLE_SECRETE, cleSecrete, valeurSecrete, masquerLibre, luhn, operationGraphql, normChemin, themesDe, cleRoute, routes, sequencesMessage, resumeExport, typeTempsReel, THEMES, masquerUrl, masquerRecherche, masquerTexte, masquerObjet, corpsDepuis, tronquer, reconnaitre, estReseau, fusionner, attribuer, resumer, parPeriode, outil, enCsv, resumeHtml, duree, esc, descCible };
+  const api = { exploration, CLIC_INTERDIT, VOIR_AIMES, LIEN_INTERDIT, LIE_COMPTE, sansAccents, clicPermis, voirPlus, lienPermis, urlPropre, MASQUE, CORPS_MAX, CLE_SECRETE, cleSecrete, valeurSecrete, masquerLibre, luhn, operationGraphql, normChemin, themesDe, cleRoute, routes, sequencesMessage, resumeExport, typeTempsReel, THEMES, masquerUrl, masquerRecherche, masquerTexte, masquerObjet, corpsDepuis, tronquer, reconnaitre, estReseau, fusionner, attribuer, resumer, parPeriode, outil, enCsv, resumeHtml, duree, esc, descCible };
   racine.VRMObs = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : globalThis);

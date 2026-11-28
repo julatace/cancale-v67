@@ -19,5 +19,20 @@ $('effacer').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ quoi: 'effacer' });
   maj();
 });
-maj();
-setInterval(maj, 2000);
+async function majExpl() {
+  let s = null; try { const r = await chrome.runtime.sendMessage({ quoi: 'expl_etat' }); s = r && r.etat; } catch (_) {}
+  const z = $('expl-etat');
+  if (!s) { z.textContent = 'Pas lancée.'; z.dataset.n = '0'; $('expl-arreter').hidden = true; $('expl-reprendre').hidden = true; $('expl-lancer').hidden = false; return; }
+  const enAttente = (s.file || []).length + (s.courant ? 1 : 0);
+  z.dataset.n = String(s.n || 0); z.dataset.actif = s.actif ? '1' : '0';
+  z.textContent = (s.n || 0) + ' page' + ((s.n || 0) > 1 ? 's' : '') + ' vue' + ((s.n || 0) > 1 ? 's' : '') + ' · ' + enAttente + ' en attente · ' + (s.actif ? 'exploration en cours' : (s.arret ? (s.arret.fini ? 'terminée : ' : 'arrêtée : ') + s.arret.raison : 'arrêtée'));
+  $('expl-arreter').hidden = !s.actif;
+  $('expl-lancer').hidden = !!s.actif;
+  $('expl-lancer').textContent = s.n ? 'Recommencer depuis le début' : 'Explorer le site tout seul';
+  $('expl-reprendre').hidden = !!s.actif || !enAttente || !!(s.arret && s.arret.fini);
+}
+$('expl-lancer').addEventListener('click', async () => { await chrome.runtime.sendMessage({ quoi: 'expl_lancer' }); majExpl(); });
+$('expl-reprendre').addEventListener('click', async () => { await chrome.runtime.sendMessage({ quoi: 'expl_reprendre' }); majExpl(); });
+$('expl-arreter').addEventListener('click', async () => { await chrome.runtime.sendMessage({ quoi: 'expl_arreter' }); majExpl(); });
+maj(); majExpl();
+setInterval(() => { maj(); majExpl(); }, 1000);

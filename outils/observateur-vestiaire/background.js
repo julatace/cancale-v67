@@ -130,6 +130,11 @@ async function terminer(d, erreur) {
     for (const h of d.responseHeaders) if (String(h.name).toLowerCase() === 'content-type') e.mime = String(h.value || '').slice(0, 80);
   }
   e.cache = !!d.fromCache;
+  if (explTab != null && d.tabId === explTab) {
+    e.origine = 'exploration';
+    if (e.statut === 403 || e.statut === 429) explArreter('Vestiaire a répondu ' + e.statut + ' (' + e.methode + ' ' + e.chemin + ')', true);
+    else if (e.statut === 401 && /\/users\/me\b/.test(e.chemin)) explArreter('déconnecté (401 sur ' + e.chemin + ')', true);
+  }
   e.erreur = erreur ? String(d.error || 'erreur').slice(0, 120) : '';
   noter([e], true);
 }
@@ -160,6 +165,7 @@ chrome.runtime.onMessage.addListener((msg, sender, repondre) => {
         if (!ev || typeof ev !== 'object') continue;
         ev.tabId = sender.tab.id; ev.frameId = sender.frameId;
         if (typeof ev.t !== 'number') ev.t = Date.now();
+        if (explTab != null && ev.tabId === explTab) ev.origine = 'exploration';
         if (ev.src === 'compte') { const c = await compteVu(ev); if (c) out.push(c); continue; }
         out.push(ev);
       }
@@ -167,6 +173,10 @@ chrome.runtime.onMessage.addListener((msg, sender, repondre) => {
     })();
     return;
   }
+  if (msg.quoi === 'expl_lancer') { explLancer(false).then((r) => repondre(r)); return true; }
+  if (msg.quoi === 'expl_reprendre') { explLancer(true).then((r) => repondre(r)); return true; }
+  if (msg.quoi === 'expl_arreter') { explArreter('arrêtée par toi', false).then(() => repondre({ ok: true })); return true; }
+  if (msg.quoi === 'expl_etat') { explLire().then((s) => repondre({ ok: true, etat: s })); return true; }
   if (msg.quoi === 'vider') { vider().then(() => repondre({ ok: true })); return true; }
   if (msg.quoi === 'effacer') {
     aEcrire = [];
@@ -239,6 +249,7 @@ chrome.tabs.onUpdated.addListener((tabId, ch, tab) => {
   });
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
+  if (explTab != null && tabId === explTab) explArreter('onglet d\'exploration fermé', false);
   pret.then(async () => {
     const o = await onglets();
     if (o[tabId] == null) return;
@@ -328,6 +339,7 @@ chrome.debugger.onEvent.addListener((src, methode, p) => {
         if (!EST_OBSERVE.test(String(u.hote).replace(/:\d+$/, '')) && !/^(Document|XHR|Fetch|WebSocket|EventSource|Script)$/.test(p.type || '')) return;   // images et polices d'ailleurs : bruit
         const meth = p.request.method;
         const e = {
+          origine: explTab != null && tabId === explTab ? 'exploration' : undefined,
           src: 'cdp', api: 'net', t: Math.round((p.wallTime || Date.now() / 1000) * 1000), mono: p.timestamp,
           methode: meth, hote: u.hote, chemin: u.chemin, recherche: u.recherche, params: u.params, type: String(p.type || '').toLowerCase(),
           tabId, session: sid ? 'iframe' : 'onglet', frameUrl: '', initiatorType: p.initiator ? p.initiator.type : '',
@@ -393,3 +405,176 @@ chrome.debugger.onEvent.addListener((src, methode, p) => {
     } catch (_) {}
   })();
 });
+
+
+// ══ Explorer le site tout seul (2.1.0) ═══════════════════════════════════════
+// Sur TON clic : un onglet vestiairecollective.com dédié, dans une fenêtre à part qui ne passe pas au premier plan,
+// connecté à ton compte (le même navigateur), parcourt en LECTURE l'accueil, ton profil et ton dressing, tes
+// articles (et la liste de ceux qui les ont aimés si le site la montre), tes notifications, ta messagerie, tes offres,
+// tes commandes, tes favoris, tes réglages ; puis, en largeur, les liens du même site liés à ton compte (200 pages au
+// plus, profondeur 3). Chaque page : défilement jusqu'en bas, ouverture de ce qui s'ouvre sans écrire (explorateur.js,
+// liste noire de regles.js). Rythme : 3 à 9 s au hasard entre deux pages, jamais deux fois le même temps. Arrêt
+// immédiat : vérification (captcha) affichée, 403 / 429, déconnexion, onglet fermé, ton « Arrêter ». Reprise possible :
+// l'état vit dans chrome.storage.local (« obs_expl »), un réveil du fond reprend là où il en était.
+// Tout ce que l'onglet d'exploration provoque est capté comme le reste, marqué origine « exploration ».
+const EXPL_DEFAUT = { min: 3000, max: 9000, maxPages: 200, profMax: 3, maxClics: 25 };
+let explTab = null;
+let explBoucle = false;
+let explStop = false;
+async function explLire() { try { return (await chrome.storage.local.get('obs_expl')).obs_expl || null; } catch (_) { return null; } }
+// L'onglet d'exploration reste « exploration » même arrêté : ce qui s'y passe ensuite n'est pas un geste de l'utilisateur.
+async function explEcrire(s) { if (s && s.tabId != null) explTab = s.tabId; await chrome.storage.local.set({ obs_expl: s }).catch(() => {}); }
+// Réservé au banc : un rythme plus court (le défaut reste 3 à 9 s, 200 pages, profondeur 3).
+async function explReglages() {
+  let e = {}; try { e = (await chrome.storage.local.get('obs_expl_essai')).obs_expl_essai || {}; } catch (_) {}
+  const r = Object.assign({}, EXPL_DEFAUT);
+  for (const k of Object.keys(EXPL_DEFAUT)) if (Number.isFinite(Number(e[k])) && Number(e[k]) > 0) r[k] = Number(e[k]);
+  r.vitesse = e.min ? Math.max(0.05, r.min / EXPL_DEFAUT.min) : 1;
+  return r;
+}
+chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch.obs_expl) { const s = ch.obs_expl.newValue; if (s && s.tabId != null) explTab = s.tabId; } });
+pret.then(async () => { const s = await explLire(); if (s && s.tabId != null) explTab = s.tabId; if (s && s.actif) explDerouler(); });
+
+function noterExpl(ev) { noter([Object.assign({ src: 'exploration', t: Date.now(), origine: 'exploration', tabId: explTab }, ev)], true); }
+
+async function moiConnu() {
+  try { const t = await chrome.storage.session.get(null); for (const k of Object.keys(t)) if (k.startsWith('compte_') && t[k] && t[k].userId) return String(t[k].userId); } catch (_) {}
+  return '';
+}
+
+async function explLancer(reprise) {
+  await pret;
+  let s = await explLire();
+  if (s && s.actif && explBoucle && !explStop) return { ok: true, etat: s, deja: true };
+  // Une boucle précédente encore en train de finir sa page : on attend qu'elle ait rendu la main.
+  if (explBoucle) { explStop = true; for (let i = 0; i < 120 && explBoucle; i++) await attendre(250); }
+  s = await explLire();
+  const reg = await explReglages();
+  // L'exploration enregistre : l'interrupteur est allumé avec elle.
+  if (!actif) { await chrome.storage.local.set({ obs_on: true }); await lireReglages(); voyant(); }
+  const moi = await moiConnu();
+  if (!reprise || !s || !s.file || (!s.file.length && !s.courant)) {
+    let origine = 'https://www.vestiairecollective.com';
+    try { const l = await chrome.tabs.query({ url: ONGLETS_VC }); const u = l.map((t) => t.url).find(Boolean); if (u) origine = new URL(u).origin; } catch (_) {}
+    const graines = ['/', moi ? '/members/profile-' + moi + '.shtml' : null, '/notifications/', '/chat/'].filter(Boolean).map((p) => ({ url: origine + p, prof: 0, compte: true }));
+    s = { actif: true, origine, moi, file: graines, vus: [], n: 0, delais: [], debut: Date.now(), arret: null, courant: null, tabId: null, windowId: null };
+  } else {
+    s.actif = true; s.arret = null; s.moi = s.moi || moi;
+    if (s.courant) { s.file.unshift(s.courant); s.courant = null; }
+  }
+  s.reglages = { maxPages: reg.maxPages, profMax: reg.profMax };
+  s.run = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // une exploration = un numéro ; une ancienne boucle s'efface
+  explStop = false;
+  await explEcrire(s);
+  noterExpl({ etape: reprise ? 'reprise' : 'debut', detail: (reprise ? 'Exploration reprise' : 'Exploration lancée') + ' · ' + s.file.length + ' page(s) en attente' });
+  explDerouler();
+  return { ok: true, etat: s };
+}
+
+async function explArreter(raison, garderOnglet) {
+  explStop = true;
+  const s = await explLire();
+  if (!s || !s.actif) return;
+  s.actif = false; s.arret = { raison, t: Date.now() }; s.garderOnglet = !!garderOnglet;
+  await explEcrire(s);
+  noterExpl({ etape: 'arret', detail: 'Exploration arrêtée : ' + raison });
+  if (s.tabId != null) { try { chrome.tabs.sendMessage(s.tabId, { quoi: 'expl_stop' }).catch(() => {}); } catch (_) {} }
+  // Sur une vérification, un refus ou une déconnexion, l'onglet reste ouvert pour que tu voies ce qui s'affiche.
+  if (!garderOnglet && s.windowId != null) { try { await chrome.windows.remove(s.windowId); } catch (_) {} }
+}
+
+const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
+// Attente découpée : « Arrêter » est entendu en moins d'un quart de seconde.
+async function attendreOuStop(ms) { const fin = Date.now() + ms; while (Date.now() < fin) { if (explStop) return false; await attendre(Math.min(250, fin - Date.now())); } return !explStop; }
+function attendreCharge(tabId, timeout) {
+  return new Promise((ok) => {
+    let fini = false;
+    const finir = (v) => { if (fini) return; fini = true; chrome.tabs.onUpdated.removeListener(ecoute); clearTimeout(m); ok(v); };
+    const ecoute = (id, ch) => { if (id === tabId && ch.status === 'complete') finir(true); };
+    chrome.tabs.onUpdated.addListener(ecoute);
+    const m = setTimeout(() => finir(false), timeout);
+  });
+}
+async function demanderPage(tabId, o) {
+  for (let i = 0; i < 12; i++) {
+    if (explStop) return null;
+    try { const r = await chrome.tabs.sendMessage(tabId, o, { frameId: 0 }); if (r) return r; } catch (_) {}
+    await attendre(500);
+  }
+  return null;
+}
+// Un temps au hasard entre min et max, jamais deux fois le même (à la milliseconde) dans une exploration.
+function delaiUnique(s, reg) {
+  const deja = new Set(s.delais || []);
+  let d;
+  do { d = Math.round(reg.min + Math.random() * (reg.max - reg.min)); } while (deja.has(d));
+  s.delais = (s.delais || []).concat(d).slice(-500);
+  return d;
+}
+
+async function explDerouler() {
+  if (explBoucle) return;
+  explBoucle = true;
+  let run = null;
+  try {
+    const reg = await explReglages();
+    let s = await explLire();
+    run = s && s.run;
+    const encore = (x) => x && x.actif && x.run === run && !explStop;
+    while (encore(s)) {
+      if (s.n >= reg.maxPages) { await explFin(s, 'limite de ' + reg.maxPages + ' pages atteinte'); return; }
+      const item = s.file.shift();
+      if (!item) { await explFin(s, 'tout ce qui était à voir a été vu'); return; }
+      if (s.vus.includes(item.url)) { await explEcrire(s); continue; }
+      s.courant = item; s.vus.push(item.url);
+      await explEcrire(s);
+      // L'onglet : créé à la première page, dans une fenêtre qui ne prend pas le premier plan.
+      let tabId = s.tabId;
+      let vivant = false;
+      if (tabId != null) { try { await chrome.tabs.get(tabId); vivant = true; } catch (_) {} }
+      const charge = vivant ? attendreCharge(tabId, 30000) : null;
+      if (!vivant) {
+        const w = await chrome.windows.create({ url: item.url, focused: false, type: 'normal', width: 1280, height: 900 });
+        s.windowId = w.id; s.tabId = tabId = w.tabs[0].id; explTab = tabId;
+        await explEcrire(s);
+        await attendreCharge(tabId, 30000);
+      } else {
+        await chrome.tabs.update(tabId, { url: item.url });
+        await charge;
+      }
+      if (!encore(await explLire())) break;
+      const r = await demanderPage(tabId, { quoi: 'expl_page', vitesse: reg.vitesse, moiId: s.moi || '', maxClics: reg.maxClics });
+      s = await explLire();
+      if (!encore(s)) break;
+      s.courant = null;
+      s.n++;
+      let ajout = 0;
+      if (r && Array.isArray(r.liens)) {
+        for (const l of r.liens) {
+          if (item.prof + 1 > reg.profMax) break;
+          if (s.vus.includes(l.url) || s.file.some((x) => x.url === l.url)) continue;
+          if (!(l.compte || (l.article && item.compte))) continue;    // liés au compte : pages du compte, et les articles vus depuis elles
+          s.file.push({ url: l.url, prof: item.prof + 1, compte: !!l.compte }); ajout++;
+        }
+      }
+      let chemin = item.url; try { chemin = new URL(item.url).pathname; } catch (_) {}
+      noterExpl({ etape: 'page', chemin, profondeur: item.prof, n: s.n, clics: r && r.clics ? r.clics.length : 0, clicsDetail: r && r.clics, refuses: r && r.refuses, liens: ajout, titre: r && r.titre, detail: 'Page ' + s.n + ' vue : ' + chemin + (r ? '' : ' (la page n\'a pas répondu)') });
+      await explEcrire(s);
+      if (r && r.captcha) { await explArreter('vérification affichée (' + r.captcha + ')', true); return; }
+      if (r && r.deconnecte) { await explArreter('déconnecté (' + r.deconnecte + ')', true); return; }
+      const d = delaiUnique(s, reg);
+      await explEcrire(s);
+      if (!(await attendreOuStop(d))) break;
+      s = await explLire();
+    }
+  } catch (err) {
+    const x = await explLire();
+    if (x && x.run === run) await explArreter('erreur : ' + String(err && err.message || err).slice(0, 120), true);
+  } finally { explBoucle = false; }
+}
+async function explFin(s, raison) {
+  s.actif = false; s.arret = { raison, t: Date.now(), fini: true };
+  await explEcrire(s);
+  noterExpl({ etape: 'arret', detail: 'Exploration terminée : ' + raison });
+  if (s.windowId != null) { try { await chrome.windows.remove(s.windowId); } catch (_) {} }
+}
