@@ -135,7 +135,7 @@ const FAV2 = Array.from({ length: 22 }, (_, k) => { const a = TOUTES[k % 10]; co
   return Object.assign({ id: 'f' + k, itemId: a.id, pseudo: 'acheteur_' + k, titre: a.titre, prix: a.prix, date: new Date(T0 - (k * 41 + 3) * MIN).toISOString(), photo: img('a' + (k % 10)), num: a.num || undefined,
     envoi: s.envoi || 'a_envoyer', cochable }, cochable ? { offre: k === 3 ? 40 : Math.round(a.prix * 90) / 100, texte: `Bonjour acheteur_${k}, une offre pour toi !` } : {}, s.offreFaite ? { offreFaite: true } : {}, s.raison ? { raison: s.raison } : {}, s.raisonFiltre ? { cochable: false, raisonFiltre: s.raisonFiltre } : {}); });
 FAV2.forEach((x) => { if (!x.num) delete x.num; });
-const AP2 = { etat: 'pret', total: FAV2.filter((x) => x.cochable).length, nonProuves: 1, ecartes: 0, selection: [], liste: FAV2.filter((x) => x.cochable).slice(0, 15), tous: FAV2, totalTous: FAV2.length, retires: 2, max: 15,
+const AP2 = { etat: 'pret', avertissement: 'dressing_ancien', total: FAV2.filter((x) => x.cochable).length, nonProuves: 1, ecartes: 0, selection: [], liste: FAV2.filter((x) => x.cochable).slice(0, 15), tous: FAV2, totalTous: FAV2.length, retires: 2, max: 15,
   message: { versions: 3, offre: { mode: 'pct', valeur: 10, arrondi: false }, intervalleMinutes: 1, intervalleMaxMinutes: 2, rythme: 'normal' }, reglages: { version: 1, message: 'Bonjour {pseudo}', pourcentage: 10, offreMode: 'pct' } };
 const COCHABLES = FAV2.filter((x) => x.cochable).map((x) => x.id);
 
@@ -164,6 +164,7 @@ const lireF = (pg) => pg.evaluate(() => {
     entetes: Array.from(r.querySelectorAll('.fav6-table .th6r .th6')).filter(vis).map((b) => b.textContent.replace(/[↑↓↕]/g, '').trim()),
     ids: rangs.map((li) => li.getAttribute('data-fav-qui')), dates: rangs.map((li) => Date.parse(li.getAttribute('data-fav-date') || '')),
     un: r.querySelectorAll('[data-fav6-un]').length,
+    avert: (r.querySelector('[data-fav6-avertissement]') || {}).textContent || '',
     etats: Object.fromEntries(rangs.map((li) => [li.getAttribute('data-fav-qui'), li.getAttribute('data-fav-etat6') + '|' + ((li.querySelector('.et6') || {}).textContent || '') + '|' + [...li.querySelectorAll('.rs6')].map((x) => x.textContent).join(' ¦ ')])),
     offres: Object.fromEntries(rangs.map((li) => { const o = li.querySelector('[data-fav-offre6]'); return [li.getAttribute('data-fav-qui'), o ? o.getAttribute('data-fav-offre6') + ':' + (o.getAttribute('data-offre') || '') : '']; })),
     cases: rangs.map((li) => !!li.querySelector('input[data-fav-coche]')), coches: rangs.filter((li) => li.hasAttribute('data-coche')).map((li) => li.getAttribute('data-fav-qui')),
@@ -241,6 +242,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       // T3 : 7000 (achat 30 ⇒ plancher 33) offre ; 7001 (mini 46) offre ; 7002 (ni mini ni achat) sans offre ; f3 = 7003 offre 40 < mini 48 ⇒ sans offre.
       dit(a.offres.f0 === 'oui:49.5' && a.offres.f1 === 'oui:54' && a.offres.f2 === 'oui:58.5' && a.offres.f3 === 'remontee:48' && a.offres.f4 === '', `${T} : 5.410.8 : l’offre part toujours ; sans plancher au % réglé (58,50 €) ; sous le prix mini ⇒ REMONTÉE (48 €), jamais dessous`, JSON.stringify([a.offres.f0, a.offres.f1, a.offres.f2, a.offres.f3, a.offres.f4]));
       dit(a.segs.join(' ') === `tous:22* nouveaux:${COCHABLES.length + 2} envoyes:2 ignores:1` && a.un === COCHABLES.length, `${T} : segments Tous · Pas encore contactés · Envoyés · Vendus/Vinted, avec leurs nombres ; « Envoyer » sur chaque favori à contacter (${a.un})`, a.segs.join(' '));
+      dit(/relit chaque article au moment d’envoyer/.test(a.avert) && a.un > 0, `${T} : 5.455.6 : dressing ancien ⇒ DIT au-dessus de la liste, et la liste reste envoyable`, a.avert);
       dit(!a.debord && !a.petits.length, `${T} : rien ne déborde, cibles ≥ 44 px`, JSON.stringify({ d: a.debord, p: a.petits.slice(0, 6) }));
       await cap(t.pg, N('1-liste'));
       // 5.455.7 (Julien : « montre les actions faites, avec l'heure, le montant de l'offre, la version ») : le DÉTAIL vient du

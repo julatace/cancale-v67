@@ -32705,9 +32705,22 @@ async function departImport(uid, opts = {}) {
   let neuf;
   if (opts.force) {
     // « Tout récupérer » : TOUT l'historique, sans horizon (SON clic).
-    neuf = { v: 2, debut: t, demande: true, tout: true, at: t };
+    neuf = { v: 2, debut: t, demande: !opts.suite, tout: true, at: t };
     for (const [k] of IMPORT_TYPES) neuf[k] = { page: 1, lus: 0, total: null, pagesTotal: null, fini: false };
     neuf.annonces = { lus: 0, total: null, fini: false };
+    // 5.455.7 : la SUITE d'un import de 12 mois fini (`opts.suite` = son état) repart où il s'était arrêté — la page après la
+    //    dernière lue, ses ventes déjà comptées ; un type fini au bout de la liste de Vinted (pas à l'horizon) reste fini ; les
+    //    annonces restent telles quelles. Jamais deux fois la même page.
+    const av = opts.suite;
+    if (av && typeof av === 'object') {
+      for (const [k] of IMPORT_TYPES) {
+        const a = av[k]; if (!a || typeof a !== 'object') continue;
+        if (a.fini && !a.horizon) { neuf[k] = Object.assign({}, a); continue; }
+        const pg = Number(a.page) > 0 ? Number(a.page) : 1;   // `page` = la PROCHAINE à lire (posée après chaque page rangée)
+        neuf[k] = { page: pg, lus: (pg - 1) * IMPORT_PER_PAGE, total: a.total == null ? null : a.total, pagesTotal: a.pagesTotal == null ? null : a.pagesTotal, fini: false };
+      }
+      if (av.annonces) neuf.annonces = Object.assign({}, av.annonces);
+    }
   } else {
     const rows = await sbGet(`app_data?id=in.(harvest_${uid}_orders_sold,harvest_${uid}_orders_purchased,harvest_${uid}_listings)&${SELECT_DEPART_IMPORT}`);
     if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }   // pas su ⇒ rien
@@ -33001,7 +33014,7 @@ async function tickImport() {
     if (st && importFini(st) && st.publie) {
       // 5.455.7 : un import de 12 mois déjà fini repart UNE fois pour tout le reste (sans horizon) ; fini « tout » ⇒ rien.
       if (st.tout) return 0;
-      const n = await departImport(String(uid), { force: true }); if (!n) return 0;
+      const n = await departImport(String(uid), { force: true, suite: st }); if (!n) return 0;
       await publierImport(String(uid), n); noterDiag('import_tout_auto');
     }
     return await importerHistorique(uid);

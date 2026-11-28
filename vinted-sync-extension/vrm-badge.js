@@ -2804,6 +2804,8 @@ function vrmVerifVisible(sel) {
       // 5.455.7 (Julien, 27 nov. 23:10 : « sans crainte de se faire embêter ») : ses messages par défaut sont à lui seul, et les
       //    protections actives, dites en clair (rien n'est réglé ici : ce sont celles de l'extension, inchangées).
       `<p class="note5" data-fav6-uniques>${esc(TU('f6_uniques'))}</p><details class="sur6" data-fav6-sur><summary>${esc(TU('f6_sur_t'))}</summary><ul>${[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `<li>${esc(TU('f6_sur_' + i))}</li>`).join('')}</ul></details>`,
+      // 5.455.6 : un dressing ancien ne bloque plus — il est DIT (VRM relit l'annonce et son prix au moment d'envoyer).
+      /^dressing_/.test(String(a.avertissement || '')) ? `<p class="note5" data-fav6-avertissement="${esc(a.avertissement)}">${esc(TU('f6_avert_dressing'))}</p>` : '',
       a.ventesAilleurs === 'pas_su' ? '<p class="note5 ambre6" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</p>' : '',
       Number(a.retires) > 0 ? `<p class="note5" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</p>` : '',
       favErreur ? `<p class="note5 err6" role="alert" data-fav-erreur6>${esc(favErreur)}</p>` : '',
