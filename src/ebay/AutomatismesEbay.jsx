@@ -185,7 +185,7 @@ export default function AutomatismesEbay({ compte = 'principal', headers, confir
         </div>
       ) : null}
 
-      <Groupe titre={tr('eauto.journal.titre')} pied={etat.dernier && etat.dernier.at ? tr('eauto.journal.dernier', { quand: quand(etat.dernier.at), n: String(etat.dernier.gestes || 0) }) : tr('eauto.journal.jamais')} attrs={{ 'data-eauto-groupe': 'journal' }}>
+      <Groupe titre={tr('eauto.journal.titre')} pied={etat.dernier && etat.dernier.at ? (etat.dernier.raison && !etat.dernier.lu ? tr('eauto.journal.rien', { quand: quand(etat.dernier.at), raison: trOu('eauto.raison.' + etat.dernier.raison, {}, etat.dernier.raison) }) : tr('eauto.journal.dernier', { quand: quand(etat.dernier.at), n: String(etat.dernier.gestes || 0) })) : tr('eauto.journal.jamais')} attrs={{ 'data-eauto-groupe': 'journal' }}>
         {(etat.journal || []).filter((e) => e.moteur !== 'reglage').slice(0, 30).map((e, i) => (
           <Rangee key={i} titre={phraseJournal(e)} sousLignes={2} sousTitre={quand(e.at)} ton={e.etat === 'incertain' ? 'ambre' : 'neutre'} attrs={{ 'data-eauto-journal': e.moteur, 'data-eauto-etat': e.etat }}/>
         ))}

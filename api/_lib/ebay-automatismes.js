@@ -382,6 +382,14 @@ export async function lectureVendeur({ owner, lireReglageVendeur }) {
 // maintenant » (son clic). `deps` : { owner, compte, lireDonnee, modifierDonnee, lireReglageVendeur, accessToken,
 // fetcher, maintenant, horloge, finA, suffixe }.
 export async function passerUnCompte(deps) {
+  const r = await passerUnCompteBrut(deps);
+  // Pourquoi rien n'a tourné (jeton, marché, devise, numérotation) : dit sur la page, au « dernier passage ».
+  if (r.raison && !['eteint', 'etat-pas-su'].includes(r.raison) && !('lu' in r)) {
+    await deps.modifierDonnee(ID_AUTO, deps.owner, surCompte(r.ref, (x) => { x.dernier = { at: deps.maintenant || Date.now(), lu: false, gestes: 0, raison: r.raison }; })).catch(() => null);
+  }
+  return r;
+}
+async function passerUnCompteBrut(deps) {
   const { owner, compte, lireDonnee, modifierDonnee, lireReglageVendeur, accessToken, fetcher, maintenant = Date.now(), horloge = () => Date.now() } = deps;
   const ref = refDe(compte), suffixe = deps.suffixe != null ? deps.suffixe : (compte && compte.suffixe) || '';
   const etatBrut = await lireDonnee(ID_AUTO, owner);
@@ -391,6 +399,8 @@ export async function passerUnCompte(deps) {
   if (!c || !unAllume(c.reglages)) return { ref, raison: 'eteint' };
   const marche = marcheDuCompte(compte);
   if (!marche || compte.siteInconnu) return { ref, raison: 'marche' };
+  // L'argent de VRM est en euros (le plancher aussi) : un compte en livres ou en dollars n'est jamais touché seul.
+  if (marche.devise !== 'EUR') return { ref, raison: 'devise' };
   const lv = await lectureVendeur({ owner, lireReglageVendeur });
   if (lv.mk === undefined) return { ref, raison: 'numerotation-pas-sue' };
   const at = await accessToken(owner, suffixe);
@@ -460,6 +470,7 @@ export function creerAutomatismesEbay(d) {
     const lv = await lectureVendeur({ owner: ctx.owner, lireReglageVendeur: d.lireReglageVendeur });
     const pd = lv.planchers === undefined ? 'pas-su' : planchersDit(lv.planchers);
     const maj = majorationDe(lv.majoration, ref);
+    const enEuros = d.marche().devise === 'EUR';
     let annonces = null, raisonAnnonces = null;
     if (b.annonces === true) {
       const c = await clientDe(ctx);
@@ -468,11 +479,11 @@ export function creerAutomatismesEbay(d) {
         const ls = await c.client.trading('GetMyeBaySelling', '<ActiveList><Include>true</Include><Pagination><EntriesPerPage>200</EntriesPerPage><PageNumber>1</PageNumber></Pagination></ActiveList>');
         const l = ls.ok ? annoncesDe(ls.xml, 'ActiveList') : null;
         if (!l) raisonAnnonces = 'pas-lu';
-        else annonces = l.map((a) => { const num = lv.mk === undefined ? '' : numDeAnnonce(a, lv.mk); const pl = num && !pd ? plancherEbay(lv.planchers, num, maj) : null;
+        else annonces = l.map((a) => { const num = lv.mk === undefined ? '' : numDeAnnonce(a, lv.mk); const pl = num && !pd && enEuros ? plancherEbay(lv.planchers, num, maj) : null;
           return { itemId: a.itemId, titre: a.titre, prixC: centimes(a.prix), devise: a.devise || '', num, plancherC: pl ? pl.c : null, observateurs: a.observateurs, photo: a.photo, debut: a.debut, url: lienAnnonce(d.marche(), a.itemId) }; });
       }
     }
-    return { status: 200, body: { ok: true, ...vue(e, ref), planchers: { etat: pd || 'ok', at: lv.planchers && Number(lv.planchers.at) ? Number(lv.planchers.at) : null, n: lv.planchers && obj(lv.planchers.parNum) ? Object.keys(lv.planchers.parNum).length : 0 }, majoration: maj, annonces, raisonAnnonces } };
+    return { status: 200, body: { ok: true, ...vue(e, ref), planchers: { etat: pd || 'ok', at: lv.planchers && Number(lv.planchers.at) ? Number(lv.planchers.at) : null, n: lv.planchers && obj(lv.planchers.parNum) ? Object.keys(lv.planchers.parNum).length : 0 }, majoration: maj, enEuros, annonces, raisonAnnonces } };
   }
 
   // RÉGLER : SON geste. Allumer un moteur exige `confirme: true` (vérifié ICI, pas seulement à l'écran).
@@ -507,6 +518,7 @@ export function creerAutomatismesEbay(d) {
     const ids = new Set();
     for (const l of lignes) { if (!obj(l) || !ID_ANNONCE_EBAY.test(String(l.itemId)) || ids.has(String(l.itemId))) return refus(400, 'lignes', 'Une annonce est illisible ou en double — rien n\'a été envoyé.'); ids.add(String(l.itemId)); }
     const ref = refDe(ctx.compte);
+    if (op !== 'fin' && d.marche().devise !== 'EUR') return refus(409, 'devise', 'Ce compte eBay n\'est pas en euros : VRM ne change pas ses prix en série (son plancher est en euros). Fais-le sur eBay.');
     let lv = null, sku = null;
     if (op !== 'fin') {
       lv = await lectureVendeur({ owner: ctx.owner, lireReglageVendeur: d.lireReglageVendeur });

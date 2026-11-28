@@ -345,6 +345,13 @@ const tousLesCorps = [];
     const l = await app({ action: 'autolire' });
     dit(l.j.journal.some((e) => e.moteur === 'baisse' && e.etat === 'fait') && l.j.dernier && l.j.dernier.gestes === 2, 'la page relit le journal et le dernier passage', JSON.stringify(l.j.dernier));
   });
+  await essaie('J. un compte qui n’est pas en euros', async () => {
+    remettreBase(); remettreEbay();
+    lignes.push({ owner: J, id: 'ebay_comptes', data: { comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'banc_uk', principal: true, ajouteLe: 1, site: 'GB' }] } });
+    poser(mod.ID_AUTO, { v: 1, actif: true, comptes: { principal: { reglages: { baisse: { actif: true, pct: 10, jours: 14 } } } }, journal: [] });
+    const p = await passer(T0);
+    dit(!ecritures().length && etatAuto().comptes.principal.dernier && etatAuto().comptes.principal.dernier.raison === 'devise', 'compte eBay.co.uk (livres) : AUCUN geste automatique (le plancher est en euros), dit « devise »', JSON.stringify(etatAuto().comptes.principal.dernier));
+  });
   // §2.8 et §3 sur TOUT ce qui est parti chez eBay pendant ce banc.
   dit(tousLesCorps.length > 20 && !tousLesCorps.some((c) => /FreeShipping|ShippingServiceCost|ShippingDetails|shippingCost|"shipping/i.test(String(c))), '§2.8 : aucun corps envoyé à eBay ne porte un champ de livraison', String(tousLesCorps.length) + ' corps');
   dit(!tousLesCorps.some((c) => /<Action>(Accept|Decline)<\/Action>/.test(String(c))), '§3 : aucune Action Accept / Decline n’est jamais partie (c’est eBay qui accepte, à SON seuil)', '');
