@@ -16770,6 +16770,49 @@ async function vintedPageFavori(acc, adresse, corps, options = {}) {
     } catch (_) { return { status: 0, ok: false, json: null, incertain: true }; }
   }, acc);
 }
+// ══ 5.455.8 (Julien, 28 nov. : « si l'agent ne parvient pas à le faire, il doit se débrouiller, trouver le chemin ») ══════
+//  LA REPRISE D'UN ENVOI AUX FAVORIS, sans cul-de-sac ni doublon :
+//   · la page pas prête (aucun onglet vinted.fr sur ce compte, ou l'onglet de travail parti ailleurs) : l'onglet de travail est
+//     ramené UNE fois sur vinted.fr (`rechargerPageFavori`, il attend son chargement réel, jamais un délai fixe), puis l'étape
+//     est refaite ;
+//   · un envoi À MOITIÉ fait (l'offre partie, le message pas) : la conversation est RELUE ; un message de lui déjà là ⇒ fait,
+//     rien ne repart ; sinon le message seul part (jamais une 2ᵉ offre) ;
+//   · la boîte de l'offre absente (pas de transaction dans la réponse de Vinted, ou l'adresse de l'offre en 404) : la transaction
+//     de la CONVERSATION relue d'abord ; sinon le message d'abord, puis l'offre depuis la conversation relue ;
+//   · la route qui a marché est RETENUE par étape (`vrmFavorisRoutes`) : la fois suivante, elle est prise directement.
+//  Cul-de-sac vrai seulement : refus de Vinted (sa phrase), vérification, 403/429, article vendu, plancher.
+const ROUTES_FAV = 'vrmFavorisRoutes';
+async function routeFavori(etape) { try { const m = (await chrome.storage.local.get(ROUTES_FAV))[ROUTES_FAV] || {}; const r = m[String(etape)]; return r && typeof r === 'object' ? String(r.route || '') : ''; } catch (_) { return ''; } }
+async function retenirRouteFavori(etape, route) { try { const m = (await chrome.storage.local.get(ROUTES_FAV))[ROUTES_FAV] || {}; m[String(etape)] = { route: String(route).slice(0, 40), at: Date.now() }; await chrome.storage.local.set({ [ROUTES_FAV]: m }); noterDiag('favori_route_apprise_' + String(etape).replace(/[^a-z_]/g, '') + '_' + String(route).replace(/[^a-z_]/g, '')); } catch (_) {} }
+async function rechargerPageFavori(acc) {
+  const domaine = (acc && acc.domain) || 'www.vinted.fr';
+  let id = null;
+  const pg = await pageVintedPour(acc);
+  if (!pg.refus) id = pg.tabId;
+  else if (pg.refus === 'onglet') { try { const m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; if (m && m.tabId != null) { const t = await chrome.tabs.get(m.tabId).catch(() => null); if (t) id = t.id; } } catch (_) { id = null; } }
+  else return false;   // un autre compte connecté : jamais « réparé » ici
+  if (id == null) return false;
+  try { if (pg.refus) await chrome.tabs.update(id, { url: `https://${domaine}/inbox` }); else if (chrome.tabs.reload) await chrome.tabs.reload(id); } catch (_) { return false; }
+  noterDiag('favori_page_rechargee');
+  return !!(await attendreOnglet(id));
+}
+// Un message ÉCRIT par le vendeur (lui) dans cette conversation (jamais une offre, jamais un message du système).
+function monMessageFavori(liste, uid) {
+  if (!Array.isArray(liste)) return null;
+  return liste.some((m) => { if (!m || typeof m !== 'object') return false; const t = String(m.entity_type || m.type || m.kind || '').toLowerCase(); if (/offer|status|system|transaction|event|action|notification|info/.test(t)) return false;
+    const u = String(m.user_id || (m.entity && m.entity.user_id) || (m.user && m.user.id) || (m.sender && m.sender.id) || ''); const c = typeof m.content === 'string' ? m.content : typeof m.body === 'string' ? m.body : (m.entity && typeof m.entity.body === 'string') ? m.entity.body : '';
+    return u === String(uid) && !!c.trim(); });
+}
+// La transaction d'une conversation relue (« la boîte de l'offre » quand la réponse de la demande n'en dit rien).
+//    Une transaction qui dit un AUTRE article (ou un autre article dans la conversation) n'est jamais prise : `autre`.
+function txDeConversationFavori(cv, itemId) {
+  const tr = cv && cv.transaction && typeof cv.transaction === 'object' ? cv.transaction : null, d = cv && cv.data && typeof cv.data === 'object' ? cv.data : null;
+  const t = tr ? (tr.id || tr.transaction_id) : (cv && cv.transaction_id) || (d && d.transaction_id);
+  const it0 = d && Array.isArray(d.items) && d.items[0] && typeof d.items[0] === 'object' ? d.items[0] : null;
+  const art = String((tr && (tr.item_id || (tr.item && tr.item.id))) || (cv && cv.item_id) || (it0 && (it0.item_id || it0.id)) || '');
+  if (itemId && art && art !== String(itemId)) return { tx: '', autre: true };
+  return { tx: /^\d{1,20}$/.test(String(t || '')) ? String(t) : '', autre: false };
+}
 // 5.455 (4ᵉ export de l'Observateur, 26 nov. : tous les 400 de Bleam venaient de là) : quand Vinted exige de vérifier le
 //  numéro de téléphone du compte, TOUTE écriture répond 400 et la page part sur /users/verification/phone. Un 400 se relit
 //  donc par la question même de la page (`authorization/check/phone_verification` : 400 = à vérifier, 200 = fait) — jamais
@@ -22654,7 +22697,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // réduction est choisie, et le fil n'est relu que si la réponse de création
   // ne suffit pas à vérifier le destinataire et l'historique. Sans onglet Vinted
   // ouvert sur ce compte, RIEN ne part.
-  const pg=await pageVintedPour(acc);
+  let pg=await pageVintedPour(acc);
+  // 5.455.8 : la page pas prête ⇒ l'onglet de travail ramené une fois sur vinted.fr, puis l'étape refaite.
+  if(pg.refus==='onglet'&&await rechargerPageFavori(acc))pg=await pageVintedPour(acc);
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
   // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
   const refuseesIci=await versionsRefusees(uid);
@@ -22700,6 +22745,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // ⚠️⚠️ 5.455 (`favorisrequetes`, Julien, 26 nov. soir : « A, fais comme Vintex ») : le chemin de Vintex, par les requêtes de
   //    la PAGE (voir `vintedPageFavori`) : conversation, relecture, transaction, offre, message. Aucun clic, aucune cloche.
   //    Chaque identité est relue AVANT d'écrire ; un doute ⇒ rien de plus ne part.
+  let repriseMoitie=false;
   if((await cheminFavoris())==='requetes'){
     // ══ 5.455.4 (Julien, 27 nov. : « tu vas tout reprendre comme Vintex », « je ne veux pas d'erreur ») — LE CHEMIN DE VINTEX ══
     //  Réécrit court, dans l'ordre observé chez Vintex (Observateur, 26 nov.), depuis l'onglet vinted.fr (`vintedPageFavori`) :
@@ -22724,19 +22770,23 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     }catch{return rep('refuse',0,'autorisation_expiree','autorisation');}
     {const g=await garde();if(g)return g;}
     // 6a. Le registre : une offre ou un message déjà faits à CET acheteur pour CET article ⇒ rien ne part. Illisible ⇒ rien non plus.
-    {const rg=await registreFavori(uid);if(rg===null)return rep('refuse',0,'historique_non_verifie');const deja=rg[cleRegistreFavori(body.itemId,body.recipientId)];if(deja&&(deja.o||deja.m)){noterDiag('favori_req_registre_'+(deja.m?'message':'offre'));return rep('ignore',0,'conversation_deja_contactee');}}
+    {const rg=await registreFavori(uid);if(rg===null)return rep('refuse',0,'historique_non_verifie');const deja=rg[cleRegistreFavori(body.itemId,body.recipientId)];if(deja&&deja.m){noterDiag('favori_req_registre_message');return rep('ignore',0,'conversation_deja_contactee');}
+      // 5.455.8 : l'offre partie, le message pas (un envoi coupé) ⇒ REPRISE : la conversation relue décide ; jamais une 2ᵉ offre.
+      if(deja&&deja.o){repriseMoitie=true;noterDiag('favori_req_reprise_moitie');}}
     // 1. La demande.
     etape('conversation');
     const adrQ=adresseMessagerieApi(acc.domain,'inquiries');
     if(!adrQ)return rep('refuse',0,'onglet_vinted');
-    const q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});
+    let q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});
+    // 5.455.8 : rien n'est parti (la page n'a pas répondu) ⇒ la page ramenée une fois, la demande refaite (Vinted rend la MÊME conversation).
+    if(q&&q.rienParti&&q.sansPage==='onglet'&&await rechargerPageFavori(acc)){q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});if(q&&!q.rienParti)await retenirRouteFavori('page','recharger');}
     {const f=fin(q);if(f)return f;}
     if(q.incertain||!q.status)return rep('incertain',0,'creation_non_confirmee');
     {const t=await telephone(q);if(t)return t;}
     if([404,422].includes(q.status)||(q.status===400)){noterDiag('favori_req_conversation_refusee_'+q.status);return rep('ignore',q.status,'conversation_refusee');}
     if(!q.ok)return rep(q.status>=400&&q.status<500?'refuse':'incertain',q.status);
     // 2. La conversation et la transaction de la RÉPONSE.
-    const uuid=uuidConversationCree(q.json),tx=txCreationFavori(q.json);
+    const uuid=uuidConversationCree(q.json);let tx=txCreationFavori(q.json);
     {const connues=['inquiry_id','transaction_id','conversation_id','read_after_write_token','id','conversation'];const autres=q.json&&typeof q.json==='object'?Object.keys(q.json).filter((k)=>!connues.includes(k)):[];if(autres.length){noterDiag('favori_req_inquiry_cles_neuves');await noterFormeFavori('inquiry','cles',formeCles(q.json));}}
     if(!uuid){noterDiag('favori_req_uuid_absent');await noterFormeFavori('inquiry','uuid_absent',formeCles(q.json));return rep('incertain',q.status,'creation_non_confirmee');}
     if(!tx){noterDiag('favori_req_sans_transaction');await noterFormeFavori('inquiry','transaction',formeCles(q.json));}
@@ -22761,7 +22811,10 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(personnes.length>1||(personnes.length===1&&personnes[0]!==body.recipientId)){noterDiag('favori_req_autre_personne');return rep('refuse',ln.status,'destinataire_different');}
     if(cv.allow_reply===false)return rep('ignore',ln.status,'conversation_refusee');
     etape('historique');
-    const ecritsAvant=messagesEcritsMessagerie(cv.messages);
+    // 5.455.8 : REPRISE d'un envoi à moitié fait : SON message déjà dans la conversation ⇒ fait (registre complété, rien ne repart) ;
+    //    sinon seule SON offre y est ⇒ le message part, sans 2ᵉ offre.
+    if(repriseMoitie){const mm=monMessageFavori(cv.messages,uid);if(mm===true){await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');noterDiag('favori_req_reprise_deja_fait');return rep('envoye',ln.status,'',);}}
+    const ecritsAvant=repriseMoitie?0:messagesEcritsMessagerie(cv.messages);
     if(ecritsAvant<0){await noterFormeFavori('conversation','messages',formeCles(cv));return rep('ignore',ln.status,'historique_non_verifie');}
     if(ecritsAvant>0||(cv.pagination&&cv.pagination.has_next===true))return rep('ignore',ln.status,body.auto===true?'conversation_existante':'conversation_deja_contactee');
     // Une conversation qui porte des messages du SYSTÈME (ou l'invitation de Vinted à faire une offre) : on continue, comme Vintex ;
@@ -22770,6 +22823,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(cv.messages.length>0){noterDiag('favori_req_messages_systeme');await noterFormeFavori('conversation','types',[...new Set(cv.messages.slice(0,8).map((m)=>String(m&&typeof m==='object'?(m.entity_type||m.type||m.kind||'sans_type'):typeof m).replace(/[^a-z_]/gi,'').slice(0,24)))].join(','));}
     const oppL=(Array.isArray(cv.opposite_users)?cv.opposite_users:[]).find((x)=>x&&typeof x==='object'&&idPersonneFavori(x)===body.recipientId);
     const login=oppL&&typeof oppL.login==='string'&&/^[\w.\-]{1,80}$/.test(oppL.login)?oppL.login:'';
+    // 5.455.8 : pas de transaction dans la réponse de la demande ⇒ celle de la CONVERSATION relue (la boîte de l'offre).
+    let txAutre=false,txDeConv=false;
+    if(!tx){const t2=txDeConversationFavori(cv,body.itemId);txAutre=t2.autre;if(t2.tx){tx=t2.tx;txDeConv=true;noterDiag('favori_req_tx_conversation');await retenirRouteFavori('transaction','conversation');}}
     // 4a. La transaction de la réponse, relue (comme Vintex) : le prix de CET article, maintenant.
     let prixAnnonce=null,devise='EUR',titre='';
     if(tx){
@@ -22780,7 +22836,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       if(frein)return rep('refuse',t.status);
       const tr=t.ok?(t.json&&t.json.transaction||t.json):null;
       const artTx=tr&&typeof tr==='object'?String(tr.item_id||(tr.item&&tr.item.id)||(tr.offer&&tr.offer.item_id)||''):'';
-      if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');return rep('refuse',t.status,'article_different');}   // la transaction de LA DEMANDE dit un autre article : jamais une offre dessus
+      if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');return rep('refuse',t.status,txDeConv?'offre_prix_inconnu':'article_different');}   // 5.455.8 : celle de la conversation (repli) ⇒ « pas de transaction pour CET article », rien d'écrit de plus   // la transaction de LA DEMANDE dit un autre article : jamais une offre dessus
       if(tr&&typeof tr==='object'){
         const ach=String(tr.buyer_id||(tr.buyer&&tr.buyer.id)||'');
         if(ach&&ach!==body.recipientId){noterDiag('favori_req_tx_autre_acheteur');return rep('refuse',t.status,'destinataire_different');}
@@ -22804,10 +22860,15 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const versionV=choixV.version;
     if(!versionV)return rep('refuse',400);
     // 4b. L'offre décidée (plancher, garde du prix) AVANT d'écrire quoi que ce soit.
-    let op=null;
-    if(offre){
+    let op=null,offreApres=false;
+    // 5.455.8 : un envoi à moitié fait garde SON offre (jamais une 2ᵉ) ; la boîte de l'offre absente ⇒ le message d'abord, l'offre ensuite.
+    const offreIci=offre&&!repriseMoitie;
+    if(offreIci&&!tx&&txAutre){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}   // la conversation dit un autre article : rien
+    if(offreIci&&!tx){noterDiag('favori_offre_apres_message');offreApres=true;}
+    // La route APPRISE : la dernière fois, la boîte de l'offre manquait et « le message d'abord » a marché ⇒ prise directement.
+    if(offreIci&&!offreApres&&(await routeFavori('offre'))==='apres_message'){noterDiag('favori_route_offre_apres_message');offreApres=true;}
+    if(offreIci&&!offreApres){
       if(!(Number(prixAnnonce)>0)){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}   // TOUTES les sources ont échoué
-      if(!tx){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}   // pas de transaction où poser l'offre
       if(String(devise)!=='EUR'){noterDiag('favori_offre_autre_devise');return rep('refuse',0,'offre_prix_inconnu');}   // l'argent reste en euros
       op=choixV.op||await offreAvecPlancher(body.itemId,prixAnnonce,offre);
       if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
@@ -22833,11 +22894,14 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       noterDiag(faite?'favori_offre_ok':'favori_offre_refusee_'+o.status);
       if(faite||o.status>=500)await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');   // 6b. faite (ou peut-être) : jamais une 2ᵉ
       if(faite)await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(op.prix)});
+      if(!faite&&o.status===404){noterDiag('favori_offre_404_apres_message');offreApres=true;op=null;}   // 5.455.8 : la boîte de l'offre absente ⇒ message d'abord
+      else{
       if(!faite&&(o.status>=400&&o.status<500||o.ok))await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(o.json)||'',refusAt:Date.now()});   // 5.455.8 : SA phrase de Vinted, sur la rangée
       if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       attente=jeton;
       const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
       if(!att.ok){noterDiag('favori_message_pas_parti_'+att.raison);return rep('refuse',0,att.raison);}
+      }
     }
     etape('ecriture');
     const ec=await attendreEcriture(uid,acc,texteV,premier?'premier':'serie');
@@ -22850,6 +22914,26 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
     {const f=fin(r);if(f)return f;}
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
+    if(r.ok&&offreApres&&offre){
+      // 5.455.8 : le message est parti ; l'offre depuis la CONVERSATION relue (sa transaction), au plancher, une seule fois.
+      let txA=tx;
+      {await pauseFavori('relire',uid);const l2=await vintedPage(acc,'GET',adresseMessagerieVinted(acc.domain,uuid),null,{timeoutMs:12000});if(!frein)frein=freinFavoriAuto(l2);const c2=l2&&l2.ok?convMessagerieLue(l2.json,uuid):null;const t3=txDeConversationFavori(c2,body.itemId);if(t3.autre)txA='';else if(t3.tx)txA=t3.tx;}
+      const rgA=await registreFavori(uid);const dejaO=rgA&&rgA[cleRegistreFavori(body.itemId,body.recipientId)]&&rgA[cleRegistreFavori(body.itemId,body.recipientId)].o;
+      if(txA&&!frein&&!dejaO){
+        let px=prixAnnonce;if(!(Number(px)>0)){const t4=await vintedPage(acc,'GET',`/api/v2/transactions/${txA}`,null,{timeoutMs:12000});const tr4=t4&&t4.ok?(t4.json&&t4.json.transaction||t4.json):null;const pr4=tr4?prixDeTransaction(tr4):null;if(pr4&&pr4.devise==='EUR')px=pr4.montant;}
+        const opA=Number(px)>0?await offreAvecPlancher(body.itemId,px,offre):null;
+        const gpA=opA&&opA.prix?await gardePrixEcriture({sorte:'offre',site:'vinted',uid,id:String(body.itemId||''),prixC:Math.round(Number(opA.prix)*100),actuelC:Math.round(Number(px)*100),mode:'auto'}):null;   // la MÊME garde du prix
+        if(opA&&opA.prix&&prixOffrePage(opA.prix)&&opA.raison!=='offre_sous_plancher'&&gpA&&gpA.ok&&!(await garde())){
+          await pauseFavori('offre',uid);
+          const oA=await vintedPageFavori(acc,`/api/v2/transactions/${txA}/offers`,{offer:{currency:'EUR',price:prixOffrePage(opA.prix)}});
+          if(oA&&!oA.rienParti&&ecritureFavoriPartie(oA))ecrits++;
+          const fA=!!(oA&&oA.ok&&(oA.json==null||oA.json.code==null||Number(oA.json.code)===0));
+          if(fA||(oA&&oA.status>=500))await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');
+          if(fA){await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(opA.prix)});op=opA;await retenirRouteFavori('offre','apres_message');noterDiag('favori_offre_apres_message_ok');}
+          else if(oA&&oA.status>=400&&oA.status<500)await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(oA.json)||'',refusAt:Date.now()});
+        }
+      }
+    }
     if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{}),t:String(texteV||'').slice(0,160)});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
     if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // refusé net : pas parti
     {const t=await telephone(r);if(t)return t;}

@@ -72,7 +72,8 @@ async function monde(racine, opts = {}) {
       ownKeys: (t) => [...new Set([...Reflect.ownKeys(t), ...[...b.lignes.values()].map((r) => r.id)])],
       getOwnPropertyDescriptor: (t, k) => (k in t ? Reflect.getOwnPropertyDescriptor(t, k) : [...b.lignes.values()].some((r) => r.id === k) ? { configurable: true, enumerable: true, writable: true, value: ([...b.lignes.values()].find((r) => r.id === k) || {}).data } : undefined),
     }),
-    store: { __commeBleamDefaut: true, __favorisVintex: true, vrmChoixComptes: { [UID]: { choix: 'oui', login: 'jujuf38', at: 1 } }, vrmSession: { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'banc@vrm.test', expires_at: Date.now() + 365 * 864e5 } },
+    ...(opts.onglets ? { onglets: opts.onglets } : {}),
+    store: { ...(opts.store || {}), __commeBleamDefaut: true, __favorisVintex: true, vrmChoixComptes: { [UID]: { choix: 'oui', login: 'jujuf38', at: 1 } }, vrmSession: { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'banc@vrm.test', expires_at: Date.now() + 365 * 864e5 } },
     vinted: (e) => (opts.vinted && opts.vinted(e)) || vintedDefaut(e) });
   vm.runInContext('Date.now = () => __h();', Object.assign(f.ctx, { __h: () => h.t }));
   const fetchFond = f.ctx.fetch;

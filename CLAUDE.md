@@ -485,7 +485,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **28 nov. · FAVORIS 5.455.8 : « un envoi ne peut pas échouer » + agent autonome** : plus aucun refus pour envoi « à vérifier », file restée active ou liste ancienne ; un refus reste sur SA rangée, la liste ne disparaît plus ; offres > 7 j expirées ; plus d'import du passé ; interrupteur de l'agent (Favoris). `2026-11-28-favoris-urgent.md`. Geste : installer la 5.455.8.
+- **28 nov. · FAVORIS 5.455.8 : « un envoi ne peut pas échouer » + agent autonome** : plus aucun refus pour envoi « à vérifier », file restée active ou liste ancienne ; un refus reste sur SA rangée, la liste ne disparaît plus ; offres > 7 j expirées ; plus d'import du passé ; interrupteur de l'agent (Favoris, écart protégé 3–12 min gardé) ; reprise sans cul-de-sac. `2026-11-28-favoris-urgent.md`. Geste : installer la 5.455.8.
 - **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
 - **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.

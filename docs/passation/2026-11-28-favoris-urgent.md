@@ -39,9 +39,19 @@ conversation, faire une offre et un message » · « pourquoi tout prend du temp
 - **Agent autonome** : interrupteur « Envoyer automatiquement aux nouveaux favoris » sur la page Favoris (message, offre %,
   plancher ; SON « Allumer » = l'autorisation) ; ligne en direct « Agent favoris : actif · N envoyés aujourd'hui · prochain
   dans 42 s », « Pause » / « Reprendre » (local, par compte), « Arrêter » (éteint chez VRM), journal (heure, personne, article,
-  offre, message). Le pilote (`piloteFavorisTick`) suit l'heure donnée par le serveur ; écart entre envois automatiques
-  20–60 s (`AUTO_ECART_MS`, avant 3–12 min — demandé le 28 nov.) ; une attente de l'extension n'est plus comptée « sautée ».
-  Ses réglages (attente 10–60 min après le favori, plage, 15/h, jour) sont inchangés. Captcha = arrêt jusqu'à « Reprendre »
+  offre, message). Le pilote (`piloteFavorisTick`) suit l'heure donnée par le serveur ; l'écart PROTÉGÉ entre envois
+  automatiques reste 3–12 min (`AUTO_ECART_MS`, CLAUDE.md §3 : défaut jamais changé sans sa demande — un premier passage à
+  20–60 s a été REMIS à 3–12 min, mutation « ecart-20-60 » dans `audit-favoris-agent`) ; une attente de l'extension n'est plus
+  comptée « sautée ». Ses réglages (attente 10–60 min après le favori, plage, 15/h, jour) sont inchangés.
+- **Reprise sans cul-de-sac** (Julien : « si l'agent ne parvient pas, il doit trouver le chemin ») — chemin des requêtes :
+  page pas prête ⇒ l'onglet de travail ramené UNE fois sur vinted.fr (chargement attendu, jamais un délai fixe) puis l'étape
+  refaite ; offre en 404 ⇒ le message d'abord, puis l'offre depuis la conversation relue ; pas de transaction ⇒ celle de la
+  conversation (même article, sinon rien) ; envoi à moitié fait (offre partie, message pas) ⇒ conversation relue, jamais une
+  2ᵉ offre, son message déjà là ⇒ « fait » ; la route qui a marché est retenue par étape (`vrmFavorisRoutes`) et prise
+  directement la fois suivante. Chemin par l'interface : sélecteur → repérage (`vrm-trouver.js`) → geste appris
+  (`vrm-appris.js`), déjà en place. Prouvé par `audit-favoris-reprise` (R1–R6, 7 mutations).
+  Pas fait : un favori que VINTED refuse (offre refusée, texte refusé) n'est PAS relancé seul (il redemanderait la même chose
+  à Vinted) : sa phrase est sur sa rangée ; les attentes (pause, onglet, compte, session) reprennent seules (3 fois). Captcha = arrêt jusqu'à « Reprendre »
   (§3, non réglable) ; 403/429 = pause posée, reprise seule.
 
 ## Temps (mesurés, `audit-favoris-envoi-direct` E1)
@@ -52,7 +62,7 @@ Les blocages qui faisaient « attendre sans fin » (incertain, file active, tent
 
 ## Preuves
 `audit-favoris-envoi-direct` (vrai serveur + vrai fond + vrai panneau, E1–E6 ; arbre d'avant : 8 rouges ; 7 mutations
-rouges) · `audit-favoris-agent` (A1–A5, 5 mutations rouges) · banc `favoris-envoi-direct` (390/1512, clair/sombre, captures
+rouges) · `audit-favoris-agent` (A1–A5, 5 mutations rouges) · `audit-favoris-reprise` (R1–R6, 7 mutations) · banc `favoris-envoi-direct` (390/1512, clair/sombre, captures
 regardées) · audits et bancs remis à la nouvelle règle : `audit-ext-cloche-favoris` K3/K9, `audit-favoris-clair`,
 `audit-favoris-trancher` T1, `audit-favoris-liste` B1, `audit-favoris-discretion` D6, `audit-offres-sans-reponse` (heure du
 banc), `audit-favoris-auto` (écart), bancs `panneau-favoris-tableau`, `favoris-envoi`, `import-depart`.
