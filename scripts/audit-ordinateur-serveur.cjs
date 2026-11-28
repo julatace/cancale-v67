@@ -264,7 +264,7 @@ const H = 3600000;
   { const lp = {}; const f = profil({ uid: A, lignes: lp }); lp.presence_aaaaaaaaaaaaaaaa = { serveur: { on: true, uid: B, lu: Date.now() - 3000 } };
     const r9 = await tick(f);
     dit(lectures(f) === 0 && r9 && r9.saute === 'decale', 'S9b un autre profil vient de lire (3 s) ⇒ cette lecture attend (jamais deux comptes au même moment)', JSON.stringify(r9));
-    lp.presence_aaaaaaaaaaaaaaaa.serveur.lu = Date.now() - 60000; forcer(f); f.store.vrmServeurEtat.prochain = 0;
+    lp.presence_aaaaaaaaaaaaaaaa.serveur.lu = Date.now() - 60000; forcer(f); if (f.store.vrmServeurEtat) f.store.vrmServeurEtat.prochain = 0;
     await tick(f);
     dit(lectures(f) === 1, 'S9c l’autre a lu il y a 1 min ⇒ elle part', lectures(f)); }
 
