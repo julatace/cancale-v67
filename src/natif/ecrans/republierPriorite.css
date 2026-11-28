@@ -48,3 +48,9 @@
   .n-pdo-raison-tete { padding: 0 var(--n-marge) 12px; }
   .n-pdo-raison .n-glyphe { flex: none; margin-top: 1px; }
 }
+
+/* (28 nov.) « S'essouffle » : sous la rangée, « Republier » (le bouton commun) et « Pourquoi ? », alignés sur le texte. */
+@layer vrm-natif {
+  .n-rp-ess { display: grid; gap: 4px; padding: 0 0 8px; }
+  .n-rp-ess .n-actions { justify-content: start; }
+}

@@ -1711,6 +1711,17 @@ function PushPrefsSetting({ comptes, onMuets }) {
             <div style={{fontSize:12,color:C.muted,lineHeight:1.4,padding:'6px 0 2px'}} data-np-capte-note="">{tr('reglages.push.capte.note')}</div>
           </div>
         </section>
+        {/* (28 nov., choix de Julien) « N annonces s'essoufflent » : ÉTEINTE par défaut (seul `push_prefs.essouffle === true`
+            l'allume), une par jour au plus — décidé par le serveur (api/_lib/essoufflement-notif.js). Aucune carte récurrente. */}
+        <section className="vrm-notif-groupe" data-notif-essouffle="">
+          <div className="vrm-notif-groupe-corps" style={{padding:'0 12px'}}>
+            {(() => { const on = !!(prefs && prefs.essouffle === true); const nom = tr('ess.notif.titre'); return (
+              <div className="vrm-np-ligne" data-np-essouffle={on ? 'on' : 'off'} style={{borderTop:0}}>
+                <span className="vrm-np-lib">{nom}<small>{tr('ess.notif.desc')}</small></span>
+                <Interrupteur on={on} onClick={() => ecrirePrefs({ ...(prefs || {}), essouffle: !on }, `« ${nom} »`)} disabled={!prefs || busy} label={tr(on ? 'ess.notif.on' : 'ess.notif.off', { quoi: nom })}/>
+              </div>); })()}
+          </div>
+        </section>
       </div>
     </details>
     {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant

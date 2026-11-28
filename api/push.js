@@ -52,6 +52,7 @@ import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
 import { notifierVerificationVinted } from './_lib/verification-vinted.js';
 import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
+import { notifierEssouffleesDuVendeur } from './_lib/essoufflement-notif.js';   // (28 nov.) « N annonces s'essoufflent »
 import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 import { notifierCapte } from './_lib/push-capte.js';
 import { notifierRetraitsEnRetard } from './_lib/retraits-retard-notif.js';
@@ -183,6 +184,13 @@ async function traiter(req, res) {
     if (body.action === 'veille') {
       const r = await notifierAlertesDuVendeur();
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.n ? { n: r.n } : {}), ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (28 nov.) « 3 ANNONCES S'ESSOUFFLENT » : l'écran « À republier » donne le NOMBRE seul ; éteinte par défaut
+    // (`push_prefs.essouffle`), une par jour au plus — tout est décidé ici (api/_lib/essoufflement-notif.js).
+    if (body.action === 'essouffle') {
+      const r = await notifierEssouffleesDuVendeur(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
     // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »

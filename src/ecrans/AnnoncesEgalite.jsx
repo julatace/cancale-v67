@@ -57,6 +57,8 @@ import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { plusVue, joursPlusVue, CLE_PLUS_VUE_JOURS } from '../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import { lireRelevesEnLigne } from '../plusVueLecture.js';
+import { courbesParCompte, jourParis } from '../essoufflement.js';   // (28 nov.) « S'essouffle » : LA règle (courbes plates, gain estimé)
+import { lireCourbesEssoufflement } from '../essoufflementLecture.js';
 import { useFiltrePlateforme, optionTableau } from '../natif/FiltrePlateformes.jsx';   // (25 nov.) le filtre par plateforme de l'onglet
 import { TOUTES, nombresPlateformes, optionsPlateformes, choixEffectif } from '../filtrePlateforme.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
@@ -373,6 +375,24 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // cours ⇒ undefined ; ratée ⇒ null (jamais « rien à republier »). Publié pour Aujourd'hui (cet appareil), jamais sur un doute.
   const [nLitiges, majLitiges] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => abonnerLitiges(majLitiges), []);
+  // ── (28 nov., choix de Julien) « S'ESSOUFFLE » ── les courbes (`courbes_annonces_*`, ext. 5.428) des annonces Vinted EN
+  // LIGNE et de SES republications passées, lues PROJETÉES quand l'écran est calme ; en cours ⇒ undefined (personne n'est
+  // dit essoufflé), ratées ⇒ null (« — », dit au pied). La règle : src/essoufflement.js, consommée par `republierEnPriorite`.
+  const [courbesEss, setCourbesEss] = React.useState(undefined);
+  const sigEss = React.useMemo(() => {
+    if (!modele) return '';
+    const par = {};
+    for (const a of modele.articles) for (const x of a.annonces) if (x.site === 'vinted' && x.etat === 'enligne' && x.compte) (par[x.compte] = par[x.compte] || []).push(String(x.id));
+    return JSON.stringify(par);
+  }, [modele]);
+  React.useEffect(() => {
+    if (!sigEss || sigEss === '{}') return undefined;
+    let mort = false, idle = 0;
+    const lire = () => { if (mort) return; let sig = null; try { sig = JSON.parse(sigEss); } catch (_) { return; }
+      lireCourbesEssoufflement(lireTout, sig).then((r) => { if (!mort) setCourbesEss(r ? courbesParCompte(r.rows, r.lus) : null); }, () => { if (!mort) setCourbesEss(null); }); };
+    const t = setTimeout(() => { try { if (typeof window.requestIdleCallback === 'function') { idle = window.requestIdleCallback(lire, { timeout: 3000 }); return; } } catch (_) {} setTimeout(lire, 900); }, 700);
+    return () => { mort = true; clearTimeout(t); try { if (idle) window.cancelIdleCallback(idle); } catch (_) {} };
+  }, [sigEss]);
   const prio = React.useMemo(() => {
     if (!modele) return modele;
     const roles = load(CLE_ROLES_COMPTES, {}) || {};
@@ -380,10 +400,19 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     const jv = load(CLE_VUES_LUES, null);
     return republierEnPriorite(modele.articles, { jours: regPrio.jours, parJour: regPrio.parJour, maintenant: Date.now(), cle: cleNum,
       comptesBloques: new Set([...(pauseCB || []), ...(bannisCB || [])].map(String)), comptesPersonnels: comptesPersonnels(roles), comptesHorsVente: horsVente,
-      enLitige: enLitigeConnus(), journalVues: jv && jv.a && typeof jv.a === 'object' ? jv.a : null });
+      enLitige: enLitigeConnus(), journalVues: jv && jv.a && typeof jv.a === 'object' ? jv.a : null, courbes: courbesEss });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modele, regPrio.jours, regPrio.parJour, cleBloques, nLitiges]);
+  }, [modele, regPrio.jours, regPrio.parJour, cleBloques, nLitiges, courbesEss]);
   React.useEffect(() => { if (prio && lectureUtile(lu) && AUTH.user?.id) publierPriorite(prio, { owner: AUTH.user.id }); }, [prio, lu]);
+  // (28 nov.) La notification « N annonces s'essoufflent » (ÉTEINTE par défaut, Réglages → Notifications) : le NOMBRE seul,
+  // au plus un appel par jour et par appareil ; le serveur décide (allumée ? déjà dite aujourd'hui ?) — api/_lib/essoufflement-notif.js.
+  const nEss = prio && prio.essouffle && prio.essouffle.etat === 'lu' ? prio.essouffle.n : null;
+  React.useEffect(() => {
+    if (!(nEss > 0) || !lectureUtile(lu) || !AUTH.user?.id) return;
+    const jour = jourParis(), cleJ = 'vrm_essouffle_appel';
+    try { if (localStorage.getItem(cleJ) === jour) return; localStorage.setItem(cleJ, jour); } catch (_) { return; }
+    try { fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) }, body: JSON.stringify({ action: 'essouffle', n: nEss }) }).catch(() => {}); } catch (_) {}
+  }, [nEss, lu]);
   // ── (22 nov., choix n° 27) « PLUS VUE DEPUIS N J » ── les relevés quotidiens (`vinted_suivi_{uid}`, src/plusVue.js : LA règle)
   // des annonces Vinted EN LIGNE, lus projetés APRÈS la liste ; pas lu ⇒ aucune étiquette (jamais « plus vue » sur un doute).
   const [joursPV, setJoursPV] = React.useState(() => { try { return joursPlusVue(localStorage.getItem(CLE_PLUS_VUE_JOURS)); } catch (_) { return joursPlusVue(null); } });
@@ -439,6 +468,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     n: prio ? prio.liste.length : undefined,
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={(r) => { if (r && r.plusVue != null) { poserJoursPV(r.plusVue); return; } poserRegPrio(r); }}
+      onRepublierUne={(l) => republierPrio({ ids: [l.annonce.id], compte: l.annonce.compte })}
       plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.article.annonces.find((x) => x.site === 'vinted' && String(x.id) === String(l.annonce.id)) || null), autres: plusVuesHorsPrio, republier: republierUne }}
       Photo={(src, o) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async" className={o && o.className} style={o && o.style}/>} Logo={logoDuSite} euros={(n) => fmt(n)} Icon={Icon}/>,
   };

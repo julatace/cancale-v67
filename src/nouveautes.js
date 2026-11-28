@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., republier-essouffle) src/essoufflement.js, src/republierPriorite.js : courbe plate ⇒ en tête, gain estimé.
+  { id: 'republier-essouffle', date: '2026-11-28', titre: 'Annonces essoufflées en tête de « Republier »', phrase: 'Plus de vues depuis des jours : le gain estimé, toi qui lances.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
   { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.

@@ -181,6 +181,7 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
         // (19 nov., publier-agent) ce que CETTE annonce dit d'elle-même — la fiche article neutre (src/publier/agent.js) les lit, site par site.
         titre: str(a.titre), photo: a.photo || null, taille: str(a.taille), condition: str(a.condition), marque: str(a.marque), depuis: dateLue(a.depuis), url: str(a.url),
         verif: a.site === 'vinted' ? str(a.verif) : '',   // (27 nov.) en vérification par Vinted (lu) : aucune action ne la prend
+        reservee: a.reservee === true,   // (28 nov.) réservée par Vinted (lu) : jamais proposée à republier
         favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), lu: Number.isFinite(a.lu) ? a.lu : null, numero: numDe(a),
         venduLe: a.etat === 'vendue' ? dateLue(a.venduLe) : null,   // (22 nov.) la date de SA vente, lue (jamais devinée)
         venteMail: a.etat === 'vendue' && !!a.venteMail,   // (24 nov.) vendue d'après l'e-mail de vente, Vinted pas encore relu

@@ -82,6 +82,8 @@ export const FAMILLE_DE = {
   lbcsuppression: 'rappels',
   // (11 nov., lot agent2-veille) Un chiffre qui a chuté d'un coup sans raison (src/veilleChiffres.js).
   veille: 'rappels',
+  // (28 nov.) « 3 annonces s'essoufflent » : une fois par jour au plus, ÉTEINT par défaut (`push_prefs.essouffle`, api/_lib/essoufflement-notif.js).
+  essouffle: 'rappels',
   // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
   rappel: 'rappels',
   // (16 nov., lot abonnement-clair) Le rappel 3 jours avant un prélèvement de l'abonnement (api/_lib/rappel-prelevement.js).

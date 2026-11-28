@@ -31,11 +31,18 @@
 //   Le classement ne relie rien et ne décide rien : il range ce qu'il PROPOSE.
 // Puis les `parJour` premières (5 / 10 / 20 / 50, 10 par défaut) : la liste du jour.
 //
+// (28 nov., choix de Julien) « S'ESSOUFFLE » EN TÊTE : une annonce Vinted EN LIGNE dont la courbe (les derniers jours LUS,
+// jamais interpolés) est plate — LA règle de src/essoufflement.js (`etatAnnonce`) — est proposée même si elle n'a pas
+// encore l'âge de « Dorment », et passe DEVANT les autres : rangées par le gain estimé de SON compte (`gainCompte`, ses
+// republications passées ; inconnu ⇒ après), puis le nombre de jours à plat, puis son identité. Mêmes exclusions (comptées),
+// plus « réservée ». Courbes en cours de lecture (`courbes` undefined) ou pas lues (null) ⇒ personne n'est dit essoufflé.
+//
 // RIEN NE PART D'ICI (§3 : republication à l'aveugle refusée). L'écran coche, « Republier N » ouvre l'atelier
 // Republier du panneau de l'extension avec ces annonces présélectionnées (src/ouvrirPanneau.js) ; c'est LUI qui lance
 // dans le panneau. Module PUR (hors `publier…`/`lire…`), exécuté par scripts/audit-republier-priorite.cjs.
 import { filtrerArticles, JOUR_MS, cleDefaut } from './articles/modele.js';
 import { SEUILS_QUI_DORMENT, seuilValide } from './quiDorment.js';
+import { etatAnnonce, gainCompte } from './essoufflement.js';
 
 export const SEUILS_AGE = SEUILS_QUI_DORMENT;               // l'âge mini = le seuil du segment « Dorment »
 export const PAR_JOUR_CHOIX = [5, 10, 20, 50];
@@ -44,7 +51,7 @@ export const CLE_SEUIL_DORMENT = 'vrm_qd_seuil';            // le seuil partagé
 export const CLE_PAR_JOUR = 'vrm_repub_priorite_n';          // le nombre par jour (cet appareil)
 export const CLE_PUBLICATION_PRIO = 'vrm_repub_priorite';    // ce qu'Annonces publie pour Aujourd'hui (cet appareil)
 export const EVT_REPUB_PRIORITE = 'vrm:repub-priorite';
-export const EXCLUSIONS = ['vendue', 'masquee', 'litige', 'bloque', 'perso'];
+export const EXCLUSIONS = ['vendue', 'masquee', 'reservee', 'litige', 'bloque', 'perso'];
 export const POIDS = Object.freeze({ zeroFavori: 14, parFavori: 7, favorisMax: 4, baisse: 14, peuVue: 7 });
 
 const str = (v) => (v == null ? '' : String(v).trim());
@@ -92,9 +99,12 @@ export function scorePriorite({ jours, vues = null, favoris = null, baisse = nul
 // `articles` : `construireArticles(...).articles` (src/articles/modele.js). `null`/`undefined` ⇒ rendu tel quel (pas lu ≠ rien).
 // opts : { jours, parJour, maintenant, cle (`cleNum`), comptesBloques (Set d'uid), comptesPersonnels (Set d'uid),
 //          comptesHorsVente (Set d'uid : achats), enLitige ({ nums: Set de clés N°, ids: Set d'identifiants d'annonce } | null),
-//          journalVues (`vrm_vues_lues`.a : { 'vinted#id': série }) }
-// Rend { n (proposables), liste (les `parJour` premières, classées), classees (toutes, classées), reste, exclues: { vendue, masquee, litige, bloque, perso },
-//        sansCompteur (proposables dont vues ou favoris ne sont pas lus), reglage }.
+//          journalVues (`vrm_vues_lues`.a : { 'vinted#id': série }),
+//          courbes (`courbesParCompte(...)` de src/essoufflement.js : { [uid]: { a, ev, lus } } · null pas su · undefined en cours) }
+// Rend { n (proposables), liste (les `parJour` premières, classées), classees (toutes, classées), reste, exclues: { vendue, masquee, reservee, litige, bloque, perso },
+//        sansCompteur (proposables dont vues ou favoris ne sont pas lus), reglage,
+//        essouffle: { etat: 'lecture'|'passu'|'lu', n (essoufflées), passu (en ligne dont la courbe ne dit rien), gains: { [uid]: { n, moyenne } } } }.
+// Une ligne essoufflée porte `essouffle: { jours }` et `gain: { n, moyenne }` (celui de SON compte).
 export function republierEnPriorite(articles, opts = {}) {
   if (!Array.isArray(articles)) return articles === undefined ? undefined : null;
   const reglage = lireReglagePrio(opts);
@@ -103,11 +113,51 @@ export function republierEnPriorite(articles, opts = {}) {
   const bloques = ensemble(opts.comptesBloques), perso = ensemble(opts.comptesPersonnels), horsVente = ensemble(opts.comptesHorsVente);
   const litige = opts.enLitige && typeof opts.enLitige === 'object' ? { nums: ensemble(opts.enLitige.nums), ids: ensemble(opts.enLitige.ids) } : null;
   const J = opts.journalVues && typeof opts.journalVues === 'object' ? opts.journalVues : {};
-  const exclues = { vendue: 0, masquee: 0, litige: 0, bloque: 0, perso: 0 };
+  const exclues = { vendue: 0, masquee: 0, reservee: 0, litige: 0, bloque: 0, perso: 0 };
   const proposables = [];
   let sansCompteur = 0;
+  const C = opts.courbes && typeof opts.courbes === 'object' ? opts.courbes : null;
+  const ess = { etat: opts.courbes === undefined ? 'lecture' : C ? 'lu' : 'passu', n: 0, passu: 0, gains: {} };
+  const gainDe = (uid) => { if (!C) return null; if (!ess.gains[uid]) { const g = gainCompte(C[uid], { maintenant }); ess.gains[uid] = { n: g.n, moyenne: g.moyenne }; } return ess.gains[uid]; };
+  // La raison d'écarter un article (vendue, masquée, réservée, litige, bloqué, personnel) — UNE fonction pour les deux entrées.
+  const raisonEcart = (a, x) => {
+    const compte = str(x.compte);
+    if (a.annonces.some((y) => y.etat === 'vendue')) return 'vendue';
+    if (a.annonces.some((y) => y.site === 'vinted' && y.etat === 'masquee')) return 'masquee';
+    if (a.annonces.some((y) => y.site === 'vinted' && y.reservee === true)) return 'reservee';
+    if (litige && (litige.ids.has(str(x.id)) || (cle(a.numero) && litige.nums.has(cle(a.numero))))) return 'litige';
+    if (bloques.has(compte) || a.annonces.some((y) => y.etat === 'bloque')) return 'bloque';
+    if (perso.has(compte) || horsVente.has(compte)) return 'perso';
+    return '';
+  };
+  // L'annonce essoufflée d'un article (la plus longue à plat parmi ses annonces Vinted EN LIGNE), ou null ; compte les « pas su ».
+  const essouffleeDe = (a) => {
+    if (!C) return null;
+    let m = null, passu = false;
+    for (const y of a.annonces) {
+      if (y.site !== 'vinted' || y.etat !== 'enligne') continue;
+      const e = etatAnnonce(C, y.compte, y.id, { maintenant });
+      if (e.etat === 'essoufflee') { if (!m || e.jours > m.e.jours || (e.jours === m.e.jours && str(y.id) < str(m.x.id))) m = { x: y, e }; }
+      else if (e.etat === 'passu') passu = true;
+    }
+    if (!m && passu) ess.passu += 1;
+    return m;
+  };
   for (const a of articles) {
     if (!a || !Array.isArray(a.annonces)) continue;
+    const es = essouffleeDe(a);
+    if (es) {
+      const raisonE = raisonEcart(a, es.x);
+      if (raisonE) { exclues[raisonE] += 1; continue; }
+      const x = es.x, compte = str(x.compte);
+      const jours = x.depuis != null ? Math.floor((maintenant - x.depuis) / JOUR_MS) : null;
+      const vues = entier(x.vues), favoris = entier(x.favoris);
+      if (vues == null || favoris == null) sansCompteur += 1;
+      ess.n += 1;
+      proposables.push({ cle: a.cle, article: a, annonce: { id: str(x.id), compte, pseudo: str(x.pseudo) }, numero: str(a.numero),
+        jours, vues, favoris, baisse: null, score: scorePriorite({ jours: jours || 0, vues, favoris }), essouffle: { jours: es.e.jours }, gain: gainDe(compte) });
+      continue;
+    }
     // Une annonce Vinted assez ancienne mais MASQUÉE par Vinted, ou d'un compte BLOQUÉ mis en pause (sa dernière trace) : elle
     // n'est pas « en ligne », la règle « Dorment » ne la voit pas — elle est COMPTÉE parmi les écartées (dite, jamais cachée).
     const vieille = (etat) => a.annonces.some((y) => y.site === 'vinted' && y.etat === etat && y.depuis != null && maintenant - y.depuis >= reglage.jours * JOUR_MS);
@@ -122,12 +172,7 @@ export function republierEnPriorite(articles, opts = {}) {
     const x = enLigne[0];
     if (!x) continue;
     const compte = str(x.compte);
-    let raison = '';
-    if (a.annonces.some((y) => y.etat === 'vendue')) raison = 'vendue';
-    else if (a.annonces.some((y) => y.site === 'vinted' && y.etat === 'masquee')) raison = 'masquee';
-    else if (litige && (litige.ids.has(str(x.id)) || (cle(a.numero) && litige.nums.has(cle(a.numero))))) raison = 'litige';
-    else if (bloques.has(compte) || a.annonces.some((y) => y.etat === 'bloque')) raison = 'bloque';
-    else if (perso.has(compte) || horsVente.has(compte)) raison = 'perso';
+    const raison = raisonEcart(a, x);
     if (raison) { exclues[raison] += 1; continue; }
     const jours = Math.floor((maintenant - x.depuis) / JOUR_MS);
     const vues = entier(x.vues), favoris = entier(x.favoris);
@@ -136,17 +181,21 @@ export function republierEnPriorite(articles, opts = {}) {
     proposables.push({ cle: a.cle, article: a, annonce: { id: str(x.id), compte, pseudo: str(x.pseudo) }, numero: str(a.numero),
       jours, vues, favoris, baisse, score: scorePriorite({ jours, vues, favoris, baisse }) });
   }
-  proposables.sort((p, q) => q.score - p.score || q.jours - p.jours || (p.annonce.id < q.annonce.id ? -1 : p.annonce.id > q.annonce.id ? 1 : 0));
+  // Les essoufflées d'abord : le gain connu de leur compte (le plus grand d'abord ; inconnu après), puis les jours à plat.
+  const gainTri = (p) => (p.gain && p.gain.moyenne != null ? p.gain.moyenne : -1);
+  proposables.sort((p, q) => (q.essouffle ? 1 : 0) - (p.essouffle ? 1 : 0)
+    || (p.essouffle && q.essouffle ? (gainTri(q) - gainTri(p) || q.essouffle.jours - p.essouffle.jours) : 0)
+    || q.score - p.score || (q.jours || 0) - (p.jours || 0) || (p.annonce.id < q.annonce.id ? -1 : p.annonce.id > q.annonce.id ? 1 : 0));
   proposables.forEach((p, i) => { p.rang = i + 1; });
   const liste = proposables.slice(0, reglage.parJour);
-  return { n: proposables.length, liste, classees: proposables, reste: proposables.length - liste.length, exclues, sansCompteur, reglage };
+  return { n: proposables.length, liste, classees: proposables, reste: proposables.length - liste.length, exclues, sansCompteur, reglage, essouffle: ess };
 }
 
 // LA RAISON d'une ligne, en morceaux (l'écran les dit dans sa langue) : « 41 j · 136 vues · 0 favori · vues qui baissent ».
 // Un compteur pas lu ⇒ son morceau « pas lu » (jamais 0).
 export function raisonPriorite(l) {
   if (!l) return [];
-  const out = [{ k: 'jours', n: l.jours }];
+  const out = l.jours != null ? [{ k: 'jours', n: l.jours }] : [];
   out.push(l.vues == null ? { k: 'vuesPasLues' } : { k: 'vues', n: l.vues });
   out.push(l.favoris == null ? { k: 'favorisPasLus' } : { k: 'favoris', n: l.favoris });
   if (l.baisse === true) out.push({ k: 'baisse' });
