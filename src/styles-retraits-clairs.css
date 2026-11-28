@@ -15,7 +15,7 @@
   font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 20px; font-weight: 700; letter-spacing: .04em;
   color: var(--p-encre, currentColor); font-variant-numeric: tabular-nums; line-height: 1.2;
 }
-.vrm-rpf-code-gros.is-ambre { color: var(--p-ambre-texte, #B25000); font-family: inherit; font-size: 15px; letter-spacing: 0; }
+.vrm-rpf-code-gros.is-ambre { color: var(--p-ambre-texte, var(--n-ambre)); font-family: inherit; font-size: 15px; letter-spacing: 0; }
 .vrm-rpf-code-gros.is-qr { font-family: inherit; font-size: 15px; letter-spacing: 0; }
 .vrm-rpf-code2 { font-size: 15px; font-weight: 600; color: var(--p-gris, #6E6E73); }
 .vrm-rpf-code-venir { font-size: 14px; font-weight: 600; color: var(--p-gris, #6E6E73); }
@@ -99,10 +99,10 @@
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-k { color: var(--p-gris, #6E6E73); font-weight: 400; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: var(--p-encre, #1D1D1F); font-weight: 400; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
 :root[data-theme="dark"]:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v { color: #F5F5F7; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .is-ambre { color: var(--p-ambre-texte, #B25000); font-weight: 600; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .is-ambre { color: var(--p-ambre-texte, var(--n-ambre)); font-weight: 600; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-v .vrm-rpf-source:has(+ *)::after { content: ' · '; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt .vrm-rp-sous { display: block !important; margin: 0 !important; font-size: 13px !important; line-height: 18px !important; color: var(--p-gris, #6E6E73) !important; font-weight: 400 !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt .vrm-rp-sous.is-ambre { color: var(--p-ambre-texte, #B25000) !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-detail-txt .vrm-rp-sous.is-ambre { color: var(--p-ambre-texte, var(--n-ambre)) !important; }
 /* Les gestes : UNE rangée, une forme. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 8px !important; margin: 2px 0 0 !important; }
 :root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) {

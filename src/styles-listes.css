@@ -294,7 +294,7 @@
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-photo > :is([data-ann-a-confirmer], [data-boostee], .vrm-vignette-marque) {
     font-size: 0 !important; padding: 0 !important; width: 10px !important; height: 10px !important; min-width: 0 !important; border-radius: 50% !important; left: auto !important; right: 4px !important; top: 4px !important; bottom: auto !important; border: 2px solid var(--d-carte, #fff) !important;
   }
-  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-photo > .vrm-vignette-marque.is-ambre { background: var(--d-point-ambre, #FF9F0A) !important; }
+  :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-photo > .vrm-vignette-marque.is-ambre { background: var(--d-point-ambre, var(--n-ambre)) !important; }
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-ann-overview > .vrm-fiche-numero {
     position: static !important; grid-column: 2 !important; grid-row: 1 !important; margin: -10px 0 !important; inset: auto !important; transform: none !important;
   }
@@ -351,13 +351,13 @@
 /* Le point ambre d'une rangée : 8 px devant le titre, jamais la place d'une cible. */
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-title > .vrm-fu-point[data-fu-point] {
   display: inline-block !important; width: 8px !important; height: 8px !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important;
-  border-radius: 50% !important; margin: 0 8px 1px 0 !important; vertical-align: middle !important; background: var(--d-point-ambre, #FF9F0A) !important; place-items: unset !important;
+  border-radius: 50% !important; margin: 0 8px 1px 0 !important; vertical-align: middle !important; background: var(--d-point-ambre, var(--n-ambre)) !important; place-items: unset !important;
 }
 /* Les pastilles d'icônes de « Ensuite » : un carré doux teinté (12 %), pas un rond gris. */
 :root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-pile.is-vide .vrm-pile-v.is-tuile {
   border-radius: var(--d-r-pastille-icone, 10px) !important; background: var(--d-pastille-neutre-fond, rgba(118,118,128,.12)) !important; color: var(--d-pastille-neutre, #3A3A3C) !important; box-shadow: none !important; border: 0 !important;
 }
-:root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task:has(.is-urgent) .vrm-pile.is-vide .vrm-pile-v.is-tuile { background: var(--d-pastille-ambre-fond, rgba(255,159,10,.14)) !important; color: var(--d-pastille-ambre, #B25000) !important; }
+:root:root body .vrm-main[data-ecran="journee"] .vrm-day-task-list .vrm-day-task:has(.is-urgent) .vrm-pile.is-vide .vrm-pile-v.is-tuile { background: var(--d-pastille-ambre-fond, var(--n-ambre-fond)) !important; color: var(--d-pastille-ambre, var(--n-ambre)) !important; }
 /* « À ce rythme, novembre finira vers … » : une rangée sur le fond de la page (son « estimation » gris lisible, ≥ 4,5:1),
    44 px au doigt, 36 à la souris. */
 :root:root:root body .vrm-main[data-ecran="journee"] .vrm-ap-ligne { min-height: 44px !important; background: transparent !important; box-shadow: none !important; }

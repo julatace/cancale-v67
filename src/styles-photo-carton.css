@@ -20,8 +20,8 @@
 .vrm-pc-range-txt b { font-size: 15px; font-weight: 600; }
 .vrm-pc-range-txt small { font-size: 13px; opacity: .65; }
 .vrm-pc-note { margin: 0; font-size: 14px; line-height: 1.35; }
-.vrm-pc-note.is-ambre { color: #ff9f0a; }
-.vrm-pc.is-clair .vrm-pc-note.is-ambre { color: #B25000; }
+.vrm-pc-note.is-ambre { color: var(--n-ambre); }
+.vrm-pc.is-clair .vrm-pc-note.is-ambre { color: var(--n-ambre); }
 .vrm-pc-ligne dd { display: flex; align-items: center; gap: 10px; justify-content: flex-end; min-width: 0; }
 .vrm-pc-date { color: var(--d-gris, #6E6E73); font-size: 13px; }
 .vrm-pc-voir { min-height: 44px; min-width: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--vrm-accent-texte, #16181D); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }

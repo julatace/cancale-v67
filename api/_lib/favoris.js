@@ -1,5 +1,6 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {vendeurExige,lireCommeVendeur} from './session.js';
+import {exclusDuSite} from './ebay-crm-regle.js';   // (28 nov., lot ebay-crm) la liste d'exclusion, toutes plateformes
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris,raisonSansPreuveFavori} from './favoris-cibles.js';
 import {defautsFavorisUniques} from '../../src/favorisDefauts.js';
@@ -307,7 +308,10 @@ export async function routeFavoris(req,res){
       }else if(c.action==='reprendre'){
         decision=d=>reprendreFile(d,{owner,maintenant});
       }else if(c.action==='suivant'){
-        const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
+        // (28 nov., lot ebay-crm, C6) SA liste d'exclusion (toutes plateformes) : un membre Vinted exclu ne reçoit plus rien.
+        const ex=await lireCommeVendeur(req,`app_data?owner=eq.${owner}&id=eq.vrm_crm_exclus&select=l:data->liste`);
+        const exclus=Array.isArray(ex)?exclusDuSite({liste:ex[0]?.l||[]},'vinted'):null;
+        const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi,exclus});
       }else if(c.action==='terminer'){
         if(typeof c.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(c.jeton))throw new RefusFavoris('Tentative invalide.',400);
         // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est

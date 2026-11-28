@@ -2475,3 +2475,39 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
 - **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., compta-finitions, pour rester sous 60 Ko)
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans compta-finitions, pour rester sous 60 Ko)
+- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., agent-rangement, pour rester sous 60 Ko)
+- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., ebay-livraison, pour rester sous 60 Ko)
+- **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., sneakers-cote, pour rester sous 60 Ko)
+- **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., ebay-automatismes, pour rester sous 60 Ko)
+- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
+- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans messages-parfaits, pour rester sous 60 Ko)
+- **28 nov. · Sneakers : référence, pointure, cote VRM, étiquettes, en masse (sneakers-cote)** : référence fabricant + pointure sur la fiche (proposées, SON toucher pose ; jamais une identité) ; cote = SES ventes de la même référence à l'ACHAT (calculette) et dans la valeur du stock, jamais à la mise en ligne ; StockX : pas sans clé, écarté sur décision du 28 nov. ; masse par la file `prix` / l'API eBay, plancher mini / achat + 10 %. `2026-11-28-sneakers-cote.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans ebay-crm, pour rester sous 60 Ko)
+- **28 nov. · Automatismes eBay (ebay-automatismes)** : baisse par règle, offre aux observateurs, contre-offre par paliers, remise en vente, prix eBay +x %, modification en masse, « Vendre un similaire » — API officielle, cron GitHub horaire (`?moment=ebayauto`), plancher publié par l'app (`vrm_planchers_ebay`), éteints par défaut. `2026-11-28-ebay-automatismes.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., vitesse-fluide, pour rester sous 60 Ko)
+- **28 nov. · Messages parfaits** : photo de profil (sinon l'initiale), filtre Site + Compte natif, fil en deux temps, statut de l'extension daté (3 états, revérifié avant chaque geste), « Autre prix » jamais sous le plancher sans forcer. `2026-11-28-messages-parfaits.md`. Geste : aucun.
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov. soir, fusion favoris-urgent, pour rester sous 60 Ko)
+- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+- **28 nov. · CRM eBay (ebay-crm)** : Ventes · eBay → Clients : fiche par identifiant, messages et avis auto éteints, exclus (favoris Vinted, paliers eBay). `2026-11-28-ebay-crm.md`. Geste : reconnecter eBay si besoin.
+- **28 nov. · FAVORIS 5.455.8 : « un envoi ne peut pas échouer » + agent autonome** : plus aucun refus pour envoi « à vérifier », file restée active ou liste ancienne ; un refus reste sur SA rangée, la liste ne disparaît plus ; offres > 7 j expirées ; plus d'import du passé ; interrupteur de l'agent (Favoris, écart protégé 3–12 min gardé) ; reprise sans cul-de-sac. `2026-11-28-favoris-urgent.md`. Geste : installer la 5.455.8.

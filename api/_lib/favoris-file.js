@@ -149,9 +149,16 @@ export function prolongerFile(d,{owner,jeton,maintenant}){
   e.renouvele=maintenant;
   return {data:d,valeur:{prolonge:true}};
 }
-export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
+// (28 nov., lot ebay-crm, C6) `exclus` : les identifiants de membre Vinted de SA liste d'exclusion
+// (api/_lib/ebay-crm-regle.js, toutes plateformes). `null` = liste pas lue ⇒ RIEN ne part (pas su ≠ personne).
+// Un favori d'un membre exclu n'est jamais réservé : il est annulé (« exclu »), rien n'est parti.
+export function reserverFile(d,{owner,maintenant,jeton,suivi='',exclus=new Set()}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
+  if(exclus===null)return {valeur:{vue:{...vueFile(d,owner),raison:'Ta liste d’exclusion n’a pas pu être relue : rien n’est envoyé pour l’instant.'}}};
+  let exclusAnnules=0;
+  for(const x of g.jobs)if(x.etat==='attente'&&exclus.has(String(x.recipientId))){x.etat='annule';x.raison='exclu';x.traiteLe=maintenant;exclusAnnules++;}
+  if(exclusAnnules&&!g.jobs.some(x=>x.etat==='attente')){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
   // 5.455.8 : un envoi « à vérifier » n'arrête plus toute la file (il bloquait chaque favori suivant, sans fin) : il reste écarté
   //    pour SON favori seulement (jamais renvoyé, `connus` au lancement), les autres partent.
   if(d.enCours&&!d.enCours.abandonne){

@@ -22,7 +22,7 @@
 .vrm-plan-compte-nom { font-size: var(--d-t-15, 15px); font-weight: 600; overflow-wrap: anywhere; }
 .vrm-plan-compte-id { font-weight: 400; color: var(--d-gris, #6e6e73); font-variant-numeric: tabular-nums; }
 .vrm-plan-compte-detail { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6e6e73); }
-.vrm-plan-alerte { font-size: var(--d-t-13, 13px); color: var(--d-ambre, #b25000); margin-bottom: 8px; }
+.vrm-plan-alerte { font-size: var(--d-t-13, 13px); color: var(--d-ambre, var(--n-ambre)); margin-bottom: 8px; }
 .vrm-plan-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .vrm-plan-offres { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
 @media (max-width: 520px) { .vrm-plan-offres { grid-template-columns: 1fr; } }

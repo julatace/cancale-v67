@@ -39,6 +39,7 @@ import { retourDuSuivi, etapeRetourDuSuivi, ID_RETOURS_DEPOSES_CHAMP } from './_
 import { stampBordereau } from './_lib/stamp.js';
 // (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
+import { estEtiquetteEbay, lireEtiquetteEbay, idEtiquetteEbay } from './_lib/ebay-livraison.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { motsServeur } from './_lib/mots-vendeur.js';
@@ -354,6 +355,19 @@ export function paireDuSujetMessage(sujet) {
 }
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
+// (28 nov., « expédié sans l'extension ») LE N° DE TRANSACTION ÉCRIT DANS UN E-MAIL DE COLIS : le lien
+// `/transactions/{tx}`, `transaction_id={tx}` ou « N° de transaction : {tx} ». UNIQUE : deux n° différents
+// dans le même e-mail ⇒ aucun (jamais choisi). C'est une IDENTITÉ de la vente (§5) ; la règle du départ
+// (api/_lib/depart-vente.js, `preuveTxDeLigne`) ne s'en sert que si le SUJET constate le départ.
+// Fonction PURE (scripts/audit-expedie-sans-extension.cjs).
+export function txDuTexteEmail(texte) {
+  const t = String(texte || '');
+  const vus = new Set();
+  for (const re of [/N[°ºo]?\s*de\s*(?:la\s+)?transaction\s*:?\s*#?\s*(\d{6,20})(?!\d)/gi, /\/transactions?\/(\d{6,20})(?!\d)/gi, /transaction_id=(\d{6,20})(?!\d)/gi]) {
+    for (const m of t.matchAll(re)) vus.add(m[1]);
+  }
+  return vus.size === 1 ? [...vus][0] : '';
+}
 // L'identité d'un e-mail de finalisation (versement) : `{ cle, transaction, via }`.
 // Fonction PURE (scripts/audit-robustesse-serveur.cjs).
 export function cleFinalisation({ texte, messageId, sujet, corps }) {
@@ -2544,6 +2558,28 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 00) (28 nov., ebay-livraison — §2.8) L'ÉTIQUETTE eBAY PRÉPAYÉE PAR L'ACHETEUR, reçue par e-mail : un e-mail d'eBay
+    // (l'expéditeur CLASSE l'e-mail ; le vendeur reste celui de l'adresse de réception) qui porte UN PDF et parle
+    // d'étiquette (api/_lib/ebay-livraison.js). Rangée par SON n° de commande eBay (`email_bordebay_{n°}`, jamais le
+    // titre) : « Imprimer N bordereaux » l'imprime avec ceux de Vinted. Sans n° unique ⇒ gardé entier « à vérifier »,
+    // jamais jeté ni deviné ; écriture ratée ⇒ 503 (rejeu). ⚠️ NON MESURÉ : aucun e-mail d'étiquette eBay en base.
+    if (estEtiquetteEbay({ from: mail.from, subject, attachments: mail.attachments })) {
+      const lu = lireEtiquetteEbay({ subject, text: corpsTexte, attachments: mail.attachments });
+      if (!lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'étiquette eBay : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'etiquette-ebay', garde: true, raison: lu.raison });
+        return;
+      }
+      let luPdf = null;
+      try { luPdf = await transporteurDuPdf(lu.pdf.contentB64); } catch (_) { luPdf = null; }
+      const ok = await supabaseUpsert([{ id: idEtiquetteEbay(lu.orderId), data: {
+        type: 'etiquette-ebay', orderId: lu.orderId, ...(luPdf ? champsPdf(luPdf) : {}),
+        pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Etiquette-eBay-${lu.orderId}.pdf`, receivedAt: now } }]);
+      if (!ok) { await repondre(res, 503, { ok: false, erreur: 'ecriture', message: "L'étiquette eBay n'a pas pu être rangée : renvoie-la." }); return; }
+      await logEmail({ type: 'etiquette-ebay', subject, from: mail.from, orderId: lu.orderId });
+      await repondre(res, 200, { ok: true, type: 'etiquette-ebay', orderId: lu.orderId, pdf: true });
+      return;
+    }
     // 000) (11 nov., lot retours-litiges) LE BORDEREAU DE RETOUR D'UN ACHAT — par le SUJET
     // d'abord (api/_lib/retour-email.js). Avant : « aucune règle ne le reconnaît », gardé
     // TRONQUÉ ⇒ le PDF était perdu. Rangé par SON n° de transaction (`email_bordretour_{tx}`),
@@ -2769,7 +2805,20 @@ export async function traiterEmail(req, res) {
       // (11 nov., retraits fiables) Sans n°, deux e-mails au même sujet (« Votre colis est disponible »)
       // partageaient UNE ligne : le second effaçait le premier colis. Un colis sans n° mais avec son code
       // a sa ligne à lui (sujet + code) ; un rappel du même code retombe sur la même.
-      const rowId = `email_track_${carrier}_${track.suivi || shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject)}`;
+      // (28 nov.) Le n° de la TRANSACTION écrit dans l'e-mail (Vinted : le lien de la commande). Sans n° de
+      // suivi, il donne SA ligne à l'e-mail : deux ventes au même sujet (« Ton colis est en route ») ne
+      // partagent plus une ligne (la seconde effaçait la preuve de la première).
+      const txLu = txDuTexteEmail(`${mail.subject || ''}\n${texteUtile(mail)}\n${String(mail.html || '')}`);
+      // (28 nov., MESURÉ au banc audit-expedie-sans-extension) Le dernier repli du n° de suivi (« 8 à 14 chiffres »)
+      // prenait le n° de la TRANSACTION (10 chiffres, dans le lien de la commande) pour un n° de suivi : la ligne
+      // portait un faux n° (aucun transporteur ne le connaît) et deux identités se confondaient. Le n° lu comme
+      // transaction n'est jamais un n° de suivi ; sans autre n°, l'e-mail n'a pas d'identité de colis (un « arrivé »
+      // sans n° ni code redevient « info », comme toute arrivée sans n°).
+      if (txLu && track.suivi && String(track.suivi).replace(/\s+/g, '') === txLu) {
+        track.suivi = null;
+        if ((track.status === 'available' && !track.code) || track.status === 'retour') { track.status = 'info'; track.label = 'Info'; }
+      }
+      const rowId = `email_track_${carrier}_${track.suivi || (txLu && !(track.sansSuivi && track.code) ? `tx${txLu}` : shortHash(track.sansSuivi && track.code ? `${subject}|${track.code}` : subject))}`;
       // Le même colis passe par plusieurs emails (transit → à retirer → livré).
       // Le QR/code/lieu n'arrivent qu'à l'étape « à retirer » : on les GARDE si un
       // email plus tardif (sans ces infos) réécrit la même ligne.
@@ -2839,9 +2888,17 @@ export async function traiterEmail(req, res) {
           if (retourLie) sensLigne = 'sortant';
         }
       }
+      // (28 nov.) Le n° de transaction est celui d'une de SES VENTES (son bordereau `email_bord_{tx}` existe) :
+      // le colis est SORTANT (jamais « à retirer » chez lui). Lecture ratée ⇒ pas su : rien ne change.
+      const txLigne = txLu || (prevLigne && /^\d{6,20}$/.test(String(prevLigne.transaction || '')) ? String(prevLigne.transaction) : '');
+      if (!sensLigne && txLigne) {
+        const bt = await lireLignes(`id=eq.email_bord_${txLigne}&select=id`);
+        if (Array.isArray(bt) && bt.length) sensLigne = 'sortant';
+      }
       if (sensLigne) track.sens = sensLigne;
       await supabaseUpsert([{ id: rowId, data: {
         type: 'suivi', carrier, suivi: track.suivi || '', status: track.status,
+        ...(txLigne ? { transaction: txLigne } : {}),
         statusLabel: track.label, subject: sujetGarde, receivedAt: now,
         ...(sensLigne ? { sens: sensLigne } : {}),
         ...(emailAtLigne ? { emailAt: emailAtLigne } : {}),

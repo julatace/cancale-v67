@@ -41,7 +41,7 @@ export function OuvrirPaiements({ entetes = () => ({}), proAccueil = PRO_OUVERT,
           {r.pasSu ? 'Pas pu relire : réessaie.' : `${r.ok} sur ${r.total} prêts`}
         </div>
         <div aria-hidden="true" style={{ display: 'flex', gap: 3, marginTop: 10 }}>
-          {r.liste.map((x) => <span key={x.cle} style={{ flex: 1, height: 6, borderRadius: 3, background: x.etat === 'ok' ? 'var(--vrm-accent)' : x.etat === 'manque' ? 'var(--vrm-warn, #B25E00)' : 'var(--vrm-line)', opacity: x.etat === 'ok' ? 0.9 : 0.75 }}/>)}
+          {r.liste.map((x) => <span key={x.cle} style={{ flex: 1, height: 6, borderRadius: 3, background: x.etat === 'ok' ? 'var(--vrm-accent)' : x.etat === 'manque' ? 'var(--vrm-warn, var(--n-ambre))' : 'var(--vrm-line)', opacity: x.etat === 'ok' ? 0.9 : 0.75 }}/>)}
         </div>
       </div>
       <GroupeIos titre="Ce qu’il faut">
@@ -58,7 +58,7 @@ export function OuvrirPaiements({ entetes = () => ({}), proAccueil = PRO_OUVERT,
                   {deplie && <span className="vrm-ios-detail" data-ou-cliquer="" style={{ marginTop: 4, whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}>Où : {x.ou}</span>}
                 </span>
                 <span className="vrm-ios-valeur" data-ton={x.etat === 'manque' ? 'warn' : undefined}
-                  style={{ color: x.etat === 'ok' ? 'var(--vrm-accent)' : x.etat === 'manque' ? 'var(--vrm-warn, #B25E00)' : 'var(--vrm-muted)', fontWeight: 600 }}>{MARQUE[x.etat]}</span>
+                  style={{ color: x.etat === 'ok' ? 'var(--vrm-accent)' : x.etat === 'manque' ? 'var(--vrm-warn, var(--n-ambre))' : 'var(--vrm-muted)', fontWeight: 600 }}>{MARQUE[x.etat]}</span>
               </button>
             </div>
           );

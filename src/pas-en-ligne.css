@@ -6,9 +6,9 @@
   --pel-gris: var(--w-gris, #6E6E73);
   --pel-tuile: var(--w-remplir, rgba(118,118,128,.12));
   --pel-trait: rgba(60,60,67,.14);
-  --pel-ambre: #A35200;
+  --pel-ambre: var(--n-ambre);
 }
-:root[data-theme="dark"] { --pel-encre: #F5F5F7; --pel-gris: #A1A1A6; --pel-trait: rgba(235,235,245,.16); --pel-ambre: #FFB340; }
+:root[data-theme="dark"] { --pel-encre: #F5F5F7; --pel-gris: #A1A1A6; --pel-trait: rgba(235,235,245,.16); --pel-ambre: var(--n-ambre); }
 
 @layer vrm-premium {
 .vrm-pel { display: flex; flex-direction: column; gap: 14px; color: var(--pel-encre); min-width: 0; }

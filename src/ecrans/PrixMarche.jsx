@@ -3,6 +3,7 @@
 import { C, Card, LignePanne, ScreenHead } from '../App.jsx';
 import Pourquoi from '../composants/PourquoiReplie.jsx';
 import { tr } from '../i18n/index.js';
+import { Groupe, Rangee } from '../natif/index.js';   // (28 nov., lot sneakers-cote) l'entrée de la feuille « Sneakers »
 
 
 // ⟦← App.jsx #1⟧
@@ -31,6 +32,8 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
             </div>
           </Card>
         )}
+        {/* (28 nov., lot sneakers-cote) la valeur du stock au prix VRM par RÉFÉRENCE fabricant (SES ventes), l'entonnoir, en masse. */}
+        <Groupe attrs={{ 'data-snk-entree': 'prix-marche' }}><Rangee titre={tr('snk.entree')} sousTitre={tr('snk.entreeDetail')} fin="chevron" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'valeur' })); } catch (_) {} }} attrs={{ 'data-snk-ouvrir': 'valeur' }}/></Groupe>
         {groups.length === 0 ? (
         <Card style={{ padding: 16 }}>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>

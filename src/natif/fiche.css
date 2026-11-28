@@ -161,9 +161,9 @@
   .nf-compte-site + .nf-compte-vide { display: none; }
   .nf-c-etat { grid-area: etat; justify-self: end; }
   /* (21 nov., ext. 5.426) « Vendue → retirée sur » : ambre = encore à retirer (un geste à faire). */
-  .nf-etat-site[data-nf-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .nf-etat-site[data-nf-ton="ambre"] { background: var(--n-ambre-fond, var(--n-ambre-fond)); color: var(--n-ambre, var(--n-ambre)); }
   /* (22 nov.) Vestiaire « à corriger » : le seul état de modération qui appelle un geste. */
-  .nf-etat-site[data-nf-ton="corriger"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .nf-etat-site[data-nf-ton="corriger"] { background: var(--n-ambre-fond, var(--n-ambre-fond)); color: var(--n-ambre, var(--n-ambre)); }
   .nf-etat-site { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 8px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
   /* (21 nov., fiche-sites) La date (vente ou mise en ligne), l'état de chaque site, « Publier » là où elle n'est pas. */
   .nf-c-date { grid-area: date; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }

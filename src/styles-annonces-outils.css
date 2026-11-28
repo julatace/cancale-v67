@@ -28,7 +28,7 @@
   letter-spacing: -.03em; font-variant-numeric: tabular-nums; padding: 4px 0; outline: none; min-height: 48px;
 }
 .vrm-ao-prix-champ b { font-size: 28px; font-weight: 700; color: var(--fu-gris, #6e6e73); }
-.vrm-ao-prix-champ input[aria-invalid="true"] { text-decoration: underline wavy var(--fu-ambre, #ff9f0a); }
+.vrm-ao-prix-champ input[aria-invalid="true"] { text-decoration: underline wavy var(--fu-ambre, var(--n-ambre)); }
 .vrm-ao-sites { list-style: none; margin: 0 0 12px; padding: 0; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; overflow: hidden; }
 .vrm-ao-site { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 4px; min-height: 60px; }
 .vrm-ao-site + .vrm-ao-site { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
@@ -41,13 +41,13 @@
 .vrm-ao-etat { font-size: 13px; font-weight: 700; text-align: right; display: flex; flex-direction: column; align-items: flex-end; max-width: 46%; }
 .vrm-ao-etat small { font-weight: 400; color: var(--fu-gris, #6e6e73); font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
 .vrm-ao-etat.is-fait { color: var(--fu-encre, #1d1d1f); }
-.vrm-ao-etat.is-refuse, .vrm-ao-etat.is-incertain, .vrm-ao-etat.is-a-faire { color: var(--fu-ambre-txt, #b25000); }
+.vrm-ao-etat.is-refuse, .vrm-ao-etat.is-incertain, .vrm-ao-etat.is-a-faire { color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-ao-etat.is-envoi { color: var(--fu-gris, #6e6e73); }
 .vrm-ao-ouvrir {
   flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 999px; background: var(--fu-case, #f2f2f7);
   color: inherit; font-size: 15px; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
 }
-.vrm-ao-mini { margin: 0 4px 12px; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); font-size: 15px; font-weight: 600; }
+.vrm-ao-mini { margin: 0 4px 12px; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond, var(--n-ambre-fond)); color: var(--fu-ambre-txt, var(--n-ambre)); font-size: 15px; font-weight: 600; }
 .vrm-ao-vide { margin: 0 4px 12px; color: var(--fu-gris, #6e6e73); font-size: 15px; }
 .vrm-ao-principal {
   display: block; width: 100%; min-height: 52px; border: 0; border-radius: 999px; background: var(--fu-bleu, #16181D); color: #fff;

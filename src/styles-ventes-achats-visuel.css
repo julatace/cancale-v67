@@ -35,16 +35,16 @@ html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-
 /* L'étape actuelle (la dernière faite) : le seul bleu. */
 html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"][data-derniere] > i { background: var(--fu-bleu, var(--vrm-accent, #16181D)) !important; }
 /* L'étape en cours, seulement quand un geste est dû : ambre. */
-html body .vrm-fu-frise > .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre, #ff9f0a) !important; }
+html body .vrm-fu-frise > .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre, var(--n-ambre)) !important; }
 html body .vrm-fu-frise > .vrm-fu-legende {
   display: block !important; grid-column: 1 / -1 !important; min-width: 0 !important;
   font: 400 12px/1.25 var(--vrm-police, -apple-system, BlinkMacSystemFont, sans-serif) !important;
   color: var(--fu-gris, #6e6e73) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
   font-variant-numeric: tabular-nums;
 }
-html body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: var(--fu-ambre-txt, #b25000) !important; font-weight: 600 !important; }
+html body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: var(--fu-ambre-txt, var(--n-ambre)) !important; font-weight: 600 !important; }
 :root[data-theme="dark"] body .vrm-fu-frise > .vrm-fu-legende { color: #98989d !important; }
-:root[data-theme="dark"] body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: #ffb340 !important; }
+:root[data-theme="dark"] body .vrm-fu-frise > .vrm-fu-legende[data-ton="urgent"] { color: var(--n-ambre) !important; }
 /* Chaque segment garde son nom et son état pour VoiceOver ; à l'écran, la légende seule. */
 html body .vrm-fu-frise > .vrm-fu-seg > .vrm-fu-sr {
   position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important;

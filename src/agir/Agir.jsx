@@ -14,6 +14,8 @@ import { phraseSuivi, suiviTermine } from './suivi.js';
 import { usePeutAgir, useCompteAgir, envoyerGeste, useSuiviCommande, agirOuPanneau, useFaitsAgir as useFaitsAgirA, envoyerSerie as envoyerSerieA, agirMaintenant as agirMaintenantA, faitsAgir as faitsAgirA } from './porte.js';
 import { NOMS_SITES_AGIR } from './peutAgir.js';
 import { motsNavigateur } from '../navigateurExtension.js';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (28 nov., messages-parfaits) l'extension ne sait pas recevoir le geste d'ici ⇒ son panneau, sur CETTE conversation
+import { prixContreOffre } from '../messages/contreOffre.js';
 import './agir.css';
 
 // La phrase d'un « non » : la raison ET le geste, en une phrase (« Connecte l'extension sur shop_x : ouvre Vinted dans {nav} »).
@@ -108,6 +110,9 @@ export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = nul
   const surVue = React.useCallback((v) => { if (v === undefined || v === null) return; if (v.etat === 'fait') setTexte(''); setEnCours(!suiviTermine(v)); }, []);
   const champ = React.useRef(null);
   const v = usePeutAgir(site, compte, 'repondre', 'file');
+  // (28 nov., messages-parfaits) La file refuse, mais l'extension de CE navigateur a CE compte dans son onglet (une extension
+  // qui ne sait pas recevoir ce geste depuis l'app) : son PANNEAU, ouvert sur CETTE conversation — c'est dit, rien ne part d'ici.
+  const vp = usePeutAgir(site, compte, 'repondre', 'panneau');
   // Une réponse rapide touchée (src/ReponsesRapidesApp.jsx) remplit CE champ — rien ne part avant « Envoyer ».
   React.useEffect(() => {
     const f = (e) => { const d = e && e.detail; if (d && d.site === site && String(d.conv) === String(conv) && typeof d.texte === 'string') { setTexte(d.texte.slice(0, max)); try { if (champ.current) champ.current.focus({ preventScroll: true }); } catch (_) {} } };
@@ -130,6 +135,7 @@ export function ComposerReponse({ site, compte, conv, max = 2000, onEnvoye = nul
     <div className="vrm-agir-composer vrm-mp-compose vrm-mp-compose-ro" {...attrs} aria-describedby={decrit || undefined}>
       <span className="vrm-mp-compose-ro-ic" aria-hidden="true"><Glyphe nom="lock" taille={15}/></span>
       <span className="vrm-mp-compose-ro-t" data-mp-compose-ro={decrit ? 'bandeau' : 'raison'}>{decrit ? tr('mpro.compose.ro') : texteRaison(v)}</span>
+      {vp.ok && conv != null ? <BoutonPanneauConv site={site} compte={compte} conv={conv} action="repondre" libelle={tr('mparf.panneau.repondre')}/> : null}
     </div>
   );
   return (
@@ -153,9 +159,33 @@ const eur = (n) => { const x = Number(n); return Number.isFinite(x) ? x.toLocale
 // (24 nov., lot messages-pro) La paire de gestes d'une carte d'offre de 2026 : « Refuser » (second) et « Accepter N € »
 // (LE geste, plein) côte à côte ; « Proposer N € » en geste discret dessous (tertiaire). Mêmes gestes, mêmes data-* ;
 // Accepter DEMANDE toujours (il vend la paire). `decrit` : l'id du bandeau « Lecture seule » (la raison n'est pas répétée).
-export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, decrit = '' }) {
+// Le bouton « … dans l'extension » d'une conversation : le panneau de l'extension de CE navigateur, sur CETTE conversation
+// (`?vrm=panneau&page=messages&ids={conv}`, lu par l'extension depuis la 5.410), le geste pré-choisi. Rien ne part d'ici.
+export function BoutonPanneauConv({ site, compte, conv, action, libelle }) {
+  const [dit, setDit] = React.useState('');
+  return (
+    <span className="vrm-mp-panneau" data-mp-panneau={action}>
+      <Bouton variante="teinte" icone={<Glyphe nom="link" taille={15}/>} attrs={{ 'data-mp-panneau-ouvrir': String(conv) }}
+        onClick={() => { const u = ouvrirPanneau({ site, compte: String(compte), page: 'messages', ids: [String(conv)], action }); setDit(u ? tr('mparf.panneau.ouvert') : ''); }}>{libelle}</Bouton>
+      {dit ? <small className="vrm-agir-issue" role="status" data-mp-panneau-dit="">{dit}</small> : null}
+    </span>
+  );
+}
+
+// (28 nov., messages-parfaits — Julien : « faire une contre-offre DEPUIS L'APP », « jamais sous le plancher sauf si je le force »)
+// `plancher` : { c (centimes), de: 'mini' | 'achat' } — le prix mini, sinon l'achat + 10 % (src/reglesAuto.js `plancherBaisse`,
+// la règle de la baisse) ; null = aucun plancher connu. « Autre prix » : un montant SAISI par lui, jugé par `prixContreOffre`
+// (src/messages/contreOffre.js) ; sous le plancher (ou sans plancher connu) ⇒ rien ne part sans SA case « je le veux quand
+// même » ET sa confirmation. `affiche` : le prix de l'annonce (une contre-offre au-dessus n'a pas de sens : refusée, dite).
+export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, decrit = '', plancher = null, affiche = null }) {
   const [issue, setIssue] = React.useState(null);
   const [confirmer, setConfirmer] = React.useState(false);
+  const [autre, setAutre] = React.useState(false);
+  const [saisi, setSaisi] = React.useState('');
+  const [force, setForce] = React.useState(false);
+  const [confirmerAutre, setConfirmerAutre] = React.useState(false);
+  const vOffre = usePeutAgir('vinted', compte, 'offre', 'file');
+  const vPanneau = usePeutAgir('vinted', compte, 'offre', 'panneau');
   const base = { site: 'vinted', compte, geste: 'offre', decrit };
   const [enCours, setEnCours] = React.useState(false);   // un geste déposé, pas encore d'issue : aucun second geste sur CETTE offre
   const surVue = React.useCallback((v) => { if (v === undefined || v === null) return; setEnCours(!suiviTermine(v)); }, []);
@@ -168,6 +198,33 @@ export function GestesOffreVinted({ compte, tx, oid, conv, prix, contre = null, 
         <BoutonAgir {...base} par="file" variante="plein" className="vrm-mp-accepter" icone={<Glyphe nom="check" taille={17}/>} onClick={() => setConfirmer(true)} attrs={{ 'data-agir-accepter': String(prix) }}>{tr('agir.offre.accepter', { prix: eur(prix) })}</BoutonAgir>
       </div>
       {contre != null ? <BoutonAgir {...base} par="file" variante="texte" className="vrm-mp-contre" onClick={() => partir('contreOffre', { tx: String(tx), prix: contre, ...(conv != null ? { conv: String(conv) } : {}) })} attrs={{ 'data-agir-contre': String(contre) }}>{tr('agir.offre.contre', { prix: eur(contre) })}</BoutonAgir> : null}
+      {!vOffre.ok && vPanneau.ok && conv != null ? <BoutonPanneauConv site="vinted" compte={compte} conv={conv} action="offre" libelle={tr('mparf.panneau.offre')}/> : null}
+      {vOffre.ok && !autre ? <Bouton variante="texte" className="vrm-mp-autre-prix" onClick={() => setAutre(true)} attrs={{ 'data-agir-autre-prix': '' }}>{tr('mparf.contre.autre')}</Bouton> : null}
+      {vOffre.ok && autre ? (() => {
+        const j = prixContreOffre({ saisi, offre: prix, affiche, plancher });
+        const bloque = !j.ok || ((j.sous || j.sansPlancher) && !force);
+        const eurC = (c) => eur(c / 100);
+        return (
+          <div className="vrm-mp-contre-autre" data-agir-contre-autre={j.code} data-agir-plancher={plancher && plancher.c != null ? String(plancher.c) : ''}>
+            <label className="vrm-mp-contre-champ">
+              <span className="vrm-sr">{tr('mparf.contre.champ')}</span>
+              <input type="text" inputMode="decimal" autoComplete="off" value={saisi} placeholder={tr('mparf.contre.champ')} onChange={(e) => { setSaisi(e.target.value.slice(0, 12)); setForce(false); }} data-agir-contre-saisi=""/>
+              <span aria-hidden="true">€</span>
+            </label>
+            <small className="vrm-mp-contre-regle" data-agir-contre-code={j.code}>{tr('mparf.contre.' + j.code, { plancher: plancher && plancher.c != null ? eurC(plancher.c) : '', de: tr('mparf.contre.de.' + ((plancher && plancher.de) || 'aucun')), offre: eur(prix), affiche: affiche != null ? eur(affiche) : '' })}</small>
+            {j.ok && (j.sous || j.sansPlancher) ? <label className="vrm-mp-contre-forcer"><input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} data-agir-contre-forcer=""/><span>{tr(j.sous ? 'mparf.contre.forcer' : 'mparf.contre.forcerSans')}</span></label> : null}
+            <span className="vrm-mp-contre-l">
+              <Bouton variante="texte" onClick={() => { setAutre(false); setSaisi(''); setForce(false); }} attrs={{ 'data-agir-contre-annuler': '' }}>{tr('mparf.contre.annuler')}</Bouton>
+              <BoutonAgir {...base} par="file" variante="teinte" className="vrm-mp-contre-envoyer" onClick={bloque ? undefined : () => { if (j.sous || j.sansPlancher) setConfirmerAutre(true); else partir('contreOffre', { tx: String(tx), prix: j.prix, ...(conv != null ? { conv: String(conv) } : {}) }); }}
+                attrs={{ 'data-agir-contre-envoyer': j.ok ? String(j.prix) : '', 'aria-disabled': bloque ? 'true' : undefined }}>{j.ok ? tr('agir.offre.contre', { prix: eur(j.prix) }) : tr('mparf.contre.proposer')}</BoutonAgir>
+            </span>
+            {confirmerAutre && j.ok ? <Feuille ouverte titre={tr('agir.offre.contre', { prix: eur(j.prix) })} onFermer={() => setConfirmerAutre(false)}
+              pied={<Bouton variante="plein" onClick={() => { setConfirmerAutre(false); setAutre(false); partir('contreOffre', { tx: String(tx), prix: j.prix, ...(conv != null ? { conv: String(conv) } : {}) }, true); }} attrs={{ 'data-agir-contre-confirmer': String(j.prix) }}>{tr('mparf.contre.confirmerOui')}</Bouton>}>
+              <p className="vrm-agir-feuille-p">{tr(j.sous ? 'mparf.contre.confirmerSous' : 'mparf.contre.confirmerSans', { prix: eur(j.prix), plancher: plancher && plancher.c != null ? eurC(plancher.c) : '' })}</p>
+            </Feuille> : null}
+          </div>
+        );
+      })() : null}
       <IssueOuSuivi issue={issue} onVue={surVue}/>
       {confirmer ? <Feuille ouverte titre={tr('agir.offre.accepter', { prix: eur(prix) })} onFermer={() => setConfirmer(false)}
         pied={<Bouton variante="plein" onClick={() => { setConfirmer(false); partir('accepter', { ...ids, prix }, true); }} attrs={{ 'data-agir-accepter-confirmer': '' }}>{tr('agir.offre.confirmerOui')}</Bouton>}>

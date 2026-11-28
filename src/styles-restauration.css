@@ -20,7 +20,7 @@
 .vrm-retour-val { color: var(--w-gris, #6E6E73); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: right; }
 .vrm-retour-ligne.is-garde .vrm-retour-val, .vrm-retour-ligne.is-refus .vrm-retour-val { font-style: italic; }
 .vrm-retour-plus { font-size: 13px; }
-.vrm-retour-conflits { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: var(--w-carte, #fff); box-shadow: inset 3px 0 0 var(--warn, #B25E00); }
+.vrm-retour-conflits { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 16px; background: var(--w-carte, #fff); box-shadow: inset 3px 0 0 var(--warn, var(--n-ambre)); }
 .vrm-retour-conflits p { margin: 0; font-size: 13.5px; color: var(--w-encre, #1D1D1F); }
 .vrm-retour-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-retour-actions .vrm-b { min-height: 44px; }

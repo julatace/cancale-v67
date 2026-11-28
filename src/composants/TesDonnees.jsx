@@ -41,7 +41,7 @@ export default function TesDonnees({ onJournal, onExporter, onFermer, cloisonne 
       {onExporter ? <AccAvant geste="export.donnees"/> : null}
       <GroupeIos titre="Tes gestes" data-td-groupe="gestes">
         {onJournal && <RangeeIos titre="Ce que l’extension a fait" detail="Chaque geste fait en ton nom, daté, avec sa preuve." onClick={onJournal} data-td-journal=""/>}
-        {onExporter && <RangeeIos titre="Exporter mes données" detail="Un fichier sur ton appareil : ventes, achats, stock, compta." onClick={onExporter} data-td-exporter=""/>}
+        {onExporter && <RangeeIos titre="Exporter mes données" detail="Ventes, achats, stock, compta : un fichier." onClick={onExporter} data-td-exporter=""/>}
         {onFermer && <RangeeIos titre="Supprimer mon compte" detail="Ce qui part, ce qui reste et pourquoi ; tout en bas de Mon compte." onClick={onFermer} data-td-fermer=""/>}
         <a className="vrm-td-lien" href="/statut" target="_blank" rel="noopener" data-td-statut="">
           <RangeeIos titre="État de VRM" detail="La base, les e-mails, les notifications, en direct." chevron/>

@@ -1,5 +1,7 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_textes_restes from './de/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './de/rangement.js';
+import ecran_ebay_crm from './de/ebayCrm.js';   // (28 nov.) le CRM eBay   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './de/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './de/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './de/suiviVente.js';
@@ -22,6 +24,7 @@ import ecran_rentabilite from './de/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_gains from './de/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './de/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './de/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
+import ecran_sneakers from './de/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './de/aDistance.js';
@@ -52,6 +55,7 @@ import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './de/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './de/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './de/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -131,7 +135,9 @@ import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './de/actionsExt.js';
 import ecran_ebay_series from './de/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_ameliorations27 from './de/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_ameliorations27 from './de/ameliorations27.js';
+import ecran_compta_finitions from './de/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_messages_parfaits from './de/messagesParfaits.js';   // (28 nov.) Messages : photo de profil, statut de l'extension, contre-offre
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './de/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './de/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -140,6 +146,8 @@ import ecran_loupe_num from './de/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
+  ...ecran_ebay_crm,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -578,7 +586,7 @@ export default {
   "reglages.depannage.statut.q": "VRM scheint gestört",
   "reglages.depannage.statut.r": "Schau auf die Statusseite. Alles läuft? Lade diese Seite neu.",
   "reglages.donnees.confidentialite": "Datenschutzerklärung",
-  "reglages.donnees.desc": "Deine Verkäufe, Einkäufe und Anzeigen in einer Datei, für dich.",
+  "reglages.donnees.desc": "Verkäufe, Einkäufe, Anzeigen: eine Datei für dich.",
   "reglages.donnees.droits": "Deine weiteren Rechte:",
   "reglages.donnees.exporter": "Exportieren",
   "reglages.donnees.exporterOu.dessous": "„Komplettes Backup“ unten",
@@ -1565,6 +1573,13 @@ export default {
   "ebay.param.livraison": "Lieferung",
   "ebay.param.livraison.aide": "Du zahlst nie Porto: Der Käufer zahlt es an eBay.",
   "ebay.param.livraison.geree": "Über eBay",
+  "ebay.param.colis": "Gewicht und Größe des Pakets",
+  "ebay.param.colis.aide": "Standardmäßig ein mittleres Paket (1,2 kg): eBay berechnet das Porto, das der Käufer zahlt.",
+  "ebay.param.colis.mesures": "Gewicht (g) · Länge · Breite · Höhe (cm)",
+  "ebay.param.colis.poids": "Gewicht in Gramm",
+  "ebay.param.colis.longueur": "Länge in Zentimetern",
+  "ebay.param.colis.largeur": "Breite in Zentimetern",
+  "ebay.param.colis.hauteur": "Höhe in Zentimetern",
   "ebay.param.delaiEnvoi": "Bearbeitungszeit",
   "ebay.param.delaiEnvoi.aide": "Werktage zwischen Zahlung und Abgabe.",
   "ebay.param.delai.jour": "Am selben Tag",
@@ -2423,6 +2438,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
@@ -2481,6 +2497,9 @@ export default {
   ...ecran_offres_photos,
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
+  ...ecran_compta_finitions,
+  ...ecran_messages_parfaits,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
+  ...ecran_sneakers,
 };

@@ -33,6 +33,22 @@ export const NOUVEAUTES = Object.freeze([
   // (28 nov., ext. 5.455.8 — « un envoi ne peut pas échouer », « un vrai agent autonome ») docs/passation/2026-11-28-favoris-urgent.md
   { id: 'favoris-envoi-direct', date: '2026-11-28', titre: 'Favoris : Envoyer part, toujours', phrase: 'Extension 5.455.8 : refus dit sur la rangée, la liste reste.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'favoris-agent', date: '2026-11-28', titre: 'Favoris : l’agent qui envoie seul', phrase: 'Un interrupteur par compte, ligne en direct et journal.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (28 nov., vitesse-fluide) src/composants/saisieDifferee.jsx, molette sous <main>, Annonces : nombres et liste gardés.
+  { id: 'vitesse-fluide', date: '2026-11-28', titre: 'Recherche et défilement plus fluides', phrase: 'La lettre tapée s’affiche tout de suite, la molette ne fige plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (28 nov., messages-parfaits) src/ecrans/FilsTous.jsx, src/messages/ : photo de profil, filtre Site + Compte, statut daté.
+  { id: 'messages-parfaits', date: '2026-11-28', titre: 'Messages : photos de profil, statut vrai', phrase: 'Filtre Site et Compte, fil tout de suite, contre-offre à ton prix.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (28 nov., sneakers-cote) src/sneakers/ : référence fabricant, pointure, cote VRM (SES ventes), étiquettes, en masse.
+  { id: 'sneakers-cote', date: '2026-11-28', titre: 'Référence, pointure et cote de tes ventes', phrase: 'Valeur du stock, étiquettes et modification en masse, sans aucune clé.', tab: 'annonces', pour: 'sneakers', mode: 'tous' },
+  // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.
+  { id: 'ebay-livraison', date: '2026-11-28', titre: 'eBay : colis, étiquette et suivi dans Ventes', phrase: 'Date limite eBay, étiquette prépayée par l’acheteur, En route puis Livrée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
+  { id: 'ebay-crm', date: '2026-11-28', titre: 'eBay : fiche acheteur et messages automatiques', phrase: 'Ses achats, ses messages, ses litiges ; merci et évaluation, éteints par défaut.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
+  { id: 'ebay-automatismes', date: '2026-11-28', titre: 'eBay : baisse, offres et remise en vente automatiques', phrase: 'Chacun éteint par défaut, jamais sous ton prix mini, tout au journal.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'assistant-rangement', date: '2026-11-28', titre: 'Un assistant qui organise ton rangement', phrase: 'Il pose des questions, propose pièces, meubles et étages, puis tu valides.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
+  { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.
+  { id: 'expedie-sans-extension', date: '2026-11-28', titre: 'Colis parti : vu même sans l’extension', phrase: 'E-mail ou transporteur : il sort d’« à envoyer », réimprimer demande.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »
   { id: 'vrai-benefice', date: '2026-11-27', titre: 'Ton vrai bénéfice, mois par mois', phrase: 'Et le compte qui vend le mieux : le même chiffre que l’export.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (27 nov., tout-va-bien) src/SondesToutVaBien.jsx, src/toutVaBienSondes.js : une rangée par morceau.

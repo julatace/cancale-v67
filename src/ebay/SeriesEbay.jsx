@@ -56,7 +56,7 @@ export function FeuilleOffresEbay({ lignes = [], onFermer, appel, corpsCompte = 
       <Groupe>
         <div style={{ padding: '4px var(--n-marge, 16px) 8px' }}>
           <Champ libelle={tr('ebaySeries.offres.remise')} valeur={remiseTxt} onChange={(v) => { if (!enCours) setRemiseTxt(v); }} inputMode="numeric" suffixe="%" attrs={{ 'data-ebay-serie-remise': '' }}/>
-          {!remiseOk ? <div style={{ color: 'var(--n-ambre, #b25e00)', fontSize: 13, marginTop: 6 }} data-ebay-serie-remise-err="">{tr('ebaySeries.offres.remiseErr')}</div> : null}
+          {!remiseOk ? <div style={{ color: 'var(--n-ambre)', fontSize: 13, marginTop: 6 }} data-ebay-serie-remise-err="">{tr('ebaySeries.offres.remiseErr')}</div> : null}
         </div>
       </Groupe>
       {faites ? <p style={{ margin: '0 var(--n-marge, 16px) 8px', color: 'var(--n-encre-2)' }} data-ebay-serie-resume={faites}>{tr('ebaySeries.resume', { faites, n: choisies.length + faites })}</p> : null}

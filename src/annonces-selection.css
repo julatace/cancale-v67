@@ -37,7 +37,7 @@
 .vrm-act-choix span { font-size: 13px; color: var(--vrm-muted, #636366); line-height: 1.4; }
 .vrm-act-verif { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .vrm-act-paire { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--vrm-line, rgba(0,0,0,.08)); display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--vrm-ink, #38383A); line-height: 1.45; }
-.vrm-act-paire[data-act-manque]:not([data-act-manque="0"]) { border-left: 3px solid var(--vrm-warn, #B25000); }
+.vrm-act-paire[data-act-manque]:not([data-act-manque="0"]) { border-left: 3px solid var(--vrm-warn, var(--n-ambre)); }
 .vrm-act-pb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .vrm-act-pb a { min-height: 44px; display: inline-flex; align-items: center; color: var(--vrm-accent, #16181D); font-weight: 600; text-decoration: none; }
 .vrm-act-muet { color: var(--vrm-muted, #636366); }

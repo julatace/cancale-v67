@@ -31,7 +31,7 @@
 .avc-envoyer:disabled { opacity: .45; }
 .avc-apprendre p { margin: 0; }
 .avc-apprendre ol { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
-.avc-refus { margin: 0; font-size: 14px; color: var(--sb-ambre, #764300); }
+.avc-refus { margin: 0; font-size: 14px; color: var(--sb-ambre, var(--n-ambre)); }
 .avc-suivi { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
 .avc-suivi small { color: var(--sb-encre-2, inherit); }
 /* Posé DIRECTEMENT sur le fond (le titre, la phrase d'aide, « personne pour l'instant ») : l'encre claire du

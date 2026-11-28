@@ -56,7 +56,8 @@ import { MAIN_MOTS, motsServeur } from './_lib/mots-vendeur.js';
 import { sbCle } from './_lib/cle.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication } from './_lib/ebay.js';
+import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication, lireComptes as lireComptesEbay, lireReglageVendeur as lireReglageEbay, accessToken as jetonEbayVendeur } from './_lib/ebay.js';
+import { passageAutomatismesEbay } from './_lib/ebay-automatismes.js';   // (28 nov., lot ebay-automatismes)
 import { passageAlertesEbay, notifAlertes } from './_lib/ebay-alertes.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
@@ -67,6 +68,7 @@ import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/dep
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
+import { passerCrmVendeur } from './_lib/ebay-crm.js';   // (28 nov., lot ebay-crm) les automatismes du CRM eBay, app fermée
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, txAchatsEnRetour, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
@@ -387,7 +389,7 @@ function txsAExpedier(d) {
   // l'extension. Une preuve illisible (`null`) manque, rien d'autre : le colis reste compté.
   const pr = d.preuves || {};
   const partisVinted = ventesPartiesParPreuve({ bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone, bordsShipped,
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null, finalisees: pr.finalisees || null });
   const pasPartie = (t) => !masquees.has(t) && !partisVinted.has(String(t));
   const resume = new Set(); let resumeTrouve = false;
   const parTx = {};
@@ -426,7 +428,7 @@ function ventesEmailColis(d) {
   const pr = d.preuves || {};
   return colisVentesEmailServeur({ mails: d.mailsVentes, comptes: [...vivants], masques: d.main.vinted_accounts_hidden, panneau: d.panneau, connues, lectures,
     bordsParTx: Array.isArray(d.bords) ? bordsDuVendeur(d) : {}, shipDone: objet(d.main.vinted_ship_done), bordsShipped: objet(d.main.vinted_bords_shipped),
-    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null });
+    panelBordsDone: pr.panelBordsDone || {}, lignesEmail: pr.lignesEmail || null, departs: d.departs, entrants: pr.entrants || null, etiquettes: pr.etiquettes || null, finalisees: pr.finalisees || null });
 }
 
 // `soir` : le bilan du DIMANCHE SOIR (26 oct.). Il porte la semaine EN COURS
@@ -946,6 +948,8 @@ async function purgeBordereauxDuVendeur(maintenant = Date.now()) {
 const resumePurge = (r) => (!r ? null : { fait: !!r.fait, candidats: r.candidats || 0, supprimes: r.supprimes || 0, octets: r.octets || 0, ...(r.gardes ? { gardes: r.gardes } : {}), ...(r.migration ? { migration: r.migration } : {}), ...(r.fait ? {} : { raison: r.raison || 'pas-su' }) });
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
+  // (28 nov., lot ebay-crm) Messages et évaluations automatiques eBay (éteints par défaut), APRÈS la relecture des commandes.
+  const crmEbay = relu && relu.fait ? await passerCrmVendeur(proprietaireCourant() || '').catch(() => ({ fait: false, raison: 'erreur' })) : { fait: false, raison: 'pas-relu' };
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   // (15 nov., lot argent-plus) Les lectures du bilan, UNE fois pour l'e-mail ET la notification.
@@ -1022,7 +1026,7 @@ async function traiterVendeur() {
   try { suiviEnvoi = await notifsSuiviEnvoi(); } catch (e) { suiviEnvoi = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, retoursAchat, colisDanger, suiviEnvoi, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, retoursAchat, colisDanger, suiviEnvoi, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), crmEbay, transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1687,6 +1691,8 @@ async function traiterVendeurSoirHeure() {
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
+  // (28 nov., lot ebay-crm) Messages et évaluations automatiques eBay (éteints par défaut), APRÈS la relecture des commandes.
+  const crmEbay = relu && relu.fait ? await passerCrmVendeur(proprietaireCourant() || '').catch(() => ({ fait: false, raison: 'erreur' })) : { fait: false, raison: 'pas-relu' };
   const out = await rappelDuSoir();
   const rappels = await rappelsPersoSur();
   // (15 nov., lot retour-parfait) « Retour à déposer avant demain 10 h » (la limite LUE est demain), déposé/livré lus chez le transporteur.
@@ -1697,7 +1703,7 @@ async function traiterVendeurSoir() {
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), crmEbay, transporteurs: transp };
 }
 
 // ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────
@@ -1961,6 +1967,24 @@ async function passageDuCron(req, res, moment, bailEtat) {
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
     const { fait, ...nombres } = r || {};
     res.status(fait ? (r.echecs || r.panne ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs && !r.panne, moment: 'alertes', ...nombres });
+    return;
+  }
+  // (28 nov., lot ebay-automatismes) `?moment=ebayauto` : LES AUTOMATISMES eBAY (baisse par règle, offres aux
+  // observateurs, contre-offres par paliers, remise en vente des invendus), et RIEN d'autre — GitHub chaque heure
+  // (.github/workflows/ebay-automatismes.yml). Seuls les vendeurs dont un moteur est ALLUMÉ sont visités
+  // (api/_lib/ebay-automatismes.js) ; sélection pas lue ⇒ 503. La réponse ne porte que des NOMBRES.
+  if (moment === 'ebayauto') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'ebayauto', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageAutomatismesEbay({
+        lire: fetchPaginated, lireDonnee: lireDonneeEbay, modifierDonnee: modifierDonneeEbay, lireReglageVendeur: lireReglageEbay, accessToken: jetonEbayVendeur,
+        lireComptes: lireComptesEbay, comptesActifs, acces: accesVendeur, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000,
+      });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    const { fait, ...nombres } = r || {};
+    res.status(fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs, moment: 'ebayauto', ...nombres });
     return;
   }
   const soir = moment === 'soir';

@@ -91,18 +91,18 @@ html[data-vrm-d24] { --pp-bleu: #16181D;
   --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(244 244 245 / .16) 0%, rgb(244 244 245 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(52 190 137 / .16) 0%, rgb(52 190 137 / 0) 70%), linear-gradient(170deg, #16181D 0%, #16181D 45%, #303036 100%);
   --pp-verre: rgb(249 250 251 / .9); --pp-verre-o: #D7DEE6; --pp-verre-bord: rgb(255 255 255 / .75);
   --pp-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(27 27 31 / .55);
-  --pp-v-encre: #1C1C20; --pp-v-encre-2: #3F5468; --pp-v-ambre: #764300; --pp-v-puits: rgb(54 54 60 / .07);
+  --pp-v-encre: #1C1C20; --pp-v-encre-2: #3F5468; --pp-v-ambre: var(--n-ambre); --pp-v-puits: rgb(54 54 60 / .07);
   --pp-sur-2: #F3F4F6; background: var(--pp-bleu); }
 html[data-theme="dark"][data-vrm-d24] { --pp-bleu: #27272D;
   --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(52 190 137 / .14) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(170deg, #3A3A41 0%, #27272D 50%, #171719 100%);
   --pp-verre: rgb(19 19 22 / .72); --pp-verre-o: #212126; --pp-verre-bord: rgb(255 255 255 / .12);
   --pp-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
-  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; }
+  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: var(--n-ambre); --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; }
 @media (prefers-color-scheme: dark) { html:not([data-theme])[data-vrm-d24] { --pp-bleu: #27272D;
   --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(52 190 137 / .14) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(170deg, #3A3A41 0%, #27272D 50%, #171719 100%);
   --pp-verre: rgb(19 19 22 / .72); --pp-verre-o: #212126; --pp-verre-bord: rgb(255 255 255 / .12);
   --pp-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
-  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; } }
+  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: var(--n-ambre); --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; } }
 html[data-vrm-d24] body { isolation: isolate; background: var(--pp-bleu); }
 html[data-vrm-d24] body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-color: var(--pp-bleu); background-image: var(--pp-fond-bleu); }
 /* Sur le bleu : le blanc (le titre, le chiffre, les phrases). */

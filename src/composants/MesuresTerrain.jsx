@@ -80,7 +80,7 @@ export function MesuresTerrain({ entetes, nomEcran = (e) => e, Bouton = BoutonBa
   const enHausse = hausses(jour, veille);
   const lignes = tableau(jour);
   const morceaux = (jour.lignes || []).filter((l) => l.metrique === 'morceau').reduce((s, l) => s + l.n, 0);
-  const ambre = (k) => (enHausse.has(k) ? { color: 'var(--vrm-warn, #B25E00)', fontWeight: 700 } : null);
+  const ambre = (k) => (enHausse.has(k) ? { color: 'var(--vrm-warn, var(--n-ambre))', fontWeight: 700 } : null);
   return (
     <div data-mesures="lu" data-mesures-jour={jour.jour}>
       {tete}
