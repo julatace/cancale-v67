@@ -25,6 +25,7 @@
 //    T14 (base PANNE seulement) « aucun compte … relié » : la lecture a échoué, l'absence n'est pas prouvée.
 //  Juge le texte rendu (innerText visible), jamais un libellé précis ; chaque défaut sort avec sa phrase en contexte.
 //
+//  `CAPTURER=1` : une capture de CHAQUE écran (sinon seulement des écrans fautifs).
 //  `BASES=volume,vide,panne` `ECRANS=a,b` `LARGEURS=390,1512` `THEMES=clair` `SORTIE=dossier` (défaut
 //  /tmp/banc-donnees-texte : `donnees.json`, `donnees.md`, captures des écrans fautifs). `BANC_DIST=…` juge un autre
 //  build (avant). `MUTATION=undefined` : pose « undefined € » dans l'écran — le banc doit le voir (sinon rouge).
@@ -84,7 +85,9 @@ function lire({ mut }) {
       const bloc = bloc0 && r.contains(bloc0) && (bloc0.innerText || '').length < 240 ? bloc0 : el;
       const t = (bloc.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
       // Un bloc qui porte un champ (« Je veux toucher [   ] € ») : le chiffre est dans le champ, pas dans le texte.
-      if (t) lignes.push((bloc.querySelector && bloc.querySelector('input, select') ? '[saisie] ' : '') + t.slice(0, 220));
+      // Une PLAQUE de N° (« N° » et le nombre dans deux éléments) : un numéro de rangement s'écrit sans séparateur.
+      const plaque = el.closest('.n-plaque, [class*="plaque"], [class*="vrm-num"], [data-num], [data-n-plaque]');
+      if (t) lignes.push(((bloc.querySelector && bloc.querySelector('input, select')) || el.closest('.nf-champ-faux, [data-nf-champ]') ? '[saisie] ' : '') + (plaque ? '[num] ' : '') + t.slice(0, 220));
     }
     // Les champs remplis (une valeur « undefined » dans un champ se voit aussi).
     for (const i of r.querySelectorAll('input:not([type=hidden]):not([type=password]), select')) {
@@ -125,7 +128,7 @@ const REGLES = [
       if (/N°\s?$|n°\s?$|#\s?$/i.test(avant)) continue;
       if (/^(19|20)\d\d$/.test(m[1])) continue;   // une année
       if (m[1].length > 6) continue;                // un identifiant (transaction, suivi)
-      if (/^\[champ\]/.test(t)) continue;
+      if (/^\[(champ|num)\]/.test(t)) continue;
       return m[0];
     }
     return null; } },
@@ -170,6 +173,7 @@ async function ouvrirEcran(nav, W, sombre, ec, base) {
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
   await P.pret(o.pg);
   if (ec.evt) { await o.pg.evaluate((x) => window.dispatchEvent(new CustomEvent(x.nom, { detail: x.detail })), ec.evt); await o.pg.waitForTimeout(ATTENTE); }
+  if (ec.clic) await o.pg.waitForSelector(ec.clic, { timeout: 8000, state: 'attached' }).catch(() => {});
   if (ec.clic) { const l = o.pg.locator(ec.clic).first(); if (await l.count()) { await l.click({ timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(ATTENTE); } else o.manque = 'clic introuvable : ' + ec.clic; }
   await o.pg.waitForTimeout(800);
   return o;
@@ -192,7 +196,7 @@ async function ouvrirEcran(nav, W, sombre, ec, base) {
         const r = { base, ecran: ec.cle, W, theme: th, lignes: m.lignes.length, defauts, texte: m.lignes };
         resultats.push(r);
         const vrais = defauts.filter((x) => !x.admis);
-        if (vrais.length) await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `${base}-${ec.cle}-${W}-${th}.png`) }).catch(() => {});
+        if (vrais.length || process.env.CAPTURER) await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `${base}-${ec.cle}-${W}-${th}.png`) }).catch(() => {});
         console.log(`· ${base} ${ec.cle} ${W} ${th} : ${m.lignes.length} lignes, ${vrais.length} défaut(s)${vrais.length ? ' — ' + vrais.slice(0, 4).map((x) => `${x.d} « ${x.extrait} » dans « ${x.phrase.slice(0, 90)} »`).join(' | ') : ''}`);
       } catch (e) {
         resultats.push({ base, ecran: ec.cle, W, theme: th, lignes: 0, defauts: [{ d: 'T11', extrait: String(e.message || e).slice(0, 160), phrase: '(banc)', admis: '' }] });

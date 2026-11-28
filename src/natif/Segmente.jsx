@@ -12,6 +12,7 @@
 //             options={[{ cle: 'envoyer', libelle: 'À envoyer', n: 3 }, { cle: 'route', libelle: 'En route' }, { cle: 'finies', libelle: 'Finies' }]}/>
 import React from 'react';
 import { cx } from './outils.js';
+import { nombre } from '../i18n/index.js';   // (28 nov., boutons-donnees) « 1 025 », jamais « 1025 »
 
 // (24 nov., main-vert) Un `radio` dit son état par `aria-checked` : un `aria-pressed` venu des anciens appelants (attrs) est
 // INTERDIT sur ce rôle (axe aria-allowed-attr, critique) — il est retiré ici, une fois pour tous les appelants.
@@ -56,7 +57,7 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
         >
           <span className="n-segmente-libelle">{o.libelle}</span>
           {/* (26 nov.) Un espace avant le compte : le nom lu est « À envoyer 3 », jamais « À envoyer3 » (test controles-finitions-interface). */}
-          {o.n ? <>{' '}<span className="n-segmente-n">{o.n}</span></> : null}
+          {o.n ? <>{' '}<span className="n-segmente-n">{typeof o.n === 'number' ? nombre(o.n) : o.n}</span></> : null}
         </button>
       ))}
     </div>

@@ -25,7 +25,7 @@
 // « — » se touche et ouvre SA saisie sur place. AUCUN bouton par rangée ; « à relier » est un état discret.
 import React from 'react';
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
-import { tr } from '../../i18n/index.js';
+import { tr, nombre as nombreI18n } from '../../i18n/index.js';
 import { Page, PagePoussee, ChampRecherche } from '../Page.jsx';
 import { Groupe } from '../Groupe.jsx';
 import { Rangee, Vignette } from '../Rangee.jsx';
@@ -398,7 +398,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         <button type="button" className="n-ad-compte" data-n-famille="rangee" aria-expanded={ouvertG ? 'true' : 'false'} onClick={() => basculerRepli(g.cle)} data-ad-repli={g.cle}>
           {Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}
           {g.cle !== 'sans' ? <AvatarCompte pseudo={titre} cle={g.cle} petit/> : null}
-          <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {n}</span></span>
+          <span className="n-ad-compte-nom">{titre}<span className="n-ad-compte-n"> · {nombreI18n(n)}</span></span>
           {g.site ? <span className="n-eg-sr"> · {nomSite(g.site)} · {tr('egalite.groupe.n', { n })}</span> : null}
           {bloque ? <span className="n-ad-etiquette" data-ad-bandeau="bloque">{tr('tableau.etat.bloque')}</span> : null}
           {/* (24 nov.) « Lecture seule » : l'extension n'a ce compte dans aucun onglet — ses annonces restent visibles, ses gestes éteints. */}
