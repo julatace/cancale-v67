@@ -292,6 +292,11 @@ const tousLesCorps = [];
     offresRecues = [{ id: '5005', itemId: '120000000003', buyer: 'autre_banc', prix: '40.00' }];
     const p6 = await passer(T0 + 5 * 3600000);
     dit(!p6.journal.some((x) => x.appel === 'RespondToBestOffer'), 'une annonce sans SKU VRM-n° : jamais de contre-offre', '');
+    // (28 nov., lot ebay-crm, C6) Un acheteur de SA liste d'exclusion (par identifiant, casse ignorée) : aucune contre-offre.
+    lignes.push({ owner: J, id: 'vrm_crm_exclus', data: { liste: [{ site: 'ebay', id: 'acheteur_exclu' }] } });
+    offresRecues = [{ id: '5006', itemId: '120000000001', buyer: 'Acheteur_Exclu', prix: '60.00' }];
+    const p7 = await passer(T0 + 6 * 3600000);
+    dit(!p7.journal.some((x) => x.appel === 'RespondToBestOffer'), 'un acheteur EXCLU (liste d’exclusion du CRM) : jamais de contre-offre automatique', '');
   });
   await essaie('F. E4 remise en vente', async () => {
     remettreBase(); remettreEbay();

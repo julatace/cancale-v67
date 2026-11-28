@@ -2498,3 +2498,6 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans messages-parfaits, pour rester sous 60 Ko)
 - **28 nov. · Sneakers : référence, pointure, cote VRM, étiquettes, en masse (sneakers-cote)** : référence fabricant + pointure sur la fiche (proposées, SON toucher pose ; jamais une identité) ; cote = SES ventes de la même référence à l'ACHAT (calculette) et dans la valeur du stock, jamais à la mise en ligne ; StockX : pas sans clé, écarté sur décision du 28 nov. ; masse par la file `prix` / l'API eBay, plancher mini / achat + 10 %. `2026-11-28-sneakers-cote.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans ebay-crm, pour rester sous 60 Ko)
+- **28 nov. · Automatismes eBay (ebay-automatismes)** : baisse par règle, offre aux observateurs, contre-offre par paliers, remise en vente, prix eBay +x %, modification en masse, « Vendre un similaire » — API officielle, cron GitHub horaire (`?moment=ebayauto`), plancher publié par l'app (`vrm_planchers_ebay`), éteints par défaut. `2026-11-28-ebay-automatismes.md`. Geste : aucun.

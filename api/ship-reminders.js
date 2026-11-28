@@ -68,6 +68,7 @@ import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/dep
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
+import { passerCrmVendeur } from './_lib/ebay-crm.js';   // (28 nov., lot ebay-crm) les automatismes du CRM eBay, app fermée
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
 import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, txAchatsEnRetour, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
@@ -947,6 +948,8 @@ async function purgeBordereauxDuVendeur(maintenant = Date.now()) {
 const resumePurge = (r) => (!r ? null : { fait: !!r.fait, candidats: r.candidats || 0, supprimes: r.supprimes || 0, octets: r.octets || 0, ...(r.gardes ? { gardes: r.gardes } : {}), ...(r.migration ? { migration: r.migration } : {}), ...(r.fait ? {} : { raison: r.raison || 'pas-su' }) });
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
+  // (28 nov., lot ebay-crm) Messages et évaluations automatiques eBay (éteints par défaut), APRÈS la relecture des commandes.
+  const crmEbay = relu && relu.fait ? await passerCrmVendeur(proprietaireCourant() || '').catch(() => ({ fait: false, raison: 'erreur' })) : { fait: false, raison: 'pas-relu' };
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
   // (15 nov., lot argent-plus) Les lectures du bilan, UNE fois pour l'e-mail ET la notification.
@@ -1023,7 +1026,7 @@ async function traiterVendeur() {
   try { suiviEnvoi = await notifsSuiviEnvoi(); } catch (e) { suiviEnvoi = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, retoursAchat, colisDanger, suiviEnvoi, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, retoursAchat, colisDanger, suiviEnvoi, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), crmEbay, transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1688,6 +1691,8 @@ async function traiterVendeurSoirHeure() {
 async function traiterVendeurSoir() {
   // Le soir : lire et notifier les changements, puis le rappel du soir.
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
+  // (28 nov., lot ebay-crm) Messages et évaluations automatiques eBay (éteints par défaut), APRÈS la relecture des commandes.
+  const crmEbay = relu && relu.fait ? await passerCrmVendeur(proprietaireCourant() || '').catch(() => ({ fait: false, raison: 'erreur' })) : { fait: false, raison: 'pas-relu' };
   const out = await rappelDuSoir();
   const rappels = await rappelsPersoSur();
   // (15 nov., lot retour-parfait) « Retour à déposer avant demain 10 h » (la limite LUE est demain), déposé/livré lus chez le transporteur.
@@ -1698,7 +1703,7 @@ async function traiterVendeurSoir() {
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), crmEbay, transporteurs: transp };
 }
 
 // ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────

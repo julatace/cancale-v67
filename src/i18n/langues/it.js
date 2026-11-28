@@ -1,6 +1,7 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
 import ecran_textes_restes from './it/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
-import ecran_rangement from './it/rangement.js';   // (28 nov.) l'assistant de rangement
+import ecran_rangement from './it/rangement.js';
+import ecran_ebay_crm from './it/ebayCrm.js';   // (28 nov.) le CRM eBay   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './it/suiviVente.js';
@@ -146,6 +147,7 @@ export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_rangement,
+  ...ecran_ebay_crm,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,

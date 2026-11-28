@@ -109,6 +109,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Prix d'achat** | ⚠️ 19 nov. (« 2 oui », remplace l'ancien §2.5) : le montant du REÇU de CET achat (par identité) se pose seul ; jamais deviné, un lot jamais divisé, une saisie jamais écrasée (`src/prixAchatRecu.js`). |
 | **Gestes d'envoi** | ⚠️ 19 nov. (« 4 oui ») : « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont **RETIRÉS** ; le dépôt est constaté par le suivi du transporteur ; « Imprimer N bordereaux » depuis Aujourd'hui. Ne pas les remettre. |
 | **Messages aux favoris** | **Permis sur sa demande** (24 oct., refait « comme Vintex » le 29 oct., 5.280-5.281) : sur son clic, file serveur à autorisation unique, offre Vinted réelle, rythme « comme Vintex ». ⚠️ Le plafond de 10 messages/60 min de la file est **RETIRÉ (sa décision)** ; reste le plafond d'actions de l'extension. ⚠️ 19 nov. (« on garde toujours le temps aléatoire ») : rythme **au hasard 20 à 60 s** (21 nov., 5.419, sa demande ; 40 à 90 s avant) entre deux messages par défaut (jamais deux fois le même temps), « Plus prudent » 2 à 4 min, plus le temps d'écriture ; plafonds inchangés (15/h, 50/h, jour, prudence) — `api/_lib/favoris-file.js` `delaiRythme`. Leboncoin : il ne dit pas QUI a mis en favori, VRM n'écrit à personne. |
+| **Acheteurs (CRM eBay)** | 28 nov. : PERMIS sur eBay — fiche par IDENTIFIANT, automatismes éteints, exclusions ; segments, offres aux anciens : refusés. |
 | **Plafond d'actions** | ⚠️⚠️ **50 actions/heure/compte PAR DÉFAUT (sa décision du 29 oct.), et depuis le 20 nov. (« vas-y fais ») SA CADENCE PAR COMPTE**, réglée dans Paramètres du panneau de l'extension (5.410, `vinted_cadence`) : favoris/h 15 par défaut (1–15 depuis le 22 nov., 5.437 : « 15 par heure, la limite de Vinted »), actions/h 50 par défaut (10–100), plafond du jour réglable (déf. Discrétion), pause entre messages 20–60 s par défaut (5.419), réglable de 20 s à 4 min, **toujours au hasard** ; plus vite ⇒ confirmation. `RESERVE_GESTES` = 5 reste ; une republication réserve ses 3 gestes. **Ne PAS changer les défauts sans qu'il le demande.** NON réglables : arrêt au captcha + prudence, pause 403/429, un compte à la fois, une requête à la fois, compte de l'onglet. ⚠️ **24 nov. (Julien : « faire absolument tout si l'extension est connectée ») : l'app agit par `peutAgir` (commande pour CET article, exécutée par l'extension, confirmations gardées) ; pas connectée ⇒ lecture seule ou panneau** (remplace le 20 nov. ; `audit-actions-app`). Budget de LECTURE séparé (20/h). |
 | **Double vérification par SMS** | ⛔ Refusée le 22 oct. : **payant** (75 $/mois + chaque SMS). La méthode reste l'app d'authentification (TOTP, gratuite) + un second appareil de secours. Clés d'accès (passkey) : expérimentales chez Supabase, ne pas livrer. Jamais d'invitation forcée au démarrage (retirée à sa demande, 21 oct.). |
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
@@ -131,7 +132,7 @@ journée » triée par emplacement ; étiquettes de carton avec QR ; prix consei
 mise en ligne ; alerte « achat jamais arrivé » ; alerte « argent bloqué » ; rappel des
 messages sans réponse depuis 24 h ; rappel des évaluations à laisser ; sauvegarde
 hebdomadaire envoyée chez lui ; widget iPhone enrichi ; badge « bonne affaire » ;
-saisonnalité ; photo d'étiquette → fiche ; acheteurs fidèles.
+saisonnalité ; photo d'étiquette → fiche ; acheteurs fidèles (sauf fiche eBay, §3).
 
 **Retenu le 11 octobre (à construire, plusieurs faits depuis — voir « État actuel »)** :
 prix d'achat au numérotage · double vente app fermée · rappel URSSAF · fiche
@@ -485,8 +486,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **28 nov. · CRM eBay (ebay-crm)** : Ventes · eBay → Clients : fiche par identifiant, messages et avis auto éteints, exclus (favoris Vinted, paliers eBay). `2026-11-28-ebay-crm.md`. Geste : reconnecter eBay si besoin.
 - **28 nov. · Messages parfaits** : photo de profil (sinon l'initiale), filtre Site + Compte natif, fil en deux temps, statut de l'extension daté (3 états, revérifié avant chaque geste), « Autre prix » jamais sous le plancher sans forcer. `2026-11-28-messages-parfaits.md`. Geste : aucun.
-- **28 nov. · Automatismes eBay (ebay-automatismes)** : baisse par règle, offre aux observateurs, contre-offre par paliers, remise en vente, prix eBay +x %, modification en masse, « Vendre un similaire » — API officielle, cron GitHub horaire (`?moment=ebayauto`), plancher publié par l'app (`vrm_planchers_ebay`), éteints par défaut. `2026-11-28-ebay-automatismes.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

@@ -39,6 +39,7 @@ import { jugerOffre, offreEnCours, noterOffre } from './ebay-offre.js';
 import { gardePrixRegle } from './garde-prix-regle.js';
 import { cleNum, numeroExterne } from './numerotation.js';
 import { offresEbay, lireXmlEbay } from './ebay-gestion.js';
+import { exclusDuSite, cleAcheteur } from './ebay-crm-regle.js';   // (28 nov., lot ebay-crm) la liste d'exclusion, toutes plateformes
 import { marcheDuCompte, lienAnnonce } from './ebay-marches.js';
 import { regleBaisseDe, baisseDue } from '../../src/reglesAuto.js';
 import { palierSuivant } from '../../src/negociationPaliers.js';
@@ -292,6 +293,10 @@ export async function passageCompte(k) {
       if (o.currency !== devise || (a.devise && a.devise !== devise)) continue;
       const prixC = centimes(a.prix), offreC = centimes(o.price);
       if (prixC == null || offreC == null || !(Number.isInteger(o.quantity) && o.quantity >= 1)) continue;
+      // (28 nov., lot ebay-crm, C6) Un acheteur de SA liste d'exclusion ne reçoit aucune contre-offre automatique ;
+      // la liste pas lue (`null`) ⇒ rien (pas su ≠ personne).
+      if (k.exclus === null || k.exclus === undefined) { await saute('paliers', o.itemId, num, 'exclusion-pas-sue'); continue; }
+      if (k.exclus.has(cleAcheteur(o.buyer))) { await saute('paliers', o.itemId, num, 'exclu'); continue; }
       const cle = o.itemId + '|' + String(o.buyer || '').slice(0, 64);
       const neg = obj(k.etat.paliers[cle]) || { joues: [], offres: [] };
       if ((neg.offres || []).includes(o.id) || neg.etat === 'en-cours') continue;   // déjà répondu à CETTE offre
@@ -407,6 +412,8 @@ async function passerUnCompteBrut(deps) {
   if (!at || !at.ok) return { ref, raison: (at && at.reason) || 'jeton' };
   const [reglesOffre, journalOffres] = await Promise.all([lireDonnee('ebay_offres' + suffixe, owner), lireDonnee(JOURNAL_OFFRES + suffixe, owner)]);
   const client = clientEbay({ fetcher, token: at.token, marche });
+  // (28 nov., lot ebay-crm) La liste d'exclusion du vendeur : `undefined` (pas su) ⇒ `null`, absente ⇒ vide.
+  const exclusLu = reglagesCompte(c.reglages).paliers.actif ? await lireDonnee('vrm_crm_exclus', owner) : null;
   let courant = c;
   const noterEtat = async (f) => {
     let apres = null;
@@ -415,7 +422,7 @@ async function passerUnCompteBrut(deps) {
     return w;
   };
   const k = { client, marche, reglages: c.reglages, planchers: lv.planchers, maj: majorationDe(lv.majoration, ref), mk: lv.mk, reglesOffre: obj(reglesOffre) && obj(reglesOffre.items) ? reglesOffre.items : {},
-    journalOffres, etat: courant, noterEtat, noterOffreJournal: (f) => modifierDonnee(JOURNAL_OFFRES + suffixe, owner, f), maintenant, horloge, finA: deps.finA || (horloge() + TEMPS_COMPTE_MS) };
+    journalOffres, exclus: exclusLu === undefined ? null : exclusDuSite(exclusLu, 'ebay'), etat: courant, noterEtat, noterOffreJournal: (f) => modifierDonnee(JOURNAL_OFFRES + suffixe, owner, f), maintenant, horloge, finA: deps.finA || (horloge() + TEMPS_COMPTE_MS) };
   const bilan = await passageCompte(k);
   await modifierDonnee(ID_AUTO, owner, surCompte(ref, (x) => { x.dernier = { at: maintenant, ...bilan }; })).catch(() => null);
   return { ref, ...bilan };
