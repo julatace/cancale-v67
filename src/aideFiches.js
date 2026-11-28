@@ -26,7 +26,7 @@ export const ECRANS_AIDE = ['journee', 'annonces', 'ventes', 'colis', 'messages'
 // Les feuilles qu'une fiche peut ouvrir APRÈS l'écran (écoutées par la coque,
 // toujours montée). Une feuille d'un écran chargé à la demande n'est pas ici :
 // l'événement partirait avant que l'écran l'écoute.
-export const FEUILLES_AIDE = ['vrm:calculette', 'vrm:configuration', 'vrm:visite', 'vrm:recherche-photo', 'vrm:centre-notifs'];
+export const FEUILLES_AIDE = ['vrm:calculette', 'vrm:sneakers', 'vrm:configuration', 'vrm:visite', 'vrm:recherche-photo', 'vrm:centre-notifs'];
 
 // Les panneaux de Réglages qu'un lien `reglage=` sait ouvrir (`DEMANDE_REGLAGE_SOUS`).
 export const REGLAGES_AIDE = ['push', 'agenda', 'vacances', 'numeros', 'modeles', 'imprimante', 'regime', 'apparence', 'stream', 'zoom', 'corbeille', 'verifier', 'toutvabien', 'connexions', 'depannage', 'appareils', 'double', 'equipe', 'abonnement', 'widget'];
@@ -84,6 +84,9 @@ export const FICHES_AIDE = [
   { id: 'achats-tableur', ecran: 'achats', q: 'Importer mes achats depuis un tableur', etapes: ['Achats → « + Ajouter » → Importer un tableur.', 'Choisis ton fichier .xlsx ou .csv.', 'Vérifie l’aperçu, puis importe.'], aller: { lien: '?tab=achats&achat=1' }, mots: ['importer', 'import', 'tableur', 'excel', 'csv', 'xlsx', 'fichier'] },
   { id: 'achats-relier', ecran: 'achats', q: 'Relier un achat à {un}', etapes: ['Touche « Choisir un autre achat ».', 'Cherche dans tes achats.', 'Ton clic relie : rien n’est deviné.'], aller: { lien: '?tab=achats' }, mots: ['relier', 'lier', 'associer', 'rattacher', 'achat', 'vente'] },
   { id: 'achats-calculette', ecran: 'achats', q: 'Savoir si un achat est rentable', etapes: ['Ouvre la calculette d’achat.', 'Tape le prix d’achat et le prix de vente.'], aller: { lien: '?tab=achats', feuille: 'vrm:calculette' }, mots: ['calculette', 'calculer', 'rentable', 'marge', 'gagner', 'combien'] },
+  // (28 nov., lot sneakers-cote) la cote VRM (SES ventes de la même référence), la valeur du stock, la modification en masse.
+  { id: 'sneakers-cote', ecran: 'achats', q: 'Voir ce que vaut une référence (DD1391-100)', etapes: ['Ouvre la calculette d’achat.', 'Tape la référence et la pointure.', 'VRM dit ce que tes ventes de ce modèle ont donné.'], aller: { lien: '?tab=achats', feuille: 'vrm:calculette' }, mots: ['cote', 'reference', 'stockx', 'style', 'code', 'sneakers', 'pointure', 'valeur'] },
+  { id: 'sneakers-masse', ecran: 'annonces', q: 'Baisser plusieurs annonces d’un coup', etapes: ['Ouvre Sneakers → En masse.', 'Coche les annonces, tape −10 % ou un prix.', 'Revois puis touche « Appliquer ».'], aller: { lien: '?tab=annonces', feuille: 'vrm:sneakers' }, mots: ['masse', 'plusieurs', 'baisser', 'pourcentage', 'etiquette', 'tag', 'selection'] },
   { id: 'achats-photo', ecran: 'achats', q: 'Retrouver {un} avec une photo', etapes: ['Touche l’appareil photo de la loupe.', 'Prends {le} en photo.'], aller: { lien: '?tab=achats', feuille: 'vrm:recherche-photo' }, mots: ['photo', 'image', 'appareil', 'retrouver', 'reconnaitre'] },
 
   // Stock

@@ -68,3 +68,31 @@ export function avecFiches(ventes, etat) {
   const e = etatSneakers(etat);
   return (ventes || []).map((v) => { const f = v && v.num ? e.fiches[cleNum(v.num)] : null; return f ? { ...v, ref: f.ref || v.ref, pointure: f.pointure || v.pointure } : v; });
 }
+
+// Les ARTICLES de l'écran Annonces (src/articles/modele.js, tous sites, N° par identité) quand il les a construits :
+// la feuille les préfère (Leboncoin et Vestiaire compris) ; sinon la source de l'app (Vinted et eBay).
+let articlesPublies = null;
+export function poserArticlesSneakers(articles) { articlesPublies = Array.isArray(articles) ? { at: Date.now(), articles } : null; }
+const ETAT_EN_LIGNE = new Set(['enligne', 'en-ligne']);
+export function annoncesDesArticles(articles) {
+  const out = [];
+  for (const a of articles || []) {
+    if (!a || !Array.isArray(a.annonces)) continue;
+    for (const x of a.annonces) {
+      if (!x || x.id == null || !x.site) continue;
+      out.push({ cle: x.site + ':' + x.id, site: x.site, id: String(x.id), compte: String(x.compte || ''), titre: x.titre || a.titre || '', prix: x.prix, devise: 'EUR',
+        num: a.doublon ? '' : String(a.numero || ''), mini: a.prixMini, achat: a.achat, vues: x.vues, favoris: x.favoris, enLigne: ETAT_EN_LIGNE.has(String(x.etat)), taille: x.taille || a.taille || '' });
+    }
+  }
+  return out;
+}
+export async function annoncesPourSneakers() {
+  if (articlesPublies && Date.now() - articlesPublies.at < 30 * 60000) return annoncesDesArticles(articlesPublies.articles);
+  if (typeof sources.annonces !== 'function') return null;
+  try { const a = await sources.annonces(); return Array.isArray(a) ? a : null; } catch (_) { return null; }
+}
+
+// La sélection faite dans Annonces (« Modifier en masse ») : lue UNE fois par la feuille, puis oubliée.
+let preselection = null;
+export function poserPreselectionSneakers(cles) { preselection = Array.isArray(cles) ? cles.map(String).slice(0, 800) : null; }
+export function prendrePreselectionSneakers() { const p = preselection; preselection = null; return p; }

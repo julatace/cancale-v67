@@ -12,11 +12,12 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Feuille, Groupe, Rangee, Bouton, Segmente, Tuiles, Tuile, Champ, Puce, Vide } from '../natif/index.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+import { envoyerGeste } from '../agir/porte.js';   // LA FILE que l'extension exécute (geste 'baisser', file 'prix'), par la porte
 import { valeurStockCote } from './cote.js';
 import { entonnoirParModele } from './entonnoir.js';
 import { compterTags, filtrerParTag, supprimerTag, tagsDe } from './tags.js';
-import { planMasse, lireOperation, resumePlan, lignesAEnvoyer, liensPanneau, appliquerEbay, appliquerFile, SITES_MASSE } from './masse.js';
-import { sourcesSneakers, ventesPourCote, avecFiches, poserFiches, cleNumSneakers } from './stockage.js';
+import { planMasse, lireOperation, resumePlan, liensPanneau, appliquerEbay, appliquerFile, SITES_MASSE } from './masse.js';
+import { sourcesSneakers, ventesPourCote, annoncesPourSneakers, prendrePreselectionSneakers, avecFiches, poserFiches, cleNumSneakers } from './stockage.js';
 import { normaliserRef, normaliserPointure } from './reference.js';
 import { useEtatSneakers, PucesTags } from './BlocFiche.jsx';
 import './sneakers.css';
@@ -56,8 +57,7 @@ export default function FeuilleSneakers({ ouverte = true, onFermer, vue: vueDepa
     if (!ouverte) return undefined;
     let vivant = true;
     ventesPourCote().then((v) => { if (vivant) setVentes(v); }, () => { if (vivant) setVentes(null); });
-    const s = sourcesSneakers();
-    (typeof s.annonces === 'function' ? Promise.resolve().then(() => s.annonces()) : Promise.resolve(null)).then((a) => { if (vivant) setAnnonces(Array.isArray(a) ? a : null); }, () => { if (vivant) setAnnonces(null); });
+    annoncesPourSneakers().then((a) => { if (vivant) setAnnonces(Array.isArray(a) ? a : null); }, () => { if (vivant) setAnnonces(null); });
     return () => { vivant = false; };
   }, [ouverte]);
   const options = [{ cle: 'valeur', libelle: tr('snk.vue.valeur') }, { cle: 'entonnoir', libelle: tr('snk.vue.entonnoir') }, { cle: 'tags', libelle: tr('snk.vue.tags') }, { cle: 'masse', libelle: tr('snk.vue.masse') }];
@@ -144,7 +144,7 @@ function VueTags({ annonces, etat, ecrire }) {
 
 const ETATS_MASSE = ['ok', 'sans-plancher', 'sous-plancher', 'hausse', 'inchange', 'pas-lu', 'devise'];
 function VueMasse({ annonces, etat, ecrire, confirmer }) {
-  const [coches, setCoches] = React.useState(() => new Set());
+  const [coches, setCoches] = React.useState(() => new Set(prendrePreselectionSneakers() || []));
   const [site, setSite] = React.useState('tous');
   const [tag, setTag] = React.useState('');
   const [sorte, setSorte] = React.useState('pct');
@@ -179,8 +179,7 @@ function VueMasse({ annonces, etat, ecrire, confirmer }) {
     setEnCours(true);
     try {
       if (resume.api && typeof s.ebay === 'function') await appliquerEbay(plan, s.ebay, { avecSansPlancher: sansPlancher, surEtat });
-      if (resume.file && typeof s.file === 'function') { const f = await appliquerFile(plan, s.file, { avecSansPlancher: sansPlancher, surEtat }); setPanneau(f.panneau); }
-      else if (resume.file) setPanneau(lignesAEnvoyer(plan, sansPlancher).filter((l) => l.voie === 'file'));
+      if (resume.file) { const f = await appliquerFile(plan, typeof s.file === 'function' ? s.file : envoyerGeste, { avecSansPlancher: sansPlancher, surEtat }); setPanneau(f.panneau); }
     } finally { setEnCours(false); }
   };
   const optsSite = [{ cle: 'tous', libelle: tr('snk.masse.tous') }, ...SITES_MASSE.filter((x) => enLigne.some((a) => a.site === x)).map((x) => ({ cle: x, libelle: NOM_SITE[x] }))];
