@@ -60,7 +60,9 @@ async function controles() {
       const j = t.data.groupes.o.jobs.find((x) => x.notificationId === 'n0');
       dit(t.data.groupes.o.active === true && j.etat === 'attente' && t.data.groupes.o.prochain >= T0 + 1000 + F.QUOTA_ATTENTE_MS, 'limite de l’heure (rien d’écrit) ⇒ la file ATTEND une place, elle ne s’arrête pas', { active: t.data.groupes.o.active, etat: j.etat });
       const t2 = F.terminerFile(F.reserverFile(lance.data, { owner: 'o', maintenant: T0, jeton: 'j2' }).data, { owner: 'o', jeton: 'j2', resultat: 'refuse', raison: 'quota_extension', ecrits: 1, maintenant: T0 + 1000 });
-      dit(t2.data.groupes.o.active === false, 'une écriture déjà partie ⇒ la file s’arrête comme avant (jamais de doublon)');
+      // 5.455.8 (Julien, 28 nov.) : une écriture déjà partie ⇒ CE favori n'est jamais repris (jamais de doublon) ; les autres continuent.
+      { const j2 = t2.data.groupes.o.jobs.find((x) => x.notificationId === 'n0'); let relance = null; try { relance = F.lancerFile(t2.data, { owner: 'o', targets: [cible(0)], message: 'Salut', intervalleMinutes: 0, maintenant: T0 + 2000 }); } catch (e) { relance = { refus: e.message }; }
+        dit(j2.etat === 'refuse' && t2.data.groupes.o.active === true && relance && relance.refus && /déjà été préparés/.test(relance.refus), 'une écriture déjà partie ⇒ CE favori n’est jamais repris (un nouvel envoi le refuse), les autres continuent', JSON.stringify({ etat: j2.etat, active: t2.data.groupes.o.active, relance })); }
     }
   }
   const o = P.detailOffre(95, { mode: 'pct', valeur: 10, arrondi: false }, M.prixOffreFavori);

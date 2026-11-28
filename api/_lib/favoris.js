@@ -193,7 +193,8 @@ async function apercuPourCarte(req,{owner,uid,cle,maintenant}){
   const lu=await modifierNeutre(cle,d=>({valeur:vueFile(initialiserFile(d),owner)}));
   if(!lu)throw new RefusFavoris('L’état des envois n’a pas pu être relu. Réessaie dans un instant.',503);
   const vue=lu.valeur;
-  if(vue.active)return apercuCarte({vue,maintenant});
+  // 5.455.8 : une file active ne cache plus la liste (« Des messages partent déjà… » sans favoris, sans fin) : chaque favori est
+  //    montré avec SON état (en attente, en cours, envoyé), les autres restent envoyables.
   const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
   const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],ids[3]],ids[2]);
   if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner))throw new RefusFavoris('Tes favoris n’ont pas pu être relus. Réessaie dans un instant.',503);
@@ -254,7 +255,8 @@ export async function routeFavoris(req,res){
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
         const p=validerReglagesFavoris(prefs);
-        if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
+        // 5.455.8 : des réglages changés ailleurs depuis l'aperçu ne refusent plus l'envoi : ce sont SES réglages enregistrés (`p`,
+        //    relus ici) qui partent — la feuille de l'extension les relit avant « Envoyer ».
         const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
         if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
         if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))throw new RefusFavoris('L’historique de ce compte doit être vérifié avant de lancer.');

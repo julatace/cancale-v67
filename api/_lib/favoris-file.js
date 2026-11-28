@@ -26,6 +26,10 @@ export const QUOTA_ATTENTES_MAX=12;
 // un nouvel essai (NOTIF_ATTENTE_MS), au plus NOTIF_ATTENTES_MAX fois ; ensuite « pas envoyé » avec sa raison, la file
 // continue. Seule la liste de Vinted lue jusqu'à sa dernière page dit « trop ancien » (côté extension).
 export const NOTIF_ATTENTE_MS=3*60000;
+// 5.455.8 : ce qui ARRÊTE une file (son geste, ou la vérification de Vinted) ; ce qui la fait ATTENDRE (rien d'écrit, le favori repart).
+export const ARRETS_FILE=Object.freeze(['tout_arrete','vinted_robot']);
+export const ATTENTES_FILE=Object.freeze(['pause_vinted','vinted_frein','onglet_vinted','compte_vinted_absent','compte_vinted_different','session_extension','autorisation_expiree','extension_indisponible','trop_tard']);
+export const ATTENTE_FILE_MS=60000;
 export const NOTIF_ATTENTES_MAX=1;
 export function delaiFavori(min,max,jeton){
   const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
@@ -105,8 +109,10 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
   for(const t of targets)if(!t||!entier(t.itemId)||!entier(t.recipientId)||typeof t.notificationId!=='string'||!t.notificationId||t.notificationId.length>160||typeof t.initiator!=='string'||!t.initiator||t.initiator.length>80)throw new RefusFavoris('Le destinataire du favori n’est pas confirmé.');
   const g=d.groupes[owner]||{jobs:[],active:false,prochain:0};
-  if(g.active||g.jobs.some(x=>x.etat==='reserve'))throw new RefusFavoris('Une file est déjà en cours pour ce compte.');
-  if(g.jobs.some(x=>x.etat==='incertain'))throw new RefusFavoris('Vérifie les envois incertains sur Vinted avant de préparer une nouvelle file.');
+  // 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer […] tu ouvres la conversation, tu fais une offre et un message ») :
+  //    une file restée active (un Chrome fermé, un envoi d'avant) ou un envoi « à vérifier » ne REFUSE plus un nouvel envoi. Le
+  //    nouveau lot remplace ce qui attendait encore (« annulé », donc à nouveau proposable) ; une tentative en vol (`reserve`)
+  //    garde son état et son jeton ; un favori « à vérifier » reste écarté pour LUI seul (jamais deux fois : `connus`).
   // A new launch is exactly its new selection, never an old paused remainder.
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
   // (16 nov., lot favoris-offres-irreprochable) Un favori REFUSÉ après qu'une écriture est
@@ -145,12 +151,15 @@ export function prolongerFile(d,{owner,jeton,maintenant}){
 export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
-  if(Object.values(d.groupes).some(x=>x.jobs.some(j=>j.etat==='incertain')))return {valeur:{vue:{...vueFile(d,owner),raison:'Une tentative sur ce compte doit être vérifiée sur Vinted avant la suite.'}}};
-  if(d.enCours){
+  // 5.455.8 : un envoi « à vérifier » n'arrête plus toute la file (il bloquait chaque favori suivant, sans fin) : il reste écarté
+  //    pour SON favori seulement (jamais renvoyé, `connus` au lancement), les autres partent.
+  if(d.enCours&&!d.enCours.abandonne){
     if(bailExpire(d.enCours,maintenant)){
       const autre=d.groupes[d.enCours.owner],j=autre?.jobs.find(x=>x.id===d.enCours.id);
-      if(j)j.etat='incertain';if(autre){autre.active=false;autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';}
-      // Keep the token: a late, exact receipt may still settle this attempt.
+      if(j)j.etat='incertain';if(autre){autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';if(!autre.jobs.some(x=>x.etat==='attente'))autre.active=false;}   // 5.455.8 : les autres favoris continuent
+      // Keep the token: a late, exact receipt may still settle this attempt. 5.455.8 : marquée abandonnée, elle ne retient plus la
+      //    file (avant : chaque tour la retrouvait expirée et rendait « rien », sans fin) ; une nouvelle tentative la remplace.
+      d.enCours.abandonne=true;
       return {data:d,valeur:{vue:vueFile(d,owner)}};
     }
     return {valeur:{vue:vueFile(d,owner)}};
@@ -250,6 +259,16 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     if(g.refusLocaux>=REFUS_LOCAUX_MAX){g.active=false;g.raisonCode='locaux_suite';g.raisonRefus=raison;g.raisonN=g.refusLocaux;g.raison=phraseRaisonFile('locaux_suite',{refus:raison,n:g.refusLocaux});}
     else if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  // 5.455.8 (Julien, 28 nov. : « 2 favoris sélectionnés, Envoyer : les deux doivent partir ») : un favori refusé ou « à vérifier »
+  //    n'arrête plus les AUTRES. Seuls « Tout arrêter » et la vérification de Vinted arrêtent la file. Une attente qui ne tient
+  //    pas à ce favori (pause 403/429 de Vinted, onglet, compte, session, autorisation), rien d'écrit, le remet en attente
+  //    (3 fois au plus) : la file ATTEND, elle ne refuse pas. Jamais deux fois : un favori « à vérifier » ou refusé après une
+  //    écriture reste connu (`connus`).
+  else if(!j.auto&&!['envoye','ignore'].includes(resultat)&&!ARRETS_FILE.includes(raison)&&!refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape})){   // le 3ᵉ refus « local » de suite garde son arrêt (plus bas)
+    if(resultat==='refuse'&&ATTENTES_FILE.includes(raison)&&j.ecrits===0&&(Number(j.reessais)||0)<3){j.etat='attente';delete j.raison;delete j.traiteLe;j.reessais=(Number(j.reessais)||0)+1;g.prochain=Math.max(g.prochain||0,fin+ATTENTE_FILE_MS);d.prochainGlobal=g.prochain;g.raison='Une attente de Vinted ou de l’extension : ce favori repart tout seul dans un instant.';}
+    else if(!g.jobs.some(x=>x.etat==='attente')){g.active=false;g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}
+    else g.raison=RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} VRM continue avec les favoris suivants.`:resultat==='incertain'?'Réponse incertaine pour un favori : vérifie sa conversation sur Vinted. VRM continue avec les suivants.':'Un favori n’est pas parti : VRM continue avec les suivants.';
+  }
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;const suite=!j.auto&&refusLocal({resultat,raison,ecrits:j.ecrits,cause:j.cause,etape:j.etape});if(suite){g.raisonCode='locaux_suite';g.raisonRefus=MOTS_REFUS[raison]?raison:'autre';g.raisonN=(Number(g.refusLocaux)||0)+1;}g.raison=suite?phraseRaisonFile('locaux_suite',{refus:g.raisonRefus,n:g.raisonN}):raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active){g.raison='Sélection traitée ou file arrêtée.';g.raisonCode='traitee';}}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
