@@ -17,6 +17,7 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
+import { vendCourant } from '../profilVendeur.js';   // (28 nov., main-vert) Sneakers seulement
 import { agirMaintenant, envoyerSerie, envoyerGeste, dire, republierDansApp, useFaitsAgir } from '../agir/porte.js';   // (24 nov., lot agir-tout)
 import { texteRaison } from '../agir/Agir.jsx';
 import { useComptesBloques } from '../compteBloqueEtat.js';
@@ -522,7 +523,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : panneauEnRetard() ? { ok: false, raison: panneauEnRetard() } : { ok: true }) });
   // (28 nov., lot sneakers-cote) « Modifier en masse » : la sélection (tous sites) ouvre la feuille Sneakers · En masse, déjà cochée ;
   // là : −x % / prix / marque / pointure ⇒ récapitulatif (plancher prix mini / achat + 10 %) ⇒ SON « Appliquer » (src/sneakers/masse.js).
-  actions.push({ cle: 'masse', libelle: tr('snk.action.masse'), icone: 'tag', phrase: tr('snk.action.massePhrase'),
+  // (28 nov., main-vert) Sneakers seulement (Julien, 11 nov. : « arrête de faire allusion à des chaussures ») : référence, pointure, cote.
+  if (vendCourant() === 'sneakers') actions.push({ cle: 'masse', libelle: tr('snk.action.masse'), icone: 'tag', phrase: tr('snk.action.massePhrase'),
     pour: (a) => a.annonces.some((x) => x.etat === 'enligne'),
     juger: (sel) => (sel.length ? { ok: true } : { ok: false, raison: tr('egalite.selection.aucune') }) });
   const pauserLbc = (choisis) => {

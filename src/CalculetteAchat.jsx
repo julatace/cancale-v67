@@ -3,6 +3,7 @@ import { SITES_CALCULETTE, calculer, eurosCalc } from './calculetteAchat.js';
 import { emballagesAvecCout } from './emballages.js';
 import { BarreCoutVente, PointCout } from './CascadeVente.jsx';
 import './styles-calculette-emballages.css';
+import { vendCourant } from './profilVendeur.js';
 import CoteAchat from './sneakers/CoteAchat.jsx';   // (28 nov., lot sneakers-cote) la cote VRM à l'achat (SES ventes de la même référence)
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -39,7 +40,8 @@ export default function CalculetteAchat({ onClose, Feuille, contexte = {}, embal
         <Champ id="calc-achat" label="Je l’achète" value={achat} onChange={setAchat} placeholder="60" autoFocus/>
         <Champ id="calc-revente" label="Je la revends" value={revente} onChange={setRevente} placeholder="120"/>
       </div>
-      <CoteAchat achat={achat} onRevente={setRevente} load={load}/>
+      {/* (28 nov., main-vert) Sneakers seulement (Julien, 11 nov. : « arrête de faire allusion à des chaussures ») : référence, pointure, cote. */}
+      {vendCourant() === 'sneakers' ? <CoteAchat achat={achat} onRevente={setRevente} load={load}/> : null}
       <div className="vrm-calc-sites" role="radiogroup" aria-label="Sur quelle plateforme ?">
         {SITES_CALCULETTE.map((s) => (
           <button key={s.cle} type="button" role="radio" aria-checked={site === s.cle} className={'vrm-calc-site' + (site === s.cle ? ' is-on' : '')}

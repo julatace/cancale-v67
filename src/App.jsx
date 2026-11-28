@@ -32385,7 +32385,7 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=()=>setCalcOuverte(true);window.addEventListener('vrm:calculette',ouvrir);return()=>window.removeEventListener('vrm:calculette',ouvrir);},[]);
   // (28 nov., lot sneakers-cote) « Sneakers » : `vrm:sneakers` (detail : la vue — valeur · entonnoir · tags · masse).
   const [snkOuverte,setSnkOuverte]=useState(null);
-  useEffect(()=>{const ouvrir=(e)=>setSnkOuverte(e&&typeof e.detail==='string'&&e.detail?e.detail:'valeur');window.addEventListener('vrm:sneakers',ouvrir);return()=>window.removeEventListener('vrm:sneakers',ouvrir);},[]);
+  useEffect(()=>{const ouvrir=(e)=>{ if (vendCourant() !== 'sneakers') return; setSnkOuverte(e&&typeof e.detail==='string'&&e.detail?e.detail:'valeur'); };   /* (28 nov., main-vert) la feuille Sneakers : un vendeur de Sneakers seulement */window.addEventListener('vrm:sneakers',ouvrir);return()=>window.removeEventListener('vrm:sneakers',ouvrir);},[]);
   const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une

@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { vendCourant } from '../profilVendeur.js';   // (28 nov., main-vert) Sneakers seulement
 import { C, Card, LignePanne, ScreenHead } from '../App.jsx';
 import Pourquoi from '../composants/PourquoiReplie.jsx';
 import { tr } from '../i18n/index.js';
@@ -33,7 +34,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
           </Card>
         )}
         {/* (28 nov., lot sneakers-cote) la valeur du stock au prix VRM par RÉFÉRENCE fabricant (SES ventes), l'entonnoir, en masse. */}
-        <Groupe attrs={{ 'data-snk-entree': 'prix-marche' }}><Rangee titre={tr('snk.entree')} sousTitre={tr('snk.entreeDetail')} fin="chevron" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'valeur' })); } catch (_) {} }} attrs={{ 'data-snk-ouvrir': 'valeur' }}/></Groupe>
+        {vendCourant() === 'sneakers' ? <Groupe attrs={{ 'data-snk-entree': 'prix-marche' }}><Rangee titre={tr('snk.entree')} sousTitre={tr('snk.entreeDetail')} fin="chevron" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'valeur' })); } catch (_) {} }} attrs={{ 'data-snk-ouvrir': 'valeur' }}/></Groupe> : null}
         {groups.length === 0 ? (
         <Card style={{ padding: 16 }}>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.55 }}>

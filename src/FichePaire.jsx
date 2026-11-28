@@ -4,7 +4,7 @@
 // pleine. Pas su : « — » et la raison. Pas (encore) arrivée : grisée — jamais
 // inventée. Aucune couleur (§7) sauf le rouge de deux paires sous ce N° (§5).
 import React from 'react';
-import { motsVendeur } from './profilVendeur.js';
+import { motsVendeur, vendCourant } from './profilVendeur.js';
 import {HistoriqueModifications} from './OutilsParcours.jsx';
 import './styles-fiche-paire.css';
 import './styles-annonces-outils.css';
@@ -330,7 +330,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         // (21 nov., ext. 5.428, choix 58) son annonce Vinted EN LIGNE (identité : l'id de l'annonce), une lecture projetée.
         // (28 nov., lot sneakers-cote) « Modèle » : la référence (proposée depuis le titre, posée par SON toucher), la pointure,
         // les étiquettes. Jamais une identité (§5) ; pas de cote ici (§3 : la fiche montre une annonce en ligne).
-        modele: p && !double && p.num ? <BlocFicheSneakers num={p.num} titre={titre} taille={taille} load={chargerCle} save={ecrireCle}/> : null,
+        // (28 nov., main-vert) Sneakers seulement (Julien, 11 nov. : « arrête de faire allusion à des chaussures ») : référence, pointure, cote.
+        modele: vendCourant() === 'sneakers' && p && !double && p.num ? <BlocFicheSneakers num={p.num} titre={titre} taille={taille} load={chargerCle} save={ecrireCle}/> : null,
         courbe: (() => { const v = lignesSites.find((x) => x && x.site === 'vinted' && x.etat === 'en-ligne' && /^\d{4,15}$/.test(String(x.id || ''))); return v ? <CourbeAnnonce id={String(v.id)} lire={lireCourbe}/> : null; })(),
         lecture: p && lecture ? <Herite nu attrs={{ 'data-fiche-lecture': '' }}>Lecture en cours…</Herite> : null,
       }}/>

@@ -72,6 +72,17 @@ const PERMIS = [
   ['src/questionsFrequentes.js', /^'semelle interieure'$/, 'mot-clé RECONNU dans la question d’un acheteur (lecture), jamais affiché'],
   ['src/recherchePhrase.js', /^'le la les l de du des d un une /, 'mots vides de la recherche (lecture d’une phrase), jamais affichés'],
   ['src/rechercheReglages.js', /^'vends sneakers vetements categorie'$/, 'mots-clés qui retrouvent le réglage « Je vends » dans la recherche (jamais affichés)'],
+  // ── (28 nov., main-vert) Le lot sneakers-cote (src/sneakers/) : un outil de Sneakers, monté SEULEMENT pour un vendeur de
+  // Sneakers — chaque entrée est gardée par `vendCourant() === 'sneakers'` (B7 ci-dessous le vérifie, mutations à l'appui).
+  // Ses textes vivent derrière ces portes ; ce qui suit n'est jamais affiché ailleurs. Nommés un par un, chacun lu.
+  ...['src/App.jsx', 'src/CalculetteAchat.jsx', 'src/FichePaire.jsx', 'src/ecrans/AnnoncesEgalite.jsx', 'src/sneakers/BlocFiche.jsx', 'src/sneakers/CoteAchat.jsx', 'src/sneakers/FeuilleSneakers.jsx', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}.js`)]
+    .map((f) => [f, /^'\.\.?\/(?:[\w.-]+\/)*sneakers(?:\/[\w.-]+|\.css|\.js)'$/, 'chemin d’un module ou d’une feuille de style du lot Sneakers (un `import`, jamais affiché)']),
+  ...['src/App.jsx', 'src/aideFiches.js', 'src/ecrans/AnnoncesEgalite.jsx', 'src/ecrans/PrixMarche.jsx'].map((f) => [f, /^'vrm:sneakers'$/, 'nom de l’évènement qui ouvre la feuille Sneakers (jamais affiché ; App.jsx ne l’ouvre que pour un vendeur de Sneakers, B7)']),
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}/sneakers.js`, /./, 'les textes de la feuille Sneakers, de la fiche « Modèle » et de la cote à l’achat : montrés seulement derrière les portes de B7']),
+  ['src/sneakers/reference.js', /./, 'lecture d’une référence fabricant et d’une pointure dans un titre (module pur, aucun texte affiché)'],
+  ['src/sneakers/stockage.js', /./, 'rangement de la fiche Sneakers d’un N° (module pur, aucun texte affiché)'],
+  ['src/aideFiches.js', /^'Tape la référence et la pointure\.'$/, 'fiche d’aide `seul: \'sneakers\'` (sneakers-cote) : montrée seulement à un vendeur de Sneakers (B7)'],
+  ['src/nouveautes.js', /^'Référence, pointure et cote de tes ventes'$/, 'nouveauté `pour: \'sneakers\'` (sneakers-cote) : montrée seulement à un vendeur de Sneakers (`pourSonMot`)'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
 // Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
@@ -79,7 +90,8 @@ const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/
 // (16 nov.) Bornes en LETTRES Unicode : « añadidas » (es) n'est pas « adidas » (\b de JS ne voit pas « ñ » comme une lettre).
 const MARQUES_BASKET = /(?<![\p{L}\d])(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000|jordan|new balance|asics|samba|dunk)(?![\p{L}\d])/iu;
 // (26 nov.) + src/publier/listes.js : les marques du catalogue Vestiaire et de Leboncoin, relevées sur les sites (listes de lecture).
-const MARQUES_PERMIS_FICHIERS = ['src/publier/listes.js', 'src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
+// (28 nov., main-vert) + les textes de la feuille Sneakers (« table Nike homme » : la table de conversion des pointures, dite), derrière les portes de B7.
+const MARQUES_PERMIS_FICHIERS = [...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}/sneakers.js`), 'src/publier/listes.js', 'src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
 const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l.replace(/(^|[^:'"`\\])\/\/\s.*$/, '$1'))).join('\n');
 const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) w(p); else if (/\.jsx?$/.test(f.name)) out.push(p); } }; w(path.join(racine, 'src')); return out; };
 
@@ -211,6 +223,20 @@ async function verifier(racine, { muet = false } = {}) {
   const st = sansCom(lire('src/ecrans/Stock.jsx'));
   dit(/StatBox label=\{motsStock\.noms/.test(st) && /exemple=\{exemplesStock\.emballage\}/.test(st) && !/Boîte à chaussures/.test(sansCom(lire('src/EmballagesCarte.jsx'))), 'B5 Stock : « Paires » / « Articles » et l’emballage proposé suivent ce qu’il vend');
   dit(/vend !== 'sneakers'\) c\.groupes/.test(sansCom(lire('src/ATrancher.jsx'))) && /titre: 'Annonces', cles: \['supprimes-vinted'/.test(lire('src/aTrancher.js')), 'B6 À trancher : « article » hors Sneakers, le groupe s’appelle « Annonces »');
+  // B7 (28 nov., main-vert) : l'outil Sneakers (référence, pointure, cote, « Modèle », en masse) n'est monté que pour un
+  // vendeur de Sneakers — la condition des PERMIS du lot sneakers-cote ci-dessus. Une porte retirée ⇒ rouge.
+  const portes = [
+    ['src/CalculetteAchat.jsx', /\{vendCourant\(\) === 'sneakers' \? <CoteAchat\b/],
+    ['src/FichePaire.jsx', /modele: vendCourant\(\) === 'sneakers' && [^\n]*<BlocFicheSneakers\b/],
+    ['src/ecrans/AnnoncesEgalite.jsx', /if \(vendCourant\(\) === 'sneakers'\) actions\.push\(\{ cle: 'masse'/],
+    ['src/ecrans/PrixMarche.jsx', /\{vendCourant\(\) === 'sneakers' \? <Groupe attrs=\{\{ 'data-snk-entree'/],
+  ];
+  const sansPorte = portes.filter(([f, re]) => !re.test(sansCom(lire(f)))).map(([f]) => f);
+  if (!/const ouvrir=\(e\)=>\{ if \(vendCourant\(\) !== 'sneakers'\) return; setSnkOuverte\(/.test(app)) sansPorte.push('src/App.jsx (vrm:sneakers)');
+  const fichesSnk = ['sneakers-cote', 'sneakers-masse'].filter((id) => !new RegExp(`\\{ id: '${id}', [^\\n]*seul: 'sneakers'`).test(sansCom(lire('src/aideFiches.js'))));
+  if (fichesSnk.length) sansPorte.push('src/aideFiches.js ' + fichesSnk.join(', '));
+  if (!/\{ id: 'sneakers-cote', [^\n]*pour: 'sneakers'/.test(lire('src/nouveautes.js'))) sansPorte.push('src/nouveautes.js sneakers-cote');
+  dit(!sansPorte.length, 'B7 l’outil Sneakers (cote, « Modèle », en masse, sa feuille, son aide, sa nouveauté) n’est montré qu’à un vendeur de Sneakers', sansPorte);
   return ko;
 }
 
@@ -242,6 +268,12 @@ async function verifier(racine, { muet = false } = {}) {
     ['src/composants/Illustration.jsx', 'la basket des états vides pour tous', "return n === 'basket' && vend !== 'sneakers' ? 'etiquette' : n;", 'return n;'],
     ['src/StockExplication.jsx', '« Air Max 90 » pour tous', "{sneakers ? 'Air Max 90' : 'Article'}", "{'Air Max 90'}"],
     ['src/EmballagesCarte.jsx', '« Boîte à chaussures » pour tous', 'placeholder={exemple} data-emb-champ="nom"', 'placeholder="Boîte à chaussures" data-emb-champ="nom"'],
+    // (28 nov., main-vert) les portes de l'outil Sneakers (B7)
+    ['src/CalculetteAchat.jsx', 'la cote par pointure pour tous', "{vendCourant() === 'sneakers' ? <CoteAchat achat={achat} onRevente={setRevente} load={load}/> : null}", '<CoteAchat achat={achat} onRevente={setRevente} load={load}/>'],
+    ['src/FichePaire.jsx', 'la fiche « Modèle » (pointure) pour tous', "modele: vendCourant() === 'sneakers' && p && ", 'modele: p && '],
+    ['src/ecrans/AnnoncesEgalite.jsx', '« Modifier en masse » (feuille Sneakers) pour tous', "if (vendCourant() === 'sneakers') actions.push({ cle: 'masse'", "actions.push({ cle: 'masse'"],
+    ['src/App.jsx', 'la feuille Sneakers s’ouvre pour tous', "if (vendCourant() !== 'sneakers') return; setSnkOuverte(", 'setSnkOuverte('],
+    ['src/aideFiches.js', 'l’aide de la cote pour tous', "{ id: 'sneakers-cote', ecran: 'achats', seul: 'sneakers', q:", "{ id: 'sneakers-cote', ecran: 'achats', q:"],
   ];
   let rates = 0;
   for (const [fichier, nom, avant, apres] of MUTATIONS) {
