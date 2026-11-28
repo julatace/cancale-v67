@@ -85,8 +85,7 @@ const verifQ = async (pg, t, quoi) => { const g = await regles(pg); dit(g.sw <= 
 async function scenarioK(b, port, o) {
   const t = o.nom + ' K';
   const r = await rendre(b, port, o); const { pg } = r;
-  await pg.evaluate(() => window.dispatchEvent(new Event('vrm:calculette')));
-  await pg.waitForSelector('[data-calculette]', { timeout: 15000 }).catch(() => {});
+  for (let i = 0; i < 8 && !(await pg.locator('[data-calculette]').count()); i++) { await pg.evaluate(() => window.dispatchEvent(new Event('vrm:calculette'))); await pg.waitForSelector('[data-calculette]', { timeout: 3000 }).catch(() => {}); }
   await pg.fill('#calc-ref', 'dd1391 100'); await pg.fill('#calc-pointure', '42,5'); await pg.fill('#calc-achat', '60');
   await pg.waitForSelector('[data-snk-cote-achat="pointure"]', { timeout: 10000 }).catch(() => {});
   const c = await pg.evaluate(() => { const e = document.querySelector('[data-snk-cote-achat]'); return e ? { niv: e.getAttribute('data-snk-cote-achat'), med: e.getAttribute('data-snk-cote-mediane'), n: e.getAttribute('data-snk-cote-n'), marge: e.getAttribute('data-snk-marge'), txt: e.textContent } : null; });
@@ -107,10 +106,12 @@ async function scenarioK(b, port, o) {
 async function scenarioVM(b, port, o) {
   const t = o.nom + ' VM';
   const r = await rendre(b, port, { ...o, tab: 'annonces' }); const { pg } = r;
-  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'valeur' })));
-  await pg.waitForSelector('[data-snk-valeur]', { timeout: 20000 }).catch(() => {});
+  for (let i = 0; i < 10 && !(await pg.locator('[data-snk-valeur]').count()); i++) {   // l'écoute de l'app peut arriver après le premier rendu
+    await pg.evaluate(() => { if (!document.querySelector('[data-snk-feuille]')) window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'valeur' })); });
+    await pg.waitForSelector('[data-snk-valeur]', { timeout: 3000 }).catch(() => {});
+  }
   const v = await pg.evaluate(() => { const e = document.querySelector('[data-snk-valeur]'); const f = document.querySelector('[data-snk-feuille]'); return e ? { val: e.getAttribute('data-snk-valeur'), c: e.getAttribute('data-snk-cotees'), m: e.getAttribute('data-snk-total'), txt: f ? f.textContent : '' } : null; });
-  dit(v && v.c === '3' && v.m === '4' && v.val === String(10000 + 9000 + 11000), `${t} : valeur du stock au prix VRM, « 3 sur 4 cotées » (42,5 : 100 €, 44 : 90 € à la pointure ? toutes pointures, Jordan 110 €)`, JSON.stringify(v && { ...v, txt: undefined }));
+  dit(v && v.c === '3' && v.m === '4' && v.val === String(10000 + 9500 + 11000), `${t} : valeur du stock au prix VRM, « 3 sur 4 cotées » (42,5 : 100 € à la pointure ; 44 : une seule vente ⇒ toutes pointures 95 € ; Jordan 110 €)`, JSON.stringify(v && { ...v, txt: undefined }));
   dit(v && /estimation/i.test(v.txt) && !/ta clé|colle.*clé/i.test(v.txt), `${t} : dite comme une estimation, aucune clé à poser`, '');
   await shot(pg, o.nom + '-V-valeur');
   await verifQ(pg, t, 'la valeur');
@@ -135,8 +136,7 @@ async function scenarioVM(b, port, o) {
 async function scenarioF(b, port, o) {
   const t = o.nom + ' F';
   const r = await rendre(b, port, { ...o, tab: 'annonces' }); const { pg } = r;
-  await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1' })));
-  await pg.waitForSelector('[data-snk-fiche]', { timeout: 20000 }).catch(() => {});
+  for (let i = 0; i < 8 && !(await pg.locator('[data-snk-fiche]').count()); i++) { await pg.evaluate(() => { if (!document.querySelector('[data-fiche-paire]')) window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1' })); }); await pg.waitForSelector('[data-snk-fiche]', { timeout: 3000 }).catch(() => {}); }
   await pg.evaluate(() => { const e = document.querySelector('[data-snk-fiche]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
   const p = await pg.evaluate(() => { const e = document.querySelector('[data-snk-propositions]'); return e ? e.getAttribute('data-snk-propositions') : null; });
   dit(p === 'DD1391-100', `${t} : la fiche PROPOSE la référence lue dans le titre (une puce), rien n'est posé seul`, String(p));
@@ -144,6 +144,7 @@ async function scenarioF(b, port, o) {
   dit(!avant || !/DD1391/.test(avant), `${t} : rien n'est écrit avant son toucher`, String(avant).slice(0, 80));
   await shot(pg, o.nom + '-F-fiche');
   await toucher(pg, o.tel, '[data-snk-proposee="DD1391-100"]');
+  await pg.waitForFunction(() => /DD1391/.test(localStorage.getItem('vrm_sneakers') || ''), null, { timeout: 8000 }).catch(() => {});
   const apres = await pg.evaluate(() => { const e = document.querySelector('[data-snk-fiche]'); return { ref: e && e.getAttribute('data-snk-ref'), ls: localStorage.getItem('vrm_sneakers') }; });
   dit(apres.ref === 'DD1391-100' && /"1":\{"ref":"DD1391-100"/.test(apres.ls || ''), `${t} : SON toucher pose la référence sous le N° 1 (vrm_sneakers.fiches)`, JSON.stringify(apres).slice(0, 160));
   dit(await pg.locator('[data-fiche-paire] [data-snk-cote-achat], [data-fiche-paire] [data-snk-valeur]').count() === 0, `${t} : aucune cote sur la fiche (§3)`, '');

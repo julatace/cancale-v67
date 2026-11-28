@@ -64,7 +64,7 @@ export default function FeuilleSneakers({ ouverte = true, onFermer, vue: vueDepa
   return (
     <Feuille ouverte={ouverte} onFermer={onFermer} titre={tr('snk.titre')} detente="pleine" attrs={{ 'data-snk-feuille': vue }}>
       <div className="snk-feuille">
-        <Segmente options={options} valeur={vue} onChange={setVue} libelle={tr('snk.titre')}/>
+        <div className="snk-marge-h"><Segmente options={options} valeur={vue} onChange={setVue} libelle={tr('snk.titre')}/></div>
         {vue === 'valeur' ? <VueValeur ventes={ventes} annonces={annonces} etat={etat}/> : null}
         {vue === 'entonnoir' ? <VueEntonnoir ventes={ventes} annonces={annonces} etat={etat}/> : null}
         {vue === 'tags' ? <VueTags annonces={annonces} etat={etat} ecrire={ecrire}/> : null}
@@ -89,11 +89,11 @@ function VueValeur({ ventes, annonces, etat }) {
   const refs = [...parRef.values()].sort((a, b) => b.n - a.n || a.ref.localeCompare(b.ref)).slice(0, 60);
   return (
     <>
-      <Tuiles titre={tr('snk.valeur.titre')} attrs={{ 'data-snk-valeur': r.valeurC == null ? '' : String(r.valeurC), 'data-snk-cotees': String(r.cotees), 'data-snk-total': String(r.total) }}
-        pied={<p className="snk-note">{tr('snk.valeur.pied', { sansRef: r.sansRef, sansVente: r.sansVente })} {tr('snk.stockx')}</p>}>
+      <Tuiles titre={tr('snk.valeur.titre')} attrs={{ 'data-snk-valeur': r.valeurC == null ? '' : String(r.valeurC), 'data-snk-cotees': String(r.cotees), 'data-snk-total': String(r.total) }}>
         <Tuile libelle={tr('snk.valeur.estimee')} valeur={r.valeurC == null ? null : eur(r.valeurC).replace(' €', '')} unite="€" detail={r.valeurC == null ? tr('snk.valeur.aucune') : tr('snk.valeur.estimation')}/>
-        <Tuile libelle={tr('snk.valeur.couverture')} valeur={tr('snk.valeur.nSurM', { n: r.cotees, m: r.total })} detail={tr('snk.valeur.detailNiveaux', { p: r.parNiveau.pointure, r: r.parNiveau.reference })}/>
+        <Tuile libelle={tr('snk.valeur.couverture')} valeur={tr('snk.valeur.nSurM', { n: r.cotees, m: r.total })} detail=""/>
       </Tuiles>
+      <p className="snk-note snk-marge-h" data-snk-valeur-pied="">{tr('snk.valeur.detailNiveaux', { p: r.parNiveau.pointure, r: r.parNiveau.reference })} {tr('snk.valeur.pied', { sansRef: r.sansRef, sansVente: r.sansVente })} {tr('snk.stockx')}</p>
       {refs.length ? (
         <Groupe titre={tr('snk.valeur.parRef')} attrs={{ 'data-snk-refs': String(refs.length) }}>
           {refs.map((x) => (

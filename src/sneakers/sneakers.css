@@ -20,7 +20,7 @@
 [data-snk-couleur="turquoise"] .snk-pastille, .snk-pastille[data-snk-couleur="turquoise"] { background: #4aa3a8; }
 .snk-edite { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
 .snk-edite-gestes { display: flex; justify-content: flex-end; gap: 8px; }
-.snk-pied-masse { position: sticky; bottom: 0; background: var(--n-fond); }
+.snk-pied-masse { position: sticky; bottom: 0; background: inherit; }
 .snk-cote-achat { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-top: 1px solid var(--n-bord); border-bottom: 1px solid var(--n-bord); }
 .snk-cote-res { display: flex; flex-direction: column; gap: 6px; }
 .snk-cote-tete { font-size: 15px; }
@@ -28,3 +28,4 @@
 .snk-cote-marge { margin: 0; font-size: 15px; }
 .snk-cote-marge small { color: var(--n-encre-2); }
 .snk-estimation { font-size: 12px; }
+.snk-marge-h { margin: 0 16px; }
