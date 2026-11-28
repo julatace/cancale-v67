@@ -196,6 +196,10 @@ async function mode(b, vp, sombre) {
       const t = await texteSegment(pg, 'resume', '[data-v2-argent-versements] .n-rangee, [data-v2-argent-versements] tr, [data-v2-argent-versements] [role="row"], [data-a-venir-ligne], [data-av-vente], .vg-av-groupe-eur');
       const { n, redits } = montantsRedits(t);
       check(n >= 4 && redits.length === 0, `${nom} — U Argent → Mois : chaque montant visible écrit une fois (${n} montants${redits.length ? ', redits : ' + redits.join(' · ') : ''})`);
+      // L'affiche « Reçu en octobre » écrit son chiffre en morceaux (« 60 » puis « € ») : la barre du mois en cours est jugée
+      // à part — son texte VISIBLE (hors lecteur d'écran) ne porte aucun montant quand l'affiche en porte un.
+      const b = await pg.evaluate(() => { const li = document.querySelector('.n-arg-m6[data-courant] .n-arg-m6-v'); if (!li) return null; const c = li.cloneNode(true); c.querySelectorAll('.n-lu-seul').forEach((x) => x.remove()); const aff = document.querySelector('[data-v2-argent-recu]'); return { t: c.textContent.trim(), affiche: aff ? aff.getAttribute('data-v2-argent-recu') : '' }; });
+      check(!!b && !!b.affiche && !/€/.test(b.t), `${nom} — U la barre du mois en cours ne redit pas l'affiche (« ${b && b.t} »)`, b);
       const o = await orangesRendus(pg); check(o.length === 0, `${nom} — O Argent → Mois : aucun orange rendu`, o);
     });
 
@@ -219,12 +223,15 @@ async function mode(b, vp, sombre) {
       await pg.waitForSelector(sel, { timeout: 20000 });
       const r = await pg.evaluate((sel) => { const e = document.querySelector(sel); const b = e.getBoundingClientRect(); return { vis: e.checkVisibility(), h: Math.round(b.height), ym: e.getAttribute('data-recap-rapport'), t: e.innerText.trim() }; }, sel);
       check(r.vis && /Rapport comptable/.test(r.t) && (!tel || r.h >= 44), `${nom} — R « Rapport comptable » est une rangée atteignable dans Déclarer (${r.h} px)`, r);
+      // Le mois de septembre (FINI, PAS noté) : là où « J'ai déclaré » ouvrirait le formulaire — le rapport seul ne doit pas.
+      await pg.selectOption('[data-argent-vue="declarer"] [data-recap-mois-choix]', '2026-09');
+      await pg.waitForFunction((sel) => { const e = document.querySelector(sel); return e && e.getAttribute('data-recap-rapport') === '2026-09'; }, sel, { timeout: 10000 });
       await pg.locator(sel).scrollIntoViewIfNeeded();
       await pg.click(sel);
       await pg.waitForSelector('[data-rapport-vinted]', { timeout: 40000 });
       await pg.waitForTimeout(2500);
-      const s = await pg.evaluate(() => { const e = document.querySelector('[data-rapport-vinted]'); let f = e; while (f && f.parentElement && !/fixed/.test(getComputedStyle(f).position)) f = f.parentElement; const t = f ? f.innerText : ''; return { form: !!document.querySelector('[data-decl-form]'), mois: /octobre 2026/i.test(t), t: t.replace(/\s+/g, ' ').slice(0, 160) }; });
-      check(s.mois && !s.form, `${nom} — R son toucher ouvre le rapport comptable sur ${r.ym} (octobre 2026), SANS le formulaire de déclaration`, s);
+      const s = await pg.evaluate(() => { const e = document.querySelector('[data-rapport-vinted]'); let f = e; while (f && f.parentElement && !/fixed/.test(getComputedStyle(f).position)) f = f.parentElement; const t = f ? f.innerText : ''; return { form: !!document.querySelector('[data-decl-form]'), mois: /septembre 2026/i.test(t), t: t.replace(/\s+/g, ' ').slice(0, 160) }; });
+      check(s.mois && !s.form, `${nom} — R son toucher ouvre le rapport comptable sur le mois choisi (septembre 2026, fini, pas noté), SANS le formulaire de déclaration`, s);
       await captures(pg, vp, `rapport-${nom}`);
     });
 
