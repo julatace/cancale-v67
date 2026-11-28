@@ -2787,7 +2787,7 @@ function RaisonDeclBloquee({ manque, refus = false }) {
   if (!manque) return null;
   const rates = manque.rates || [], enCours = manque.enCours || [];
   return (
-    <div data-decl-bloque="" {...(refus ? { 'data-decl-refus': '' } : {})} style={{fontSize:12,color:rates.length?C.warn:C.muted,lineHeight:1.45}}>
+    <div data-decl-bloque="" data-decl-bloque-etat={rates.length ? 'rate' : 'encours'} {...(refus ? { 'data-decl-refus': '' } : {})} style={{fontSize:12,color:rates.length?C.warn:C.muted,lineHeight:1.45}}>
       {refus && <b>Rien n'est noté. </b>}
       {rates.length
         ? <>Je n'ai pas pu lire {rates.join(', ')} : je ne note pas ta déclaration sur une liste incomplète — ce qui manquerait passerait ensuite « à régulariser ». Rouvre le rapport dans un moment.</>
@@ -18720,7 +18720,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // mois déjà noté ⇒ le rapport le montre. Il change de mois ou ferme : oublié.
   const declVoulue = useRef(null);
   useEffect(() => {
-    if (curSub !== 'ventes' || !DEMANDE_DECLARATION.ym) return;
+    // (27 nov., bancs-compta) L'écran Ventes est rendu par l'instance « Colis dans Ventes »
+    // (`only="bordereaux" colisDans="ventes"`, App.jsx `rendreColisSection`) depuis Ventes natif :
+    // plus aucune instance `ventes` n'y est montée, et « J'ai déclaré » (Déclarer, Suivi, Ma journée)
+    // menait à Ventes sans rien ouvrir (bancs declare-urssaf, suivi-urssaf). Le rapport s'ouvre ici.
+    const hoteVentes = curSub === 'ventes' || (curSub === 'bordereaux' && colisDans === 'ventes');
+    if (!hoteVentes || !DEMANDE_DECLARATION.ym) return;
     const ym = DEMANDE_DECLARATION.ym, frais = Date.now() - DEMANDE_DECLARATION.at < 30000;
     DEMANDE_DECLARATION.ym = null;
     if (!frais) return;

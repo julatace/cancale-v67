@@ -28,6 +28,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { metaVersData } = require('./_meta.cjs');
+const { allerSegment } = require('./_compta.cjs');
 const fs=require('fs'), http=require('http');
 // ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
 // extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
@@ -151,13 +152,19 @@ const eur=(s)=>{ if(s==null) return null; const n=Number(String(s).replace(/\s|�
     `attendu ${attenduMois.length} vente(s) · ${caAttendu} € — publié ${publie.n} · ${publie.ca} €`);
 
   await pg.goto('http://localhost:'+PORT+'/?tab=compta',{waitUntil:'domcontentloaded'});
-  await pg.waitForTimeout(4500);
+  // (27 nov., bancs-compta) Depuis le 10 nov. (Argent à quatre segments, src/argent.js), la carte
+  // du mois (« Prochaine déclaration », le mois en cours et son « à payer ») vit dans « Déclarer » ;
+  // le Résumé ne montre que la tuile URSSAF. On y va comme Julien : un toucher sur le segment.
+  await allerSegment(pg,'declarer',{attendre:25000});
+  await pg.waitForFunction(()=>{ const v=document.querySelector('[data-argent-vue="declarer"]'); return !!v&&/à payer \(/i.test(v.innerText); },null,{timeout:25000}).catch(()=>{});
+  await pg.waitForTimeout(1500);
   await pg.screenshot({path:SC+'/z-urssaf.png',fullPage:true});
-  const t=await pg.evaluate(()=>document.body.innerText||'');
+  const t=await pg.evaluate(()=>{ const v=document.querySelector('[data-argent-vue="declarer"]'); return (v&&!v.hidden?v.innerText:document.body.innerText)||''; });
 
   // ── LES NOMBRES RENDUS, pas les phrases ─────────────────────────────────
-  const taux   = eur((/À PAYER \(([\d,.]+) ?%\)/i.exec(t)||[])[1]);
-  const aPayer = eur((/À PAYER \([\d,.]+ ?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t)||[])[1]);
+  // (27 nov.) L'espace avant « % » est insécable (U+00A0 / U+202F) dans la carte d'aujourd'hui.
+  const taux   = eur((/À PAYER \(([\d,.]+)[ \u00a0\u202f]?%\)/i.exec(t)||[])[1]);
+  const aPayer = eur((/À PAYER \([\d,.]+[ \u00a0\u202f]?%\)\s*\n\s*([\d\s.,  ]+€)/i.exec(t)||[])[1]);
   const net    = eur((/NET APRÈS PAIEMENT\s*\n\s*([\d\s.,  ]+€)/i.exec(t)||[])[1]);
   // Le CA CITÉ : le montant entre parenthèses de la phrase qui commence par
   // « CA des ventes finalisées », sur la même ligne. Depuis la 5.131/5.133 la
