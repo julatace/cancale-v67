@@ -30,6 +30,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »
+  { id: 'vrai-benefice', date: '2026-11-27', titre: 'Ton vrai bénéfice, mois par mois', phrase: 'Et le compte qui vend le mieux : le même chiffre que l’export.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (27 nov., tout-va-bien) src/SondesToutVaBien.jsx, src/toutVaBienSondes.js : une rangée par morceau.
+  { id: 'tout-va-bien-morceaux', date: '2026-11-27', titre: 'Tout va bien ? : chaque morceau vérifié', phrase: 'Extension, sites, e-mails, capture, favoris, serveur : vert ou le geste.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (27 nov., paires-qui-dorment — choix de Julien) src/pairesDorment.js, src/natif/ecrans/PairesDorment.jsx
   { id: 'paires-qui-dorment', date: '2026-11-27', titre: 'Paires qui dorment : l’argent immobilisé', phrase: 'Plus de 21 jours en ligne, par prix d’achat, un geste chacune.', tab: 'annonces', pour: 'tous', mode: 'tous',
     titreArt: 'Articles qui dorment : l’argent immobilisé' },
@@ -52,6 +56,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ebay-questions-dabord', date: '2026-11-27', titre: 'Questions eBay sans réponse en premier', phrase: 'Dans Messages, la plus ancienne en tête, « À répondre ».', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (27 nov. 23 h, ext. 5.456.0 — Julien : « le gros panneau directement […] avec les données floutées […] Et on se connecte ici ») docs/passation/2026-11-27-connexion-panneau.md
   { id: 'connexion-panneau', date: '2026-11-27', titre: 'Extension : on se connecte dans le panneau', phrase: 'Panneau flouté, mot de passe et code qui marchent.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (27 nov. 23 h, ext. 5.455.7) docs/passation/2026-11-27-favoris-panneau-uniques.md
+  { id: 'favoris-envoyer-un', date: '2026-11-27', titre: 'Favoris : Envoyer sur chaque favori', phrase: 'Extension 5.455.7 : six états clairs, messages uniques.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (27 nov. 22:42, ext. 5.455.6 — jujuf38 : « acheteur pas encore confirmé » ×5) docs/passation/2026-11-27-favoris-jujuf38.md
+  { id: 'favoris-acheteur-lu', date: '2026-11-27', titre: 'Favoris : chaque acheteur reconnu', phrase: 'Extension 5.455.6 : plus d’« acheteur pas confirmé ».', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. nuit, ext. 5.455.5) docs/passation/2026-11-27-favoris-suite.md
   { id: 'favoris-bail', date: '2026-11-27', titre: 'Favoris : un envoi long tient', phrase: 'Extension 5.455.5 : jamais « à vérifier » à tort.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (27 nov. 18:42, ext. 5.455.4 — Julien : « autre article dans la conversation », « le chronomètre ne marche pas ») docs/passation/2026-11-27-favoris-tous-les-cas.md

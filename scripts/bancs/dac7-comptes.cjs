@@ -21,6 +21,7 @@
 const path=require('path'), fs=require('fs'), http=require('http'), zlib=require('zlib');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
+const { ouvrirCarte } = require('./_compta.cjs');
 
 const DIST=path.join(__dirname,'..','..','dist');
 const PORT=Number(process.env.BANC_PORT)||7974;
@@ -38,7 +39,11 @@ const accounts=[
 const VENTES=[];
 for(let i=0;i<31;i++) VENTES.push(['111',String(81000+i),12,cetteAnnee(i%9,2+(i%20)),cetteAnnee(i%9,4+(i%20))]);
 for(let i=0;i<5;i++) VENTES.push(['222',String(82000+i),60,cetteAnnee(3,3+i),cetteAnnee(3,6+i)]);
-VENTES.push(['222','82100',45,cetteAnnee(11,1),null]);                    // finalisée, PAS encore datée
+VENTES.push(['222','82100',45,cetteAnnee(11,1),null]);                    // finalisée, PAS encore datée, vendue CETTE année
+// (27 nov., bancs-compta) Règle du 6 nov. (src/aDaterAnnee.js) : vendue cette année et lue finalisée cette année
+// ⇒ versée cette année, COMPTÉE (82100). Le « au moins » et le manque NOMMÉ se jugent sur une vente vendue à la fin
+// de l'année d'AVANT, sans date de versement (82101) : versée l'une ou l'autre année, jamais devinée.
+VENTES.push(['222','82101',30,new Date(AN-1,11,20,12),null]);
 for(let i=0;i<40;i++) VENTES.push(['333',String(83000+i),100,cetteAnnee(5,1+(i%25)),cetteAnnee(5,3+(i%25))]);   // compte MASQUÉ
 const vente=(v)=>({ transaction_id:Number(v[1]), id:Number(v[1]), title:'Baskets inventées '+v[1], price:{amount:String(v[2]),currency_code:'EUR'}, status:'Commande finalisée', date:iso(v[3]) });
 const rows=[];
@@ -95,7 +100,7 @@ async function page(b, T, opts={}){
   const pg=await ctx.newPage();
   const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
   const lourdes=[];
-  await pg.addInitScript((sb)=>{try{localStorage.setItem('vrm_acces_direct','1');if(sb)localStorage.setItem('vinted_dark','true');}catch(_){}},!!T.sombre);
+  await pg.addInitScript((sb)=>{try{localStorage.setItem('vrm_acces_direct','1');if(sb)localStorage.setItem('vinted_dark','true'); /* (27 nov.) sans choix posé VRM s'ouvre en SOMBRE (25 nov., src/apparence.js) : « clair » est SON choix */ localStorage.setItem('vrm_apparence',JSON.stringify(sb?'sombre':'clair'));}catch(_){}},!!T.sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i,(r)=>(['image','media','font'].includes(r.request().resourceType())?r.abort():r.continue()));
   await pg.route('**/rest/v1/**',route=>{
     const brute=decodeURIComponent(route.request().url());
@@ -142,7 +147,7 @@ const lireCsv=(t)=>t.replace(/^\ufeff/,'').split(/\r?\n/).map(l=>l.split(';').ma
 const carte=(pg,id)=>pg.evaluate((id)=>{ const e=document.querySelector(`[data-dac7-compte="${id}"]`); if(!e) return null; const a=(k)=>e.getAttribute(k); return { etat:a('data-etat'), n:a('data-n'), cts:a('data-cts'), verdict:a('data-verdict'), ad:a('data-a-dater'), partiel:a('data-partiel'), texte:e.innerText, bloque:(e.querySelector('[data-dac7-bloque]')||{getAttribute:()=>null}).getAttribute('data-dac7-bloque') }; },id);
 const MODES=[ { nom:'1512 clair', vp:{width:1512,height:950}, sombre:false }, { nom:'1512 sombre', vp:{width:1512,height:950}, sombre:true },
   { nom:'390 clair', vp:{width:390,height:844}, isMobile:true, hasTouch:true, sombre:false }, { nom:'390 sombre', vp:{width:390,height:844}, isMobile:true, hasTouch:true, sombre:true } ];
-const ATT111={ n:31, cts:31*1200 }, ATT222={ n:5, cts:5*6000 }, ATTLBC={ n:2, cts:8050 };
+const ATT111={ n:31, cts:31*1200 }, ATT222={ n:6, cts:5*6000+4500 }, ATTLBC={ n:2, cts:8050 };   // 222 : 5 versées + 82100 (vendue cette année)
 const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
 
 (async()=>{
@@ -154,8 +159,8 @@ const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
       try{
         const { ctx, pg, errs, lourdes }=await page(b,{...T},{ main:{ ...MAIN0, vinted_dark:!!T.sombre } });
         await aller(pg,'compta','[data-compta-repli]',1500);
-        await pg.waitForSelector('#compta-dac7',{state:'attached',timeout:15000}).catch(()=>{});
-        if(await pg.locator('#compta-dac7').count()){ await pg.click('#compta-dac7 > summary',{timeout:15000}).catch(()=>{}); }
+        // (27 nov., bancs-compta) « DAC7 » vit dans Argent → Déclarer (10 nov.) : son segment, puis son repli, comme Julien.
+        await ouvrirCarte(pg,'[data-dac7-comptes]',{ attendre:15000 }).catch(()=>{});
         await pg.waitForFunction(()=>{ const e=document.querySelector('[data-dac7-comptes]'); return e&&e.getAttribute('data-dac7-etat')==='lu'&&!document.querySelector('[data-dac7-rapport="encours"]'); },null,{timeout:30000}).catch(()=>{});
         // Les ventes Vinted se lisent en arrière-plan : on attend qu'elles soient comptées.
         await pg.waitForFunction(()=>{ const e=document.querySelector('[data-dac7-compte="Vinted|111"]'); return e&&e.getAttribute('data-etat')==='lu'&&e.getAttribute('data-n')!=='0'; },null,{timeout:30000}).catch(()=>{});
@@ -166,8 +171,8 @@ const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
         console.log('   ',JSON.stringify({c1:c1&&{...c1,texte:undefined},c2:c2&&{...c2,texte:undefined},cl:cl&&{...cl,texte:undefined}}));
         dit(c1&&c1.etat==='lu'&&c1.n===String(ATT111.n)&&c1.cts===String(ATT111.cts)&&c1.verdict==='atteint','Vinted · 31 ventes versées ⇒ au-dessus du seuil, au centime',c1&&[c1.n,c1.cts,c1.verdict].join(' '));
         dit(c1&&/Au-dessus du seuil/.test(c1.texte)&&/31 \/ 30/.test(c1.texte),'Vinted · la carte dit « Au-dessus du seuil » et « 31 / 30 »',c1&&c1.texte.replace(/\n/g,' | '));
-        dit(c2&&c2.n===String(ATT222.n)&&c2.cts===String(ATT222.cts)&&c2.ad==='1'&&c2.partiel==='1'&&c2.verdict==='','Vinted · 5 ventes + 1 pas encore datée ⇒ « au moins », jamais « sous »',c2&&[c2.n,c2.cts,c2.ad,c2.partiel,c2.verdict].join(' '));
-        dit(c2&&/au moins 5 \/ 30/.test(c2.texte)&&/pas encore datée/.test(c2.texte)&&!/Sous le seuil/.test(c2.texte),'Vinted · le manque est NOMMÉ sur la carte',c2&&c2.texte.replace(/\n/g,' | '));
+        dit(c2&&c2.n===String(ATT222.n)&&c2.cts===String(ATT222.cts)&&c2.ad==='1'&&c2.partiel==='1'&&c2.verdict==='','Vinted · 5 versées + 1 vendue cette année (comptée, règle du 6 nov.) + 1 de l’an dernier pas datée ⇒ « au moins », jamais « sous »',c2&&[c2.n,c2.cts,c2.ad,c2.partiel,c2.verdict].join(' '));
+        dit(c2&&/au moins 6 \/ 30/.test(c2.texte)&&/pas encore datée/.test(c2.texte)&&!/Sous le seuil/.test(c2.texte),'Vinted · le manque est NOMMÉ sur la carte',c2&&c2.texte.replace(/\n/g,' | '));
         dit(c2&&c2.bloque==='1'&&c1&&c1.bloque==='0','Vinted · le blocage fiscal du porte-monnaie est dit (et son absence aussi)',`${c2&&c2.bloque} / ${c1&&c1.bloque}`);
         const exclus=await pg.evaluate(()=>{ const e=document.querySelector('[data-dac7-exclus]'); return e?{ attr:e.getAttribute('data-dac7-exclus'), texte:e.innerText }:null; });
         dit(!c3&&exclus&&/Vinted\|333/.test(exclus.attr)&&/vieux_compte/.test(exclus.texte),'compte masqué : aucune carte, et il est DIT',JSON.stringify(exclus));
@@ -189,7 +194,9 @@ const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
         dit(/\.pdf$/.test(pdf.nom)&&new RegExp('Total '+totPdf).test(t)&&/31 \/ 30/.test(t)&&/atelier_sneak/.test(t),'PDF : le compte, « 31 / 30 », le même total',t.slice(0,200));
         dit(!/encaiss/i.test(t+csv.octets.toString('utf8')),'jamais « encaissé »');
         const cibles=await pg.evaluate(()=>[...document.querySelectorAll('[data-dac7-comptes] button, [data-dac7-comptes] select, [data-dac7-comptes] a')].map(e=>Math.round(e.getBoundingClientRect().height)));
-        dit(cibles.length&&cibles.every(h=>h>=44),'cibles au doigt ≥ 44 px',cibles.join(','));
+        // (27 nov.) 44 px AU DOIGT (§7) ; à la souris, la taille « petit » des boutons est 32 px (5 nov., chantier B, src/composants/Bouton.jsx).
+        const minCible=T.hasTouch?44:32;
+        dit(cibles.length&&cibles.every(h=>h>=minCible),`cibles ≥ ${minCible} px (${T.hasTouch?'au doigt':'à la souris'})`,cibles.join(','));
         const sombreVu=await pg.evaluate(()=>{ const c=getComputedStyle(document.querySelector('.vrm-d7-carte')).backgroundColor; const m=/(\d+), (\d+), (\d+)/.exec(c); return m?(+m[1]+ +m[2]+ +m[3])/3:null; });
         dit(T.sombre?sombreVu<90:sombreVu>200,`thème ${T.sombre?'sombre':'clair'} appliqué aux cartes`,sombreVu);
         if(process.env.BANC_CAPTURE){ const f=path.join(process.env.BANC_CAPTURE,`dac7-${T.nom.replace(' ','-')}.png`);
@@ -206,7 +213,7 @@ const MAIN0={ vinted_regime:'micro', vinted_accounts_hidden:['333'] };
     try{
       const { ctx, pg, errs }=await page(b,MODES[2],{ main:{ ...MAIN0 }, emailsKO:true });
       await aller(pg,'compta','[data-compta-repli]',1500);
-      await pg.click('#compta-dac7 > summary',{timeout:15000}).catch(()=>{});
+      await ouvrirCarte(pg,'[data-dac7-comptes]',{ attendre:15000 }).catch(()=>{});
       await pg.waitForFunction(()=>{ const e=document.querySelector('[data-dac7-rapport-p="Vinted"]'); return e&&e.getAttribute('data-dac7-rapport')!=='encours'; },null,{timeout:30000}).catch(()=>{});
       const r=await pg.evaluate(()=>[...document.querySelectorAll('[data-dac7-rapport-p]')].map(e=>[e.getAttribute('data-dac7-rapport-p'),e.getAttribute('data-dac7-rapport'),e.innerText]));
       dit(r.length&&r.every(x=>x[1]==='passu'&&/pas lus/.test(x[2])),'e-mails pas lus ⇒ « e-mails pas lus », jamais « pas encore reçu »',JSON.stringify(r));

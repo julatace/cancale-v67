@@ -170,7 +170,8 @@ const rienTouche = () => etat.deletes.length === 0 && etat.base.utilisateurs.has
 
   // ── 3. La coque
   console.log('\n── La coque (App.jsx)');
-  const app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  // (27 nov., budget-vitesse) l'écran de connexion vit dans src/ecrans/Connexion.jsx : l'app se lit RECOLLÉE (scripts/_source-app.cjs)
+  const app = require('./_source-app.cjs').sourceAppCode(RACINE).replace(/\/\/[^\n]*/g, '');
   const groupes = (/const GROUPES_PLUS=\[([\s\S]*?)\n\];/.exec(app) || [])[1] || '';
   dit(!!groupes && !/id:'settings'/.test(groupes), 'Paramètres n’est plus une entrée de la navigation (colonne, « Plus »)');
   dit((app.match(/tab==='settings'&&<GardeEcran nom="settings"/g) || []).length === 1, 'l’écran Paramètres reste monté (`tab===\'settings\'`)');

@@ -26,7 +26,8 @@ if (process.argv.includes('--prouve')) {
     ['export : mois illisible = 0,00 €', 'src/exportComptable.js', "const ca = m ? valeurSue(m.ca) : 0;", "const ca = m ? Number(m.ca) || 0 : 0;"],
     ['CA de l’année : mois illisible sauté en silence', 'src/microEntreprise.js', "  if (illisibles) raisons.push(`${illisibles} mois au chiffre illisible`);", ''],
     ['courbe des mois : pas su = barre à 0', 'src/ecrans/Stats.jsx', "const brut=mois.map(m=>valeurSue(valeur(m)));", "const brut=mois.map(m=>Number(valeur(m))||0);"],
-    ['grille Achats : somme qui compte 0 €', 'src/App.jsx', "          const somme = (l)=>sommeConnue(l, M);", "          const somme = (l)=>sommeConnue(l, (o)=>montantCommande(o)); const _m = (l)=>l.reduce((a,o)=>a+montantCommande(o),0);"],
+    // (27 nov., bancs-compta) la grille Achats vit dans src/ecrans/Comptabilite.jsx depuis la découpe du 22 nov.
+    ['grille Achats : somme qui compte 0 €', 'src/ecrans/Comptabilite.jsx', "          const somme = (l)=>sommeConnue(l, M);", "          const somme = (l)=>sommeConnue(l, (o)=>montantCommande(o)); const _m = (l)=>l.reduce((a,o)=>a+montantCommande(o),0);"],
   ];
   process.exit(prouver(__filename, MUT, R) ? 0 : 1);
 }

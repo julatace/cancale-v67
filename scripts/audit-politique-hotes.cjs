@@ -260,6 +260,7 @@ const COUPLES = {
   'src/ecrans/Reglages.jsx|www.autoentrepreneur.urssaf.fr': ['lien', LIEN],
   'src/ecrans/Ebay.jsx|www.ebay.fr': ['lien', LIEN + ' — Finances eBay'],
   'src/ecrans/Ebay.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted de la même paire'],
+  'src/ecrans/Guide.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir vinted.fr » du guide de démarrage (PremiersPas, sorti d’App.jsx le 27 nov.)'],
   'src/ecrans/Leboncoin.jsx|www.leboncoin.fr': ['lien', LIEN + ' — la transaction Leboncoin (générer le bordereau)'],
   'src/ecrans/Leboncoin.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted d’origine'],
   'src/ecrans/MessagesLeboncoin.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Répondre sur Leboncoin ↗ » / « Ouvrir sur Leboncoin ↗ »'],

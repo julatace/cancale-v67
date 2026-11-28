@@ -13,6 +13,8 @@ import { delaisPar, margesPar } from '../statsVentes.js';
 import { raisonCourte } from '../design/carteChiffres.js';
 import { rentabiliteParSource, lireMeilleures, CLE_MEILLEURES, EVT_MEILLEURES } from '../rentabiliteSource.js';   // (23 nov.) par source d'achat
 import { gainsReels } from '../gainsReels.js';   // (24 nov.) « Ce que tu gagnes vraiment »
+import { vraiBenefice } from '../vraiBenefice.js';   // (27 nov.) le vrai bénéfice par mois et par compte
+import { moisRecents } from '../dateParis.js';
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const lire = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch (_) { return d; } };
@@ -71,6 +73,15 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
     } catch (_) { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f, L.extras, L.releve, L.horsEuro, bilanSrc]);
+  // (27 nov., lot vrai-benefice) PAR MOIS (les 12 derniers, au mois du versement, comme l'export comptable) et PAR COMPTE (la
+  // période choisie) : le relevé tel que Ventes le publie, par LA règle de l'export (src/vraiBenefice.js). Aucune règle ici.
+  const VB = React.useMemo(() => {
+    try {
+      if (L.releve === undefined) return undefined;
+      const F = fenetre(f);
+      return vraiBenefice(L.releve, { mois: moisRecents(12), de: F.de, a: F.a });
+    } catch (_) { return null; }
+  }, [f, L.releve]);
   const T = React.useMemo(() => { try { const F = fenetre(f); return statsTransporteurs({ ventes: pubT.ventes, achats: pubT.achats, de: F.de, a: F.a, site: siteT }); } catch (_) { return null; } }, [f, pubR, siteT]);
   const NR = React.useMemo(() => { try { const F = fenetre(f); return pubT.nonRetires ? { periode: statsNonRetires({ achats: pubT.nonRetires, de: F.de, a: F.a }), tout: statsNonRetires({ achats: pubT.nonRetires }) } : null; } catch (_) { return null; } }, [f, pubR]);
   const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : (live && live.venduPasSu ? null : undefined);
@@ -95,7 +106,7 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f, L.journal, L.extras, L.releve, lignes, valeurSel, repFav]);
   return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment} automatisations={automatisations} onAutomatisations={onAutomatisations}
-    sources={sources} gains={gains} transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', nonRetires: pubT.nonRetires ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
+    sources={sources} gains={gains} vraiBenefice={VB} transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', nonRetires: pubT.nonRetires ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
       site: siteT, setSite: (x) => { setSiteT(x); garder('vrm_stats_transp_site', x); } }} nonRetires={NR}
     seg={seg} setSeg={(x) => { setSeg(x); garder('vrm_stats_seg', x); }} f={f} setF={(x) => { setF(x); garder('vrm_stats_fenetre', x); }}
     onJournal={onNav ? () => onNav('settings') : null}/>;

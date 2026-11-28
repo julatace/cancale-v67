@@ -27,6 +27,8 @@
 require('./_porte-banc.cjs');                       // la session de banc (l'accès direct n'existe plus)
 const { chromium } = require('playwright');
 const { metaVersData } = require('./_meta.cjs');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
+const { ouvrirCarte } = require('./_compta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6351;
@@ -99,8 +101,8 @@ async function rendre(b, vp, opts) {
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     const panne = () => route.fulfill({ status: 522, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>522</html>' });
     if (route.request().method() !== 'GET') {
-      try { const corps = JSON.parse(route.request().postData() || 'null'); for (const x of [].concat(corps || [])) if (x && x.id === 'main' && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
-      return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+      try { const corps = JSON.parse(route.request().postData() || 'null'); const versMain = /[?&]id=eq\.main(&|$)/.test(decodeURIComponent(route.request().url())); for (const x of [].concat(corps || [])) if (x && (x.id === 'main' || (versMain && route.request().method() === 'PATCH')) && x.data && typeof x.data === 'object') opts.main = x.data; } catch (_) {}
+      return route.fulfill({ status: route.request().method() === 'PATCH' ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(route.request()) });   // (27 nov.) la vraie forme : PATCH conditionnel sur `main` (src/ligneCas.js), _ecriture-representee.cjs
     }
     // Base CLOISONNÉE (la production l'est) : sinon l'app n'envoie rien au nuage
     // (`cloudPush` exige CLOISONNE) et l'écriture de la déclaration ne se voit pas.
@@ -135,7 +137,10 @@ const sain = async (pg, ecran) => {
   dit(!m, `${ecran} : l'écran n'est pas tombé sur le garde-fou`, m && m[0]);
 };
 const formulaire = async (pg) => {
-  await pg.waitForFunction(() => document.querySelector('[data-decl-form]') || document.querySelector('[data-decl-bloque]'), null, { timeout: 25000 }).catch(() => {});
+  // (27 nov.) « Lecture en cours » est un état de passage (data-decl-bloque-etat="encours") : on attend le formulaire
+  // ou un VRAI refus (une lecture ratée, "rate"), jamais le premier instant du rapport.
+  // La feuille du rapport entre en glissant : le formulaire est jugé une fois VISIBLE (innerText non vide).
+  await pg.waitForFunction(() => { const f = document.querySelector('[data-decl-form]'); return (f && f.innerText.trim()) || document.querySelector('[data-decl-bloque-etat="rate"]'); }, null, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(400);
   return pg.evaluate(() => { const f = document.querySelector('[data-decl-form]'); return f ? f.innerText : null; });
 };
@@ -202,8 +207,11 @@ const juge = (cs, quoi) => {
         dit(await pg.$('[data-job="urssaf"]') == null, `A ${T} : Ma journée ne parle pas d'URSSAF`);
         // Il choisit « Particulier » : rangé au nuage, la carte suit.
         await aller(pg, 'compta', '[data-statut-carte]', 1500);
+        await ouvrirCarte(pg, '[data-statut="particulier"]');   // (27 nov.) « Ton statut » vit dans Argent → Déclarer, replié
         await touche(pg, '[data-statut="particulier"]', vp);
-        await pg.waitForTimeout(1600);
+        // (27 nov.) On attend l'ÉCRITURE (au plus 10 s), pas un délai fixe (§6.5) : l'envoi au nuage est regroupé.
+        for (let i = 0; i < 40 && !(opts.main && opts.main.vinted_regime === 'particulier'); i++) await pg.waitForTimeout(250);
+        await pg.waitForTimeout(300);
         dit(await pg.$('[data-statut-carte="particulier"]') != null, `A ${T} : « Particulier » choisi ⇒ sa carte, sans URSSAF`);
         dit(await pg.$('[data-declarer-urssaf]') == null, `A ${T} : toujours aucune déclaration URSSAF`);
         dit(opts.main && opts.main.vinted_regime === 'particulier', `A ${T} : le choix est rangé au nuage (synchronisé)`, opts.main && opts.main.vinted_regime);
@@ -227,8 +235,10 @@ const juge = (cs, quoi) => {
         const t0 = await attrs(pg, '[data-statut-taux]', 'data-statut-');
         dit(t0 && t0.taux === '12.4', `C ${T} : micro-entrepreneur sans réglage ⇒ le taux officiel de l'achat-revente (12,4 %)`, JSON.stringify(t0));
         dit(await pg.$('[data-declarer-urssaf]') != null, `C ${T} : micro ⇒ la carte de déclaration URSSAF`);
+        await ouvrirCarte(pg, '[data-taux-option="liberatoire"]');   // (27 nov.) Argent → Déclarer, replié
         await touche(pg, '[data-taux-option="liberatoire"]', vp);
-        await pg.waitForTimeout(1600);
+        for (let i = 0; i < 40 && !(opts.main && Number(opts.main.vinted_urssaf_taux) === 13.4); i++) await pg.waitForTimeout(250);   // (27 nov.) l'écriture, pas un délai
+        await pg.waitForTimeout(300);
         const t1 = await attrs(pg, '[data-statut-taux]', 'data-statut-');
         dit(t1 && t1.taux === '13.4', `C ${T} : versement libératoire ⇒ 13,4 %`, JSON.stringify(t1));
         dit(opts.main && Number(opts.main.vinted_urssaf_taux) === 13.4, `C ${T} : le taux est rangé au nuage`, opts.main && String(opts.main.vinted_urssaf_taux));

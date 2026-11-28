@@ -20,8 +20,23 @@ async function attendreDemarrage(pg) {
   return false;
 }
 
+// (28 nov., CI #1459 / #1460 : « Commencer » mesuré 1:1, blanc sur blanc, alors que le bouton est noir sur toutes les
+//    captures) La mesure lit la PLACE de chaque texte, puis prend la capture 120 ms plus tard : si la page bouge entre les
+//    deux (une carte qui arrive au-dessus, sous la charge de la CI), le cadre lu tombe sur le fond d'à côté — un faux 1:1.
+//    Désormais la place de chaque texte est RELUE sur la capture même (avant de rendre le texte) : si un seul texte a bougé,
+//    la mesure est refaite (5 fois au plus, la page attendue entre deux). Une mesure n'est rendue que sur une page immobile.
 async function contrastePixels(pg, racine) {
+  let r = null;
+  for (let essai = 0; essai < 5; essai++) {
+    r = await contrastePixelsUneFois(pg, racine);
+    if (r.stable) return r.resultats;
+    await pg.waitForTimeout(400);
+  }
+  return r.resultats.concat([{ texte: 'mesure impossible : la page bouge encore après 5 essais', sel: '', fg: '', bg: '', ratio: 0, req: 4.5, dis: false, y: 0 }]);
+}
+async function contrastePixelsUneFois(pg, racine) {
   const els = await pg.evaluate((racine) => {
+    const refs = []; window.__bancMesureRefs = refs;
     try { for (const a of document.getAnimations()) { try { a.finish(); } catch (_) {} } } catch (_) {}
     const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
     const barre = document.querySelector('.vrm-tabbar, [data-n-onglets]'); const br = barre && barre.getClientRects().length ? barre.getBoundingClientRect() : null;
@@ -43,6 +58,7 @@ async function contrastePixels(pg, racine) {
       const fg = parse(cs.color); if (!fg || fg[3] * op < 0.1) continue;
       const fs = parseFloat(cs.fontSize), fw = +cs.fontWeight || 400;
       let sel = el.tagName.toLowerCase(); if (el.className && typeof el.className === 'string' && el.className.trim()) sel += '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.');
+      refs.push(el);
       out.push({ texte: t.textContent.trim().slice(0, 40), sel, fg: cs.color, a: fg[3] * op, rgb: fg.slice(0, 3), grand: fs >= 24 || (fs >= 18.66 && fw >= 700), fs,
         dis: !!el.closest('button[disabled],[aria-disabled="true"],[disabled]'), x: Math.max(0, r.left), y: Math.max(0, r.top), w: Math.min(r.width, innerWidth - Math.max(0, r.left)), h: Math.min(r.height, innerHeight - Math.max(0, r.top)) });
     }
@@ -54,19 +70,23 @@ async function contrastePixels(pg, racine) {
   await pg.waitForTimeout(120);
   const buf = await pg.screenshot({ fullPage: false });
   return pg.evaluate(async ({ b64, els }) => {
+    // La place de chaque texte, RELUE au moment de la capture (le texte encore transparent) : a-t-elle bougé ?
+    const refs = window.__bancMesureRefs || [];
+    const stable = els.every((e, i) => { const el = refs[i]; if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return Math.abs(Math.max(0, r.left) - e.x) <= 1 && Math.abs(Math.max(0, r.top) - e.y) <= 1; });
     const st = document.getElementById('banc-sans-texte'); if (st) st.remove();
     const dpr = devicePixelRatio;
     const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
     const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
     const ratio = (a, b) => { const p = lum(a), q = lum(b); return (Math.max(p, q) + 0.05) / (Math.min(p, q) + 0.05); };
-    return els.map((e) => {
+    const resultats = els.map((e) => {
       const d = x.getImageData(Math.floor(e.x * dpr), Math.floor(e.y * dpr), Math.max(1, Math.floor(e.w * dpr)), Math.max(1, Math.floor(e.h * dpr))).data;
       const px = []; for (let i = 0; i < d.length; i += 12) px.push([d[i], d[i + 1], d[i + 2]]);
       px.sort((a, b) => lum(a) - lum(b)); const bg = px[Math.floor(px.length / 2)];
       const fg = e.rgb.map((v, i) => v * e.a + bg[i] * (1 - e.a));
       return { texte: e.texte, sel: e.sel, fg: e.fg, bg: 'rgb(' + bg.join(',') + ')', ratio: Math.round(ratio(fg, bg) * 100) / 100, req: e.grand ? 3 : 4.5, dis: e.dis, y: Math.round(e.y) };
     }).filter((r) => !r.dis && r.ratio < r.req);
+    return { stable, resultats };
   }, { b64: buf.toString('base64'), els });
 }
 

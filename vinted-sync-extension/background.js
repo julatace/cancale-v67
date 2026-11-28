@@ -16697,6 +16697,18 @@ function ecritureFavoriPartie(x) { if (!x || x.rienParti) return false; const s 
 const REGISTRE_FAVORIS = 'vrmFavorisFaits';
 const cleRegistreFavori = (item, acheteur) => String(item) + ':' + String(acheteur);
 async function registreFavori(uid) { try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return null; } }
+// 5.455.7 (Julien : « montre les actions faites sur chaque favori, comme Offre faite ») : CE QUI A ÉTÉ FAIT pour chaque favori,
+//    par son id de notification — l'offre (heure, montant envoyé), le message (heure, n° de version). Écrit AU GESTE, à la
+//    réponse de Vinted, jamais deviné ; lu par le panneau (`favorisPourCarte` → `faits`). 3 000 favoris au plus par compte.
+const FAITS_FAVORIS = 'vrmFavorisFaitsN';
+async function noterFaitFavori(uid, nid, quoi) {
+  if (typeof nid !== 'string' || !nid || nid.length > 160) return;
+  try { const m = (await chrome.storage.local.get(FAITS_FAVORIS))[FAITS_FAVORIS] || {}; const u = m[String(uid)] = m[String(uid)] && typeof m[String(uid)] === 'object' ? m[String(uid)] : {};
+    u[nid] = Object.assign({}, u[nid], quoi);
+    const cles = Object.keys(u); if (cles.length > 3000) for (const c of cles.slice(0, cles.length - 3000)) delete u[c];
+    await chrome.storage.local.set({ [FAITS_FAVORIS]: m }); } catch (_) {}
+}
+async function faitsFavoris(uid) { try { const m = (await chrome.storage.local.get(FAITS_FAVORIS))[FAITS_FAVORIS] || {}; const u = m[String(uid)]; return u && typeof u === 'object' ? u : {}; } catch (_) { return {}; } }
 async function effacerRegistreFavori(uid, item, acheteur, quoi) {
   try { const m = (await chrome.storage.local.get(REGISTRE_FAVORIS))[REGISTRE_FAVORIS] || {}; const u = m[String(uid)]; const k = cleRegistreFavori(item, acheteur); if (!u || !u[k]) return; delete u[k][quoi]; if (!Object.keys(u[k]).length) delete u[k]; await chrome.storage.local.set({ [REGISTRE_FAVORIS]: m }); } catch (_) {}
 }
@@ -22844,6 +22856,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       const faite=!!(o.ok&&(o.json==null||o.json.code==null||Number(o.json.code)===0));
       noterDiag(faite?'favori_offre_ok':'favori_offre_refusee_'+o.status);
       if(faite||o.status>=500)await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');   // 6b. faite (ou peut-être) : jamais une 2ᵉ
+      if(faite)await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(op.prix)});
       if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       attente=jeton;
       const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
@@ -22860,7 +22873,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
     {const f=fin(r);if(f)return f;}
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
-    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
+    if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{})});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
     if(r.status>=400&&r.status<500)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // refusé net : pas parti
     {const t=await telephone(r);if(t)return t;}
     if([400,422].includes(r.status)){await noterVersionRefusee(uid,versionV.modele||versionV.texte);noterDiag('favori_message_refuse_'+r.status);return rep('refuse',r.status,'texte_refuse');}
@@ -25024,6 +25037,8 @@ async function reglagesFavorisCarte(msg, sender) {
   if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
   const id = `vrm_favoris_reglages_${uid}`;
   let refus = null;
+  // 5.455.7 : la graine de SES messages par défaut (son compte VRM — jamais écrit en clair dans un texte).
+  const grainePerso = await authToken().then((x) => (x && x.user_id) || null).catch(() => null);
   const r = await modifierLigneCas(id, (d) => {
     const avant = d && d.version === 1 ? d : {};
     const voulu = Object.assign({}, avant, { envoisActifs: false });
@@ -25034,7 +25049,7 @@ async function reglagesFavorisCarte(msg, sender) {
     if (msg.offre && typeof msg.offre === 'object') { voulu.pourcentage = msg.offre.pct; voulu.offreMode = 'pct'; voulu.offreValeur = null; voulu.arrondi = msg.offre.arrondi === true; }
     if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
     delete voulu.rev;
-    try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 300); return undefined; }
+    try { return GARDES_APP.validerReglagesFavoris(voulu, { graine: grainePerso }); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 300); return undefined; }
   });
   if (refus) return { ok: false, code: 'regle', raison: refus };
   if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
@@ -25582,7 +25597,7 @@ async function favorisPourCarte(uid, relire) {
       finally { _favorisCarteApercuEnVol = false; }
     })().catch(() => {});
   }
-  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file };
+  return { apercu: ap && Date.now() - Number(ap.at || 0) < 6 * 3600000 ? ap : null, file, faits: await faitsFavoris(uid) };
 }
 
 // ══ 5.376 : LES LIENS DE LA CARTE OUVRENT LE SITE, JAMAIS VRM ═══════════════════
@@ -32738,13 +32753,28 @@ async function departImport(uid, opts = {}) {
   let neuf;
   if (opts.force) {
     // « Tout récupérer » : TOUT l'historique, sans horizon (SON clic).
-    neuf = { v: 2, debut: t, demande: true, tout: true, at: t };
+    neuf = { v: 2, debut: t, demande: !opts.suite, tout: true, at: t };
     for (const [k] of IMPORT_TYPES) neuf[k] = { page: 1, lus: 0, total: null, pagesTotal: null, fini: false };
     neuf.annonces = { lus: 0, total: null, fini: false };
+    // 5.455.7 : la SUITE d'un import de 12 mois fini (`opts.suite` = son état) repart où il s'était arrêté — la page après la
+    //    dernière lue, ses ventes déjà comptées ; un type fini au bout de la liste de Vinted (pas à l'horizon) reste fini ; les
+    //    annonces restent telles quelles. Jamais deux fois la même page.
+    const av = opts.suite;
+    if (av && typeof av === 'object') {
+      for (const [k] of IMPORT_TYPES) {
+        const a = av[k]; if (!a || typeof a !== 'object') continue;
+        if (a.fini && !a.horizon) { neuf[k] = Object.assign({}, a); continue; }
+        const pg = Number(a.page) > 0 ? Number(a.page) : 1;   // `page` = la PROCHAINE à lire (posée après chaque page rangée)
+        neuf[k] = { page: pg, lus: (pg - 1) * IMPORT_PER_PAGE, total: a.total == null ? null : a.total, pagesTotal: a.pagesTotal == null ? null : a.pagesTotal, fini: false };
+      }
+      if (av.annonces) neuf.annonces = Object.assign({}, av.annonces);
+    }
   } else {
     const rows = await sbGet(`app_data?id=in.(harvest_${uid}_orders_sold,harvest_${uid}_orders_purchased,harvest_${uid}_listings)&${SELECT_DEPART_IMPORT}`);
     if (rows === null || !Array.isArray(rows)) { noterDiag('import_base_muette'); return null; }   // pas su ⇒ rien
-    neuf = { v: 2, debut: t, demande: false, tout: false, at: t };
+    // 5.455.7 (Julien, 27 nov. 23:00 : « l'extension doit tout récupérer dans tous les cas ») : l'import de départ lit TOUT
+    //    l'historique (plus d'horizon de 12 mois ni de bouton « Tout récupérer »), dans les mêmes bornes de lecture.
+    neuf = { v: 2, debut: t, demande: false, tout: true, at: t };
     for (const [k, type] of IMPORT_TYPES) {
       const r = rows.find((x) => x && x.id === `harvest_${uid}_${type}`) || {};
       neuf[k] = departTypeImport(r.n, r.t);
@@ -33028,7 +33058,13 @@ async function tickImport() {
     if (await reculBase()) return 0;
     if (await compteNonCapte(uid)) return 0;
     const st = await lireImport(uid);
-    if (st === undefined || (st && importFini(st) && st.publie)) return 0;
+    if (st === undefined) return 0;
+    if (st && importFini(st) && st.publie) {
+      // 5.455.7 : un import de 12 mois déjà fini repart UNE fois pour tout le reste (sans horizon) ; fini « tout » ⇒ rien.
+      if (st.tout) return 0;
+      const n = await departImport(String(uid), { force: true, suite: st }); if (!n) return 0;
+      await publierImport(String(uid), n); noterDiag('import_tout_auto');
+    }
     return await importerHistorique(uid);
   } catch (_) { return 0; }
 }
@@ -36730,6 +36766,109 @@ ${lettre[1]}`;
     return l.filter((t) => t.trim()).slice(0, VARIANTES_MAX - 1);
   }
 
+  // src/favorisDefauts.js
+  var BANQUE = {
+    fr: {
+      avant: ["Du coup", "Alors", "Bonne nouvelle", "Petite info", "Au fait", "Pour info", "D’ailleurs", "Et puis", "Ah et", "En plus", "En tout cas", "Petit plus"],
+      salut: ["Bonjour", "Salut", "Hello", "Coucou", "Bonsoir", "Hey", "Bonjour à toi", "Salut à toi", "Re-bonjour", "Hello hello", "Bien le bonjour", "Yo"],
+      entree: ["merci pour ton favori", "j’ai vu ton favori", "ton favori m’a fait plaisir", "je vois que l’article te plaît", "merci d’avoir aimé l’article", "content que l’article t’intéresse", "ton cœur sur l’annonce ne m’a pas échappé", "tu as aimé mon annonce", "l’article a l’air de te plaire", "merci de ton intérêt", "j’ai remarqué ton favori", "super, l’article t’a tapé dans l’œil", "merci pour le petit cœur", "ravi que l’annonce te plaise"],
+      corps: ["il est toujours disponible", "il n’attend que toi", "il est encore là", "il est prêt à partir", "je peux l’envoyer rapidement", "il part vite une fois réglé", "il est en très bon état", "tout est sur les photos", "il est bien emballé avant l’envoi", "je l’expédie sous peu après l’achat", "il est encore en vente", "je le garde pour toi un moment", "il est soigné et propre", "je réponds vite si tu as une question"],
+      offre: ["je t’ai fait une offre", "je te propose une offre", "je t’envoie une petite offre", "une offre t’attend", "je t’ai préparé une offre", "voici une offre rien que pour toi", "je te fais une offre", "je viens de t’envoyer une offre", "une offre est là pour toi", "je t’ai mis une offre", "je te glisse une offre", "je te propose une offre sympa"],
+      detail: ["dessus", "sur l’article", "pour toi", "juste au-dessus", "dans la conversation", "à saisir", "valable un moment", "à prix doux", "avec plaisir", "si ça te dit"],
+      fin: ["bonne journée", "belle journée", "à bientôt", "au plaisir", "bonne soirée", "à très vite", "n’hésite pas", "dis-moi si ça te va", "bonne fin de journée", "je reste dispo", "merci encore", "à toi de voir", "bon shopping", "à plus"],
+      ponct: [" !", " :)", ".", " 🙂", " 😊", " ^^", "…", " !!"]
+    },
+    en: {
+      avant: ["So", "Good news", "By the way", "Quick note", "Also", "FYI", "Anyway", "Just so you know", "Oh and", "Plus", "In any case", "Heads up"],
+      salut: ["Hi", "Hello", "Hey", "Hi there", "Hello there", "Good day", "Hey there", "Greetings"],
+      entree: ["thanks for the like", "I saw your favourite", "glad you like the item", "thanks for your interest", "I noticed your like", "happy the listing caught your eye", "thanks for the little heart", "you liked my listing"],
+      corps: ["it is still available", "it is ready to ship", "I can send it quickly", "it is in very good condition", "everything is in the photos", "it ships soon after purchase", "it is still for sale", "I reply fast to questions"],
+      offre: ["I made you an offer", "here is an offer for you", "I sent you a small offer", "an offer is waiting for you", "I prepared an offer", "I just sent you an offer", "there is an offer for you", "I put an offer up for you"],
+      detail: ["on it", "on the item", "just for you", "right above", "in the chat", "worth a look", "for a while", "at a nice price"],
+      fin: ["have a nice day", "see you soon", "cheers", "have a good evening", "let me know", "thanks again", "happy shopping", "take care"],
+      ponct: [" !", " :)", ".", " 🙂", " 😊", " ^^", "…", " !!"]
+    },
+    es: {
+      avant: ["Así que", "Buena noticia", "Por cierto", "Un detalle", "Además", "Para que sepas", "Total", "Ojo", "Y otra cosa", "Encima", "En todo caso", "Atento"],
+      salut: ["Hola", "Buenas", "Hey", "Hola qué tal", "Saludos", "Buenos días", "Holi", "Hola de nuevo"],
+      entree: ["gracias por el favorito", "vi tu favorito", "me alegra que te guste el artículo", "gracias por tu interés", "noté tu favorito", "gracias por el corazoncito", "te gustó mi anuncio", "el artículo parece gustarte"],
+      corps: ["sigue disponible", "está listo para enviar", "puedo enviarlo rápido", "está en muy buen estado", "todo está en las fotos", "lo envío pronto tras la compra", "sigue a la venta", "respondo rápido a dudas"],
+      offre: ["te hice una oferta", "te propongo una oferta", "te envío una pequeña oferta", "una oferta te espera", "te preparé una oferta", "acabo de enviarte una oferta", "hay una oferta para ti", "te dejé una oferta"],
+      detail: ["en él", "en el artículo", "solo para ti", "justo arriba", "en el chat", "para aprovechar", "por un tiempo", "a buen precio"],
+      fin: ["buen día", "hasta pronto", "un saludo", "buenas tardes", "dime qué te parece", "gracias de nuevo", "feliz compra", "cuídate"],
+      ponct: [" !", " :)", ".", " 🙂", " 😊", " ^^", "…", " !!"]
+    },
+    it: {
+      avant: ["Quindi", "Bella notizia", "A proposito", "Piccola nota", "Inoltre", "Per info", "Comunque", "Sappi che", "E poi", "In più", "In ogni caso", "Occhio"],
+      salut: ["Ciao", "Salve", "Buongiorno", "Ehi", "Ciao ciao", "Buonasera", "Ciao a te", "Ben trovato"],
+      entree: ["grazie per il preferito", "ho visto il tuo preferito", "felice che l’articolo ti piaccia", "grazie per l’interesse", "ho notato il tuo cuore", "ti è piaciuto il mio annuncio", "grazie per il cuoricino", "l’articolo sembra piacerti"],
+      corps: ["è ancora disponibile", "è pronto per la spedizione", "posso spedirlo in fretta", "è in ottimo stato", "è tutto nelle foto", "spedisco subito dopo l’acquisto", "è ancora in vendita", "rispondo veloce alle domande"],
+      offre: ["ti ho fatto un’offerta", "ti propongo un’offerta", "ti mando una piccola offerta", "un’offerta ti aspetta", "ti ho preparato un’offerta", "ti ho appena mandato un’offerta", "c’è un’offerta per te", "ti ho lasciato un’offerta"],
+      detail: ["sopra", "sull’articolo", "solo per te", "qui sopra", "nella chat", "da cogliere", "per un po’", "a buon prezzo"],
+      fin: ["buona giornata", "a presto", "un saluto", "buona serata", "fammi sapere", "grazie ancora", "buono shopping", "stammi bene"],
+      ponct: [" !", " :)", ".", " 🙂", " 😊", " ^^", "…", " !!"]
+    },
+    de: {
+      avant: ["Also", "Gute Nachricht", "Übrigens", "Kurz noch", "Außerdem", "Zur Info", "Jedenfalls", "Nur damit du es weißt", "Ach ja", "Dazu", "Auf jeden Fall", "Kleiner Hinweis"],
+      salut: ["Hallo", "Hi", "Hey", "Guten Tag", "Servus", "Moin", "Hallo zusammen", "Grüß dich"],
+      entree: ["danke für das Herz", "ich habe deinen Favoriten gesehen", "schön, dass dir der Artikel gefällt", "danke für dein Interesse", "mir ist dein Favorit aufgefallen", "dir gefällt meine Anzeige", "danke fürs kleine Herz", "der Artikel scheint dir zu gefallen"],
+      corps: ["er ist noch verfügbar", "er ist versandbereit", "ich kann schnell verschicken", "er ist in sehr gutem Zustand", "alles ist auf den Fotos", "ich verschicke gleich nach dem Kauf", "er ist noch zu haben", "ich antworte schnell auf Fragen"],
+      offre: ["ich habe dir ein Angebot gemacht", "ich schlage dir ein Angebot vor", "ich schicke dir ein kleines Angebot", "ein Angebot wartet auf dich", "ich habe dir ein Angebot vorbereitet", "ich habe dir gerade ein Angebot geschickt", "es gibt ein Angebot für dich", "ich habe dir ein Angebot gemacht"],
+      detail: ["dazu", "für den Artikel", "nur für dich", "gleich oben", "im Chat", "zum Zugreifen", "für eine Weile", "zum guten Preis"],
+      fin: ["schönen Tag", "bis bald", "liebe Grüße", "schönen Abend", "sag Bescheid", "nochmals danke", "viel Spaß beim Shoppen", "mach’s gut"],
+      ponct: [" !", " :)", ".", " 🙂", " 😊", " ^^", "…", " !!"]
+    }
+  };
+  var LANGUES_DEFAUTS_FAVORIS = Object.freeze(Object.keys(BANQUE));
+  function graineFavoris(idCompteVrm) {
+    let h = 0xcbf29ce484222325n;
+    const p = 0x100000001b3n, m = 0xffffffffffffffffn;
+    for (const c of "vrm-favoris:" + String(idCompteVrm == null ? "" : idCompteVrm)) {
+      h ^= BigInt(c.codePointAt(0));
+      h = h * p & m;
+    }
+    h ^= h >> 33n;
+    h = h * 0xff51afd7ed558ccdn & m;
+    h ^= h >> 33n;
+    h = h * 0xc4ceb9fe1a85ec53n & m;
+    h ^= h >> 33n;
+    return h;
+  }
+  var PARTS = ["salut", "entree", "corps", "avant", "offre", "detail", "fin", "ponct"];
+  function phraseDe(b, idx, langue) {
+    const [s, e, c, a, o, d, f, p0] = PARTS.map((k, i) => b[k][idx[i]]);
+    const maj = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    const fr = langue === "fr", p = !fr && p0 === " !" ? "!" : p0;
+    const tete = p0 === "." ? `${s}, ${e}` : `${s}${fr ? " !" : "!"} ${maj(e)}`;
+    const o2 = langue === "de" || /^I /.test(o) ? o : o.replace(/^./, (x) => x.toLowerCase());
+    return `${tete}, ${c}. ${a}, ${o2} ${d}. ${maj(f)}${p}`.replace(/\s+/g, " ").trim();
+  }
+  function defautsFavorisUniques(idCompteVrm, langue = "fr", n = 3) {
+    const b = BANQUE[langue] || BANQUE.fr;
+    let g = graineFavoris(String(idCompteVrm) + (langue && langue !== "fr" ? ":" + langue : ""));
+    const tirer = (k) => {
+      const t = BigInt(b[k].length);
+      const r = Number(g % t);
+      g = g / t;
+      if (g < 1000n) g = graineFavoris(String(g) + ":" + k);
+      return r;
+    };
+    const out = [], vus = { entree: /* @__PURE__ */ new Set(), offre: /* @__PURE__ */ new Set() };
+    for (let v2 = 0; v2 < n; v2++) {
+      const idx = PARTS.map((k) => {
+        let i = tirer(k);
+        if (vus[k]) {
+          let tours = 0;
+          while (vus[k].has(i) && tours++ < b[k].length) i = (i + 1) % b[k].length;
+          vus[k].add(i);
+        }
+        return i;
+      });
+      out.push(phraseDe(b, idx, BANQUE[langue] ? langue : "fr"));
+    }
+    return out;
+  }
+
   // src/reglagesFavoris.js
   var RYTHMES_REGLAGE = Object.freeze(["normal", "prudent", "perso"]);
   var MESSAGE_PAR_DEFAUT = "Bonjour ! Tu as mis cet article en favori : je te propose une offre dessus.";
@@ -36751,7 +36890,7 @@ ${lettre[1]}`;
     if (mode === "prix" && !(v2 >= 1 && v2 <= 99999)) throw Error("Le prix de l’offre doit être d’au moins 1 €.");
     return { pourcentage: null, offreMode: mode, offreValeur: v2, arrondi: arrondi === true };
   }
-  function validerReglagesFavoris({ message = "", variantes = [], pourcentage = null, offreMode = null, offreValeur = null, arrondi = false, intervalleMinutes, intervalleMaxMinutes = null, rythme = "normal" }) {
+  function validerReglagesFavoris({ message = "", variantes = [], pourcentage = null, offreMode = null, offreValeur = null, arrondi = false, intervalleMinutes, intervalleMaxMinutes = null, rythme = "normal" }, { graine = null, langue = "fr" } = {}) {
     if (!RYTHMES_REGLAGE.includes(rythme)) throw Error("Choisis un rythme : au hasard (40 à 90 s), plus prudent (2 à 4 min), ou tes minutes.");
     if (typeof message !== "string") throw Error("Le message doit être du texte.");
     if (variantes != null && (!Array.isArray(variantes) || variantes.some((v2) => typeof v2 !== "string"))) throw Error("Les autres versions doivent être du texte.");
@@ -36771,11 +36910,13 @@ ${lettre[1]}`;
       if (Number(maxTexte) > Number(intervalle)) max = Number(maxTexte);
     }
     const o = offreFavori({ pourcentage, offreMode, offreValeur, arrondi });
-    const texte = message.trim() ? message : o.offreMode ? MESSAGE_PAR_DEFAUT : "";
+    const uniques = !message.trim() && o.offreMode && graine != null && String(graine) ? defautsFavorisUniques(String(graine), langue, 1 + Math.min(2, VARIANTES_MAX - 1)) : null;
+    const texte = message.trim() ? message : uniques ? uniques[0] : o.offreMode ? MESSAGE_PAR_DEFAUT : "";
+    if (uniques && !autres.length) autres.push(...uniques.slice(1));
     const m = preparerMessageFavori(texte, o.pourcentage);
     if (m.erreur) throw Error(m.erreur);
     if (!m.message) throw Error("Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.");
-    if (autres.length && !message.trim()) throw Error("Écris d’abord la 1re version du message.");
+    if (autres.length && !message.trim() && !uniques) throw Error("Écris d’abord la 1re version du message.");
     return { version: 1, message: texte.trim(), ...autres.length ? { variantes: autres.map((v2) => v2.trim()) } : {}, ...o, intervalleMinutes: Number(intervalle), intervalleMaxMinutes: max, rythme, envoisActifs: false };
   }
 
@@ -38816,6 +38957,7 @@ async function sauvegardeReglagesCarte(msg, sender) {
       if (r === true) ecrits += Object.keys(plan.lignes).length;
     }
     const favKo = [];
+    const grainePlan = await authToken().then((x) => (x && x.user_id) || null).catch(() => null);   // 5.455.7
     for (const uid of Object.keys(plan.favoris)) {
       let refus = null;
       const w = await modifierLigneCas(`vrm_favoris_reglages_${uid}`, (d) => {
@@ -38823,7 +38965,7 @@ async function sauvegardeReglagesCarte(msg, sender) {
         const voulu = Object.assign({}, avant, plan.favoris[uid], { envoisActifs: false });
         if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
         delete voulu.rev;
-        try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 200); return undefined; }
+        try { return GARDES_APP.validerReglagesFavoris(voulu, { graine: grainePlan }); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 200); return undefined; }
       });
       if (w === true) ecrits++; else favKo.push({ compte: uid, raison: refus || 'écriture impossible' });
     }
