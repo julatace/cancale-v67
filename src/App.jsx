@@ -1786,7 +1786,7 @@ import { poserForfaitEmballage } from './beneficePaire.js';   // (22 nov., inté
 import ForfaitEmballage from "./ForfaitEmballage.jsx";   // (21 nov., lot rentabilite ; 22 nov., intégration finale) le forfait de la fiche
 import RetraitsFiche from './RetraitsFiche.jsx';   // (21 nov., ext. 5.426) une paire vendue est retirée partout
 import { BoutonTraduire } from './TraduireLocal.jsx';   // (22 nov., intégration finale)
-import { planchersAPublier, memesPlanchers, PLANCHERS_CLE as PLANCHERS_EBAY_CLE } from './ebay/automatismes.js';   // (28 nov., lot ebay-automatismes)
+import { publierPlanchersEbay as publierPlanchersEbayDe } from './ebay/publierPlanchers.js';   // (28 nov., lot ebay-automatismes)
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -5863,21 +5863,8 @@ const purgerCorbeille = () => {
   return _purgeCorbeilleEnVol;
 };
 onCloudReady(() => { setTimeout(() => { purgerCorbeille().catch(() => {}); }, 5000); });
-// (28 nov., lot ebay-automatismes) LE PLANCHER DE CHAQUE N° POUR LES AUTOMATISMES eBAY : publié (`vrm_planchers_ebay`)
-// quand un automatisme eBay est allumé (`vrm_ebay_auto_actif`), au chargement puis toutes les 6 h ; republié seulement
-// s'il a changé, ou après 12 h (le serveur n'agit plus sur une publication de plus de 72 h). Aucune fiche lue ⇒ rien
-// (« rien lu » ne vaut pas « rien » : une publication vide ne remplace jamais la précédente).
-const publierPlanchersEbay = () => {
-  try {
-    if (load('vrm_ebay_auto_actif', false) !== true || !AUTH.user?.id) return;
-    const fiches = load('vinted_annonce_numeros', null);
-    if (!fiches || typeof fiches !== 'object' || !Object.keys(fiches).length) return;
-    const neuf = planchersAPublier(fiches, load('vinted_buyprice_by_num', {}) || {}, load('vinted_nums_physiques', null));
-    const avant = load(PLANCHERS_EBAY_CLE, null);
-    if (avant && memesPlanchers(avant, neuf) && Date.now() - Number(avant.at || 0) < 12 * 3600000) return;
-    save(PLANCHERS_EBAY_CLE, neuf);
-  } catch (_) { /* une publication ratée : le serveur dit « plancher pas relu », rien ne bouge */ }
-};
+// (28 nov., lot ebay-automatismes) Le plancher de chaque N° pour les automatismes eBay, publié pour le serveur (src/ebay/publierPlanchers.js).
+const publierPlanchersEbay = () => publierPlanchersEbayDe({ load, save, userId: AUTH.user?.id });
 onCloudReady(() => { setTimeout(publierPlanchersEbay, 20000); try { setInterval(publierPlanchersEbay, 6 * 3600000); } catch (_) {} });
 try { window.addEventListener('vrm:planchers-ebay', publierPlanchersEbay); } catch (_) {}
 const lireListeCorbeille = () => listeCorbeille(load(CLE_CORBEILLE, {}));
