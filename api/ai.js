@@ -19,6 +19,8 @@ import { utilisateurDe } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { handleDetourage } from './_lib/detourage.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { lireCleIa } from './_lib/ia-cle.js';   // (28 nov., agent-rangement) la clé IA du VENDEUR, dans le coffre
+import { handleRangement, MODELE_RANGEMENT } from './_lib/rangement-ia.js';
 
 // (11 nov., B117) le prix part dans le prompt : un nombre ou rien, jamais un objet ou 10 000 caractères.
 export const prixBorne = (v) => { if (v == null || v === '') return undefined; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 && n < 1e6 ? n : undefined; };
@@ -40,6 +42,19 @@ export default async function handler(req, res) {
   //    au clic. Sans session, ou un autre vendeur : `ready:false` et la raison
   //    (`pas-active`) — l'app n'affiche pas un bouton qui ne marchera pas.
   //    Aucune clé ne se lit ni ne se dit ici.
+  // (28 nov., agent-rangement) « Quel moteur répond à l'assistant de rangement ? » : la clé du VENDEUR (coffre), sinon
+  //    celle du serveur pour le SEUL propriétaire de l'installation, sinon aucun (le moteur sans IA). Aucune clé ne se dit.
+  if (req.method === 'GET' && req.query && req.query.usage === 'rangement') {
+    const u = await utilisateurDe(req);
+    if (u === undefined) { res.status(503).json({ ok: false, reason: 'connexion-injoignable' }); return; }
+    if (!u) { res.status(200).json({ ok: true, moteur: null, raison: 'session' }); return; }
+    const cleV = await lireCleIa(u.id);
+    if (cleV === undefined) { res.status(200).json({ ok: true, moteur: null, raison: 'cle-pas-su' }); return; }
+    const proprio = String(process.env.VRM_OWNER_UID || '');
+    const srv = !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY) && !!proprio && u.id === proprio;
+    res.status(200).json({ ok: true, moteur: cleV ? 'vendeur' : srv ? 'proprietaire' : null, ...(cleV || srv ? {} : { raison: 'no-key' }), model: MODELE_RANGEMENT });
+    return;
+  }
   if (req.method === 'GET') {
     const cleSrv = !!(process.env.AI_API_KEY || process.env.ANTHROPIC_API_KEY);
     const proprio = String(process.env.VRM_OWNER_UID || '');
@@ -70,6 +85,17 @@ export default async function handler(req, res) {
   if (!u) { res.status(401).json({ ok: false, reason: 'session', message: "Connecte-toi à VRM pour utiliser l'assistant." }); return; }
   if ((await accesVendeur(u.id)) === false) { res.status(402).json({ ok: false, reason: 'abonnement', message: "Ton abonnement VRM n'est plus actif." }); return; }
   if (cleVendeur.length > 300) { res.status(400).json({ ok: false, reason: 'cle' }); return; }
+  // (28 nov., agent-rangement) L'ASSISTANT DE RANGEMENT : la clé du VENDEUR rangée dans le coffre (api/_lib/ia-cle.js),
+  //    jamais une clé envoyée par le navigateur ; pas su ⇒ 503 (jamais un repli sur la clé du serveur) ; aucune ⇒ celle
+  //    du serveur pour le SEUL propriétaire de l'installation ; sinon « no-key » (l'assistant continue sans IA).
+  if (b.mode === 'rangement') {
+    const cleV = await lireCleIa(u.id);
+    if (cleV === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su', message: "Je n'ai pas pu lire ta clé IA : je continue sans IA." }); return; }
+    const proprio = String(process.env.VRM_OWNER_UID || '');
+    const k = cleV || (cleServeur && proprio && u.id === proprio ? cleServeur : '');
+    if (!k) { res.status(200).json({ ok: false, reason: 'no-key', message: "L'assistant IA a besoin de TA clé. VRM n'utilise pas la sienne pour toi." }); return; }
+    return handleRangement(res, k, b);
+  }
   let key = cleVendeur;
   if (!key && cleServeur) {
     // LA CLÉ DU SERVEUR SE PAIE : pour le seul propriétaire de l'installation.

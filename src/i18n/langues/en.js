@@ -1,5 +1,6 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
 import ecran_textes_restes from './en/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './en/rangement.js';   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './en/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './en/suiviVente.js';
@@ -142,6 +143,7 @@ import ecran_loupe_num from './en/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
