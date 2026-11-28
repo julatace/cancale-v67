@@ -490,7 +490,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   const i = mi ? mi.index : -1;
   const neuf = i >= 0 ? SRC.indexOf('if (!num) num = prochainLibre(', i) : -1;
   // (15 nov.) la borne suit le bloc (la republication dans l'app Vinted s'insère avant le N° neuf) : l'ORDRE est la règle.
-  i >= 0 && neuf > i && neuf - i < 4000
+  // (28 nov.) + la photo d'un brouillon du dossier « À publier » (src/aPublier/dossier.js), elle aussi avant le N° neuf.
+  i >= 0 && neuf > i && neuf - i < 7000
     ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
     : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
           'la réutilisation par vente ne passe pas avant l\'attribution');
