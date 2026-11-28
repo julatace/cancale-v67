@@ -29,9 +29,18 @@ Cadre : l'APP seulement — l'extension (servie chez lui en 5.455.x) n'est pas t
   arrive ; (2) l'extension relit ensuite en arrière-plan (« Actualisation… », comme « Actualiser ») et remplace le fil ; une
   relecture ratée garde ce qui est montré et le dit. Temps posés dans `window.__vrmMesuresFil` (`fil`, `actualise`).
 - La liste : la copie instantanée de Messages (`src/copieEcran.js`, écran `messages`) existait déjà ; le banc mesure le retour.
-- Mesures (banc `messages-parfaits`, base inventée, extension simulée à 600 ms d'aller-retour) : voir la fin du banc
-  (« Temps »). Avant : le fil n'était lisible qu'APRÈS l'aller-retour de l'extension (≥ 600 ms au banc, des secondes chez lui) ;
-  après : lisible sur la copie en base, l'extension actualise ensuite.
+- Mesures (banc `messages-parfaits`, base inventée, extension simulée à 600 ms d'aller-retour, machine partagée — ordres de
+  grandeur ; « avant » = le build de main 80ca6e3df servi au MÊME banc) :
+
+  | 1512 clair, extension à jour | avant | après |
+  |---|---|---|
+  | du toucher au premier contenu du fil | 1 408 ms (rien avant le fil entier) | 200–350 ms (dernier message + offre connus) |
+  | du toucher au fil lisible (1re bulle) | 1 408 ms (après l'aller-retour de l'extension) | 550–910 ms (copie en base ; l'extension actualise ensuite, ~1 s) |
+  | 390 tactile : fil lisible | — | 290–475 ms (aperçu 60–265 ms) |
+  | retour sur Messages (liste) | 2 103 ms | 2 400–3 700 ms, copie instantanée peinte au même moment |
+
+  La liste à la 1re visite (4–9 s au banc) comprend la connexion et le démarrage de l'app : inchangée par ce lot (bruit de la
+  machine partagée ; aucune lecture ajoutée au chemin de la liste).
 
 ## 3. Site + compte « comme sur les autres écrans »
 

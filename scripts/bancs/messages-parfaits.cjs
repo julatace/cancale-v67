@@ -153,7 +153,8 @@ async function ouvrirFil(pg, conv) {
   console.log(`app ${DIST}`);
   const temps = [];
   try {
-    const formes = COURT ? [[false, false]] : [[true, false], [true, true], [false, false], [false, true]];
+    const FORME = (() => { const i = process.argv.indexOf('--forme'); return i > 0 ? process.argv[i + 1] : ''; })();   // « 390-clair » …
+    const formes = (COURT ? [[false, false]] : [[true, false], [true, true], [false, false], [false, true]]).filter(([m, s]) => !FORME || FORME === `${m ? '390' : '1512'}-${s ? 'sombre' : 'clair'}`);
     for (const [mobile, sombre] of formes) {
       const nom = `${mobile ? '390' : '1512'}-${sombre ? 'sombre' : 'clair'}`;
       for (const ext of ['a-jour', 'ancienne', 'absente']) {
@@ -221,15 +222,6 @@ async function ouvrirFil(pg, conv) {
           autre: !!document.querySelector('[data-agir-autre-prix]') }));
         if (ext === 'a-jour') {
           dit(g.composer === 'ok' && g.offre.length >= 2 && g.offre.every((x) => x === 'ok') && g.autre && g.panneau === 0, `${nom} : extension à jour ⇒ Répondre, Accepter / Refuser et « Autre prix » ALLUMÉS dans l'app`, JSON.stringify(g));
-          // Accepter : la confirmation d'abord.
-          await pg.click('[data-agir-accepter]').catch(() => {});
-          const f = await attendreQue(pg, () => !!document.querySelector('[data-agir-accepter-confirmer]') || null, null, 8000);
-          dit(f && !commandes().some((c) => c.geste === 'accepter'), `${nom} : Accepter ouvre la confirmation (« accepter vend la paire »), rien n'est parti`, JSON.stringify(commandes()));
-          await photo(pg, `accepter-confirmer-${nom}`);
-          await pg.click('[data-agir-accepter-confirmer]').catch(() => {});
-          await attendre(4500);
-          const acc = commandes().filter((c) => c.geste === 'accepter');
-          dit(acc.length === 1 && acc[0].compte === A && acc[0].args && String(acc[0].args.oid) === OID1, `${nom} : « Oui, accepter » ⇒ UNE commande accepter au nom de boutique_a pour CETTE offre`, JSON.stringify(acc));
           // Autre prix sous le plancher (mini 50 €) : bloqué, puis forcé + confirmé.
           await pg.click('[data-agir-autre-prix]').catch(() => {});
           await attendre(400);
@@ -248,6 +240,19 @@ async function ouvrirFil(pg, conv) {
           await attendre(4500);
           const co = commandes().filter((c) => c.geste === 'contreOffre');
           dit(co.length === 1 && co[0].compte === A && Number(co[0].args.prix) === 75 && String(co[0].args.tx) === TX1, `${nom} : confirmée ⇒ UNE contre-offre de 75 € au nom de boutique_a`, JSON.stringify(co));
+          // Une offre a UN geste à la fois (le premier attend son issue) : la page est rouverte avant d'accepter.
+          await pg.goto('https://vrm.center/?tab=messages', { waitUntil: 'domcontentloaded' });
+          await attendreQue(pg, () => document.querySelectorAll('[data-fils-tous] button[data-fil]').length >= 5 ? true : null);
+          await ouvrirFil(pg, C1); await attendreQue(pg, () => document.querySelector('[data-agir-accepter][data-agir="ok"]') ? true : null, null, 20000);
+          // Accepter : la confirmation d'abord.
+          await pg.click('[data-agir-accepter]').catch(() => {});
+          const f = await attendreQue(pg, () => !!document.querySelector('[data-agir-accepter-confirmer]') || null, null, 8000);
+          dit(f && !commandes().some((c) => c.geste === 'accepter'), `${nom} : Accepter ouvre la confirmation (« accepter vend la paire »), rien n'est parti`, JSON.stringify(commandes()));
+          await photo(pg, `accepter-confirmer-${nom}`);
+          await pg.click('[data-agir-accepter-confirmer]').catch(() => {});
+          await attendre(4500);
+          const acc = commandes().filter((c) => c.geste === 'accepter');
+          dit(acc.length === 1 && acc[0].compte === A && acc[0].args && String(acc[0].args.oid) === OID1, `${nom} : « Oui, accepter » ⇒ UNE commande accepter au nom de boutique_a pour CETTE offre`, JSON.stringify(acc));
           // Envoyer un message.
           await pg.fill('[data-agir-composer="vinted"] textarea', 'Elle taille normalement, prenez votre pointure.').catch(() => {});
           await pg.click('[data-agir-composer="vinted"] [data-agir-envoyer]').catch(() => {});
@@ -258,8 +263,9 @@ async function ouvrirFil(pg, conv) {
           await photo(pg, `gestes-envoyes-${nom}`);
         } else if (ext === 'ancienne') {
           dit(g.composer === 'lecture' && g.panneau >= 2, `${nom} : extension qui ne sait pas recevoir le geste ⇒ « Répondre / Répondre à l'offre dans l'extension »`, JSON.stringify(g));
-          const [nouv] = await Promise.all([ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null), pg.click('[data-mp-panneau="offre"] [data-mp-panneau-ouvrir]').catch(() => {})]);
-          const url = nouv ? nouv.url() : '';
+          const [nouv] = await Promise.all([ctx.waitForEvent('page', { timeout: 15000 }).catch(() => null), pg.click('[data-mp-panneau="offre"] [data-mp-panneau-ouvrir]').catch(() => {})]);
+          if (nouv) await nouv.waitForURL(/vrm=panneau/, { timeout: 15000 }).catch(() => {});
+          const url = nouv ? nouv.url() : pg.url();
           const dite = await attendreQue(pg, () => !!document.querySelector('[data-mp-panneau-dit]') || null, null, 4000);
           dit(/www\.vinted\.fr\/\?vrm=panneau&page=messages&ids=7300001&action=offre/.test(url) && dite && commandes().length === 0, `${nom} : le panneau de l'extension s'ouvre sur CETTE conversation (offre), c'est dit, rien n'est déposé`, JSON.stringify({ url, dite, n: commandes().length }));
           if (nouv) await nouv.close().catch(() => {});
