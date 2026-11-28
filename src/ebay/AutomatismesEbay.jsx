@@ -20,6 +20,8 @@ import { appelerEbay } from '../ebayRequetes.js';
 import { Groupe, Rangee, Segmente, Bouton, Feuille, Vignette, Plaque } from '../natif/index.js';
 import { reglagesCompte, avecReglages, BAISSE_PCT, BAISSE_JOURS, OFFRE_PCT, OFFRE_HEURES, OFFRE_PERIODE_JOURS, PALIERS_PRESETS, RELANCE_PAR_JOUR,
   MAJORATION_PCT, MASSE_PCT, MASSE_MAX, majorationDe, avecMajoration, MAJORATION_CLE, ligneMasse, unAllume } from './automatismes.js';
+import './automatismes.css';
+const PCT = '\u202f%';
 
 const eur = (c, devise = 'EUR') => (Number.isInteger(c) ? monnaie(c / 100, devise || 'EUR') : '—');
 const quand = (t) => (t ? dateTr(t, { day: 'numeric', month: 'short' }) + ' · ' + heureTr(t) : '');
@@ -148,8 +150,8 @@ export default function AutomatismesEbay({ compte = 'principal', headers, confir
           onClick={plOk ? null : () => { try { window.dispatchEvent(new Event('vrm:planchers-ebay')); } catch (_) {} setTimeout(lire, 4000); }} fin={plOk ? null : 'chevron'}/>
       </Groupe>
 
-      {moteur('baisse', <>{seg('baisse', 'pct', BAISSE_PCT, (v) => '−' + v + ' %')}{seg('baisse', 'jours', BAISSE_JOURS, (v) => tr('eauto.jours', { n: String(v) }))}</>)}
-      {moteur('offres', <>{seg('offres', 'pct', OFFRE_PCT, (v) => '−' + v + ' %')}{seg('offres', 'heures', OFFRE_HEURES, (v) => tr('eauto.heures', { n: String(v) }))}{seg('offres', 'periode', OFFRE_PERIODE_JOURS, (v) => tr('eauto.periode', { n: String(v) }))}</>)}
+      {moteur('baisse', <>{seg('baisse', 'pct', BAISSE_PCT, (v) => '−' + v + PCT)}{seg('baisse', 'jours', BAISSE_JOURS, (v) => tr('eauto.jours', { n: String(v) }))}</>)}
+      {moteur('offres', <>{seg('offres', 'pct', OFFRE_PCT, (v) => '−' + v + PCT)}{seg('offres', 'heures', OFFRE_HEURES, (v) => tr('eauto.heures', { n: String(v) }))}{seg('offres', 'periode', OFFRE_PERIODE_JOURS, (v) => tr('eauto.periode', { n: String(v) }))}</>)}
       {moteur('paliers', seg('paliers', 'preset', Object.keys(PALIERS_PRESETS), (v) => tr('eauto.paliers.' + v)))}
       {moteur('relance', <>{seg('relance', 'parJour', RELANCE_PAR_JOUR, (v) => tr('eauto.parJour', { n: String(v) }))}
         <Segmente libelle={tr('eauto.relance.frais')} valeur={R.relance.gratuitSeul ? 'gratuit' : 'tout'} onChange={(v) => regler('relance', { gratuitSeul: v === 'gratuit' })}
@@ -157,7 +159,7 @@ export default function AutomatismesEbay({ compte = 'principal', headers, confir
 
       <Groupe titre={tr('eauto.maj.titre')} pied={tr('eauto.maj.pied')} attrs={{ 'data-eauto-groupe': 'majoration' }}>
         <div className="eauto-choix" data-eauto-reglages="majoration">
-          <Segmente libelle={tr('eauto.maj.titre')} valeur={String(maj)} onChange={poserMajoration} options={choix(MAJORATION_PCT, (v) => (v ? '+' + v + ' %' : tr('eauto.maj.aucune')))}/>
+          <Segmente libelle={tr('eauto.maj.titre')} valeur={String(maj)} onChange={poserMajoration} options={choix(MAJORATION_PCT, (v) => (v ? '+' + v + PCT : tr('eauto.maj.aucune')))}/>
         </div>
       </Groupe>
 
@@ -177,7 +179,7 @@ export default function AutomatismesEbay({ compte = 'principal', headers, confir
       {annonces && annonces.length ? (
         <div className="eauto-masse" data-eauto-masse="">
           <Segmente libelle={tr('eauto.masse.op')} valeur={op} onChange={setOp}
-            options={[...MASSE_PCT.map((v) => ({ cle: String(v), libelle: '−' + v + ' %', attrs: { 'data-eauto-op': String(v) } })), { cle: 'prix', libelle: tr('eauto.masse.prix'), attrs: { 'data-eauto-op': 'prix' } }, { cle: 'fin', libelle: tr('eauto.masse.fin'), attrs: { 'data-eauto-op': 'fin' } }]}/>
+            options={[...MASSE_PCT.map((v) => ({ cle: String(v), libelle: '−' + v + PCT, attrs: { 'data-eauto-op': String(v) } })), { cle: 'prix', libelle: tr('eauto.masse.prix'), attrs: { 'data-eauto-op': 'prix' } }, { cle: 'fin', libelle: tr('eauto.masse.fin'), attrs: { 'data-eauto-op': 'fin' } }]}/>
           {op === 'prix' ? <label className="eauto-champ"><span>{tr('eauto.masse.nouveauPrix')}</span><input value={prixNeuf} onChange={(e) => setPrixNeuf(e.target.value)} inputMode="decimal" placeholder="49" data-eauto-prix=""/></label> : null}
           <Bouton variante="teinte" large indisponible={!cochees.length || (op === 'prix' && !prixNeuf.trim())} raison={!cochees.length ? tr('eauto.masse.rien') : ''} onClick={revoir} attrs={{ 'data-eauto-revoir': String(cochees.length) }}>
             {tr('eauto.masse.revoir', { n: String(cochees.length) })}
@@ -204,11 +206,13 @@ export default function AutomatismesEbay({ compte = 'principal', headers, confir
                 ton={l.ok ? 'neutre' : 'ambre'} attrs={{ 'data-eauto-ligne': l.a.itemId, 'data-eauto-ligne-ok': l.ok ? '1' : '0', 'data-eauto-apres-c': l.apresC != null ? String(l.apresC) : '' }}/>
             ))}
           </Groupe>
+          <div className="eauto-pied-feuille">
           {resultat ? <p className="eauto-message" role="status" data-eauto-resultat={String(resultat.faites || 0)}>{tr('eauto.masse.fait', { n: String(resultat.faites || 0), total: String((resultat.lignes || []).length) })}</p> : null}
           <Bouton variante={recap.op === 'fin' ? 'destructif' : 'plein'} confirmation={recap.op === 'fin' ? tr('eauto.recap.finConfirmer', { n: String(recap.lignes.filter((l) => l.ok).length) }) : ''}
             indisponible={!recap.lignes.some((l) => l.ok) || !!resultat} raison={!recap.lignes.some((l) => l.ok) ? tr('eauto.recap.aucune') : ''} onClick={appliquer} attrs={{ 'data-eauto-appliquer': String(recap.lignes.filter((l) => l.ok).length) }}>
             {tr('eauto.recap.appliquer.' + recap.op, { n: String(recap.lignes.filter((l) => l.ok).length) })}
           </Bouton>
+          </div>
         </Feuille>
       ) : null}
     </div>
