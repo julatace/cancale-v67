@@ -15,7 +15,7 @@ test('message figé et aucun effet réseau au lancement ; pas de lancement concu
   assert.equal(r.data.groupes[owner].jobs[0].recipientId,'201');assert.equal(r.valeur.active,true);
   assert.ok(r.data.groupes[owner].jobs.every(x=>x.message==='Message identique avec remise de 10 %.'));
   // 5.455.8 : relancer les MÊMES favoris ne refuse plus — ils remplacent ceux qui attendaient, jamais en double.
-  const r2=lancer(r.data);const j2=r2.data.groupes[owner].jobs;assert.equal(j2.filter(x=>x.id==='101:201').length,1);assert.equal(j2.find(x=>x.id==='101:201').etat,'attente');
+  assert.throws(()=>lancer(r.data),/déjà été préparés/);assert.ok(r.data.groupes[owner].jobs.every(x=>x.etat==='attente'));   // (revue) une file en cours n'est jamais annulée : le même favori relancé est refusé, rien ne change
   assert.equal(r.data.groupes[owner].jobs[0].etat,'attente');
 });
 test('une autorisation est consommable une seule fois et seulement par le bon propriétaire',()=>{
@@ -70,7 +70,8 @@ test('dédoublonnage après envoi ; refus relançable seulement par une nouvelle
 });
 test('une nouvelle sélection ne reprend pas le reste interrompu ; les jamais partis annulés peuvent être sélectionnés à nouveau',()=>{
   let d=claim(lancer(null,[cible(1),cible(2)]).data).data;d=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'refuse'}).data;
-  d=lancer(d,[cible(3)]).data;assert.equal(d.groupes[owner].jobs.find(x=>x.id==='102:202').etat,'annule');
+  // 5.455.8 (revue, défaut 5) : la file continue après un refus ; un nouveau lancement pendant qu'elle tourne AJOUTE, n'annule rien.
+  d=lancer(d,[cible(3)]).data;assert.equal(d.groupes[owner].jobs.find(x=>x.id==='102:202').etat,'attente');assert.equal(d.groupes[owner].jobs.find(x=>x.id==='103:203').etat,'attente');
   d=arreterFile(d,owner).data;d=lancer(d,[cible(2)]).data;
   assert.deepEqual(d.groupes[owner].jobs.filter(x=>x.etat==='attente').map(x=>x.notificationId),['favori-2']);
 });

@@ -195,6 +195,7 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
       const parti = sv.lancers.slice(n0).flat();
       dit(sel.length > 1 ? (r && r.ok === true && mauvais.every((id) => (r.ecartes || []).includes(id)) && !parti.some((id) => mauvais.includes(id))) : (r && r.ok === false && r.code === 'selection' && !parti.length), `${nom} ⇒ écarté (dit), jamais envoyé${sel.length > 1 ? ' ; l’autre part' : ''}`, JSON.stringify({ r, parti }).slice(0, 240));
       try { f.store.vrmFavorisCarte = null; } catch (_) {}
+      await sv.vrm({ mode: 'favoris', methode: 'POST', corps: { action: 'arreter' } });   // (revue) chaque cas part d'une file arrêtée : un lancement n'annule jamais une file en cours
     }
     dit(sv.lancers.flat().every((id) => cochables.includes(id)), 'aucun favori non cochable n’a atteint VRM', JSON.stringify(sv.lancers));
   }

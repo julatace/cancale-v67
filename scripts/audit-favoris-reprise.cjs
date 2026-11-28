@@ -5,10 +5,10 @@
 //  un faux Vinted (scripts/_favoris-monde-reel.cjs), et la vraie couche de repérage (vrm-trouver.js) dans Chromium :
 //   R1 la page pas prête (l'onglet de travail n'est pas sur vinted.fr) ⇒ ramené UNE fois sur vinted.fr, attendu chargé, puis
 //      l'envoi part (conversation, offre, message) ;
-//   R2 la boîte de l'offre absente (l'adresse de l'offre en 404) ⇒ le message d'abord, puis l'offre depuis la conversation
-//      relue — une seule offre, jamais sous le plancher ; la route « message d'abord » est RETENUE : l'envoi suivant la prend
-//      directement (aucun 404 tenté) ;
-//   R3 pas de transaction dans la réponse de la demande ⇒ celle de la CONVERSATION relue (même article) porte l'offre ;
+//   R2 la boîte de l'offre absente (404) ⇒ RIEN de plus (revue du 28 nov. : jamais un message qui annoncerait une offre jamais
+//      faite) : la phrase de Vinted sur la rangée, rien au registre (refaisable) ; l'envoi suivant garde l'ordre offre → message ;
+//   R3 pas de transaction dans la réponse de la demande ⇒ celle de la CONVERSATION, PROUVÉE par sa relecture (cet article ET
+//      cette personne), porte l'offre ; retenue pour CE compte ;
 //   R4 un envoi à moitié fait (l'offre partie, le message pas) ⇒ repris : la conversation relue, AUCUNE 2ᵉ offre, le message
 //      part une fois ; repris encore ⇒ rien ne repart ; son message déjà là ⇒ « fait », rien n'est écrit ;
 //   R5 un bouton « Envoyer » sans texte (une icône) : introuvable par son nom ⇒ trouvé par le repérage (vrm-trouver.js) ;
@@ -20,9 +20,8 @@
 const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process');
 const RACINE = process.env.FAV_REPRISE_RACINE ? path.resolve(process.env.FAV_REPRISE_RACINE) : path.join(__dirname, '..');
 const MUTATIONS = {
-  'sans-recharger': ['vinted-sync-extension/background.js', "  if(pg.refus==='onglet'&&await rechargerPageFavori(acc))pg=await pageVintedPour(acc);\n", ''],
-  'offre-404-cul-de-sac': ['vinted-sync-extension/background.js', "if(!faite&&o.status===404){noterDiag('favori_offre_404_apres_message');offreApres=true;op=null;}", "if(false){}"],
-  'route-oubliee': ['vinted-sync-extension/background.js', "    if(offreIci&&!offreApres&&(await routeFavori('offre'))==='apres_message'){noterDiag('favori_route_offre_apres_message');offreApres=true;}", ''],
+  'sans-recharger': ['vinted-sync-extension/background.js', "  if(pg.refus==='onglet'&&await rechargerPageFavori(acc)){pg=await pageVintedPour(acc);if(!pg.refus)await retenirRouteFavori(uid,'page','recharger');}\n", ''],
+  'offre-404-message-quand-meme': ['vinted-sync-extension/background.js', "      if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');", "      if(!faite&&o.status!==404)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');"],
   'sans-tx-conversation': ['vinted-sync-extension/background.js', "if(t2.tx){tx=t2.tx;txDeConv=true;", "if(false){tx=t2.tx;txDeConv=true;"],
   'reprise-cul-de-sac': ['vinted-sync-extension/background.js', "      if(deja&&deja.o){repriseMoitie=true;noterDiag('favori_req_reprise_moitie');}}", "      if(deja&&deja.o){return rep('ignore',0,'conversation_deja_contactee');}}"],
   'reprise-double-offre': ['vinted-sync-extension/background.js', "    const offreIci=offre&&!repriseMoitie;", "    const offreIci=offre;"],
@@ -70,21 +69,18 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       dit(r && r.resultat === 'envoye' && m.f.j.diags.includes('favori_page_rechargee') && (m.f.j.navigations || []).some((x) => x.id === 9 && /vinted\.fr\/inbox/.test(x.url)) && ecr(m).join(' ') === '/messaging/main/inquiries /api/v2/transactions/6000/offers /messaging/main/conversations/UUID/replies', 'R1 la page ramenée UNE fois, attendue chargée ; conversation, offre, message partent', JSON.stringify({ r, nav: m.f.j.navigations, w: ecr(m) }));
       m.fin(); }
 
-    console.log('\nR2. La boîte de l’offre absente (404) : le message d’abord, puis l’offre ; la route est retenue');
+    console.log('\nR2. La boîte de l’offre absente (404) : rien de plus — jamais un message qui annoncerait une offre jamais faite');
     { let offres = 0;
       const m = await monde(racine, { n: 2, vinted: (e) => { if (e.methode === 'POST' && /\/offers$/.test(e.chemin)) { offres++; return offres === 1 ? { status: 404, body: { code: 404, message: 'Not found' } } : { status: 200, body: { code: 0 } }; } return null; } });
       const r = await envoyer(m, 'jn0');
-      const w = ecr(m), off = corps(m, /\/offers$/);
-      const iMsg = w.findIndex((x) => /replies$/.test(x)), iOff = w.lastIndexOf('/api/v2/transactions/6000/offers');
-      dit(r && r.resultat === 'envoye' && iMsg >= 0 && iOff > iMsg && off.length === 2 && off.every((x) => x && x.offer && x.offer.price === '49.5') && w.filter((x) => /replies$/.test(x)).length === 1, 'R2 404 sur l’offre ⇒ le message part, puis l’offre (49,50 €, jamais sous le plancher) depuis la conversation relue', JSON.stringify({ r, w }));
+      const w = ecr(m);
+      const reg = ((m.f.store.vrmFavorisFaits || {})['123'] || {})['7000000180:3000000001'] || {};
       const fa = (await m.f.ctx.faitsFavoris(m.UID)).jn0 || {};
-      dit(Number(fa.o) > 0 && fa.px === 49.5 && Number(fa.m) > 0, 'R2 la rangée dit « Offre faite 49,50 € » et « Message envoyé »', JSON.stringify(fa));
-      const routes = (m.f.store.vrmFavorisRoutes || {});
-      dit(routes.offre && routes.offre.route === 'apres_message', 'R2 la route qui a marché est RETENUE (offre : après le message)', JSON.stringify(routes));
+      dit(r && r.resultat === 'refuse' && r.raison === 'offre_refusee' && !w.some((x) => /replies$/.test(x)) && !reg.o && !reg.m && fa.refus === 'Not found', 'R2 404 sur l’offre ⇒ aucun message, la phrase de Vinted sur la rangée, rien au registre (l’offre peut être refaite plus tard)', JSON.stringify({ r, w, reg, fa }));
       const avant = m.f.j.vinted.length;
       const r2 = await envoyer(m, 'jn1');
       const w2 = m.f.j.vinted.slice(avant).filter((v) => v.methode !== 'GET').map((v) => v.chemin.replace(/[0-9a-f-]{36}/, 'UUID'));
-      dit(r2 && r2.resultat === 'envoye' && w2.join(' ') === '/messaging/main/inquiries /messaging/main/conversations/UUID/replies /api/v2/transactions/6001/offers' && offres === 3, 'R2 l’envoi suivant prend la route apprise DIRECTEMENT : message puis offre, aucun 404 tenté', JSON.stringify({ r2, w2, offres }));
+      dit(r2 && r2.resultat === 'envoye' && w2.join(' ') === '/messaging/main/inquiries /api/v2/transactions/6001/offers /messaging/main/conversations/UUID/replies', 'R2 l’envoi suivant : l’ordre de Vintex, offre PUIS message', JSON.stringify({ r2, w2 }));
       m.fin(); }
 
     console.log('\nR3. Pas de transaction dans la réponse de la demande : celle de la conversation porte l’offre');
@@ -95,7 +91,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
         return null; } });
       const r = await envoyer(m, 'jn0');
       const off = corps(m, /\/offers$/);
-      dit(r && r.resultat === 'envoye' && off.length === 1 && off[0].offer.price === '49.5' && m.f.j.vinted.some((v) => v.methode === 'POST' && v.chemin === '/api/v2/transactions/6000/offers') && (m.f.store.vrmFavorisRoutes || {}).transaction, 'R3 la transaction de la conversation (même article) porte l’offre ; la route est retenue', JSON.stringify({ r, w: ecr(m), routes: m.f.store.vrmFavorisRoutes }));
+      dit(r && r.resultat === 'envoye' && off.length === 1 && off[0].offer.price === '49.5' && m.f.j.vinted.some((v) => v.methode === 'POST' && v.chemin === '/api/v2/transactions/6000/offers') && ((m.f.store.vrmFavorisRoutes || {})['123'] || {}).transaction, 'R3 la transaction de la conversation (même article) porte l’offre ; la route est retenue', JSON.stringify({ r, w: ecr(m), routes: m.f.store.vrmFavorisRoutes }));
       m.fin(); }
 
     console.log('\nR4. Un envoi à moitié fait (l’offre partie, le message pas) : repris sans doublon');

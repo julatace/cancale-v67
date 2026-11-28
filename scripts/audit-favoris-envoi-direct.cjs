@@ -113,7 +113,7 @@ const s1 = (ms) => (ms == null ? '—' : (ms / 1000).toFixed(1) + ' s');
         // L'envoi d'hier vers le 3ᵉ favori : réservé, puis abandonné (worker endormi) ⇒ « à vérifier » chez VRM.
         const ap = await call('apercu'); const reg = ap.body && ap.body.apercu && ap.body.apercu.reglages;
         await call('lancer', { selection: ['jn2'], reglages: reg });
-        await call('suivant'); h.t += 3 * 60000; await call('suivant');
+        await call('suivant'); h.t += 3 * 60000; await call('suivant'); h.t += 2 * 60000;   // la grâce de la tentative abandonnée (4 min) passée
       } });
       const v0 = m.fileServeur(); const j2 = v0 && Object.values(v0.groupes)[0].jobs.find((j) => j.notificationId === 'jn2');
       const P = await ouvrirPanneau(nav, m, racine);
@@ -188,6 +188,14 @@ const s1 = (ms) => (ms == null ? '—' : (ms / 1000).toFixed(1) + ' s');
       const compta = sansCommentaires(fs.readFileSync(path.join(racine, 'src', 'ecrans', 'Comptabilite.jsx'), 'utf8'));
       dit(!/Import de ton passé|Tout récupérer|data-import-tout/.test(badge), 'E6 le panneau : aucune ligne ni bouton d’import', (badge.match(/.{0,60}(Import de ton passé|Tout récupérer|data-import-tout).{0,60}/) || [''])[0]);
       dit(!/Tout récupérer|data-import-tout|Import de ton passé/.test(imp) && /variante === 'journee'\) return null/.test(imp) && !/<ImportDepart\b/.test(compta), 'E6 l’app : ni carte dans « Tout va bien ? », ni bouton dans Réglages (une ligne, sans bouton)', (imp.match(/.{0,60}(Tout récupérer|data-import-tout).{0,60}/) || [''])[0]);
+      // (revue) Élargi à TOUT src/ et à l'extension : « Import de ton passé » / « Importer le passé » nulle part (commentaires retirés).
+      //    « Tout récupérer » reste seulement aux imports des AUTRES sites (HistoriqueSites, clé historiqueSites.toutRecuperer) — en attente de Julien.
+      const tous = [];
+      const fouiller = (d) => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, n.name); if (n.isDirectory()) { if (!/node_modules|i18n/.test(f)) fouiller(f); } else if (/\.(jsx?|mjs)$/.test(n.name)) tous.push(f); } };
+      fouiller(path.join(racine, 'src')); fouiller(path.join(racine, 'vinted-sync-extension'));
+      const fautifs = tous.filter((f) => /Import de ton passé|Importer le passé/.test(sansCommentaires(fs.readFileSync(f, 'utf8'))));
+      const fr = fs.readFileSync(path.join(racine, 'src', 'i18n', 'langues', 'fr', 'nouveaux.js'), 'utf8');
+      dit(!fautifs.length && !/Import de ton passé/.test(fr), 'E6 nulle part dans src/ ni dans l’extension : « Import de ton passé » / « Importer le passé »', JSON.stringify(fautifs.map((f) => path.relative(racine, f))));
     }
   } catch (e) { ko++; console.log('  ❌ E0 a levé : ' + (e && e.stack || e)); }
   await nav.close();

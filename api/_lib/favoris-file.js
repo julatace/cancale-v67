@@ -76,7 +76,7 @@ function vueAuto(d,g){
   const pause=Number(d?.pauseAutoJusqua)||0;
   if(!g?.auto&&!pause)return null;
   const env=Array.isArray(d?.autoEnvois)?d.autoEnvois:[];
-  return {reglages:g?.auto?.reglages||null,demande:g?.auto?.demande||null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
+  return {reglages:g?.auto?.reglages||null,demande:g?.auto?.demande||null,pauseAgent:g?.auto?.pauseAgent?Number(g.auto.pauseAgent):null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
 }
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
@@ -115,7 +115,10 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   //    cette file en ce moment (son envoi d'il y a un instant), la sélection s'y AJOUTE ; une tentative en vol (`reserve`)
   //    garde son état et son jeton ; un favori « à vérifier » reste écarté pour LUI seul (jamais deux fois : `connus`).
   // A new launch is exactly its new selection, never an old paused remainder.
-  if(!(ajouter===true&&g.active))for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
+  // 5.455.8 (revue, défaut 5) : une file EN COURS n'est JAMAIS annulée par un nouveau lancement (une autre fenêtre, un autre
+  //    Chrome) : la sélection s'y AJOUTE, toujours. Seul le reste d'une file ARRÊTÉE (plus active) est remplacé — et c'est dit.
+  void ajouter;
+  if(!g.active&&g.jobs.some(j=>j.etat==='attente')){for(const j of g.jobs)if(j.etat==='attente'){j.etat='annule';j.raison='remplace';j.traiteLe=maintenant;}}
   // (16 nov., lot favoris-offres-irreprochable) Un favori REFUSÉ après qu'une écriture est
   // partie chez Vinted (`ecrits` ≥ 1 : la conversation ouverte, l'offre faite) reste CONNU :
   // une nouvelle file ne le recontacte jamais (avant : « refusé » le rendait à nouveau
@@ -143,6 +146,19 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
 export const BAIL_MAX_MS=15*60000;
 const depuisBail=e=>Math.max(Number(e.at)||0,Number(e.renouvele)||0);
 const bailExpire=(e,maintenant)=>maintenant-depuisBail(e)>120000||maintenant-(Number(e.at)||0)>BAIL_MAX_MS;
+// 5.455.8 (revue, défaut 4) : l'expiration du bail se CONSTATE à chaque tour (réservation à la main ET tour de l'agent) : la
+//    tentative perdue passe « à vérifier » (son favori seul, jamais renvoyé), marquée abandonnée. Elle retient encore le compte
+//    GRACE_ABANDON_MS après son dernier signe de vie (une écriture tardive d'un worker gelé ne croise jamais une 2ᵉ écriture),
+//    puis ne bloque plus rien — ni la file, ni l'agent.
+export const GRACE_ABANDON_MS=240000;
+export function expirerBail(d,maintenant){
+  const e=d&&d.enCours;if(!e||e.abandonne||!bailExpire(e,maintenant))return false;
+  const autre=d.groupes[e.owner],j=autre?.jobs.find(x=>x.id===e.id);
+  if(j&&j.etat==='reserve')j.etat='incertain';
+  if(autre){autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';if(!autre.jobs.some(x=>x.etat==='attente'))autre.active=false;}
+  e.abandonne=true;return true;
+}
+export const abandonRetient=(e,maintenant)=>!!(e&&e.abandonne&&maintenant-depuisBail(e)<GRACE_ABANDON_MS);
 export function prolongerFile(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;
   if(!e||e.owner!==owner||e.jeton!==jeton||!d.groupes[owner]?.active||bailExpire(e,maintenant))throw new RefusFavoris('La tentative n’est plus en cours.');
@@ -161,17 +177,11 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi='',exclus=new Set()
   if(exclusAnnules&&!g.jobs.some(x=>x.etat==='attente')){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
   // 5.455.8 : un envoi « à vérifier » n'arrête plus toute la file (il bloquait chaque favori suivant, sans fin) : il reste écarté
   //    pour SON favori seulement (jamais renvoyé, `connus` au lancement), les autres partent.
-  if(d.enCours&&!d.enCours.abandonne){
-    if(bailExpire(d.enCours,maintenant)){
-      const autre=d.groupes[d.enCours.owner],j=autre?.jobs.find(x=>x.id===d.enCours.id);
-      if(j)j.etat='incertain';if(autre){autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';if(!autre.jobs.some(x=>x.etat==='attente'))autre.active=false;}   // 5.455.8 : les autres favoris continuent
-      // Keep the token: a late, exact receipt may still settle this attempt. 5.455.8 : marquée abandonnée, elle ne retient plus la
-      //    file (avant : chaque tour la retrouvait expirée et rendait « rien », sans fin) ; une nouvelle tentative la remplace.
-      d.enCours.abandonne=true;
-      return {data:d,valeur:{vue:vueFile(d,owner)}};
-    }
-    return {valeur:{vue:vueFile(d,owner)}};
-  }
+  if(expirerBail(d,maintenant))return {data:d,valeur:{vue:vueFile(d,owner)}};   // 5.455.8 : constaté, la file continue ensuite
+  if(abandonRetient(d.enCours,maintenant))return {valeur:{vue:vueFile(d,owner)}};   // la tentative perdue retient encore le compte (grâce)
+  // Une tentative vivante (bail renouvelé) : on attend. Une tentative abandonnée garde son jeton (un accusé tardif exact peut
+  //    encore la régler) jusqu'à ce qu'une nouvelle la remplace, sa grâce passée.
+  if(d.enCours&&!d.enCours.abandonne)return {valeur:{vue:vueFile(d,owner)}};
   const t=d.tentatives.filter(x=>x>maintenant-3600000);
   const prochain=Math.max(g.prochain||0,d.prochainGlobal||0);
   if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
@@ -209,7 +219,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   if(resultat==='ignore'&&!(Number.isInteger(ecrits)&&ecrits>=1)){
     d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
   }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
-  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','telephone_a_verifier','element_introuvable','favori_trop_ancien','notification_pas_trouvee','fil_non_relu','destinataire_different','article_different','variable_manquante'];
+  const raisons=['acheteur_a_repondu','article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee','telephone_a_verifier','element_introuvable','favori_trop_ancien','notification_pas_trouvee','fil_non_relu','destinataire_different','article_different','variable_manquante'];
   if(raisons.includes(raison))j.raison=raison;
   j.etat=resultat;d.enCours=null;delete g.raisonCode;delete g.raisonRefus;delete g.raisonN;
   // (22 nov.) L'étape et la classe de la cause, rangées sur la ligne (liste blanche : des noms de code, jamais un texte).

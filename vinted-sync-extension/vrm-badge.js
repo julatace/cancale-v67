@@ -2656,6 +2656,7 @@ function vrmVerifVisible(sel) {
   }
   function etatRaison6(raison, base) {
     const r = String(raison || '');
+    if (r === 'acheteur_a_repondu') return { k: 'repondu', t: TU('f6_e_repondu'), raison: TU('f6_r_repondu_geste') };   // 5.455.8 : l'offre faite, l'acheteur a répondu
     if (R6_DEJA.has(r)) return { k: 'envoye', t: TU('f6_e_envoye'), raison: TU('f6_r_deja_avant') };
     if (R6_VENDU.has(r)) return { k: 'vendu', t: TU('f6_e_vendu') };
     if (R6_VINTED.has(r)) return { k: 'vinted', t: TU('f6_e_vinted'), ton: 'ambre', raison: raison6(r) };
@@ -2689,7 +2690,7 @@ function vrmVerifVisible(sel) {
     if (x.raisonFiltre) return { k: 'nouveau', t: TU('f6_e_nouveau'), raison: TU('f6_r_filtre') };
     return etatRaison6(x.raison || x.raisonEnvoi || '', x.envoi === 'pas_envoye' ? 'pas_envoye' : '');
   }
-  const GROUPE_F6 = { nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', vendu: 'ignores', verifier: 'ignores', vinted: 'ignores' };
+  const GROUPE_F6 = { repondu: 'envoyes', nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', vendu: 'ignores', verifier: 'ignores', vinted: 'ignores' };
   // L'offre prévue : seulement si une offre est réglée ; jamais sous le plancher (prix mini, sinon achat + 10 % — la règle
   // que le fond revérifie à l'envoi, `plancherFavori`) ; sans plancher, pas d'offre. Le plancher pas su ici est DIT.
   function offreFav6(x, a) {
@@ -3298,6 +3299,8 @@ function vrmVerifVisible(sel) {
           return;
         }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
+        // 5.455.8 (revue, défaut 6) : réglages changés ailleurs ⇒ le NOUVEAU récapitulatif, la feuille reste ouverte ; rien ne part sans SON « Lancer ».
+        if (r && r.code === 'reglages_changes') { if (r.apercu && avecListe(r.apercu)) { apercuFav = r.apercu; apercuFavAt = Date.now(); } if (favEnv) { favEnv.etape = 4; favEnv.info = null; envDemander(apercuFav, true); } rendre(); return; }
         // 5.453.2 : un envoi À VÉRIFIER retient la file : la phrase dit le geste (sur SA ligne), la sélection n'est pas « pas partie ».
         if (r && /incertain/i.test(String(r.raison || ''))) { favErreur = TU('f6_incertain_geste'); favFeuille = null; vueFav = null; apercuFavAt = 0; rafraichir(); return; }   // 5.455.8 : la liste reste
         // 5.410.7 : le refus se dit SUR les rangées concernées (celles que le fond nomme, sinon le lot choisi), la feuille se ferme.

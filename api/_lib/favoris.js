@@ -9,7 +9,7 @@ import {MESSAGE_PAR_DEFAUT} from '../../src/reglagesFavoris.js';
 //    ce qu'il a écrit n'est touché ; la ligne enregistrée ne change pas).
 function defautUniqueSiPartage(p,owner){if(!p||String(p.message||'').trim()!==MESSAGE_PAR_DEFAUT||(Array.isArray(p.variantes)&&p.variantes.length)||!owner)return null;const l=defautsFavorisUniques(String(owner),'fr',3);return {message:l[0],variantes:l.slice(1)};}
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile} from './favoris-file.js';
+import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile,expirerBail} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -18,7 +18,7 @@ import {preparerMessageFavori} from '../../src/favorisVinted.js';
 import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
-import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
+import {demanderAuto,etatAuto,reglerAuto,stopAuto,pauseAgentAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 import {apercuCarte,resumeFileCarte} from './favoris-carte.js';
 import {traduireResultatFavori} from '../../src/favorisProgression.js';
 
@@ -105,7 +105,9 @@ async function notifierDemandeAuto(owner,code){
   });
 }
 export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
-  const avant=await modifierNeutre(cle,d=>({valeur:{e:etatAuto(d,owner,maintenant),vue:vueFile(initialiserFile(d),owner)}}));
+  // 5.455.8 (revue, défaut 4) : chaque tour de l'agent CONSTATE l'expiration d'un bail (un worker mort en plein envoi) — avant,
+  //    seul `suivant` le faisait, et l'agent restait « occupé » pour toujours.
+  const avant=await modifierNeutre(cle,d=>{const dd=initialiserFile(d);const ch=expirerBail(dd,maintenant);return {...(ch?{data:dd}:{}),valeur:{e:etatAuto(dd,owner,maintenant),vue:vueFile(dd,owner)}};});
   if(!avant)return {etat:'lecture',ajoute:false};
   if(avant.valeur.e.etat==='a_verifier'){const r=await modifierNeutre(cle,d=>demanderAuto(d,{owner,code:'a_verifier',maintenant}));return {etat:'a_verifier',ajoute:false,vue:avant.valeur.vue,...(r?.valeur?.nouvelle?{nouvelleDemande:'a_verifier'}:{})};}
   if(avant.valeur.e.etat!=='libre')return {etat:avant.valeur.e.etat,jusqua:avant.valeur.e.jusqua||null,ajoute:false,vue:avant.valeur.vue};
@@ -296,6 +298,8 @@ export async function routeFavoris(req,res){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
         decision=d=>stopAuto(d,{owner,maintenant});
+      }else if(c.action==='auto_pause'){
+        decision=d=>pauseAgentAuto(d,{owner,pause:c.pause===true,maintenant});
       }else if(c.action==='auto'){
         // L'état de l'extension vu par l'app (onglet, compte, version) : seulement
         // pour DEMANDER un geste ; le serveur ne lui fait jamais confiance pour envoyer

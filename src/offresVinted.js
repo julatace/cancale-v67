@@ -29,14 +29,17 @@ export function etatOffreVinted(e = {}) {
 //    est EXPIRÉE : jamais montrée comme à trancher, jamais un geste dessus. Sans date : rien n'est deviné ici (l'appelant juge la
 //    fraîcheur de sa lecture).
 export const OFFRE_VIE_MS = 7 * 86400000;
-export function offreExpiree(m = {}, maintenant = Date.now()) {
+export function offreExpiree(m = {}, maintenant = Date.now(), dateConversation = null) {
   const e = (m && m.entity) || {};
   const fin = e.expires_at ?? e.expire_at ?? e.valid_until ?? m.expires_at;
   const tf = fin == null || fin === "" ? NaN : Number.isFinite(Number(fin)) ? (Number(fin) < 1e12 ? Number(fin) * 1000 : Number(fin)) : Date.parse(fin);
   if (Number.isFinite(tf)) return tf < maintenant;
   const d = m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at, nb = Number(d);
   const t = d == null || d === "" ? NaN : Number.isFinite(nb) ? (nb < 1e12 ? nb * 1000 : nb) : Date.parse(d);
-  return Number.isFinite(t) && maintenant - t > OFFRE_VIE_MS;
+  if (Number.isFinite(t)) return maintenant - t > OFFRE_VIE_MS;
+  // 5.455.8 (revue) : une offre SANS date : la date de la conversation (sa dernière activité) sert de borne ; sans elle, rien conclu.
+  const tc = dateConversation == null || dateConversation === "" ? NaN : Number.isFinite(Number(dateConversation)) ? (Number(dateConversation) < 1e12 ? Number(dateConversation) * 1000 : Number(dateConversation)) : Date.parse(dateConversation);
+  return Number.isFinite(tc) && maintenant - tc > OFFRE_VIE_MS;
 }
 export function offreVintedEnAttente(c = {}, maintenant = Date.now()) {
   const opp = c.opposite_user?.id;
@@ -67,7 +70,7 @@ export function offreVintedEnAttente(c = {}, maintenant = Date.now()) {
       String(e.user_id) !== String(opp) ||
       e.status !== 10 ||
       etatOffreVinted(e).etat !== "attente" ||
-      offreExpiree(m, maintenant)
+      offreExpiree(m, maintenant, c.updated_at ?? c.updated_at_ts ?? null)
     )
       continue;
     if (

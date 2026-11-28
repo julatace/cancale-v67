@@ -144,21 +144,7 @@ export function typeEnTete(l) {
   const t = l[k];
   return t && (chiffreEstime(t) || (t.total !== null && t.total > 0)) ? k : null;
 }
-// 5.375 : la ligne de tête d'un compte — « Import de ton passé · 340 / ~1 200 ventes · compte X ».
-export function titreImport(l, nomCompte) {
-  if (!l) return '';
-  const bouts = ['Import de ton passé'];
-  if (l.etat === 'fini') bouts.push(l.horizonMois ? `importé (${l.horizonMois} mois)` : 'tout est là');
-  else {
-    const k = l.enCours || (!l.ventes.fini ? 'ventes' : !l.achats.fini ? 'achats' : 'annonces');
-    const t = typeEnTete(l) ? l[k] : null;
-    const c = t ? (chiffreEstime(t) || (t.total !== null && t.total > 0 ? `${fr(Math.min(t.lus, t.total))} / ${fr(t.total)}` : null)) : null;
-    if (c) bouts.push(`${c} ${NOMS_TYPES[k]}`);
-    else if (k === 'annonces') bouts.push('annonces');
-  }
-  if (nomCompte) bouts.push(`compte ${nomCompte}`);
-  return bouts.join(' · ');
-}
+// 5.455.8 (revue) : la ligne de tête « Import de ton passé · … » n'est plus rendue nulle part : retirée.
 // La partie droite d'un type : « 1 240 sur 2 160 », « 3 pages lues · encore… », « 2 160 ✓ ».
 export function texteType(t, { suivant = false } = {}) {
   if (!t) return '—';

@@ -1462,6 +1462,8 @@
     f6_seg_nouveaux: { fr: 'Pas encore contactés', en: 'Not contacted yet', es: 'Aún sin contactar', it: 'Non ancora contattati', de: 'Noch nicht kontaktiert' },
     f6_seg_envoyes: { fr: 'Envoyés', en: 'Sent', es: 'Enviados', it: 'Inviati', de: 'Gesendet' },
     f6_seg_ignores: { fr: 'Vendus · Vinted', en: 'Sold · Vinted', es: 'Vendidos · Vinted', it: 'Venduti · Vinted', de: 'Verkauft · Vinted' },
+    f6_e_repondu: { fr: 'L’acheteur a répondu', en: 'The buyer replied', es: 'El comprador respondió', it: 'L’acquirente ha risposto', de: 'Der Käufer hat geantwortet' },
+    f6_r_repondu_geste: { fr: 'offre faite ; réponds-lui sur Vinted', en: 'offer made; reply on Vinted', es: 'oferta hecha; respóndele en Vinted', it: 'offerta fatta; rispondi su Vinted', de: 'Angebot gemacht; antworte auf Vinted' },
     f6_e_vendu: { fr: 'Vendu / réservé', en: 'Sold / reserved', es: 'Vendido / reservado', it: 'Venduto / riservato', de: 'Verkauft / reserviert' },
     f6_e_vinted: { fr: 'Refusé par Vinted', en: 'Refused by Vinted', es: 'Rechazado por Vinted', it: 'Rifiutato da Vinted', de: 'Von Vinted abgelehnt' },
     f6_r_deja_avant: { fr: 'déjà contacté avant', en: 'already contacted before', es: 'ya contactado antes', it: 'già contattato prima', de: 'schon vorher kontaktiert' },
