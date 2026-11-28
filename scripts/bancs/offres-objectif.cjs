@@ -139,7 +139,7 @@ const contexte = async (b, vp, sombre) => {
   await pg.route('**/api/ebay', async (r) => {
     const body = r.request().method() === 'POST' ? (r.request().postDataJSON() || {}) : {};
     const a = body.action;
-    if (!['messages', 'message', 'status', 'agent', 'achats'].includes(a)) ebayEcrits.push(body);   // les LECTURES (dont « achats », Achats · eBay) ne sont pas des écritures
+    if (!['messages', 'message', 'status', 'agent', 'achats', 'crmreglages'].includes(a)) ebayEcrits.push(body);   // les LECTURES (dont « achats », Achats · eBay, et « crmreglages », la lecture des modèles du CRM eBay — api/_lib/ebay-crm.js reglages(), aucune écriture) ne sont pas des écritures
     let j = { ok: true, connected: true, ready: true };
     if (a === 'status') j = { ok: true, connected: true, comptes: [{ cle: '', ref: 'principal', principal: true, pseudo: 'Compte de banc', relie: true }] };
     if (a === 'messages') j = { ok: true, messages: EBAY_MESSAGES, page: 1, totalPages: 1 };
