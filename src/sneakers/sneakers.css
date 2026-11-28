@@ -8,12 +8,12 @@
 .snk-propositions { padding: 0 0 4px; }
 .snk-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--n-bord);
   background: var(--n-carte); color: var(--n-encre); font: inherit; font-size: 14px; cursor: pointer; }
-.snk-tag[aria-pressed="true"] { background: var(--n-teinte, rgba(0,104,214,.1)); border-color: transparent; color: var(--n-sur-teinte, inherit); font-weight: 600; }
+.snk-tag[aria-pressed="true"] { background: var(--n-teinte); border-color: transparent; color: var(--n-sur-teinte, inherit); font-weight: 600; }
 .snk-tag-plus { color: var(--n-encre-2); }
 .snk-tag-saisie { display: inline-flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .snk-pastille { width: 8px; height: 8px; border-radius: 50%; background: #8e8e93; flex: none; display: inline-block; }
 .snk-pastille-grande { width: 14px; height: 14px; }
-[data-snk-couleur="bleu"] .snk-pastille, .snk-pastille[data-snk-couleur="bleu"] { background: #5b8fd6; }
+[data-snk-couleur="bleu"] .snk-pastille, .snk-pastille[data-snk-couleur="bleu"] { background: #6f8fb8; }   /* un bleu DOUX (jamais l’accent : le bleu vif est retiré) */
 [data-snk-couleur="vert"] .snk-pastille, .snk-pastille[data-snk-couleur="vert"] { background: #5aa36e; }
 [data-snk-couleur="sable"] .snk-pastille, .snk-pastille[data-snk-couleur="sable"] { background: #c2a878; }
 [data-snk-couleur="ardoise"] .snk-pastille, .snk-pastille[data-snk-couleur="ardoise"] { background: #5f6b7a; }
