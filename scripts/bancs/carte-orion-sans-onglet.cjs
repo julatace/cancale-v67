@@ -572,7 +572,7 @@ const lireDansCadre = (fr) => fr.evaluate(() => {
     let l = await lireCadre(pg);
     const vuPendant = l.iframeVisible && /evil/.test(l.iframeDoc || '');
     dit(!l.iframeVisible || l.iframes === 0, 'dès son chargement, la fausse page est CACHÉE (jamais montrée dans la carte)', JSON.stringify({ vis: l.iframeVisible, cadre: l.cadre, vuPendant }));
-    await pg.waitForTimeout(1800);
+    await pg.waitForTimeout(4400);   // 5.456 : le cadre a 4 s pour se dire prêt
     l = await lireCadre(pg);
     dit(l.formTop && l.cadre === 'repli' && l.iframes === 0, 'puis la carte retombe sur son formulaire dessiné (l’iframe est retiré)', JSON.stringify({ form: l.formTop, cadre: l.cadre, n: l.iframes }));
     await o.ctx.close();
