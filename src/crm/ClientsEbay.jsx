@@ -1,9 +1,9 @@
 // ── src/crm/ClientsEbay.jsx — Ventes · eBay → CLIENTS : le CRM eBay (28 nov., lot ebay-crm) ─────────────
-// Julien : « copie les CRM eBay » (3Dsellers, eDesk, ChannelReply, Seller Hub). Cinq vues :
+// Julien : « copie les CRM eBay » (3Dsellers, eDesk, ChannelReply, Seller Hub). Quatre vues :
 //   Acheteurs     l'annuaire (un acheteur = un compte eBay, jamais un nom) → la fiche (FicheAcheteur.jsx) ;
-//   Automatismes  merci, expédition, après livraison, demande d'évaluation, évaluation positive auto —
+//   Auto          merci, expédition, après livraison, demande d'évaluation, évaluation positive auto —
 //                 ÉTEINTS par défaut, allumés sur SON toucher confirmé, versions au hasard, journal ;
-//   Réponses      les modèles ({acheteur} {article} {suivi}) des conversations eBay ;
+//                 puis les modèles de réponse ({acheteur} {article} {suivi}) des conversations eBay ;
 //   Exclus        la liste d'exclusion, toutes plateformes (eBay, Vinted, Leboncoin, Vestiaire) ;
 //   Avis et litiges  répondre à une évaluation reçue ; retours et litiges par échéance, gestes confirmés.
 // Les règles : api/_lib/ebay-crm-regle.js (les mêmes que le serveur). Rien n'est deviné : « pas su » se dit.
@@ -216,15 +216,15 @@ function Suivi({ headers, compte, confirm, domaine }) {
 }
 
 export default function ClientsEbay({ compte = 'principal', headers, confirm, domaine = 'www.ebay.fr' }) {
-  const [vue, setVue] = React.useState(() => { try { return sessionStorage.getItem('vrm_crm_vue') || 'acheteurs'; } catch (_) { return 'acheteurs'; } });
+  const [vue, setVue] = React.useState(() => { try { const v = sessionStorage.getItem('vrm_crm_vue'); return ['acheteurs', 'auto', 'exclus', 'suivi'].includes(v) ? v : 'acheteurs'; } catch (_) { return 'acheteurs'; } });
   const [fiche, setFiche] = React.useState(null);
   const choisir = (v) => { setVue(v); try { sessionStorage.setItem('vrm_crm_vue', v); } catch (_) {} };
-  const opts = [['acheteurs', 'crm.vue.acheteurs'], ['auto', 'crm.vue.auto'], ['reponses', 'crm.vue.reponses'], ['exclus', 'crm.vue.exclus'], ['suivi', 'crm.vue.suivi']].map(([cle, k]) => ({ cle, libelle: tr(k) }));
+  const opts = [['acheteurs', 'crm.vue.acheteurs'], ['auto', 'crm.vue.auto'], ['exclus', 'crm.vue.exclus'], ['suivi', 'crm.vue.suivi']].map(([cle, k]) => ({ cle, libelle: tr(k) }));
   return <section data-crm-ebay={vue} aria-label={tr('crm.vues')}>
     <div className="crm-vues"><Segmente libelle={tr('crm.vues')} valeur={vue} onChange={choisir} options={opts}/></div>
     {vue === 'acheteurs' ? <Acheteurs headers={headers} compte={compte} onFiche={setFiche}/> : null}
-    {vue === 'auto' ? <Automatismes headers={headers} compte={compte} confirm={confirm}/> : null}
-    {vue === 'reponses' ? <Reponses headers={headers} compte={compte}/> : null}
+    {/* Quatre vues (cinq ne tiennent pas à 390 px) : les modèles de réponse vivent sous les automatismes. */}
+    {vue === 'auto' ? <><Automatismes headers={headers} compte={compte} confirm={confirm}/><Reponses headers={headers} compte={compte}/></> : null}
     {vue === 'exclus' ? <Exclus headers={headers} compte={compte} confirm={confirm}/> : null}
     {vue === 'suivi' ? <Suivi headers={headers} compte={compte} confirm={confirm} domaine={domaine}/> : null}
     <FicheAcheteur acheteur={fiche || ''} compte={compte} headers={headers} confirm={confirm} ouverte={!!fiche} onFermer={() => setFiche(null)}/>

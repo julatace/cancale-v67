@@ -172,11 +172,13 @@ async function rendu(b, { tel, sombre, nom }) {
     const r = envois.filter((e) => e.action === 'crmregler').pop();
     const actif = await pg.getAttribute('[data-crm-auto="apresVente"]', 'data-crm-actif').catch(() => null);
     dit(r && r.quoi === 'apresVente' && r.actif === true && r.confirme === true && Array.isArray(r.textes) && r.textes.length === 2 && !/\{[a-z]+\}/i.test(r.textes.join('').replace(/\{(acheteur|article|suivi)\}/g, '')) && actif === '1', `${t} C3 — confirmé : \`crmregler\` actif + confirme, 2 versions par défaut dans SA langue ; l'interrupteur est allumé`, JSON.stringify(r));
+    const ml = await pg.getAttribute('[data-crm-modeles-liste]', 'data-crm-modeles-liste').catch(() => null);
+    dit(ml === '2', `${t} C2 — les modèles de réponse se règlent sous les automatismes`, ml);
     const jl = await pg.getAttribute('[data-crm-journal]', 'data-crm-journal').catch(() => null);
     dit(jl === '1', `${t} C3 — le journal « Ce que VRM a fait » se lit`, jl);
     await shot(pg, nom + '-auto'); await verifQ(pg, t, 'les automatismes');
     // C6 — exclus
-    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=3');
+    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=2');
     await pg.waitForSelector('[data-crm-exclus]', { timeout: 10000 }).catch(() => {});
     await toucher(pg, tel, '[data-crm-exclure-ouvrir]');
     await pg.fill('[data-n-feuille-couche][data-n-etat="ouverte"] .n-champ-saisie >> nth=0', 'Jean Martin').catch(() => {});
@@ -186,7 +188,7 @@ async function rendu(b, { tel, sombre, nom }) {
     await shot(pg, nom + '-exclus'); await verifQ(pg, t, 'l\'exclusion');
     await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
     // C5 / C7
-    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=4');
+    await toucher(pg, tel, '[data-crm-ebay] .n-segmente [role="radio"] >> nth=3');
     await pg.waitForSelector('[data-crm-litiges]', { timeout: 10000 }).catch(() => {});
     const s = await pg.evaluate(() => ({ avis: [...document.querySelectorAll('[data-crm-avis-ligne]')].map((e) => e.getAttribute('data-crm-avis-ligne') + ':' + e.getAttribute('data-crm-repondu')), lit: [...document.querySelectorAll('[data-crm-litige]')].map((e) => e.getAttribute('data-crm-litige')) }));
     dit(s.avis.join() === '9002:0,9001:1' && s.lit.join() === 'paiement:PD-1,retour:5001', `${t} C5/C7 — l'avis négatif sans réponse à traiter, les litiges par échéance`, JSON.stringify(s));
