@@ -103,7 +103,8 @@ const NM = (() => { try { return fs.realpathSync(path.join(R0, 'node_modules'));
     fs.writeFileSync(path.join(dir, 'registres.js'), REG);
     fs.writeFileSync(path.join(dir, 'profilVendeur.js'), lire('src/profilVendeur.js'));   // (11 nov., 5.355) importé par registres.js (« paire » / « article »)
     fs.writeFileSync(path.join(dir, 'exportComptable.js'), EXP);
-    fs.writeFileSync(path.join(dir, 'statsVentes.js'), lire('src/statsVentes.js'));   // (27 nov.) importé par exportComptable.js (`margesPar`, le bénéfice d'une vente)
+    fs.writeFileSync(path.join(dir, 'statsVentes.js'), lire('src/statsVentes.js'));
+    fs.writeFileSync(path.join(dir, 'vraiBenefice.js'), lire('src/vraiBenefice.js'));   // (27 nov., lot vrai-benefice) importé par exportComptable.js (`beneficeReleve`)   // (27 nov.) importé par exportComptable.js (`margesPar`, le bénéfice d'une vente)
     fs.writeFileSync(path.join(dir, 'factureAchat.js'), lire('src/factureAchat.js'));   // (11 nov.) importé par exportComptable.js (mentionFacture)
     fs.writeFileSync(path.join(dir, 'vestiaire-regle.js'), VC.replace(/from '\.\/([^']+)\.js'/g, (x, n) => `from '${path.join(R0, 'api', '_lib', n + '.js').replace(/\\/g, '/')}'`));
     PRM = await import('file://' + path.join(dir, 'prixAchatPropose.js'));

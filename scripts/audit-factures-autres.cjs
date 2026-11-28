@@ -248,7 +248,8 @@ const faireRes = () => { const r = { code: 0, corps: null }; r.status = (c) => {
   // ── S8 RIEN NE PART PAR E-MAIL ; LA FACTURE SUR UNE VENTE PROUVÉE ───────
   const srv = lire('api/_lib/facture-autres.js').replace(/\/\/.*$/gm, '');
   dit(srv && !/smtp|envoyerSmtp|relances-essai/i.test(srv), 'S8 la route des autres sites n’envoie aucun e-mail (aucun SMTP importé)');
-  const app = lire('src/App.jsx');
+  // (27 nov., budget-vitesse) l'écran Leboncoin vit dans src/ecrans/Plateformes.jsx : l'app se lit RECOLLÉE
+  const app = require('./_source-app.cjs').sourceAppCode(racine);
   // (intégration 11nov-g2) la remise en main propre (lbc-plus) partage le même bloc, sous la MÊME condition (vente prouvée).
   dit(/suite=\{o\.isSeller === true \? (?:<>(?:(?!: null\})[\s\S])*?)?<FactureAutreVente plateforme="leboncoin"/.test(app), 'S8 Leboncoin : la facture n’apparaît que sur une VENTE prouvée (isSeller === true)');
   dit(/mode === 'facture-autre'/.test(lire('api/compte.js')), 'S8 la route est servie par api/compte.js (aucune fonction api/ de plus)');
