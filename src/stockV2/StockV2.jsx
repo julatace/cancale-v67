@@ -23,7 +23,7 @@
 //  ici : ce composant ne connaît que des clés `cleNum` et appelle les gestes de l'écran.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { tr, nombre } from '../i18n/index.js';
+import { tr, nombre, langueCourante } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { motsVendeur } from '../profilVendeur.js';   // (26 nov.) exemples de Sneakers seulement chez qui vend des sneakers
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
@@ -35,6 +35,7 @@ import MeubleDessin from './MeubleDessin.jsx';
 import { AFFICHAGES, COULEURS_MEUBLE, reglagesDe, couleurMeuble } from '../etageres/reglages.js';
 import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
 import DansFiche from '../DansFiche.jsx';
+import AssistantRangement from '../rangement/AssistantRangement.jsx';   // (28 nov., lot agent-rangement) l'assistant : une conversation, puis le plan
 import './stock-v2.css';
 import './meubles.css';
 import './pont.css';   // sans couche : rend aux pièces natives du Stock ce que dit la couche natif
@@ -215,7 +216,7 @@ function Reponse({ s, f, onDeplacer, onRanger, onVoir, sansTete = false }) {
 }
 
 // ── « ⋯ » : ce qui n'est pas compté (chacun avec SON geste) et les outils du Stock. ──
-function FeuillePlus({ s, ouverte, fermer }) {
+function FeuillePlus({ s, ouverte, fermer, ouvrirAssistant }) {
   const { Icon } = s;
   const geste = (f) => () => { fermer(); setTimeout(f, 60); };
   return (
@@ -230,6 +231,7 @@ function FeuillePlus({ s, ouverte, fermer }) {
         <Rangee icone={<Icon name="camera" size={22}/>} titre={tr('stock.trouverPhoto')} onClick={geste(s.ouvrirPhoto)} attrs={{ 'data-stock-recherche-photo': '' }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('stock.faireInventaire')} onClick={geste(s.ouvrirInventaire)} attrs={{ 'data-stock-inventaire-ouvrir': '' }}/>
         <Rangee icone={<Icon name="box" size={22}/>} titre={tr('sr.places.ajouter')} onClick={geste(s.creerMeuble)} attrs={{ 'data-creer-meuble': '' }}/>
+        {ouvrirAssistant ? <Rangee icone={<Icon name="spark" size={22}/>} titre={tr('rgt.ouvrir')} fin="chevron" onClick={ouvrirAssistant} attrs={{ 'data-rgt-ouvrir': 'menu' }}/> : null}
         <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('sm.menu.etiquetage')} sousTitre={s.etiquetage ? s.etiquetage.resume : ''} fin="chevron" onClick={geste(s.ouvrirEtiquetage)} attrs={{ 'data-sm-vers-etiquetage': '' }}/>
         <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('sr.menu.annonces')} fin="chevron" onClick={geste(s.versAnnonces)} attrs={{ 'data-sr-vers-annonces': '' }}/>
       </Groupe>
@@ -361,7 +363,7 @@ function useGlisserCase(s, m) {
 }
 
 // ── TOUS LES MEUBLES : la vue d'ensemble, puis un meuble zoomé ────────────────
-function Meubles({ s, zoom, setZoom, vise }) {
+function Meubles({ s, zoom, setZoom, vise, ouvrirAssistant }) {
   const { Icon } = s;
   const m = zoom ? s.meubles.find((x) => String(x.id) === String(zoom)) : null;
   const [perso, setPerso] = React.useState(null);
@@ -393,21 +395,32 @@ function Meubles({ s, zoom, setZoom, vise }) {
       </section>
     );
   }
-  return (
-    <section className="sm-tous" data-sr-places={s.meubles.length} data-sm-tous={s.meubles.length}>
-      {/* (21 nov., ux-reglages, audit design n° 29) Aucun meuble : le `Vide` natif (une icône, une phrase, « Créer mon
-          premier meuble ») à la place de la carte « Comment marche le Stock » permanente (l'explication reste derrière le « ? »). */}
-      {s.meubles.length === 0 ? <Vide icone={Icon ? <Icon name="grid" size={40}/> : null} phrase={tr('uxr.vide.stock')} detail={tr('uxr.vide.stockDetail')}
-        action={<Bouton variante="teinte" attrs={{ 'data-creer-meuble': '', 'data-ux-vide-geste': 'meuble' }} onClick={s.creerMeuble}>{tr('uxr.vide.stockGeste')}</Bouton>}/> : null}
-      {s.meubles.map((x) => { const c = s.compteMeuble(x); return (
+  // (28 nov., lot agent-rangement) Les meubles groupés par PIÈCE dès qu'il y en a deux (le champ `piece` posé par l'assistant) ;
+  // dans chaque pièce, l'ordre d'hier. Une seule pièce (ou aucune) : la liste d'hier, sans titre.
+  const pieces = [];
+  for (const x of s.meubles) { const p = typeof x.piece === 'string' && x.piece.trim() ? x.piece.trim() : ''; let g = pieces.find((y) => y.nom === p); if (!g) { g = { nom: p, meubles: [] }; pieces.push(g); } g.meubles.push(x); }
+  const parPiece = pieces.length > 1;
+  const tuile = (x) => { const c = s.compteMeuble(x); return (
         <button key={x.id} type="button" className="sm-tuile" data-sr-place-ouvrir={x.id} data-sm-tuile={x.id} data-sm-large={Number(x.cols) >= 6 ? '' : undefined} onClick={() => setZoom(String(x.id))}
           aria-label={`${x.name} · ${tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}${c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}`}>
           <span className="sm-tuile-tete">
-            <span className="sm-tuile-nom">{x.name}</span>
+            <span className="sm-tuile-nom">{x.name}{x.porte ? <span className="sm-tuile-porte" data-sm-porte="">{tr('rgt.porte')}</span> : null}</span>
             <span className="sm-tuile-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sm-tuile-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</span>
           </span>
           <MeubleDessin m={x} info={(i) => s.caseInfo(x.id, i)} mode="loin" vise={vise && String(vise.m) === String(x.id) ? vise.i : null}/>
-        </button>); })}
+        </button>); };
+  return (
+    <section className="sm-tous" data-sr-places={s.meubles.length} data-sm-tous={s.meubles.length} data-sm-pieces={parPiece ? pieces.length : undefined}>
+      {s.meubles.length ? <button type="button" className="sm-assistant" data-rgt-ouvrir="" onClick={ouvrirAssistant}>
+        <span className="sm-assistant-ic" aria-hidden="true">{Icon ? <Icon name="spark" size={20}/> : null}</span>
+        <span className="sm-assistant-mots"><span className="sm-assistant-titre">{tr('rgt.ouvrir')}</span><span className="sm-assistant-detail">{tr('rgt.ouvrirDetail')}</span></span>
+      </button> : null}
+      {/* (21 nov., ux-reglages, audit design n° 29) Aucun meuble : le `Vide` natif (une icône, une phrase, « Créer mon
+          premier meuble ») à la place de la carte « Comment marche le Stock » permanente (l'explication reste derrière le « ? »). */}
+      {s.meubles.length === 0 ? <Vide icone={Icon ? <Icon name="grid" size={40}/> : null} phrase={tr('uxr.vide.stock')} detail={tr('uxr.vide.stockDetail')}
+        action={<span className="sm-vide-gestes"><Bouton variante="teinte" icone={Icon ? <Icon name="spark" size={18}/> : null} attrs={{ 'data-rgt-ouvrir': 'vide' }} onClick={ouvrirAssistant}>{tr('rgt.ouvrir')}</Bouton>
+          <Bouton variante="texte" attrs={{ 'data-creer-meuble': '', 'data-ux-vide-geste': 'meuble' }} onClick={s.creerMeuble}>{tr('uxr.vide.stockGeste')}</Bouton></span>}/> : null}
+      {parPiece ? pieces.map((g) => <React.Fragment key={'p:' + g.nom}><h2 className="sm-piece" data-sm-piece-titre={g.nom || '-'}>{g.nom || tr('rgt.piece.defaut')}</h2>{g.meubles.map(tuile)}</React.Fragment>) : s.meubles.map(tuile)}
       {s.meubles.length ? <button type="button" className="sm-tuile sm-tuile-ajout" data-creer-meuble="" onClick={s.creerMeuble}>+ {tr('sr.places.ajouter')}</button> : null}
     </section>
   );
@@ -423,6 +436,7 @@ export default function StockV2({ s }) {
   const [zoom, setZoom] = React.useState(null);          // le meuble zoomé (son id)
   const [vise, setVise] = React.useState(null);          // { m, i } : la case montrée (« Voir sur le plan »)
   const [plus, setPlus] = React.useState(false);
+  const [assistant, setAssistant] = React.useState(false);   // (28 nov., lot agent-rangement)
   const [tousARanger, setTousARanger] = React.useState(false);
   const [max, setMax] = React.useState(PAR_PAGE);
   const aRangerCles = s.aRanger.map(s.cleDe).filter(Boolean);
@@ -561,7 +575,7 @@ export default function StockV2({ s }) {
             options={[{ cle: 'meubles', libelle: tr('sm.seg.meubles'), n: s.meubles.length ? nombre(s.meubles.length) : null },
               { cle: 'articles', libelle: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? tr('ru.stock.auMoins', { n: nombre(s.nombres.enLigne) }) : nombre(s.nombres.enLigne)) : null }]}/>
         </div>
-        {vue === 'meubles' ? <Meubles s={s} zoom={zoom} setZoom={(z) => { setZoom(z); setVise(null); }} vise={vise}/> : <>
+        {vue === 'meubles' ? <Meubles s={s} zoom={zoom} setZoom={(z) => { setZoom(z); setVise(null); }} vise={vise} ouvrirAssistant={() => setAssistant(true)}/> : <>
           {rangees.length ? (
             <Groupe titre={tr('sm.dansCase', { n: nombre(rangees.length) })} attrs={{ 'data-sr-groupe': 'rangees', 'data-sr-liste': lignes.length, 'data-stock-actuelles': s.nombres.etat }}>
               {rangeesVues.map(ligneRangee)}
@@ -575,7 +589,8 @@ export default function StockV2({ s }) {
       </> : null}
       {s.blocs.modale}
 
-      <FeuillePlus s={s} ouverte={plus} fermer={() => setPlus(false)}/>
+      <FeuillePlus s={s} ouverte={plus} fermer={() => setPlus(false)} ouvrirAssistant={() => { setPlus(false); setTimeout(() => setAssistant(true), 320); }}/>
+      {s.assistant ? <AssistantRangement ouverte={assistant} fermer={() => setAssistant(false)} Icon={Icon} langue={langueCourante()} {...s.assistant}/> : null}
       <Seance key={seance ? seance.id : 'aucune'} s={s} seance={seance} ouverte={seanceOuverte && !!seance} fermer={fermerSeance}/>
     </div>
   );
