@@ -30245,6 +30245,7 @@ const SRV_PLAFOND_LECTURES = 14;              // la veille s'arrête à 14 des 2
 const SRV_FILS_PAR_TOUR = 3;                  // au plus 3 conversations neuves ouvertes par relecture (chacune = 1 lecture)
 const SRV_CONVS_LUES = 20;                    // la 1re page de la boîte (20 conversations)
 const SRV_VUS_MAX = 3000;
+const SRV_DECALAGE_MS = 20000;               // deux profils de l'ordinateur ne lisent jamais à moins de 20 s l'un de l'autre
 const SRV_TOUR_MS = 60000;                    // le tour d'écriture dure 60 s, prolongé pendant le travail
 const SRV_TOUR_MARGE_MS = 15000;              // on le prolonge quand il reste moins de 15 s
 const SRV_TEXTE_MAX = 140;                    // le texte du message dans la notification
@@ -30259,8 +30260,8 @@ function srvIntervalle(alea, precedent) {
   let ms = SRV_INTERVALLE_MIN_MS + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
   const p = Number(precedent);
   if (Number.isFinite(p) && p > 0 && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
-    ms = ms + SRV_ECART_MIN_MS <= SRV_INTERVALLE_MAX_MS ? p + SRV_ECART_MIN_MS : p - SRV_ECART_MIN_MS;
-    ms = Math.min(SRV_INTERVALLE_MAX_MS, Math.max(SRV_INTERVALLE_MIN_MS, ms));
+    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (3 min) laisse toujours l'un des deux
+    ms = haut <= SRV_INTERVALLE_MAX_MS && (ms >= p || bas < SRV_INTERVALLE_MIN_MS) ? haut : bas >= SRV_INTERVALLE_MIN_MS ? bas : haut;
   }
   return ms;
 }
@@ -30526,6 +30527,14 @@ async function serveurTickUn(source) {
   if (ar && ar.quoi === 'captcha') { await serveurNoterEtat({ code: 'captcha' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'captcha' }; }
   if (await prudenceDe(u)) { await serveurNoterEtat({ code: 'prudence' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'prudence' }; }
   if (Number(etat.prochain) > t && source !== 'forcer') { if (etat.code !== 'pret' && etat.code !== 'budget') await serveurNoterEtat({ code: 'pret' }); await publierPresence(moi, false).catch(() => {}); return { saute: 'pas-encore', prochain: Number(etat.prochain) }; }
+  // LES LECTURES DÉCALÉES (Discrétion, §3 : jamais deux comptes au même moment sur un ordinateur) : un autre profil de
+  //    l'ordinateur a lu il y a moins de SRV_DECALAGE_MS (sa présence le dit) ⇒ celle-ci attend 20 à 45 s de plus.
+  if (source !== 'forcer') {
+    const moiApp = await idAppareil().catch(() => null);
+    const pr = await sbGet('app_data?id=like.presence_*&select=id,serveur:data->serveur&limit=20');
+    const autre = Array.isArray(pr) && pr.some((x) => x && String(x.id) !== `presence_${moiApp}` && x.serveur && x.serveur.on === true && Math.abs(t - (Number(x.serveur.lu) || 0)) < SRV_DECALAGE_MS);
+    if (autre) { await serveurNoterEtat({ prochain: t + 20000 + Math.floor(Math.random() * 25000) }); noterDiag('serveur_lecture_decalee'); return { saute: 'decale' }; }
+  }
   // L'intervalle suivant est tiré AVANT la lecture (une lecture ratée ne fait jamais relire en rafale).
   const ecart = srvIntervalle(Math.random(), Number(etat.precedent) || 0);
   await serveurNoterEtat({ prochain: t + ecart, precedent: ecart });

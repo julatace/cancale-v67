@@ -32,6 +32,7 @@ const SRV_PLAFOND_LECTURES = 14;              // la veille s'arrête à 14 des 2
 const SRV_FILS_PAR_TOUR = 3;                  // au plus 3 conversations neuves ouvertes par relecture (chacune = 1 lecture)
 const SRV_CONVS_LUES = 20;                    // la 1re page de la boîte (20 conversations)
 const SRV_VUS_MAX = 3000;
+const SRV_DECALAGE_MS = 20000;               // deux profils de l'ordinateur ne lisent jamais à moins de 20 s l'un de l'autre
 const SRV_TOUR_MS = 60000;                    // le tour d'écriture dure 60 s, prolongé pendant le travail
 const SRV_TOUR_MARGE_MS = 15000;              // on le prolonge quand il reste moins de 15 s
 const SRV_TEXTE_MAX = 140;                    // le texte du message dans la notification
@@ -46,8 +47,8 @@ function srvIntervalle(alea, precedent) {
   let ms = SRV_INTERVALLE_MIN_MS + Math.floor((Number.isFinite(a) && a >= 0 && a < 1 ? a : 0.5) * span);
   const p = Number(precedent);
   if (Number.isFinite(p) && p > 0 && Math.abs(ms - p) < SRV_ECART_MIN_MS) {
-    ms = ms + SRV_ECART_MIN_MS <= SRV_INTERVALLE_MAX_MS ? p + SRV_ECART_MIN_MS : p - SRV_ECART_MIN_MS;
-    ms = Math.min(SRV_INTERVALLE_MAX_MS, Math.max(SRV_INTERVALLE_MIN_MS, ms));
+    const haut = p + SRV_ECART_MIN_MS, bas = p - SRV_ECART_MIN_MS;   // l'écart (3 min) laisse toujours l'un des deux
+    ms = haut <= SRV_INTERVALLE_MAX_MS && (ms >= p || bas < SRV_INTERVALLE_MIN_MS) ? haut : bas >= SRV_INTERVALLE_MIN_MS ? bas : haut;
   }
   return ms;
 }
@@ -172,7 +173,7 @@ function srvLigne(p, maintenant) {
 // </serveur-regle>
 
 export {
-  SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS, SRV_ECART_MIN_MS, SRV_PLAFOND_LECTURES, SRV_FILS_PAR_TOUR, SRV_CONVS_LUES, SRV_VUS_MAX, SRV_TOUR_MS,
+  SRV_INTERVALLE_MIN_MS, SRV_INTERVALLE_MAX_MS, SRV_ECART_MIN_MS, SRV_PLAFOND_LECTURES, SRV_FILS_PAR_TOUR, SRV_CONVS_LUES, SRV_VUS_MAX, SRV_TOUR_MS, SRV_DECALAGE_MS,
   SRV_TOUR_MARGE_MS, SRV_TEXTE_MAX, SRV_EMAIL_FENETRE_MS, SRV_ALLUME_MS,
   srvIntervalle, srvMs, srvChangees, srvCle, srvNeufsDuFil, srvTexte, srvTour, srvLigne,
 };

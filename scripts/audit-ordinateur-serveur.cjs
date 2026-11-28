@@ -62,6 +62,7 @@ const MUTATIONS = {
   onglet: ["    try { t = await chrome.tabs.create({ url: 'https://www.vinted.fr/inbox', pinned: true, active: false });", "    try { t = null; if (t) await chrome.tabs.create({ url: 'https://www.vinted.fr/inbox', pinned: true, active: false });"],
   capte: ["    if (s === 'message' && plateforme === 'vinted' && await serveurAllume()) return { etat: 'serveur' };", ''],
   identites: ["  const rep = await serveurPoster({ action: 'serveur', evenements: lot.map((x) => x.e) });", "  const rep = await serveurPoster({ action: 'serveur', evenements: lot.map((x) => Object.assign({ texte: 'x' }, x.e)) });"],
+  decale: ["    if (autre) { await serveurNoterEtat({ prochain: t + 20000", "    if (false) { await serveurNoterEtat({ prochain: t + 20000"],
   presence: ["rt: _distCanal.etat, lus: local[COMPTES_VUS_STORE] || {}, serveur };", "rt: _distCanal.etat, lus: local[COMPTES_VUS_STORE] || {} };"],
 };
 if (args.includes('--prouve')) {
@@ -258,6 +259,14 @@ const H = 3600000;
   { const f = profil({ uid: A, lignes: {}, onglets: [] }); await tick(f);
     const o = (f.j.ongletsOptions || [])[0] || {};
     dit(o.pinned === true && o.active === false && /vinted\.fr/.test(String(o.url || '')), 'S9 aucun onglet vinted.fr ⇒ un onglet ÉPINGLÉ rouvert en arrière-plan', JSON.stringify(f.j.ongletsOptions)); }
+
+  console.log('\nS9b. Les lectures décalées entre profils');
+  { const lp = {}; const f = profil({ uid: A, lignes: lp }); lp.presence_aaaaaaaaaaaaaaaa = { serveur: { on: true, uid: B, lu: Date.now() - 3000 } };
+    const r9 = await tick(f);
+    dit(lectures(f) === 0 && r9 && r9.saute === 'decale', 'S9b un autre profil vient de lire (3 s) ⇒ cette lecture attend (jamais deux comptes au même moment)', JSON.stringify(r9));
+    lp.presence_aaaaaaaaaaaaaaaa.serveur.lu = Date.now() - 60000; forcer(f); f.store.vrmServeurEtat.prochain = 0;
+    await tick(f);
+    dit(lectures(f) === 1, 'S9c l’autre a lu il y a 1 min ⇒ elle part', lectures(f)); }
 
   console.log('\nS10–S11. Deux profils, deux comptes : jamais deux écritures au même moment');
   const empreinte = async (d) => { const m = await import('file://' + path.join(RACINE, 'src', 'aDistance.js')); return m; };
