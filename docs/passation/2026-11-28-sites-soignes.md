@@ -71,9 +71,21 @@ jamais « livraison gratuite » — aucun texte ni geste touché là). Tous les 
   coupé), tête native (`tete: true` : les sections eBay et la connexion ; une LISTE n'en a pas — AJOUT 3 de vrm-design).
   `SEUIL=1` rouge si > 1 plein, une cible trop petite, un texte cassé ou une tête manquante ; `MUTATION=plein|tete`.
   Captures AVANT : `BANC_DIST=<build d'origin/main>` ; APRÈS : le `dist/` de la branche.
-- Audits verts : tdz, variables, traduction (45), coherence, icones, quoi-de-neuf, identite ; banc `detourage-reglage`.
-- Bancs eBay existants : voir le rapport de PR (mêmes rouges avant et après sur `ebay-complet` / `ebay-comptes` :
-  leurs sélecteurs datent d'avant le mélange des sites du 20 nov. — `data-poster`, `selectOption` du compte).
+- `SEUIL=1` vert après (390 / 1512, clair / sombre, base de volume) ; ROUGE sur `origin/main` (pas de tête, segmenté
+  Annonces · eBay à 38 px) et ROUGE sous `MUTATION=tete` (prouvé).
+- Audits verts : tdz, variables, traduction (45), coherence, icones, quoi-de-neuf, identite ; bancs `detourage-reglage`,
+  `minimaliste --sites`, `leboncoin` verts.
+- `ebay-complet` (12 KO), `ebay-comptes` (17 KO), `vestiaire` (14 KO) : **les mêmes rouges, mot pour mot, sur `origin/main`**
+  (dist d'avant échangé, même banc) — leurs sélecteurs datent d'avant le mélange des sites du 20 nov. (`data-poster`,
+  `selectOption` du compte, écrans Vestiaire par site). Rien de nouveau ; à réécrire par leur propriétaire.
+- Captures avant / après (exemple inventé) : `docs/design/avant-apres/sites-ebay-{comptes,tableau,non-relie}-{avant,apres}.png`.
+
+## 5 bis. Leboncoin et Vestiaire : ce qui se voit vraiment
+
+Depuis le 20 nov. (« sans sélecteur »), Ventes, Annonces, Messages et Achats MÉLANGENT les sites : Leboncoin et Vestiaire
+n'ont plus de page à eux dans l'app (le banc le constate : `?tab=ventes&site=leboncoin` montre la liste commune). Leurs
+états propres (messages jamais relevés, site relié jamais lu, « Générer le bordereau ») ont reçu la même recette, mais
+ne s'affichent que dans les rares chemins qui les montent encore. Le gros du visible de ce lot est donc côté eBay.
 
 ## 6. Reste à faire
 

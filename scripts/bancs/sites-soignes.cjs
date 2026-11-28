@@ -169,6 +169,7 @@ async function allerPage(o, pg0, premiere) {
     await o.pg.waitForTimeout(400);
   }
   if (pg0.evt) await o.pg.evaluate((n) => window.dispatchEvent(new Event(n)), pg0.evt);
+  for (const c of pg0.clics || []) { const l = o.pg.locator(c).filter({ visible: true }).first(); if (await l.count()) { await l.click({ timeout: 4000 }).catch(() => {}); await o.pg.waitForTimeout(800); } }
   await o.pg.waitForTimeout(ATTENTE);
   await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast button')) t.click(); window.scrollTo(0, 0); }).catch(() => {});
   await o.pg.waitForTimeout(200);
