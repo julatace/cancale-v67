@@ -23,7 +23,22 @@ export function etatOffreVinted(e = {}) {
     return { etat: "refusee", libelle: lisible ? titre : "Offre refusée" };
   return { etat: "inconnu", libelle: lisible ? titre : "Statut à vérifier" };
 }
-export function offreVintedEnAttente(c = {}) {
+// 5.455.8 (Julien, 28 nov. : « l'offre de la XT6 qui est là depuis un mois ») : une offre « en attente » d'une conversation qui
+//    n'a pas été relue n'est pas en attente pour toujours. Son âge se lit sur SON message (`created_at_ts`), ou sa fin si Vinted la
+//    donne (`expires_at`) ; au-delà de OFFRE_VIE_MS (7 jours — un plafond : l'expiration de Vinted n'a jamais été mesurée), elle
+//    est EXPIRÉE : jamais montrée comme à trancher, jamais un geste dessus. Sans date : rien n'est deviné ici (l'appelant juge la
+//    fraîcheur de sa lecture).
+export const OFFRE_VIE_MS = 7 * 86400000;
+export function offreExpiree(m = {}, maintenant = Date.now()) {
+  const e = (m && m.entity) || {};
+  const fin = e.expires_at ?? e.expire_at ?? e.valid_until ?? m.expires_at;
+  const tf = fin == null || fin === "" ? NaN : Number.isFinite(Number(fin)) ? (Number(fin) < 1e12 ? Number(fin) * 1000 : Number(fin)) : Date.parse(fin);
+  if (Number.isFinite(tf)) return tf < maintenant;
+  const d = m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at, nb = Number(d);
+  const t = d == null || d === "" ? NaN : Number.isFinite(nb) ? (nb < 1e12 ? nb * 1000 : nb) : Date.parse(d);
+  return Number.isFinite(t) && maintenant - t > OFFRE_VIE_MS;
+}
+export function offreVintedEnAttente(c = {}, maintenant = Date.now()) {
   const opp = c.opposite_user?.id;
   if (opp == null) return null;
   const index = new Map();
@@ -51,7 +66,8 @@ export function offreVintedEnAttente(c = {}) {
       e.user_id == null ||
       String(e.user_id) !== String(opp) ||
       e.status !== 10 ||
-      etatOffreVinted(e).etat !== "attente"
+      etatOffreVinted(e).etat !== "attente" ||
+      offreExpiree(m, maintenant)
     )
       continue;
     if (

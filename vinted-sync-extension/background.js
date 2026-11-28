@@ -13918,12 +13918,28 @@ function remplirVariablesOffre(t, o) { return String(t).replace(/\{price\}|\{pri
 //    lectures : les conversations captées (`offresEnAttente`) et le fil RELU juste avant le
 //    geste (`relireOffre`). La DERNIÈRE offre de l'acheteur (`opp`) encore courante, au statut
 //    « en attente », jamais acceptée/refusée/expirée/retirée, avec un prix et ses identifiants.
-function derniereOffreEnAttente(msgs, oppBrut) {
+// 5.455.8 (Julien, 28 nov. : « l'offre de la XT6 qui est là depuis un mois ») : la règle d'âge de src/offresVinted.js
+//    (`offreExpiree`, OFFRE_VIE_MS = 7 jours, la fin donnée par Vinted d'abord) — une offre plus vieille est EXPIRÉE : jamais
+//    listée « à trancher », jamais un geste. Sans date sur le message : la date de la LECTURE de la conversation (`capAt`) sert
+//    de borne (une lecture de plus de 7 jours ne prouve plus rien d'« en attente »).
+const OFFRE_VIE_MS = 7 * 86400000;
+function offreExpireeMsg(m, maintenant, capAt) {
+  const e = (m && m.entity) || {};
+  const ms = (v) => { if (v == null || v === '') return NaN; const n = Number(v); return Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : Date.parse(v); };
+  const tf = ms(e.expires_at ?? e.expire_at ?? e.valid_until ?? m.expires_at);
+  if (Number.isFinite(tf)) return tf < maintenant;
+  const t = ms(m.created_at_ts ?? e.created_at_ts ?? m.created_at ?? e.created_at);
+  if (Number.isFinite(t)) return maintenant - t > OFFRE_VIE_MS;
+  return Number.isFinite(capAt) && maintenant - capAt > OFFRE_VIE_MS;
+}
+function derniereOffreEnAttente(msgs, oppBrut, capAt) {
   const opp = oppBrut != null && oppBrut !== '' ? Number(oppBrut) : null;
   let derniere = null;
+  const maintenant = Date.now();
   for (const msg of (Array.isArray(msgs) ? msgs : [])) {
     if (!msg || msg.entity_type !== 'offer_request_message') continue;
     const e = msg.entity || {};
+    if (offreExpireeMsg(msg, maintenant, capAt)) continue;
     if (opp != null && e.user_id !== opp) continue;
     if (e.current === false) continue;
     if (e.status !== OFFRE_EN_ATTENTE) continue;
@@ -13998,7 +14014,7 @@ async function offresEnAttente(uid) {
     const vus = new Set();
     for (const r of rows) {
       const cid = String(r.cid || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
-      const d = derniereOffreEnAttente(r.msgs, r.opp);
+      const d = derniereOffreEnAttente(r.msgs, r.opp, Date.parse(r.cap || ''));
       // 5.430 : l'acheteur (son id, l'identité) et la note que la conversation RANGÉE porte (`noteBrute`, datée de sa capture).
       if (d) out.push({ conv: cid, prix: d.prix, tx: d.tx, oid: d.oid, item: String(r.it || ''), titre: String(r.descr || ''), article: r.ti, pseudo: r.login,
         acheteur: /^\d{1,20}$/.test(String(r.opp || '')) ? String(r.opp) : '', noteBrute: { rep: r.rep, rc: r.rc, cap: r.cap } });
@@ -23328,16 +23344,31 @@ async function favorisCarte(msg, sender) {
     }
     // 5.407 : seulement des favoris COCHABLES de l'aperçu montré de CE compte (encore en vente,
     // jamais contactés, destinataire prouvé), lu il y a moins de 30 min ; sinon rien ne part.
+    // 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer […] tu regardes les derniers favoris et tu envoies ») : une liste
+    //    gardée trop ancienne (ou effacée par l'envoi d'avant) ne REFUSE plus rien — elle est relue ICI, chez VRM, tout de suite ;
+    //    seuls les favoris qui ne sont VRAIMENT plus à contacter (vendu, réservé, déjà contacté) sont écartés, et dits sur LEUR
+    //    rangée (`ecartes`) ; les autres partent.
+    let ecartes = [];
     {
       let ap = null; try { ap = ((await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {})[o.uid] || null; } catch (_) { ap = null; }
-      const ok = ap && Array.isArray(ap.cochables) && Date.now() - Number(ap.at || 0) < FAVORIS_CARTE_CHOIX_MS ? new Set(ap.cochables) : null;
-      if (!ok) return refuse('selection', 'La liste de tes favoris doit être relue avant l’envoi : rouvre l’onglet Favoris. Rien n’est parti.');
-      if (sel.some((id) => !ok.has(id))) return Object.assign(await refuse('selection', 'Un favori choisi n’est plus à contacter (article vendu, ou déjà contacté) : la liste est relue. Rien n’est parti.'), { ids: sel.filter((id) => !ok.has(id)) });
+      let ok = ap && Array.isArray(ap.cochables) && ap.cochables.length && Date.now() - Number(ap.at || 0) < FAVORIS_CARTE_CHOIX_MS ? new Set(ap.cochables) : null;
+      if (!ok || sel.some((id) => !ok.has(id))) {
+        const f = await apercuCarteFrais(o.uid);
+        if (!f.ok || !f.apercu) return refuse('serveur', (f.raison || 'VRM n’a pas répondu.') + ' Rien n’est parti : réessaie dans un instant.');
+        ok = new Set(cochablesApercu(f.apercu));
+        if (f.apercu.reglages) reglagesL = f.apercu.reglages;
+      }
+      ecartes = sel.filter((id) => !ok.has(id));
+      if (ecartes.length) { for (const id of ecartes) sel.splice(sel.indexOf(id), 1); }
+      if (!sel.length) return Object.assign(await refuse('selection', 'Ce favori n’est plus à contacter (article vendu ou réservé, ou personne déjà contactée). Rien n’est parti.'), { ids: ecartes });
     }
     if (horsLigne()) return refuse('hors-ligne', 'Pas de réseau : rien n’est parti.');
     if ((await toutArreteDepuis(null)) > 0) return refuse('tout-arrete', '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.');
+    // 5.455.8 : une file déjà en route sur CE compte ne refuse plus : la nouvelle sélection s'y AJOUTE (le serveur garde ce qui est
+    //    en vol, jamais deux fois la même personne pour le même article) ; une file d'un AUTRE compte garde son tour.
     const avant = await lireEtatFavorisCarte();
-    if (avant && avant.actif) return refuse('deja', 'Des messages partent déjà depuis cette carte.');
+    if (avant && avant.actif && avant.uid !== o.uid) return refuse('deja', 'Des messages partent déjà sur un autre compte Vinted : attends la fin, puis renvoie.');
+    const ajout = !!(avant && avant.actif && avant.uid === o.uid);
     // 5.410.8 : « Annuler l'ancienne file et envoyer ces N » (SON choix, dans la confirmation) : la file restée active
     //    chez VRM est arrêtée d'abord (ses favoris en attente deviennent annulés, donc à nouveau à envoyer), puis la nouvelle part.
     if (msg.remplacer === true) { const ar = await apiFavorisCarte(o.uid, 'arreter'); if (!ar.ok) return refuse('serveur', (ar.json && ar.json.message) || 'VRM n’a pas arrêté l’ancienne file : rien n’est parti.'); }
@@ -23358,12 +23389,14 @@ async function favorisCarte(msg, sender) {
       if (!id || items.some((y) => (typeof x.notificationId === 'string' && x.notificationId ? y.n === x.notificationId : y.id === id))) continue;
       items.push({ id, photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120), ...(typeof x.notificationId === 'string' && x.notificationId && x.notificationId.length <= 160 && sel.includes(x.notificationId) ? { n: x.notificationId } : {}) });   // 5.440 : la ligne de la file (son état sur la fenêtre)
     }
-    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items, sel: sel.slice(0, FAVORIS_CARTE_MAX), jobs: jobsDuLot(r.json.vue, sel), travail: ot && ot.tabId != null ? ot.tabId : null, ...(texteEnvoi ? { texteEnvoi } : {}), premierFait: false };
+    const selT = ajout ? [...new Set([...(Array.isArray(avant.sel) ? avant.sel : []), ...sel])].slice(-FAVORIS_CARTE_MAX * 2) : sel.slice(0, FAVORIS_CARTE_MAX);
+    const itemsT = ajout ? [...(Array.isArray(avant.items) ? avant.items : []), ...items.filter((x) => !(avant.items || []).some((y) => y && y.n && y.n === x.n))].slice(-FAVORIS_CARTE_MAX * 2) : items;
+    const st = Object.assign(ajout ? avant : {}, { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: ajout ? avant.debut : Date.now(), total: selT.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items: itemsT, sel: selT, jobs: ajout ? jobsDuLot(Object.assign({}, r.json.vue, { lot: null, jobs: (r.json.vue.jobs || []).filter((j) => j && j.etat !== 'annule') }), selT) : jobsDuLot(r.json.vue, selT), travail: ot && ot.tabId != null ? ot.tabId : (ajout ? avant.travail : null), ...(texteEnvoi ? { texteEnvoi } : {}), premierFait: ajout ? !!avant.premierFait : false });
     await poserEtatFavorisCarte(st);
     await noterApercuCarte(o.uid, { etat: 'encours', total: 0 });
     logActivity(`💬 Messages aux favoris lancés depuis la carte : ${sel.length}`);
     planifierFavorisCarte(0);
-    return { ok: true, etat: st };
+    return { ok: true, etat: st, ...(ecartes.length ? { ecartes } : {}) };
   }
   if (quoi === 'arreter') {
     const r = await apiFavorisCarte(o.uid, 'arreter');
@@ -25466,7 +25499,8 @@ async function tickFavorisCarte() {
         return;
       }
       const g = await apiFavorisCarte(st.uid, null);
-      if (!g.ok || !g.json || !g.json.vue) return attendre('vrm');
+      // 5.455.8 : VRM injoignable ⇒ la file ATTEND et réessaie seule dans 20 s (rien n'est refusé, rien n'est perdu).
+      if (!g.ok || !g.json || !g.json.vue) { planifierFavorisCarte(20000); return attendre('vrm'); }
       if (g.json.carte) st.file = g.json.carte;
       { const jb = jobsDuLot(g.json.vue, st.sel); if (jb) st.jobs = jb; }
       if (!g.json.vue.active) {
@@ -25497,13 +25531,15 @@ async function tickFavorisCarte() {
         if (av.ms < 25000) planifierFavorisCarte(av.ms + 300);
         return;
       }
-      if (!(await rejouerTerminers())) return attendre('vrm');   // 5.455.4 : un compte rendu en souffrance d'abord
+      if (!(await rejouerTerminers())) { planifierFavorisCarte(20000); return attendre('vrm'); }   // 5.455.4 : un compte rendu en souffrance d'abord
       const s = await apiFavorisCarte(st.uid, 'suivant');
-      if (!s.ok || !s.json) return attendre('vrm');
+      if (!s.ok || !s.json) { planifierFavorisCarte(20000); return attendre('vrm'); }
       if (s.json.carte) st.file = s.json.carte;
       if (s.json.vue) { const jb = jobsDuLot(s.json.vue, st.sel); if (jb) st.jobs = jb; }
       const t = s.json.travail;
-      if (!t || typeof t.jeton !== 'string') { st.attente = null; await poserEtatFavorisCarte(st); return; }
+      // 5.455.8 : rien à prendre tout de suite (une tentative d'un autre Chrome se termine, ou son temps n'est pas venu) : la file
+      //    réessaie seule (avant : elle restait « en attente » jusqu'au réveil suivant, sans rien dire).
+      if (!t || typeof t.jeton !== 'string') { st.attente = null; const r0 = (Number(s.json.vue && s.json.vue.prochain) || 0) - (Number(s.json.serveur) || Date.now()); await poserEtatFavorisCarte(st); if (s.json.vue && s.json.vue.active) planifierFavorisCarte(r0 > 1000 ? Math.min(r0 + 300, 25000) : 5000); return; }
       st.attente = null; st.prochain = null; st.quoi = ''; st.enCours = Date.now();
       { const id = String(t.itemId || ''), it = Array.isArray(st.items) ? st.items.find((x) => x.id === id) : null; st.item = { id, photo: it ? it.photo : '', titre: it ? it.titre : '' }; st.cours = String(t.notificationId || '').slice(0, 160); st.passes = [...new Set([...(Array.isArray(st.passes) ? st.passes : []), id])].slice(-FAVORIS_CARTE_MAX); }
       await poserEtatFavorisCarte(st);

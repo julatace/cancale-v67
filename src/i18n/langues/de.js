@@ -911,6 +911,8 @@ export default {
   "historiqueSites.phrase.encoursVc": "Wird gelesen · {d}, solange Vestiaire offen ist.",
   "historiqueSites.phrase.encours": "Wird gelesen.",
   "historiqueSites.toutRecuperer": "Alles abholen",
+  "importDepart.ligneAuto": "Die Erweiterung liest deinen Vinted-Verlauf von selbst.",
+  "importDepart.ligneEncours": "Die Erweiterung liest deinen Vinted-Verlauf gerade von selbst.",
   // ── messages aux favoris, en trois temps (src/FavorisEtapes.jsx, lot favoris-clair)
   "favoris.titre": "Nachrichten an Favoriten",
   "favoris.sousTitre": "Schreib Leuten, die deine Anzeigen gemerkt haben.",

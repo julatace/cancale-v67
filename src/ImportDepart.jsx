@@ -17,6 +17,7 @@ import React from 'react';
 import { typeEnTete, lireImportDepart, importsAMontrer, phraseImport, texteType, pctType, butType, pagesType, titreImport, texteAnnonces, marquerImportsVus, CLE_IMPORT_VU } from './importDepart.js';
 import { EXT_CAPACITES, lireTout, load, save, vintedDeChrome, raisonExtGlobale, onVmrExt, vmrCmd, vmrExtPresent, extSait, Bouton } from './App.jsx';
 import './styles-import-depart.css';
+import { tr } from './i18n/index.js';
 
 function useImportDepart(uids) {
   const cle = (uids || []).join(',');
@@ -133,58 +134,15 @@ export default function ImportDepart({ comptes = [], variante = 'journee' }) {
     if (neuf) save(CLE_IMPORT_VU, neuf);
   }, [cleMontres]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (variante === 'journee') {
-    if (!montres.length) return null;
-    const passe = montres.some((l) => l.horizonMois || l.annonces);
-    return (
-      <section className="vrm-imp vrm-imp-journee" data-import-journee={montres.length} aria-label={passe ? 'Import de ton passé' : 'Ton historique Vinted'}>
-        {passe ? null : <div className="vrm-imp-titre">Ton historique Vinted</div>}
-        {montres.map((l) => <Compte key={l.uid} l={l} nom={nomDe(comptes, labels, l.uid)} montrerNom={uids.length > 1} />)}
-      </section>
-    );
-  }
-
-  const vc = vintedDeChrome();
-  const onglet = vc ? String(vc.uid || '') : null;
-  const rx = raisonExtGlobale(false, { cap: 'importdepart', role: 'récupère ton historique Vinted' });
-  const sait = extSait('importdepart');
-  const lancer = async (uid) => {
-    if (occupe || rx) return;
-    setOccupe(true);
-    setIssue({ uid, texte: 'C’est parti…' });
-    let r = null;
-    if (!vmrExtPresent()) r = { accepte: false, raison: 'L’extension ne répond pas ici : rien n’est parti.' };
-    else { try { r = await vmrCmd({ cmd: 'importTout', uid }, 20000); } catch (_) { r = null; } }
-    setIssue({ uid, texte: r && r.accepte ? 'Lecture lancée. La barre avance ici.' : ((r && r.raison) || 'L’extension n’a pas répondu. Réessaie.'), ok: !!(r && r.accepte) });
-    setOccupe(false);
-    relire();
-  };
+  // 5.455.8 (Julien, 28 nov. : « Import de ton passé : je t'avais demandé de l'enlever ») : plus aucune carte ni bouton d'import,
+  //    ni dans Ma journée ni dans Réglages. L'extension lit TOUT l'historique seule (`departImport`) ; Réglages → Mon historique
+  //    en dit UNE ligne, sans bouton ni barre.
+  void occupe; void setOccupe; void issue; void setIssue; void relire; void montres;
+  if (variante === 'journee') return null;
+  const enCoursN = etats ? uids.filter((u) => etats[u] && etats[u].etat === 'encours').length : 0;
   return (
-    <div className="vrm-imp vrm-imp-reglages" data-import-reglages={uids.length} data-import-sait={sait}>
-      <p className="vrm-imp-note">Tes 12 derniers mois, lus une fois par l’extension. « Tout récupérer » lit plus ancien.</p>
-      {rx ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext={rx.code || ''}>{rx.texte}</p> : null}
-      {!rx && extSait('importpasse') !== 'ok' ? <p className="vrm-imp-note vrm-imp-geste" role="status" data-import-ext="passe">Mets l’extension à jour ({EXT_CAPACITES.importpasse}) pour les 12 mois et les annonces.</p> : null}
-      {etats === null ? <p className="vrm-imp-note" role="status" data-import-passu="">Pas su pour l’instant : la base n’a pas répondu.</p> : null}
-      {!uids.length ? <p className="vrm-imp-note">Aucun compte Vinted relié.</p> : null}
-      {uids.map((uid) => {
-        const l = etats ? etats[uid] : undefined;
-        const ici = onglet === uid;
-        const enCours = l && l.etat === 'encours';
-        const iss = issue && issue.uid === uid ? issue : null;
-        return (
-          <div key={uid} className="vrm-imp-ligne" data-import-ligne={uid} data-import-etat={l ? l.etat : (l === null ? 'aucun' : 'lecture')} data-import-onglet={ici ? '1' : '0'}>
-            <div className="vrm-imp-tete">
-              <span className="vrm-imp-nom">{nomDe(comptes, labels, uid)}</span>
-              {!l ? <span className="vrm-imp-phrase">{l === null ? (ici ? 'Pas encore commencé.' : 'Ouvre vinted.fr sur ce compte.') : '—'}</span> : null}
-            </div>
-            {l ? <Compte l={l} nom="" montrerNom={false} /> : null}
-            {ici && !rx && !enCours ? (
-              <Bouton variante="secondaire" data-import-tout={uid} disabled={occupe} onClick={() => lancer(uid)}>Tout récupérer</Bouton>
-            ) : null}
-            {iss ? <p className="vrm-imp-note" role="status" data-import-issue={iss.ok ? 'ok' : 'refus'}>{iss.texte}</p> : null}
-          </div>
-        );
-      })}
+    <div className="vrm-imp vrm-imp-reglages" data-import-reglages={uids.length}>
+      <p className="vrm-imp-note" data-import-ligne-unique={enCoursN ? 'encours' : 'auto'}>{tr(enCoursN ? 'importDepart.ligneEncours' : 'importDepart.ligneAuto')}</p>
     </div>
   );
 }

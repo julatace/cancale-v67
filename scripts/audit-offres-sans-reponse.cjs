@@ -76,7 +76,7 @@ if (arg.includes('--prouve')) {
   const carte = (convs) => {
     const m = new Map();
     for (const c of convs) {
-      const off = OV.offreVintedEnAttente({ opposite_user: { id: OPP }, messages: c.messages });
+      const off = OV.offreVintedEnAttente({ opposite_user: { id: OPP }, messages: c.messages }, MAINT);   // 5.455.8 : l'âge de l'offre se juge à l'heure du banc
       if (off) m.set(`11_${c.id}`, { ...off, titre: c.titre || 'Nike 42', item: c.item || '501', side: c.side || 'seller', msgs: c.messages, opp: OPP });
     }
     return m;
