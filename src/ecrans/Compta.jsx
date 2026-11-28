@@ -4206,7 +4206,7 @@ function PrevisionUrssafCarte({ onNav }) {
       <div className="n-arg-gestes" data-urssaf-etape="3">
         {aNoter.length ? <NBouton variante="plein" onClick={() => demanderDeclaration(aNoter[0], onNav)} attrs={{ 'data-fu-geste': '', 'data-urssaf-cest-declare': aNoter[0] }}>{tr('compta.aiDeclare')}</NBouton>
           : <p className="n-arg-note">{tr('compta.dejaNoteIci')}</p>}
-        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
+        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
       </div>
     </NCarte>
   );

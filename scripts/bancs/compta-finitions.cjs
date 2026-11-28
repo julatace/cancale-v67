@@ -238,18 +238,29 @@ async function mode(b, vp, sombre) {
     // ── D (suite) : « Je n'ai pas de dépenses » ÉCRIT la réponse, et plus rien n'est redemandé, même rechargé.
     await essaie(`${nom} D réponse`, async () => {
       await ouvrir(pg, 'compta');
-      await pg.waitForSelector('[data-dep-mois="lu"] [data-depenses-aucune]', { timeout: 40000 });
-      await pg.locator('[data-dep-mois="lu"] [data-depenses-aucune]').scrollIntoViewIfNeeded();
-      await pg.click('[data-dep-mois="lu"] [data-depenses-aucune]');
-      await pg.waitForFunction(() => !document.querySelector('[data-depenses-aucune]'), null, { timeout: 10000 }).catch(() => {});
+      // Pendant le passage d'un écran à l'autre, l'app pose l'écran vrai, encore CACHÉ (`.vrm-attente-cache`, aria-hidden), à
+      // côté de ce qu'on voit (src/AttenteEcran.jsx) : ce qu'on VOIT est hors de tout aria-hidden.
+      const vus = () => pg.evaluate(() => [...document.querySelectorAll('[data-dep-mois="lu"] [data-depenses-aucune]')].filter((e) => e.checkVisibility() && !e.closest('[aria-hidden="true"]')).length);
+      await pg.waitForFunction(() => [...document.querySelectorAll('[data-dep-mois="lu"] [data-depenses-aucune]')].some((e) => e.checkVisibility() && !e.closest('[aria-hidden="true"]')), null, { timeout: 40000 });
+      const nVus = await vus();
+      check(nVus === 1, `${nom} — D revenu sur Argent : le choix est à l'écran UNE fois (${nVus})`);
+      // L'écran vrai prend la place de sa copie (l'élément est REMPLACÉ) : on attend que l'écran soit posé, puis on touche à
+      // l'endroit où on le voit (souris / doigt, comme Julien).
+      await pg.waitForFunction(() => !document.querySelector('.vrm-attente-cache'), null, { timeout: 30000 }).catch(() => {});
+      await pg.waitForTimeout(1500);
+      const pt = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-dep-mois="lu"] [data-depenses-aucune]')].find((x) => x.checkVisibility() && !x.closest('[aria-hidden="true"]')); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+      if (!pt) throw new Error('le choix a disparu avant le toucher');
+      await pg.waitForTimeout(300);
+      if (tel) await pg.touchscreen.tap(pt.x, pt.y); else await pg.mouse.click(pt.x, pt.y);
+      await pg.waitForFunction(() => ![...document.querySelectorAll('[data-depenses-aucune]')].some((e) => e.checkVisibility() && !e.closest('[aria-hidden="true"]')), null, { timeout: 10000 }).catch(() => {});
       await pg.waitForTimeout(1500);
       const ecrit = etat.ecritures.some((d) => d && d.vrm_compta && d.vrm_compta.sansDepenses && d.vrm_compta.sansDepenses.at);
-      const apres = await pg.evaluate(() => ({ choix: !!document.querySelector('[data-depenses-aucune]'), av: !!document.querySelector('[data-v2-avant-depenses]') }));
+      const apres = await pg.evaluate(() => { const vu = (sel) => [...document.querySelectorAll(sel)].some((e) => e.checkVisibility() && !e.closest('[aria-hidden="true"]')); return { choix: vu('[data-depenses-aucune]'), av: vu('[data-v2-avant-depenses]') }; });
       check(ecrit && !apres.choix && !apres.av, `${nom} — D son toucher ÉCRIT « pas de dépenses » (vrm_compta.sansDepenses) ; le choix et « avant tes dépenses » partent`, { ecrit, ...apres });
       await ouvrir(pg, 'compta');
       await pg.waitForSelector('[data-dep-mois="lu"]', { timeout: 40000 });
       await pg.waitForTimeout(2000);
-      const re = await pg.evaluate(() => ({ choix: !!document.querySelector('[data-depenses-aucune]'), av: !!document.querySelector('[data-v2-avant-depenses]') }));
+      const re = await pg.evaluate(() => { const vu = (sel) => [...document.querySelectorAll(sel)].some((e) => e.checkVisibility() && !e.closest('[aria-hidden="true"]')); return { choix: vu('[data-depenses-aucune]'), av: vu('[data-v2-avant-depenses]') }; });
       check(!re.choix && !re.av, `${nom} — D rechargé : rien n'est redemandé (§2.10)`, re);
     });
     check(!errs.length, `${nom} — aucune erreur de page`, errs[0]);
