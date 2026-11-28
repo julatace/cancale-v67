@@ -3,8 +3,9 @@
 // (src/crm/api.js) : l'hôte l'affiche, chargée à la demande (rien ne pèse au démarrage).
 import React from 'react';
 import { EVENEMENT_FICHE } from './api.js';
+import { lazySur } from '../chargementSur.js';
 
-const FicheAcheteur = React.lazy(() => import('./FicheAcheteur.jsx'));
+const FicheAcheteur = lazySur(() => import('./FicheAcheteur.jsx'));   // (28 nov., main-vert) jamais React.lazy nu (audit-ouverture)
 
 export default function HoteFicheAcheteur({ headers, confirm }) {
   const [c, setC] = React.useState(null);
