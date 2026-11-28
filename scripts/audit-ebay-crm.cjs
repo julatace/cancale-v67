@@ -272,6 +272,10 @@ async function verifier(racine) {
     dit(e1b.corps.ok === false && e1b.corps.reason === 'acheteur' && !aaq().length, 'R5b. l’acheteur vu à l’écran n’est pas celui de la commande : rien n’est envoyé', JSON.stringify(e1b.corps));
     const e2 = await route({ action: 'crmecrire', orderId: '27-00000001-0000', acheteur: 'client_c', texte: 'Bonjour client_c', confirme: true });
     dit(e2.corps.ok && dest().join() === 'client_c', 'R6. écrire à l’acheteur d’une commande rangée : le destinataire est CELUI de la commande', JSON.stringify(e2.corps));
+    const e3 = await route({ action: 'crmecrire', itemId: '110000000001', acheteur: 'quelqu_un', texte: 'Bonjour', confirme: true });
+    dit(e3.corps.ok === false && e3.corps.reason === 'commande' && dest().length === 1, 'R6b. depuis une conversation : un pseudo SANS commande de cette annonce ⇒ rien n’est envoyé', JSON.stringify(e3.corps));
+    const e4 = await route({ action: 'crmecrire', itemId: '110000000001', acheteur: 'CLIENT_C', texte: 'Re', confirme: true });
+    dit(e4.corps.ok && dest().join() === 'client_c,client_c', 'R6c. depuis une conversation : l’acheteur de CETTE annonce (sa commande) reçoit', JSON.stringify(e4.corps));
     EB.retours = [{ returnId: '5002', orderId: 'o2', state: 'RETURN_REQUESTED', buyerLoginName: 'b', sellerResponseDue: { respondByDate: { value: new Date(MAINTENANT + 3 * JOUR).toISOString() } }, creationInfo: { item: { itemId: '1' } } }];
     EB.paiements = [{ paymentDisputeId: 'PD-9', orderId: 'o3', paymentDisputeStatus: 'ACTION_NEEDED', respondByDate: new Date(MAINTENANT + JOUR).toISOString(), buyerUsername: 'c' }];
     const li = await route({ action: 'crmlitiges' });
@@ -307,7 +311,8 @@ const MUTATIONS = {
   'eval-hors-attente': ['api/_lib/ebay-crm.js', "          if (!ev) { saute('n-attend-pas'); continue; }", "          if (!ev) ev = { itemId: item, transactionId: '0', acheteur: o.buyer.username };"],
   'contester-sans-relire': ['api/_lib/ebay-crm.js', "      if (etat !== 'ACTION_NEEDED' || (choix.length && !choix.includes('CONTEST'))) return", '      if (false) return'],
   'ecrire-a-un-autre': ['api/_lib/ebay-crm.js', "    if (b.acheteur != null && !memeAcheteur(b.acheteur, acheteurDeCommande(o))) return", '    if (false) return'],
-  'ecrire-sans-commande': ['api/_lib/ebay-crm.js', "    const o = orders.find((x) => x.orderId === String(b.orderId || '') && (x._compte || 'principal') === refCompte(ctx));", "    const o = orders.find((x) => x.orderId === String(b.orderId || '')) || orders[0];"],
+  'ecrire-sans-commande': ['api/_lib/ebay-crm.js', "    const o = b.orderId != null ? orders.find((x) => x.orderId === String(b.orderId || '') && (x._compte || 'principal') === refCompte(ctx))", "    const o = b.orderId != null ? (orders.find((x) => x.orderId === String(b.orderId || '')) || orders[0])"],
+  'conversation-sans-commande': ['api/_lib/ebay-crm.js', " && memeAcheteur(b.acheteur, acheteurDeCommande(x)) && (x.lineItems || [])", " && (x.lineItems || [])"],
 };
 function copie(mut) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ebay-crm-'));

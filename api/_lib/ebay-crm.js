@@ -268,8 +268,11 @@ export function creerCrmEbay({ accessToken, lireDonnee, modifierDonnee, lireComm
     if (!corps || corps.length > LONGUEUR_MESSAGE || /\{[a-zA-Z]+\}/.test(corps)) return echec('Message vide, trop long, ou avec une variable pas remplie.', 400, 'texte');
     const orders = await lireCommandes(ctx);
     if (!Array.isArray(orders)) return echec('Je n’ai pas pu relire tes commandes — rien n’a été envoyé.', 503, 'pas-su');
-    const o = orders.find((x) => x.orderId === String(b.orderId || '') && (x._compte || 'principal') === refCompte(ctx));
-    const item = o && Array.isArray(o.lineItems) && o.lineItems[0] ? String(o.lineItems[0].legacyItemId || '') : '';
+    // Par sa commande, ou (une conversation) par l'annonce ET l'acheteur : la commande la plus récente de CE couple.
+    const o = b.orderId != null ? orders.find((x) => x.orderId === String(b.orderId || '') && (x._compte || 'principal') === refCompte(ctx))
+      : orders.filter((x) => (x._compte || 'principal') === refCompte(ctx) && ID.test(String(b.itemId || '')) && memeAcheteur(b.acheteur, acheteurDeCommande(x)) && (x.lineItems || []).some((l) => String(l.legacyItemId || '') === String(b.itemId)))
+        .sort((x, y) => (Date.parse(y.creationDate || '') || 0) - (Date.parse(x.creationDate || '') || 0))[0];
+    const item = o && Array.isArray(o.lineItems) && o.lineItems[0] ? String((b.orderId == null ? b.itemId : o.lineItems[0].legacyItemId) || '') : '';
     if (!o || !acheteurDeCommande(o) || acheteurMasque(acheteurDeCommande(o)) || !ID.test(item)) return echec('Cette commande n’est pas rangée sur ce compte eBay, ou eBay n’a pas donné son acheteur — rien n’a été envoyé.', 409, 'commande');
     if (b.acheteur != null && !memeAcheteur(b.acheteur, acheteurDeCommande(o))) return echec('L’acheteur de cette commande a changé — rien n’a été envoyé.', 409, 'acheteur');
     const a = await jeton(ctx); if (a.ko) return a.ko;
