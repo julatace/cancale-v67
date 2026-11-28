@@ -65,7 +65,8 @@ export const SOUS_SECTIONS = {
   // (20 nov., « les mêmes dispositions sur toutes les plateformes ») Commandes D'ABORD : Ventes · eBay ouvre la même liste que
   // Ventes · Vinted (l'écran natif) ; le tableau et les autres sections sont des rangées sous elle.
   'ventes.ebay': [['ventes', 'Commandes'], ['tableau', 'Tableau'], ['agent', 'À traiter'], ['offres', 'Offres'], ['argent', 'Argent'], ['sante', 'Santé']],
-  'annonces.ebay': [['annonces', 'Annonces'], ['trafic', 'Trafic'], ['promo', 'Promotion']],
+  // (28 nov., lot ebay-automatismes) + Automatismes (baisse par règle, offres, paliers, remise en vente, masse).
+  'annonces.ebay': [['annonces', 'Annonces'], ['trafic', 'Trafic'], ['promo', 'Promotion'], ['auto', 'Automatismes']],
 };
 export const sousSections = (tab, site) => SOUS_SECTIONS[tab + '.' + site] || null;
 
@@ -104,7 +105,7 @@ const PLACE_SECTION = {
   leboncoin: { colis: ['ventes', 'leboncoin'] },
   ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'],
     // (15 nov., eBay complet 2) les commandes restent joignables par leur nom ; les nouvelles sections aussi.
-    ventes: ['ventes', 'ebay.ventes'], tableau: ['ventes', 'ebay.tableau'], argent: ['ventes', 'ebay.argent'], sante: ['ventes', 'ebay.sante'], trafic: ['annonces', 'ebay.trafic'] },
+    ventes: ['ventes', 'ebay.ventes'], tableau: ['ventes', 'ebay.tableau'], argent: ['ventes', 'ebay.argent'], sante: ['ventes', 'ebay.sante'], trafic: ['annonces', 'ebay.trafic'], auto: ['annonces', 'ebay.auto'] },
 };
 // Sans section (ou une section inconnue), l'espace d'un site ouvrait sur ses
 // ventes ; Vestiaire (une page qui commençait par « Publier ») sur ses annonces.
