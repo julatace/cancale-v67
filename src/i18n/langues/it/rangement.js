@@ -130,8 +130,8 @@ export default {
   "rgt.appliquer": "Applica questo piano",
   "rgt.place": "{nom} · r{r} c{c}",
   "rgt.resume": {
-    "one": "{pieces} stanza · {meubles} mobili · {places} caselle",
-    "other": "{pieces} stanze · {meubles} mobili · {places} caselle"
+    "one": "{n} stanza · {meubles} mobili · {places} caselle",
+    "other": "{n} stanze · {meubles} mobili · {places} caselle"
   },
   "rgt.resumeArticles": {
     "one": "per {n} articolo.",
