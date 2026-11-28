@@ -23,6 +23,7 @@ import ecran_rentabilite from './de/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_gains from './de/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './de/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './de/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
+import ecran_sneakers from './de/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './de/aDistance.js';
@@ -53,6 +54,7 @@ import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './de/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './de/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './de/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -2432,6 +2434,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
@@ -2494,4 +2497,5 @@ export default {
   ...ecran_messages_parfaits,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
+  ...ecran_sneakers,
 };

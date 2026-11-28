@@ -56,7 +56,8 @@ import { MAIN_MOTS, motsServeur } from './_lib/mots-vendeur.js';
 import { sbCle } from './_lib/cle.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication } from './_lib/ebay.js';
+import { comptesActifs, normaliserRegistre, lireDonnee as lireDonneeEbay, modifierDonnee as modifierDonneeEbay, jetonApplication, oublierJetonApplication, lireComptes as lireComptesEbay, lireReglageVendeur as lireReglageEbay, accessToken as jetonEbayVendeur } from './_lib/ebay.js';
+import { passageAutomatismesEbay } from './_lib/ebay-automatismes.js';   // (28 nov., lot ebay-automatismes)
 import { passageAlertesEbay, notifAlertes } from './_lib/ebay-alertes.js';
 import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
@@ -1961,6 +1962,24 @@ async function passageDuCron(req, res, moment, bailEtat) {
     } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
     const { fait, ...nombres } = r || {};
     res.status(fait ? (r.echecs || r.panne ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs && !r.panne, moment: 'alertes', ...nombres });
+    return;
+  }
+  // (28 nov., lot ebay-automatismes) `?moment=ebayauto` : LES AUTOMATISMES eBAY (baisse par règle, offres aux
+  // observateurs, contre-offres par paliers, remise en vente des invendus), et RIEN d'autre — GitHub chaque heure
+  // (.github/workflows/ebay-automatismes.yml). Seuls les vendeurs dont un moteur est ALLUMÉ sont visités
+  // (api/_lib/ebay-automatismes.js) ; sélection pas lue ⇒ 503. La réponse ne porte que des NOMBRES.
+  if (moment === 'ebayauto') {
+    let r = null;
+    try {
+      const cl = await cloisonnee();
+      if (!cl) { res.status(503).json({ ok: false, moment: 'ebayauto', raison: cl === null ? 'base injoignable' : 'cloisonnement-requis' }); return; }
+      r = await passageAutomatismesEbay({
+        lire: fetchPaginated, lireDonnee: lireDonneeEbay, modifierDonnee: modifierDonneeEbay, lireReglageVendeur: lireReglageEbay, accessToken: jetonEbayVendeur,
+        lireComptes: lireComptesEbay, comptesActifs, acces: accesVendeur, exclus: [PROPRIETAIRE_NEUTRE], maintenant: Date.now(), budgetMs: 100000,
+      });
+    } catch (e) { r = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; }
+    const { fait, ...nombres } = r || {};
+    res.status(fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!fait && !r.echecs, moment: 'ebayauto', ...nombres });
     return;
   }
   const soir = moment === 'soir';

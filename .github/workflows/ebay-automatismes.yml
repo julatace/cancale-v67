@@ -1,0 +1,35 @@
+name: Automatismes eBay (chaque heure)
+# (28 nov., lot ebay-automatismes) Julien allume un automatisme eBay (eBay › Automatismes) : baisse par règle,
+# offre aux observateurs, contre-offre par paliers, remise en vente des invendus. Le serveur les applique par l'API
+# officielle d'eBay, avec SES réglages et SON jeton (api/_lib/ebay-automatismes.js). Le plan gratuit de Vercel ne
+# lance une tâche planifiée qu'une fois par jour : GitHub appelle donc la route chaque heure. La route décide seule
+# (seuls les vendeurs dont un moteur est allumé, 12 gestes par compte et par passage au plus). Sans le secret
+# `CRON_SECRET` dans GitHub (le même que colis-frais.yml), rien n'est appelé et le journal le dit.
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ebay-automatismes
+  cancel-in-progress: false
+jobs:
+  ebayauto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler le passage des automatismes eBay
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucun automatisme eBay ne tourne."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 280 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=ebayauto")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,vendeurs:r.vendeurs,comptes:r.comptes,gestes:r.gestes,baisse:r.baisse,offres:r.offres,paliers:r.paliers,relance:r.relance,incertains:r.incertains,refus:r.refus,echecs:r.echecs,raison:r.raison}))" || true
+          test "$code" = "200"

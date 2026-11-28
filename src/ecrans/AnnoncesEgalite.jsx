@@ -24,6 +24,7 @@ import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiais
 import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
+import { poserArticlesSneakers, poserPreselectionSneakers } from '../sneakers/stockage.js';   // (28 nov., lot sneakers-cote)
 import VueAnnonces, { FeuilleFait } from '../natif/ecrans/Annonces.jsx';
 // (27 nov., choix de Julien) « Paires qui dorment » : LE plan (src/pairesDorment.js) et sa vue.
 import { planPairesDorment, selectCourbesPlan } from '../pairesDorment.js';
@@ -332,6 +333,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       meubleDe: (s) => { const m = (load('vrm_meubles', []) || []).find((x) => x && String(x.id) === String(s.m)); return m ? `${m.name || ''} · ${Number(s.i) + 1}` : ''; } });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lu, tic]);
+  // (28 nov., lot sneakers-cote) Les articles construits ici (tous sites, N° par identité) servent la feuille « Sneakers » (en masse, valeur).
+  React.useEffect(() => { if (modele && Array.isArray(modele.articles)) poserArticlesSneakers(modele.articles); }, [modele]);
   const sites = React.useMemo(() => (modele ? [...new Set(modele.articles.flatMap((a) => a.sites))] : []), [modele]);
   // (20 nov., « ce qui manque ») CET écran est le propriétaire (§11) de deux chiffres qu'Aujourd'hui lit :
   //   · les VUES ET FAVORIS de ses annonces en ligne (src/vuesFavoris.js) : un point daté par lecture qui change quelque
@@ -506,6 +509,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     { cle: 'pauseLbc', libelle: tr('actionsExt.pause'), icone: 'archive', phrase: tr('actionsExt.phrase', { site: 'Leboncoin' }),
       pour: (a) => lbcEnLigne(a).length > 0,
       juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : panneauEnRetard() ? { ok: false, raison: panneauEnRetard() } : { ok: true }) });
+  // (28 nov., lot sneakers-cote) « Modifier en masse » : la sélection (tous sites) ouvre la feuille Sneakers · En masse, déjà cochée ;
+  // là : −x % / prix / marque / pointure ⇒ récapitulatif (plancher prix mini / achat + 10 %) ⇒ SON « Appliquer » (src/sneakers/masse.js).
+  actions.push({ cle: 'masse', libelle: tr('snk.action.masse'), icone: 'tag', phrase: tr('snk.action.massePhrase'),
+    pour: (a) => a.annonces.some((x) => x.etat === 'enligne'),
+    juger: (sel) => (sel.length ? { ok: true } : { ok: false, raison: tr('egalite.selection.aucune') }) });
   const pauserLbc = (choisis) => {
     const l = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), compte: String(x.compte || '').replace(/^lbc-account:/i, ''), numero: a.numero || '' })));
     if (!l.length) return;
@@ -519,6 +527,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const onAction = (k, choisis) => {
     if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }
     if (k === 'pauseLbc') { pauserLbc(choisis); return; }
+    if (k === 'masse') { poserPreselectionSneakers(choisis.flatMap((a) => a.annonces.filter((x) => x.etat === 'enligne').map((x) => x.site + ':' + x.id))); try { window.dispatchEvent(new CustomEvent('vrm:sneakers', { detail: 'masse' })); } catch (_) {} return; }
     if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
     const sel = choisis.map(vintedDe).filter((v) => v && !v.verif).map((v) => ({ uid: v.compte, id: v.id }));

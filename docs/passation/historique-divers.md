@@ -2489,5 +2489,12 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., ebay-livraison, pour rester sous 60 Ko)
 - **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
 
-### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans messages-parfaits, pour rester sous 60 Ko)
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., sneakers-cote, pour rester sous 60 Ko)
 - **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., ebay-automatismes, pour rester sous 60 Ko)
+- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
+- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans messages-parfaits, pour rester sous 60 Ko)
+- **28 nov. · Sneakers : référence, pointure, cote VRM, étiquettes, en masse (sneakers-cote)** : référence fabricant + pointure sur la fiche (proposées, SON toucher pose ; jamais une identité) ; cote = SES ventes de la même référence à l'ACHAT (calculette) et dans la valeur du stock, jamais à la mise en ligne ; StockX : pas sans clé, écarté sur décision du 28 nov. ; masse par la file `prix` / l'API eBay, plancher mini / achat + 10 %. `2026-11-28-sneakers-cote.md`. Geste : aucun.
