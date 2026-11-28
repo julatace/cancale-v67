@@ -32,8 +32,12 @@ export function ligneLotAutre(x, i, { imprimesVc = {}, lbcPdf = false, numLbc = 
   }
   if (x.__autre === 'eb') {
     const e = x.x || {};
-    return { cle: x.key, site: 'ebay', trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: null,
-      pdf: false, cochable: false, num: x.num || '', titre: e.titre || `Commande ${e.orderId || ''}`.trim(), photo: x.photo || null, sous: 'eBay' };
+    // (28 nov., ebay-livraison) L'étiquette PRÉPAYÉE PAR L'ACHETEUR reçue par e-mail (`email_bordebay_{n° de commande}`,
+    // `x.etiquette`) part avec les bordereaux Vinted ; sans elle, la ligne reste grisée (l'étiquette se prend dans eBay).
+    // VRM n'achète jamais d'étiquette (§2.8).
+    const pdf = !!x.etiquette;
+    return { cle: x.key, site: 'ebay', orderId: String(e.orderId || ''), trNom: x.trNom, rang: i, age: null, ancienne: false, imprime: null,
+      pdf, cochable: pdf, num: x.num || '', titre: e.titre || `Commande ${e.orderId || ''}`.trim(), photo: x.photo || null, sous: 'eBay' };
   }
   return null;
 }

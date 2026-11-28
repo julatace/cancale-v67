@@ -30,6 +30,8 @@ export const PAYEURS_RETOUR = Object.freeze(['Buyer', 'Seller']);
 export const TAUX_TVA_MAX = 30;
 export const SOUS_TITRE_MAX = 55;
 const ID_PROFIL = /^\d{6,19}$/;
+// (28 nov., ebay-livraison) Le colis (grammes, centimètres) : des entiers bornés, rien d'autre.
+export const COLIS_BORNES = Object.freeze({ poids: [50, 30000], longueur: [1, 150], largeur: [1, 150], hauteur: [1, 150] });
 const ID_DESCRIPTEUR = /^\d{1,9}$/;
 const CP = /^[A-Za-z0-9 -]{2,12}$/;
 const montant = (v) => {
@@ -183,6 +185,19 @@ export function optionsPublication(it, compte = {}) {
   }
   // Annonce privée (les pseudos des acheteurs ne sont pas montrés).
   if (p.privee === true) o.privee = true;
+  // (28 nov., ebay-livraison) LE COLIS : poids et dimensions pour la livraison GÉRÉE par eBay (eBay en tire le port, que
+  // l'acheteur paie — §2.8). Aucun port, aucun transporteur, jamais « gratuite » : `<ShippingPackageDetails>` seulement.
+  if (p.colis != null) {
+    const c = p.colis;
+    if (typeof c !== 'object' || Array.isArray(c)) return { err: 'Colis mal formé.' + RIEN };
+    const x = {};
+    for (const k of ['poids', 'longueur', 'largeur', 'hauteur']) {
+      const v = Number(c[k]); const [a, b] = COLIS_BORNES[k];
+      if (!Number.isInteger(v) || v < a || v > b) return { err: k === 'poids' ? `Poids du colis : en grammes, de ${a} à ${b}.` + RIEN : `Taille du colis : en centimètres, de ${a} à ${b}.` + RIEN };
+      x[k] = v;
+    }
+    o.colis = x;
+  }
   return { options: Object.keys(o).length ? o : null };
 }
 
@@ -195,7 +210,7 @@ export function appelTrading(options, verif) {
 
 // Les morceaux de XML, chacun VIDE quand l'option n'est pas posée.
 export function xmlOptions(o, devise) {
-  const vide = { type: null, retour: null, apresEtat: '', apresDelai: '', fin: '', lieu: null, codePostal: '', sousTitre: '', categorie2: '' };
+  const vide = { type: null, retour: null, apresEtat: '', apresDelai: '', fin: '', lieu: null, codePostal: '', sousTitre: '', categorie2: '', colis: '' };
   if (!o) return vide;
   const m = (n) => (Math.round(n * 100) / 100).toFixed(2);
   const x = { ...vide };
@@ -227,6 +242,14 @@ export function xmlOptions(o, devise) {
   if (o.tva != null) x.fin += `<VATDetails><VATPercent>${o.tva}</VATPercent></VATDetails>`;
   if (o.privee) x.fin += '<PrivateListing>true</PrivateListing>';
   if (o.delaiEnvoi != null) x.delai = o.delaiEnvoi;
+  // (28 nov., ebay-livraison) Poids et taille, unités métriques (Trading API `ShippingPackageDetails`, hors `ShippingDetails` :
+  // son compte refuse tout `<ShippingDetails>`, mesuré le 27 sept.). ⚠️ NON MESURÉ à blanc sur son compte.
+  if (o.colis) {
+    const c = o.colis, kg = Math.floor(c.poids / 1000), g = c.poids % 1000;
+    x.colis = '<ShippingPackageDetails><MeasurementUnit>Metric</MeasurementUnit>'
+      + `<PackageDepth unit="cm">${c.hauteur}</PackageDepth><PackageLength unit="cm">${c.longueur}</PackageLength><PackageWidth unit="cm">${c.largeur}</PackageWidth>`
+      + `<WeightMajor unit="kg">${kg}</WeightMajor><WeightMinor unit="gr">${g}</WeightMinor></ShippingPackageDetails>`;
+  }
   return x;
 }
 
