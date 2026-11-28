@@ -70,3 +70,25 @@ Rouges d'AVANT cette branche (aussi rouges sur 8908343b7) : bancs `extension-fav
 
 ## Gestes de Julien
 Installer l'extension 5.455.8 (remplacer le dossier, ⟳). S'il veut l'agent : Favoris → l'interrupteur → « Allumer ».
+
+## Revue indépendante (28 nov. soir) — 7 défauts confirmés, corrigés
+Contrôle permanent : `scripts/audit-favoris-revue.cjs` (V1–V7 ; sur l'arbre d'avant 9c85efda3 : 16 rouges / 17 ; 12 mutations).
+Scripts du relecteur : `scripts/_revue/` (s1–s5).
+1. **Mauvaise transaction** : la transaction de la CONVERSATION n'est prise que si sa relecture dit CET article ET CETTE personne
+   (`achTx`, `txDeConv`) ; sinon écartée — offre demandée ⇒ rien de plus.
+2. **« Message d'abord » RETIRÉ** : toujours l'offre puis le message (Vintex). Offre refusée ou 404 ⇒ aucun message, la phrase de
+   Vinted sur la rangée, rien au registre (l'offre peut être refaite). Routes retenues par compte, 7 jours ; aucune ne change
+   plus l'ordre (la route « offre après message » n'existe plus).
+3. **Reprise d'un envoi à moitié fait** : l'acheteur a répondu ⇒ `acheteur_a_repondu`, rien n'est écrit ; l'auteur d'un message
+   reconnu par user_id / sender_id / author_id (message ou `entity`, objets user/sender/author) ; le message repris dit le prix
+   de l'offre RÉELLEMENT faite (`faits[n].px`).
+4. **Agent « occupé » pour toujours** : `expirerBail` est appelé à chaque tour de l'agent (route `auto`) et à chaque `suivant` ;
+   une tentative abandonnée retient le compte `GRACE_ABANDON_MS` (4 min après son dernier signe de vie), puis plus rien.
+5. **Un 2ᵉ lancement n'annule jamais une file en cours** : il s'y ajoute ; seul le reste d'une file ARRÊTÉE est remplacé (`remplace`).
+6. **409 « réglages ont changé »** : plus aucune relance automatique ; le nouveau récapitulatif est rendu au panneau (`reglages_changes`),
+   « Lancer » à nouveau. Les réglages envoyés restent ceux qu'il a vus (plus de remplacement silencieux à la relecture).
+7. **Import du passé** : `titreImport` et les composants morts retirés ; E6 élargi à tout `src/` et à l'extension. « Tout récupérer »
+   des AUTRES sites (`HistoriqueSites.jsx`) laissé, en attente de Julien.
+Risques traités : pause de l'agent chez VRM par compte (`auto_pause`, `pauseAgent`) ; `rechargerPageFavori` ne touche que l'onglet
+de travail de VRM ; grâce d'une tentative abandonnée (aucune 2ᵉ écriture simultanée) ; offre sans date expirée par la date de sa
+conversation (`updated_at`).
