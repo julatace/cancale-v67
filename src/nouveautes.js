@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., agent-rangement) src/rangement/ : l'entretien (avec ta clé IA ou sans IA), le plan, rien avant ton toucher.
+  { id: 'assistant-rangement', date: '2026-11-28', titre: 'Un assistant qui organise ton rangement', phrase: 'Il pose des questions, propose pièces, meubles et étages, puis tu valides.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.
   { id: 'expedie-sans-extension', date: '2026-11-28', titre: 'Colis parti : vu même sans l’extension', phrase: 'E-mail ou transporteur : il sort d’« à envoyer », réimprimer demande.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (27 nov., lot vrai-benefice) src/vraiBenefice.js, Statistiques › Gains « Par mois » et « Par compte »

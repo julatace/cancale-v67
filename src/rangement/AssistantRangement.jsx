@@ -70,7 +70,7 @@ function CarteCle({ enTete, onChange }) {
         <div className="rgt-cle">
           <label className="rgt-cle-champ">
             <span className="rgt-cle-libelle">{tr('rgt.cle.libelle')}</span>
-            <input type="password" autoComplete="off" spellCheck="false" value={cle} onChange={(e) => setCle(e.target.value)} placeholder="sk-ant-…" data-rgt-cle-champ="" maxLength={300}/>
+            <input type="password" autoComplete="off" spellCheck="false" value={cle} onChange={(e) => setCle(e.target.value)} placeholder={tr('rgt.cle.exemple')} data-rgt-cle-champ="" maxLength={300}/>
           </label>
           <Bouton variante="teinte" chargement={enCours} indisponible={!cle.trim()} onClick={() => envoyer({ action: 'poser', cle: cle.trim() })} attrs={{ 'data-rgt-cle-poser': '' }}>{tr('rgt.cle.poser')}</Bouton>
         </div>)}

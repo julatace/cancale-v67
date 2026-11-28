@@ -1,5 +1,6 @@
 // de · l'assistant de rangement (28 nov., lot agent-rangement)
 export default {
+  "rgt.cle.exemple": "sk-ant-…",
   "rgt.titre": "Lager-Assistent",
   "rgt.ouvrir": "Lager-Assistent",
   "rgt.ouvrirDetail": "Er stellt dir ein paar Fragen zu Räumen und Möbeln und schlägt dann den Plan vor.",
@@ -147,7 +148,6 @@ export default {
   "rgt.neuf": "neu",
   "rgt.retires": "Entfernte Möbel",
   "rgt.deplacements": {
-    "zero": "Keine Umlagerung",
     "one": "{n} Karton umzulagern",
     "other": "{n} Kartons umzulagern"
   },

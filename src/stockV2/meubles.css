@@ -190,6 +190,7 @@
 
 /* (28 nov., lot agent-rangement) L'entrée de l'assistant de rangement (une rangée entière se touche), les titres de pièce,
    la pastille « Près de la porte » d'une tuile. */
+@layer vrm-natif {
 .sm-assistant { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 12px 14px; border: 1px solid var(--n-bord, #D6D6D6);
   border-radius: var(--n-r-carte, 12px); background: var(--n-carte, #F3F3F3); color: var(--n-encre, #000); font: inherit; text-align: left; cursor: pointer; }
 .sm-assistant:active { background: var(--n-appui, #E6E6E6); }
@@ -201,3 +202,4 @@
 .sm-piece { grid-column: 1 / -1; margin: 12px 4px 0; font-size: 20px; font-weight: 700; color: var(--n-encre, #000); }
 .sm-tuile-porte { margin-left: 8px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; background: var(--n-vert-fond, #DDF4E6); color: var(--n-vert, #17744A); border: 1px solid var(--n-vert-bord, #C3EAD2); vertical-align: middle; }
 .sm-vide-gestes { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+}

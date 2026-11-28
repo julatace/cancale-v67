@@ -53,3 +53,6 @@
 .rgt-porte { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--n-vert-fond); color: var(--n-vert); border: 1px solid var(--n-vert-bord); }
 .rgt-meuble .sm-meuble { max-width: 100%; }
 .rgt-gestes { display: flex; justify-content: center; margin-top: 6px; }
+/* Les pièces posées à même la feuille gardent la gouttière des groupes natifs (16 px). */
+.rgt-moteur, .rgt-fil, .rgt-reponses, .rgt-resume, .rgt-alerte, .n-feuille-corps > .rgt-note, .rgt-gestes, .rgt-apercu > .rgt-note { margin-left: 16px; margin-right: 16px; }
+.rgt-resume { margin-left: 20px; }

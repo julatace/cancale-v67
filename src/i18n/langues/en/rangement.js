@@ -1,5 +1,6 @@
 // en · l'assistant de rangement (28 nov., lot agent-rangement)
 export default {
+  "rgt.cle.exemple": "sk-ant-…",
   "rgt.titre": "Storage assistant",
   "rgt.ouvrir": "Storage assistant",
   "rgt.ouvrirDetail": "It asks a few questions about your rooms and furniture, then suggests the plan.",
@@ -147,7 +148,6 @@ export default {
   "rgt.neuf": "new",
   "rgt.retires": "Removed units",
   "rgt.deplacements": {
-    "zero": "No moves",
     "one": "{n} box to move",
     "other": "{n} boxes to move"
   },
