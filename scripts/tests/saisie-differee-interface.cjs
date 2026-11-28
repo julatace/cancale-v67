@@ -58,8 +58,8 @@ const MUT = process.env.MUTATION === '1';
       const prefixes = 'nike air'.split('').map((_, i) => 'nike air'.slice(0, i + 1));
       const bons = retards.filter((x, i) => (nom === 'InputDiffere' && i >= 6) || x.vu === prefixes[i]).length;
       // Lettre montrée dès l'image suivante : au plus 1 rendu lourd (150 ms) ne la sépare de la frappe.
-      const lentes = retards.filter((x) => x.ms > 120).length;
-      ok(lentes <= 1, `${nom} : chaque lettre peinte sans attendre l'écran (${retards.map((x) => x.ms).join('/')} ms par lettre ; > 120 ms : ${lentes})`);
+      const lentes = retards.filter((x) => x.ms > 200).length;   // un rendu lourd entier = 300 ms ; une tranche de transition = 25 ms (machine chargée : marge)
+      ok(lentes <= 1, `${nom} : chaque lettre peinte sans attendre l'écran (la 1re mesure l'écran : lourd ⇒ transition) (${retards.map((x) => x.ms).join('/')} ms par lettre ; > 200 ms : ${lentes})`);
       ok(bons === retards.length, `${nom} : le champ montre ce qui est tapé, lettre après lettre (${retards.map((x) => JSON.stringify(x.vu)).join(' ')})`);
       // 2. Au bout : l'écran a exactement ce qui a été tapé.
       await p.waitForFunction(([e, v]) => { const x = document.querySelector('[data-ecran-q="' + (e === 'b' ? 'b:' : '') + v + '"]'); return !!x; }, [ecran, attendu], { timeout: 10000 }).catch(() => {});

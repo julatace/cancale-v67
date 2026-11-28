@@ -378,8 +378,9 @@ async function onglets(pg, cdp) {
       console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} INP ${String(m.inp).padStart(4)} ms · CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
     }
   }
-  // « Plus » (la feuille derrière la photo du profil), puis la fermer.
-  {
+  // « Plus » (la feuille derrière la photo du profil), puis la fermer. (À l'ordinateur, la carte du compte au pied de la
+  // barre latérale peut manquer : le geste est alors sauté, jamais une erreur du banc.)
+  if (await pg.locator('[data-n-coque-plus]').count().catch(() => 0)) {
     const m = await tracer(pg, cdp, async () => { await TAP(pg.locator('[data-n-coque-plus]').first(), { timeout: 30000 }); }, () => !!document.querySelector('[data-n-feuille-plus]'));
     sortie.push({ geste: 'Plus (ouvrir)', ...m }); console.log(`  Plus (ouvrir)  INP ${m.inp} ms · CPU ${m.cpu} ms · plus longue ${m.plusLongue} ms · écran ${m.mur} ms`);
     await pg.keyboard.press('Escape').catch(() => {}); await attendre(600);
