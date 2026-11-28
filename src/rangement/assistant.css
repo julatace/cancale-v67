@@ -36,11 +36,6 @@
 .rgt-alerte { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--n-ambre-fond); border: 1px solid var(--n-ambre-bord);
   color: var(--n-encre); font-size: 14px; font-weight: 600; line-height: 1.4; }
 
-.rgt-cle { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
-.rgt-cle-champ { display: flex; flex-direction: column; gap: 4px; }
-.rgt-cle-libelle { font-size: 13px; color: var(--n-encre-2); }
-.rgt-cle-champ input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--n-bord); background: var(--n-carte-2);
-  color: var(--n-encre); font: inherit; font-size: 16px; }
 
 .rgt-apercu { margin-top: 18px; display: flex; flex-direction: column; gap: 4px; }
 .rgt-resume { margin: 0 4px 6px; font-size: 15px; font-weight: 600; color: var(--n-encre); }
@@ -56,3 +51,5 @@
 /* Les pièces posées à même la feuille gardent la gouttière des groupes natifs (16 px). */
 .rgt-moteur, .rgt-fil, .rgt-reponses, .rgt-resume, .rgt-alerte, .n-feuille-corps > .rgt-note, .rgt-gestes, .rgt-apercu > .rgt-note { margin-left: 16px; margin-right: 16px; }
 .rgt-resume { margin-left: 20px; }
+/* (28 nov., ia-sans-cle) la progression du téléchargement du modèle du navigateur */
+.rgt-progres { display: block; width: calc(100% - 32px); margin: 0 16px 12px; height: 4px; accent-color: var(--n-accent, #0068D6); }

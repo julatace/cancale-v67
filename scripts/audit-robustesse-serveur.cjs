@@ -305,7 +305,8 @@ const ligne = (owner, id) => base.find((r) => r.owner === owner && r.id === id);
     const eb = fs.readFileSync(path.join(R, 'api', 'ebay.js'), 'utf8');
     const ai = fs.readFileSync(path.join(R, 'api', 'ai.js'), 'utf8');
     dit(/async function ebayJson[\s\S]{0,400}signal: AbortSignal\.timeout/.test(eb) && /async function tradingCall[\s\S]{0,900}signal: AbortSignal\.timeout/.test(eb), 'D eBay : lecture et appel Trading ont un délai');
-    dit((ai.match(/api\.anthropic\.com\/v1\/messages'[\s\S]{0,400}?signal: AbortSignal\.timeout/g) || []).length >= 2, 'D les deux appels à l’IA ont un délai');
+    // (28 nov., ia-sans-cle) l'IA tourne dans le navigateur : api/ai.js n'appelle PLUS aucun fournisseur d'IA.
+    dit(!/api\.anthropic\.com|x-api-key/.test(ai), 'D api/ai.js n’appelle plus aucun fournisseur d’IA (IA du navigateur, aucune clé)');
     let vj = {}; try { vj = JSON.parse(fs.readFileSync(fs.existsSync(path.join(R, 'vercel.json')) ? path.join(R, 'vercel.json') : path.join(ICI, 'vercel.json'), 'utf8')); } catch (_) {}
     let cl = {}; try { cl = await import('file://' + path.join(R, 'api', '_lib', 'cron-lots.js')); } catch (_) {}
     const fx = vj.functions || {};

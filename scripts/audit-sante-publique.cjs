@@ -75,7 +75,7 @@ const faireRes = () => { const x = { code: null, corps: null, entetes: {} }; x.s
   const compte = await import('file://' + path.join(R, 'api', 'compte.js'));
   const sante = async (jeton) => { const res = faireRes(); await compte.default({ method: 'GET', query: { mode: 'sante' }, headers: jeton ? { authorization: 'Bearer ' + jeton } : {} }, res); return res; };
   const PUBLIQUES = ['etat', 'ok', 'owner', 'serviceKey', 'statut'];
-  const CONFIG = ['detourage', 'ia', 'relancesEssai', 'stripe', 'stripeWebhook'];
+  const CONFIG = ['detourage', 'relancesEssai', 'stripe', 'stripeWebhook'];
 
   const p = await sante(null);
   const cles = Object.keys(p.corps || {}).sort();

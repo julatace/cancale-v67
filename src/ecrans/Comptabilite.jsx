@@ -7071,7 +7071,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (brouillons de republication : état retiré avec l'atelier. La clé
   //  `vinted_annonce_drafts` reste synchronisée — on ne supprime pas des
   //  données du nuage au passage d'un écran.)
-  const [repubAi, setRepubAi] = useState({ busy:false, key:'', res:null, why:'', reason:'' }); // état de la rédaction IA
   const [repubBucket, setRepubBucket] = useState('all'); // filtre file de travail : all|low|mid|top
   // ══ ATELIER DE REPUBLICATION — TRANCHE 1 : brouillon VRM (socle, non destructif) ══
   // Préparer/conserver le contenu d'une annonce DANS VRM, sans rien toucher sur
@@ -16856,39 +16855,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listQ, listSize, listBuy, sales.items, annBase, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts]);
   const copyText = (txt, key) => { try { navigator.clipboard.writeText(txt); setCopied(key); setTimeout(()=>setCopied(''),1500); } catch(_){} };
-  // ── Atelier « Rédiger avec l'IA » (feature A) ──────────────────────────────
-  // Le MOTEUR existe déjà côté serveur (api/ai.js : titre + description
-  // réécrits, consigne stricte « ne rien inventer », clé jamais dans le code).
-  // Il ne manquait que le bouton — l'atelier avait été retiré, laissant `repubAi`
-  // et le réglage de clé orphelins (motif du tiroir Nav, §4.11). On rebranche.
-  // ⚠️ COPIE SEULEMENT — rien n'est publié tout seul (§3) : il relit, ajuste et
-  // colle sur Vinted. La clé perso reste sur l'appareil (`vrm_ai_key`), envoyée
-  // en HTTPS ; côté serveur elle n'est même pas nécessaire si AI_API_KEY est sur
-  // Vercel. Pas de clé ⇒ on le DIT (aucune rédaction inventée).
-  const [iaOpen, setIaOpen] = useState(false);
-  // ⚠️ « TROUVE UNE SOLUTION » (Julien, 24 sept.) pour l'IA jugée « pas top » :
-  // le défaut, c'était un bouton qui échoue sans clé. On ne le montre donc QUE
-  // quand l'IA marche — clé locale posée, OU clé serveur (AI_API_KEY sur Vercel,
-  // illimitée pour tous les appareils). Sans clé, l'entrée n'apparaît pas :
-  // jamais de bouton mort. La sonde /api/ai (GET) ne renvoie aucune donnée
-  // sensible, juste { ready }.
-  const [aiPret, setAiPret] = useState(() => { try { return !!(load('vrm_ai_key','')||'').trim(); } catch(_) { return false; } });
-  useEffect(() => { if (aiPret) return; let stop=false;
-    fetch('/api/ai', { headers: enTeteSession() }).then(r=>r.json()).then(j=>{ if(!stop && j && j.ready) setAiPret(true); }).catch(()=>{});
-    return ()=>{ stop=true; }; }, [aiPret]);
-  const redigerIA = async (e) => {
-    if (!e) return;
-    setRepubAi({ busy:true, key:String(e.numero||e.id||''), res:null, why:'', reason:'' });
-    try {
-      const r = await fetch('/api/ai', { method:'POST', headers:{'content-type':'application/json', ...enTeteSession()},
-        body: JSON.stringify({ title:e.title||'', brand:extractBrand(e.title)||'',
-          size:e.size||extractSize(e.title)||'', price:e.price, desc:e.desc||'',
-          key: (load('vrm_ai_key','')||'').trim() || undefined }) });
-      const j = await r.json().catch(()=>({}));
-      if (j && j.ok) setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:{ title:j.title||'', desc:j.desc||'' }, why:j.why||'', reason:'' });
-      else setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:null, why:'', reason:(j&&j.reason)||'network' });
-    } catch(_) { setRepubAi({ busy:false, key:String(e.numero||e.id||''), res:null, why:'', reason:'network' }); }
-  };
+  // (28 nov., lot ia-sans-cle) L'atelier « Rédiger une annonce (IA) », retiré de l'interface le 30 sept. (Julien : « ça ne
+  // va pas servir ») mais resté dans le code (plus rien ne l'ouvrait), est SUPPRIMÉ : c'était le dernier lecteur de la clé
+  // `vrm_ai_key`. Aucune IA ne passe plus par le serveur (api/ai.js) ; ne pas le remettre sans sa demande.
 
   // ── Rapport comptable (#3) ─────────────────────────────────────────
   // ── SAISIE EN SÉRIE DES PRIX D'ACHAT ───────────────────────────────────────
@@ -31739,77 +31708,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                    ); })()}
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-      {iaOpen && (
-        <div onClick={()=>setIaOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}} data-noswipe="1">
-          <FermeAuRetour fermer={()=>setIaOpen(false)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,maxHeight:'90vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>✨ Rédiger une annonce (IA)</div>
-                <div style={{fontSize:11,color:C.muted,marginTop:1}}>Choisis un article : l'IA propose titre et description. <b>Tu copies, tu publies.</b> <Pourquoi>Rien n'est envoyé tout seul, et l'IA n'invente aucune caractéristique.</Pourquoi></div>
-              </div>
-              <button type="button" onClick={()=>setIaOpen(false)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer',lineHeight:1}}>×</button>
-            </div>
-            <div style={{overflowY:'auto',padding:'10px 12px 16px'}}>
-              {(()=>{ const items=Object.entries(numeros)
-                  .filter(([id,e])=>e&&e.numero&&String(e.title||'').trim())
-                  .sort((a,b)=>Number(b[1].numero||0)-Number(a[1].numero||0));
-                if(!items.length) return <div style={{textAlign:'center',padding:'26px 12px',color:C.muted,fontSize:13}}>Aucun article numéroté à rédiger.</div>;
-                return items.map(([id,e])=>{ const k=String(e.numero||id); const actif=repubAi.key===k;
-                  return (
-                  <div key={id} style={{background:C.card,border:`1px solid ${actif?C.accent+'55':C.border}`,borderRadius:12,padding:'8px 10px',marginBottom:6}}>
-                    <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                      <div style={{width:40,height:40,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        {e.photo?<PhotoVinted src={e.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<span style={{fontSize:17}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
-                      </div>
-                      <div style={{flex:'1 1 130px',minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                          <span style={{color:C.accentTexte,fontWeight:700}}>N°{e.numero}</span> {e.title}
-                        </div>
-                        {e.price!=null&&e.price!==''&&<div style={{fontSize:11,color:C.muted,marginTop:1}}>{eur(e.price).toFixed(2).replace('.',',')}&nbsp;€</div>}
-                      </div>
-                      <button type="button" onClick={()=>redigerIA({...e,id})} disabled={repubAi.busy&&actif}
-                        style={{flexShrink:0,border:`1px solid ${C.accent}`,background:`${C.accent}12`,color:C.accentTexte,borderRadius:12,padding:'8px 12px',fontSize:13,fontWeight:700,cursor:repubAi.busy&&actif?'default':'pointer',fontFamily:'inherit',opacity:repubAi.busy&&actif?0.6:1}}>
-                        {repubAi.busy&&actif?'…':'✨ Rédiger'}
-                      </button>
-                    </div>
-                    {actif&&!repubAi.busy&&repubAi.reason&&(
-                      <div style={{marginTop:8,fontSize:12,color:C.muted,lineHeight:1.45}}>
-                        {repubAi.reason==='no-key'
-                          ? <span data-ia-pas-active="">L'assistant IA n'est pas encore activé sur VRM pour ton compte : rien n'est rédigé sans lui, tes suggestions calculées restent là.</span>
-                          : <>L'IA n'a pas répondu ({repubAi.reason}). Réessaie dans un instant.</>}
-                      </div>
-                    )}
-                    {actif&&!repubAi.busy&&repubAi.res&&(()=>{
-                      // (5 nov.) Le N° écrit là où il l'a choisi (Réglages → Numéros →
-                      // « Le N° sur tes annonces Vinted », src/etiquetteNumero.js) : le
-                      // texte copié est celui qui partira. Un refus (titre > 100) laisse
-                      // le texte tel quel et le dit.
-                      const etq=poserEtiquette({titre:repubAi.res.title,description:repubAi.res.desc},e.numero,lireReglageEtiquette(load(CLE_REGLAGE_ETIQUETTE,null)));
-                      const tIA=etq.titre, dIA=etq.description;
-                      return (
-                      <div data-ia-etiquette={etq.pose?etq.place:(etq.refus?'refus':'aucune')} style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
-                        <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400,marginBottom:2}}>Titre proposé</div>
-                          <div style={{fontSize:13,color:C.text,fontWeight:600}}>{tIA}</div>
-                          <button type="button" onClick={()=>copyText(tIA,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
-                        </div>
-                        <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400,marginBottom:2}}>Description proposée</div>
-                          <div style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{dIA}</div>
-                          <button type="button" onClick={()=>copyText(dIA,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
-                        </div>
-                        {etq.refus&&<div data-ia-etiquette-refus="" style={{fontSize:12,color:C.text}}>N°{e.numero} pas ajouté : {etq.refus}.</div>}
-                        {repubAi.why&&<div style={{fontSize:11,color:C.muted,fontStyle:'italic'}}>{repubAi.why}</div>}
-                      </div>
-                    ); })()}
-                  </div>
-                  ); });
-              })()}
             </div>
           </div>
         </div>

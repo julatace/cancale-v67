@@ -792,9 +792,6 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
   const [pairId, setPairId] = React.useState(null);    // paire choisie (ses photos partent avec)
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [pairQ, setPairQ] = React.useState('');        // recherche dans le sélecteur de paires
-  const [aiPret, setAiPret] = React.useState(false);   // l'IA de rédaction est-elle branchée ?
-  const [aiBusy, setAiBusy] = React.useState(false);
-  const [aiWhy, setAiWhy] = React.useState('');
   const [plusAttr, setPlusAttr] = React.useState(false);  // afficher les caractéristiques facultatives
   // (11 nov., ebay-complet) TOUS LES RÉGLAGES eBAY de cette annonce : ses choix
   // (`reglagesA`) par-dessus ses défauts (Paramètres → Comptes eBay).
@@ -863,28 +860,8 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       </select>
     );
   };
-  // L'IA de rédaction (api/ai) est-elle disponible ? On ne montre le bouton que
-  // si oui — jamais un bouton mort (§ « une clé perso reste sur l'appareil »).
-  React.useEffect(() => { let stop = false;
-    try { if ((load('vrm_ai_key', '') || '').trim()) { setAiPret(true); return; } } catch (_) {}
-    fetch('/api/ai', { headers: enTeteSession() }).then(r => r.json()).then(j => { if (!stop && j && j.ready) setAiPret(true); }).catch(() => {});
-    return () => { stop = true; };
-  }, []);
-  // Génère un titre eBay avec l'IA — à partir des VRAIES caractéristiques de la
-  // paire (marque/taille/état) ; l'IA a consigne de NE RIEN INVENTER (api/ai).
-  const titreIA = async () => {
-    const base = (pairSel ? pairSel.title : titre) || '';
-    if (!base.trim()) { setRes({ err: 'Choisis un article (ou tape un titre) d\'abord.' }); return; }
-    setAiBusy(true); setAiWhy(''); setRes(null);
-    try {
-      const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json', ...enTeteSession() },
-        body: JSON.stringify({ title: base, brand: extractBrand(base) || '', size: (pairSel && pairSel.taille) || extractSize(base) || '', price: prix || undefined, desc: desc || '', key: (load('vrm_ai_key', '') || '').trim() || undefined }) });
-      const j = await r.json().catch(() => ({}));
-      if (j && j.ok && j.title) { setTitre(String(j.title).slice(0, 80)); if (!desc.trim() && j.desc) setDesc(String(j.desc)); setCat(null); setCheck(null); setAiWhy(j.why || ''); }
-      else setRes({ err: (j && j.reason === 'no-key') ? 'La rédaction automatique demande ta propre clé IA, et VRM n\'a pas encore de réglage pour la poser : écris le titre toi-même.' : 'L\'IA n\'a pas pu rédiger le titre — réessaie.' });
-    } catch (_) { setRes({ err: 'IA injoignable — réessaie.' }); }
-    setAiBusy(false);
-  };
+  // (28 nov., lot ia-sans-cle) « Optimiser le titre avec l'IA » (retiré de l'écran le 30 sept.) : son code mort, dernier
+  // envoi de `vrm_ai_key` au serveur, est SUPPRIMÉ. Aucune IA ne passe plus par le serveur (api/ai.js).
   // Choisir une paire remplit le titre (règle §11 partagée), sa pointure et
   // TOUTES ses photos captées — plus aucun lien à coller. Le titre reste
   // modifiable ; la pointure sera reportée sur l'attribut eBay après l'analyse.
@@ -1520,14 +1497,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
           {/* 2 — TITRE & CATÉGORIE */}
           <BlocEbay n="2" titre="Titre & catégorie" right={<span style={{ fontSize: 11, color: titre.length > 75 ? C.warn : C.muted }}>{titre.length}/80</span>}>
             <input value={titre} maxLength={80} onChange={e => { setTitre(e.target.value); setCat(null); setCheck(null); }} placeholder={vendActuel() === 'sneakers' ? 'Nike Air Max 1 Aquatone Bleu Taille 44' : exemplesActuels().annonce.titre} style={inp} />
-            {/* Rédaction IA : optimise le titre à partir des VRAIES infos de la
-                paire (jamais d'invention, api/ai). Affiché seulement si l'IA est
-                branchée — sinon le titre reste celui de la paire, déjà rempli. */}
-            {/* Bouton IA retiré le 30 septembre (rédaction IA abandonnée). */}
-            {false && aiPret && (
-              <button type="button" onClick={titreIA} disabled={aiBusy} style={{ marginTop: 8, width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}0d`, color: C.accentTexte, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: aiBusy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: aiBusy ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>{aiBusy ? 'L\'IA rédige…' : '✨ Optimiser le titre avec l\'IA'}</button>
-            )}
-            {aiWhy && <div style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>✨ {aiWhy}</div>}
+            {/* Bouton IA retiré le 30 septembre (rédaction IA abandonnée) ; son code supprimé le 28 nov. (ia-sans-cle). */}
             <div style={{ marginTop: 10 }}>
               {!cat ? (
                 <button type="button" onClick={() => analyser()} disabled={analyse || !titre.trim()} style={{ width: '100%', border: `1px solid ${C.accent}`, background: `${C.accent}12`, color: C.accentTexte, borderRadius: 12, padding: '11px 14px', fontSize: 13, fontWeight: 700, cursor: (analyse || !titre.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (analyse || !titre.trim()) ? 0.5 : 1 }}>{analyse ? 'eBay cherche la catégorie…' : 'Trouver la catégorie eBay'}</button>

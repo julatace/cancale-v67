@@ -3,8 +3,8 @@
 //  Julien : « je veux un vrai agent IA qui pose des questions, totalement intelligent, qui adapte les étages, les pièces
 //  de rangement, etc. ». Récit : docs/passation/2026-11-28-agent-rangement.md.
 //
-//  Module PUR (aucun accès au navigateur ni à la base). Les deux moteurs de l'assistant (src/rangement/entretien.js sans
-//  IA, src/rangement/moteurIA.js avec la clé du vendeur) rendent LE MÊME plan JSON, et ce module le VALIDE avant tout
+//  Module PUR (aucun accès au navigateur ni à la base). Les deux moteurs de l'assistant (src/rangement/entretien.js, l'assistant
+//  guidé ; src/rangement/moteurIA.js, l'IA du navigateur — aucune clé) rendent LE MÊME plan JSON, et ce module le VALIDE avant tout
 //  affichage et tout enregistrement — une réponse de modèle qui ne passe pas `validerPlan` n'est jamais montrée.
 //
 //  LE FORMAT (strict : toute clé inconnue, tout type faux, toute borne dépassée ⇒ refus, avec la raison) :
