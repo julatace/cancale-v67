@@ -16,7 +16,7 @@
 .vrm-vis .vrm-vis-apercu:has(.vrm-vis-img:only-child) { justify-content: center; }
 .vrm-vis .vrm-vis-attente, .vrm-vis .vrm-vis-vide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px 12px; border-radius: 12px; background: var(--fu-case, rgba(118,118,128,.12)); font: 400 14px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-vis .vrm-vis-vide b { color: var(--fu-encre, inherit); font-weight: 600; font-size: 15px; }
-.vrm-vis .vrm-vis-manques { margin: 0; padding: 0 2px; list-style: none; display: flex; flex-direction: column; gap: 4px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-ambre-txt, #b25000); overflow-wrap: anywhere; }
+.vrm-vis .vrm-vis-manques { margin: 0; padding: 0 2px; list-style: none; display: flex; flex-direction: column; gap: 4px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-ambre-txt, var(--n-ambre)); overflow-wrap: anywhere; }
 .vrm-vis .vrm-vis-note { margin: 0 2px; font: 400 13px/1.4 var(--vrm-police); color: var(--fu-gris2, #6e6e73); }
 .vrm-vis .vrm-vis-pied { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 :root:not([data-theme="dark"]) .vrm-vis .vrm-vis-boutique input { background: var(--fu-carte, #fff); }

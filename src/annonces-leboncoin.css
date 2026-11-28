@@ -19,7 +19,7 @@
 .vrm-lbc-catalog-info [data-etat]{display:inline-flex;align-items:center;gap:5px;}
 .vrm-lbc-catalog-info [data-etat]::before{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--gestion-muted,#636366);}
 .vrm-lbc-catalog-info [data-etat=active]::before{background:var(--gestion-accent,#16181D);}
-.vrm-lbc-catalog-info [data-etat=pause]::before,.vrm-lbc-catalog-info [data-etat=plusvue]::before{background:var(--vrm-warn,#B25000);}
+.vrm-lbc-catalog-info [data-etat=pause]::before,.vrm-lbc-catalog-info [data-etat=plusvue]::before{background:var(--vrm-warn,var(--n-ambre));}
 .vrm-lbc-catalog-info [data-etat=vendue]::before{background:var(--gestion-ink,#3A3A3C);}
 :root[data-theme=dark] .vrm-lbc-catalog-info [data-etat=active]::before{background:var(--vrm-accent,#B5BDCA);}
 .vrm-lbc-catalog li>b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
@@ -32,7 +32,7 @@
 .vrm-lbc-catalog :focus-visible{outline:2px solid var(--gestion-accent,#16181D);outline-offset:-2px;}
 @media(max-width:767px){.vrm-lbc-catalog li{gap:8px;padding:8px 10px;}.vrm-lbc-catalog header{padding:12px;}.vrm-lbc-catalog header>span{white-space:normal;text-align:right;max-width:90px;}.vrm-lbc-catalog>input{font-size:17px;}.vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{font-size:11px;padding:0 4px;}.vrm-lbc-catalog-gestes{flex-direction:column;gap:0;}.vrm-lbc-catalog-info>div small{flex-basis:100%;}}
 /* (6 nov.) « À confirmer » (src/enLigneLbc.js) : la lecture complète de « Mes annonces » a plus de 24 h. Dit UNE fois, en tête ; ambre = un geste à faire (§7). */
-.vrm-lbc-catalog-info [data-etat=aconfirmer]::before{background:var(--vrm-warn,#B25000);}
+.vrm-lbc-catalog-info [data-etat=aconfirmer]::before{background:var(--vrm-warn,var(--n-ambre));}
 .vrm-lbc-catalog>p.vrm-lbc-catalog-confirmer{padding:0 16px 12px;font-size:12px;line-height:1.55;}
 .vrm-lbc-catalog-confirmer a{display:inline-flex;align-items:center;min-height:44px;color:var(--gestion-accent,#16181D);font-weight:600;text-decoration:none;}
 :root[data-theme=dark] .vrm-lbc-catalog-confirmer a{color:var(--vrm-accent,#B5BDCA);}

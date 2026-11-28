@@ -137,7 +137,8 @@ import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './fr/actionsExt.js';
 import ecran_ebay_series from './fr/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './fr/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_ameliorations27 from './fr/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_ameliorations27 from './fr/ameliorations27.js';
+import ecran_compta_finitions from './fr/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './fr/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './fr/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -584,7 +585,7 @@ export default {
   "reglages.depannage.statut.q": "VRM semble en panne",
   "reglages.depannage.statut.r": "Regarde la page d’état. Tout y marche ? Recharge cette page.",
   "reglages.donnees.confidentialite": "politique de confidentialité",
-  "reglages.donnees.desc": "Tes ventes, achats et annonces dans un fichier, pour toi.",
+  "reglages.donnees.desc": "Ventes, achats, annonces : un fichier, pour toi.",
   "reglages.donnees.droits": "Tes autres droits :",
   "reglages.donnees.exporter": "Exporter",
   "reglages.donnees.exporterOu.dessous": "« Sauvegarde complète » ci-dessous",
@@ -2485,6 +2486,7 @@ export default {
   ...ecran_offres_photos,
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
+  ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
   ...ecran_boutons_donnees,

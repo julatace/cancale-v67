@@ -230,7 +230,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   const rythme = E.etatEmballages(reg, E.colisFaits({ vinted: Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['r' + i, t0 + J + i * J])) }), t0 + 8 * J);
   dit(rythme.types[0].jours === 3 && E.etatEmballages(reg, faits(['1', '2']), t0 + 2 * J).types[0].jours === null, 'E8 « à ton rythme ≈ N jours » : 3 cartons, 7 colis en 8 j ⇒ ≈ 3 j ; seulement mesuré (≥ 3 colis en 14 j), sinon rien', String(rythme.types[0].jours));
   dit(E.poserType(reg, { nom: 'Bulle', n: '3', tous: true, pour: 'beaucoup' }).erreur && Object.keys(E.lireReglage(reg)).includes('parModele'), 'E9 « une unité fait combien de colis » : un nombre entier, sinon refusé');
-  dit(/color: var\(--d-ambre, var\(--vrm-warn, #B25000\)\)/.test(lire('styles-colis-plus.css')) && !/#D70015|#FF3B30|var\(--vrm-danger/.test(lire('styles-colis-plus.css')), 'E10 l’alerte de fournitures est ambre, jamais rouge (§7)');
+  dit(/color: var\(--d-ambre, var\(--vrm-warn, var\(--n-ambre\)\)\)/.test(lire('styles-colis-plus.css')) && !/#D70015|#FF3B30|var\(--vrm-danger/.test(lire('styles-colis-plus.css')), 'E10 l’alerte de fournitures est au jeton du geste (--n-ambre : plus d’orange, 28 nov.), jamais rouge (§7)');
 
   // ── F · format retenu par modèle ─────────────────────────────────────────────
   console.log('\n── F. 96 · Le format retenu par modèle');

@@ -15,7 +15,7 @@
 .vrm-cp-note { margin: 2px 0 8px; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
 /* 97 · fournitures */
 .vrm-cp-four { font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
-.vrm-cp-alerte { margin: 4px 0 10px; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-ambre, var(--vrm-warn, #B25000)); }
+.vrm-cp-alerte { margin: 4px 0 10px; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-ambre, var(--vrm-warn, var(--n-ambre))); }
 .vrm-emb2-form label.vrm-cp-coche { flex-direction: row; align-items: center; gap: 10px; min-height: 44px; font-size: var(--d-t-15, 15px); font-weight: 400; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
 .vrm-emb2-form label.vrm-cp-coche input { width: 22px; height: 22px; accent-color: var(--d-accent, #16181D); }
 
@@ -71,4 +71,4 @@
 .vrm-cp-rate input { width: 22px; height: 22px; flex: none; accent-color: var(--d-accent, #16181D); }
 .vrm-cp-rate span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-cp-rate small { flex: none; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
-.vrm-cp-rate[data-lot-rate-coche="1"] small { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }
+.vrm-cp-rate[data-lot-rate-coche="1"] small { color: var(--d-ambre, var(--vrm-warn, var(--n-ambre))); font-weight: 600; }

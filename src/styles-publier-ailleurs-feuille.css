@@ -32,7 +32,7 @@
 .vrm-pa-site-nom { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; }
 .vrm-pa-etat { flex: none; font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); }
 .vrm-pa-site[data-pa-etat="vue-en-ligne"] .vrm-pa-etat, .vrm-pa-site[data-pa-etat="publiee"] .vrm-pa-etat { color: var(--fu-encre, #1d1d1f); }
-.vrm-pa-etat[data-ton="geste"] { color: var(--fu-ambre-txt, #b25000); }
+.vrm-pa-etat[data-ton="geste"] { color: var(--fu-ambre-txt, var(--n-ambre)); }
 
 .vrm-pa-frise { list-style: none; margin: 10px 0 8px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .vrm-pa-frise li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; color: var(--fu-gris, #6e6e73); }
@@ -45,12 +45,12 @@
 .vrm-pa-frise li[data-pa-etape-etat="fait"] .vrm-pa-pastille { background: var(--fu-encre, #1d1d1f); color: var(--fu-carte, #fff); }
 .vrm-pa-frise li[data-pa-etape-etat="ici"] { color: var(--fu-encre, #1d1d1f); }
 .vrm-pa-frise li[data-pa-etape-etat="ici"] .vrm-pa-pastille { box-shadow: inset 0 0 0 2px var(--fu-encre, #1d1d1f); background: transparent; color: var(--fu-encre, #1d1d1f); }
-.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] { color: var(--fu-ambre-txt, #b25000); }
-.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] .vrm-pa-pastille { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] { color: var(--fu-ambre-txt, var(--n-ambre)); }
+.vrm-pa-frise li[data-pa-etape-etat="a-corriger"] .vrm-pa-pastille { background: var(--fu-ambre-fond, var(--n-ambre-fond)); color: var(--fu-ambre-txt, var(--n-ambre)); }
 
 .vrm-pa-manques { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .vrm-pa-manques li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--fu-case, #f2f2f7); }
-.vrm-pa-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); }
+.vrm-pa-manques li[data-bloque="1"] { background: var(--fu-ambre-fond, var(--n-ambre-fond)); color: var(--fu-ambre-txt, var(--n-ambre)); }
 .vrm-pa-manques b { font-size: 15px; font-weight: 700; }
 .vrm-pa-manques small { font-size: 13px; color: var(--fu-gris, #6e6e73); }
 .vrm-pa-manques li[data-bloque="1"] small { color: inherit; }

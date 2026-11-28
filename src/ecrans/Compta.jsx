@@ -3173,7 +3173,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
     <summary>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{tr('compta.microEntreprise')}</span>
-        <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
+        <span style={{ fontSize: 13, color: besoin ? (C.warn || 'var(--n-ambre)') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
     <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
@@ -3201,7 +3201,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
   const jour = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   const nomMois = (ym) => MOIS_NOMS_FR[Number(String(ym).slice(5)) - 1];
   const ETAT = { declaree: 'Notée déclarée', a_declarer: 'À déclarer', en_retard: 'Pas notée', en_cours: 'En cours' };
-  const ambre = C.warn || C.amber || '#B25000';
+  const ambre = C.warn || C.amber || 'var(--n-ambre)';
   // (2 nov.) Dans « Le détail », le repli porte déjà le titre : pas de redite.
   const titre = sansTitre ? null : <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{tr('compta.suiviDeclarationsUrssaf')}</div>;
   if (suivi === undefined) return <Card style={{ padding: '14px 16px', marginTop: sansTitre ? 0 : 12 }}><div data-suivi-urssaf="charge">{titre}<div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{tr('compta.lectureDeclarations')}</div></div></Card>;
@@ -3311,6 +3311,10 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
 }
 function CarteUrssafMois({ liveStats, onNav }) {
   const v = useLigneUrssaf();
+  // (28 nov., compta-finitions, point 3) La carte « Déclarer {période} » (`PrevisionUrssafCarte`, en tête de Déclarer) porte DÉJÀ
+  // le montant à recopier, les cotisations, « J'ai déclaré » et « Ouvrir l'URSSAF » de la période ouverte : la même lecture
+  // (`usePrevisionUrssaf`) dit ici si elle est montrée, pour ne pas les redire (§7 : un nombre, un geste, une fois).
+  const { P: Pparcours } = usePrevisionUrssaf();
   const urssafMois = v ? v.mois : null;
   // `declare` : le registre « J'ai déclaré ce mois » était-il lu quand la ligne
   // a été publiée (`lu`) ou pas encore (`pasSu`) ? (revue du 6 octobre)
@@ -3438,6 +3442,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
             const aNoter = registreDecl == null ? ymsDue : ymsDue.filter((ym) => !moisDeclare(registreDecl, ym));
             const faite = registreDecl != null && ymsDue.length > 0 && aNoter.length === 0;
             const nomYm = (ym) => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); };
+            const parcoursLa = finie && aNoter.length > 0 && !!Pparcours && (Pparcours.etat === 'lu' || Pparcours.etat === 'passu') && !Pparcours.enCours
+              && Array.isArray(Pparcours.mois) && ymsDue.some((ym) => Pparcours.mois.includes(ym));
             const late=!faite&&urssafDue.daysLeft<0, soon=!faite&&urssafDue.daysLeft>=0&&urssafDue.daysLeft<=14;
             const col=late?C.danger:soon?C.warn:C.text;
             // (29 oct., revue) PÉRIODE DÉJÀ NOTÉE « DÉCLARÉE » : plus de compte à
@@ -3467,6 +3473,16 @@ function CarteUrssafMois({ liveStats, onNav }) {
                 </div>
               );
             }
+            // La période ouverte est déjà dans la carte « Déclarer » du haut : ici, l'échéance et la période seulement.
+            if (parcoursLa) return (
+              <div data-prevision-urssaf={prevIci ? prevIci.etat : 'avant'} data-prevision-label={urssafDue.label} data-prevision-dans-parcours="" style={{background:C.card2||C.bg,borderRadius:12,padding:'12px 14px',fontSize:13,lineHeight:1.5,color:C.muted}}>
+                <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:15,fontWeight:700,color:C.text,letterSpacing:-0.2,whiteSpace:'nowrap'}}>{urssafDue.dueDate.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</span>
+                  <span style={{fontSize:13,fontWeight:600,whiteSpace:'nowrap',color:(late||soon)?C.text:C.muted}}>{late?tr('compta.retard', { x: String(-urssafDue.daysLeft) }):urssafDue.daysLeft===0?tr('compta.aujourdHui'):tr('compta.dans2', { daysLeft: String(urssafDue.daysLeft) })}</span>
+                </div>
+                <div style={{marginTop:4}}>{tr('stats.periode')}{tr('commun.deuxPoints')}<b style={{color:C.text,fontWeight:600}}>{urssafDue.label}</b></div>
+              </div>
+            );
             return (
               <div data-prevision-urssaf={prevIci ? prevIci.etat : 'avant'} data-prevision-label={urssafDue.label} data-prevision-ca={prevIci && prevIci.ca != null ? String(prevIci.ca) : ''} data-prevision-partiel={prevIci && prevIci.partiel ? '1' : ''} style={{background:C.card2||C.bg,borderRadius:12,padding:'14px 14px 12px',border:(late||soon)?`1px solid ${col}55`:`1px solid transparent`}}>
                 <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:'2px 10px',flexWrap:'wrap'}}>
@@ -3558,7 +3574,7 @@ const periodeUrssafDuMois = (ym, ligne, declare, taux) => {
   return { label: due.label, date: due.dueDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
     declaree: nDeclares === yms.length, nDeclares, memeQueMois: yms.length === 1, ca, partiel };
 };
-function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accounts }) {
+function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accounts, onNav = null }) {
   const v = useLigneUrssaf();
   const urssafMois = v ? v.mois : null;
   const TAUX_URSSAF = tauxUrssaf() / 100;
@@ -3649,6 +3665,10 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
           <NRangee icone={<Icon name="printer" size={22}/>} titre={recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')} fin="chevron" indisponible={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} attrs={{ 'data-recap-imprimer': '', title: tr('compta.recapImprimerTitre') }}/>
           <NRangee icone={<Icon name="doc" size={22}/>} titre={recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('pdf')} attrs={{ 'data-recap-pdf': '' }}/>
           <NRangee icone={<Icon name="save" size={22}/>} titre={recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('csv')} attrs={{ 'data-recap-csv': '', title: tr('compta.fichierExcelNumbers') }}/>
+          {/* (28 nov., compta-finitions, point 4) Le RAPPORT COMPTABLE du même mois (ventes, registre d'achats, CSV) : il ne
+              s'ouvrait plus que par « J'ai déclaré » depuis que le menu « Outils » de Ventes n'est plus rendu. Le même chemin,
+              sans le formulaire de déclaration (`demanderDeclaration(…, { rapport: true })`). */}
+          {onNav ? <NRangee icone={<Icon name="receipt" size={22}/>} titre={tr('cf.rapportComptable')} fin="chevron" onClick={()=>demanderDeclaration(ymRecap, onNav, { rapport: true })} attrs={{ 'data-recap-rapport': ymRecap }}/> : null}
         </div>
         <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
@@ -3961,8 +3981,11 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
           {cotis != null
             ? <b className="vrm-argent-w-n">{P.partiel ? <small>{tr('journee.moins')} </small> : null}{somme(cotis)}</b>
             : chiffre(qD)}
-          {cotis != null && P.ca != null ? <small className="vg-a-petit vg-a-urssaf-pied">{tr('verre2.argent.tauxDe', { taux: tauxTxt, ca: montant(P.ca) })}</small> : null}
         </button>
+        {/* (28 nov., compta-finitions, point 2 — §7 « un nombre, une fois ») La base de l'URSSAF (« 12,4 % de 60 € reçus ») redisait
+            le « Reçu » écrit juste au-dessus : elle n'est plus écrite sous le montant, elle s'ouvre sous « Pourquoi ? » (la même
+            source, `P.ca`). */}
+        {cotis != null && P.ca != null ? <span className="vg-a-urssaf-pied" data-argent-urssaf-base={String(Math.round(P.ca * 100))}><Pourquoi label={tr('cf.urssafPourquoi')}>{tr('verre2.argent.tauxDe', { taux: tauxTxt, ca: montant(P.ca) })}</Pourquoi></span> : null}
         {aNoter.length ? <Bouton variante="secondaire" className="vg-a-declare" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
       </div>
     </section>
@@ -4038,6 +4061,10 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
       onClick: manquent > 0 ? versSaisiePrix : () => ouvrirRepliCompta('compta-benefice'), sous: '' },
   ];
+  // (28 nov., compta-finitions, point 1 — règle du 22 oct.) Rien n'a JAMAIS été noté en dépenses (et il n'a pas répondu
+  // « pas de dépenses ») : le bénéfice affiché n'est qu'un net AVANT ses dépenses — la rangée le dit (`depensesEtat`, la même
+  // règle que « Net avant tes dépenses »). Pas avant l'arrivée du nuage (pas su ≠ jamais noté). Le brut l'est par son nom.
+  { const fb = faits.find((x) => x.id === 'benefice'); if (fb && !fb.brut && !fb.pasSu && Bn && Bn.depenses === 'jamais' && isCloudReady()) fb.avantDepenses = true; }
   // (21 nov., argent-vintex) `sur` : la population des prix (Bn.n) — la phrase « 13 prix d'achat à saisir sur 15 » vient
   // de la MÊME source que la couverture (n − nCout sur n), plus de second chiffre à côté.
   const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, sur: Bn.n, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
@@ -4183,7 +4210,7 @@ function PrevisionUrssafCarte({ onNav }) {
       <div className="n-arg-gestes" data-urssaf-etape="3">
         {aNoter.length ? <NBouton variante="plein" onClick={() => demanderDeclaration(aNoter[0], onNav)} attrs={{ 'data-fu-geste': '', 'data-urssaf-cest-declare': aNoter[0] }}>{tr('compta.aiDeclare')}</NBouton>
           : <p className="n-arg-note">{tr('compta.dejaNoteIci')}</p>}
-        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
+        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
       </div>
     </NCarte>
   );
@@ -4354,6 +4381,9 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
               {morceaux.map((m, i) => <React.Fragment key={i}>{i ? ' · ' : ''}{m}</React.Fragment>)}
             </p>;
           })()}
+          {/* (28 nov., compta-finitions) « Ton bénéfice » est daté à la VENTE (après dépenses et URSSAF) quand « Reçu » / « Par mois »
+              sont datés au VERSEMENT : deux chiffres, deux noms, et chacun dit sa date sous son « Pourquoi ? ». */}
+          <div className="vrm-compta-pourquoi-date" data-benef-pourquoi-date="vente"><Pourquoi ecrit>{tr('cf.beneficeDate')}</Pourquoi></div>
           {B.depenses === 'jamais' && nuagePret && onSansDepenses ? (
             <div className="vrm-compta-geste"><ChoixDepenses onAucune={onSansDepenses} onAjouter={onAjouterDepense} /></div>
           ) : onAjouterDepense && nuagePret ? (
@@ -4999,7 +5029,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         {designV2 ? <ARegler onglet="argent" Icon={Icon}/> : null}
         {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
         {designV2 ? <DepensesMois etat={nuagePret ? 'lu' : 'encours'} moisLong={new Date().toLocaleDateString(localeCourante(), { month: 'long' })} chargesMois={{ total: chargesMois }}
-          lignes={depensesDuMois(data, moisCle)} montant={fmt} onEnregistrer={enregistrerRapide} onRetirer={(id) => retirer('depenses', id)} onPhoto={(f) => compressImage(f, 1100, 0.7)} ouvrirDemande={demandeRapide}/> : null}
+          lignes={depensesDuMois(data, moisCle)} montant={fmt} onEnregistrer={enregistrerRapide} onRetirer={(id) => retirer('depenses', id)} onPhoto={(f) => compressImage(f, 1100, 0.7)} ouvrirDemande={demandeRapide}
+          jamais={nuagePret && comptaVide(data)} onAucune={() => repondreSansDepenses(data, maj)}/> : null}
         {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
@@ -5239,7 +5270,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
           <div className="vrm-compta-q-tete"><h2 className="vrm-compta-question">{tr('compta.comptable')}</h2></div>
           {!exportDevant && <ExportComptableCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
           {!exportDevant && <RegistresCarte lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts} />}
-          <RecapComptableMensuel liveStats={liveStats} compta={data} panelOff={panelOff} accounts={accounts} />
+          <RecapComptableMensuel liveStats={liveStats} compta={data} panelOff={panelOff} accounts={accounts} onNav={onNav} />
           {/* (10 nov., lot R) Le livre de police : un bloc isolé, statut pro seulement (src/livrePolice.js). */}
           <LivrePoliceCarte lireAchats={lireAchatsRegistre} registreDe={registreAchatsDe} panelOff={panelOff} />
           {/* ── HÉRO : LE RÉSULTAT ─────────────────────────────────────────────────

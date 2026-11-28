@@ -80,6 +80,7 @@ const DUREES_CI = {
   // (27 nov., bancs-compta) Dix bancs compta remis au vert et ajoutés : durées ESTIMÉES ici (seuls, conteneur de session).
   'declare-urssaf': 330, 'achats-export': 300, 'suivi-urssaf': 270, 'dac7-comptes': 240, 'compta-claire': 210,
   'registres': 240, 'seuils-prevision': 180, 'statut-fiscal': 150, 'urssaf': 60, 'export-donnees': 60,
+  'compta-finitions': 240,   // (28 nov.) mesuré ici, seul : ~4 min (4 modes × Ventes, Aujourd'hui, Argent, rapport, rechargement)
 };
 // Les bancs ROUGES CONNUS (scripts/audits-exceptions.json, clé `bancs`) : chacun dit
 // SES lignes rouges connues (`rouges`, une expression régulière sur la ligne). Le banc

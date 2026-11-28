@@ -132,7 +132,8 @@ import ecran_offres_photos from './de/offresPhotos.js';   // (22 nov.) offres sa
 import ecran_actions_ext from './de/actionsExt.js';
 import ecran_ebay_series from './de/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
-import ecran_ameliorations27 from './de/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_ameliorations27 from './de/ameliorations27.js';
+import ecran_compta_finitions from './de/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './de/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './de/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -579,7 +580,7 @@ export default {
   "reglages.depannage.statut.q": "VRM scheint gestört",
   "reglages.depannage.statut.r": "Schau auf die Statusseite. Alles läuft? Lade diese Seite neu.",
   "reglages.donnees.confidentialite": "Datenschutzerklärung",
-  "reglages.donnees.desc": "Deine Verkäufe, Einkäufe und Anzeigen in einer Datei, für dich.",
+  "reglages.donnees.desc": "Verkäufe, Einkäufe, Anzeigen: eine Datei für dich.",
   "reglages.donnees.droits": "Deine weiteren Rechte:",
   "reglages.donnees.exporter": "Exportieren",
   "reglages.donnees.exporterOu.dessous": "„Komplettes Backup“ unten",
@@ -2480,6 +2481,7 @@ export default {
   ...ecran_offres_photos,
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
+  ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
   ...ecran_boutons_donnees,

@@ -14,7 +14,7 @@
   --bx-sol:var(--vrm-bg,#F2F2F7); --bx-filet:var(--vrm-line,#E5E5EA); --bx-fin:var(--vrm-hair,rgba(0,0,0,.06));
   --bx-gris:var(--vrm-card2,#F2F2F7);
   --bx-accent:var(--vrm-accent,#16181D); --bx-accent-texte:var(--vrm-accent-texte,#16181D); --bx-sur-accent:var(--vrm-on-accent,#FFFFFF);
-  --bx-ambre:var(--vrm-warn,#B25000); --bx-ambre-doux:var(--vrm-warn-soft,#FFF4E5);
+  --bx-ambre:var(--vrm-warn,var(--n-ambre)); --bx-ambre-doux:var(--vrm-warn-soft,var(--n-ambre-fond));
   --bx-sortie:cubic-bezier(.23,1,.32,1); --bx-tiroir:cubic-bezier(.32,.72,0,1);
   --bx-ombre: none;
 }

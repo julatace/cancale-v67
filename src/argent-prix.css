@@ -16,7 +16,7 @@
 .vrm-ap-mois, .vrm-ap-date { align-self: flex-start; min-height: 44px; border: 0; border-radius: var(--d-r-case, 12px); background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, inherit); padding: 0 12px; font: 600 15px/1 var(--vrm-police, system-ui, sans-serif); }
 .vrm-ap-tuile { border: 0; text-align: left; cursor: pointer; font: inherit; min-height: 64px; }
 .vrm-ap-tuile:disabled { cursor: default; }
-.vrm-ap-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, #B25000); }
+.vrm-ap-tuile.is-ambre .vrm-ac-chiffre { color: var(--d-ambre, var(--n-ambre)); }
 .vrm-ap-ligne-bouton { padding: 0 !important; }
 .vrm-ap-ligne-geste { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 16px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; min-width: 0; }
 .vrm-ap-chevron { flex: 0 0 auto; color: var(--d-gris-3, #C7C7CC); font-size: 20px; line-height: 1; }
