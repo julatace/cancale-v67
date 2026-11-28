@@ -1,7 +1,12 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
-import {resoudreCiblesFavoris} from './favoris-cibles.js';
+import {resoudreCiblesFavoris,raisonSansPreuveFavori} from './favoris-cibles.js';
+import {defautsFavorisUniques} from '../../src/favorisDefauts.js';
+import {MESSAGE_PAR_DEFAUT} from '../../src/reglagesFavoris.js';
+// 5.455.7 : un réglage qui porte le texte par défaut PARTAGÉ d'avant, sans autre version : SON jeu unique à la place (rien de
+//    ce qu'il a écrit n'est touché ; la ligne enregistrée ne change pas).
+function defautUniqueSiPartage(p,owner){if(!p||String(p.message||'').trim()!==MESSAGE_PAR_DEFAUT||(Array.isArray(p.variantes)&&p.variantes.length)||!owner)return null;const l=defautsFavorisUniques(String(owner),'fr',3);return {message:l[0],variantes:l.slice(1)};}
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
 import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
@@ -119,17 +124,18 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     // (12 nov.) Un mot qui fait bannir dans le message enregistré : rien ne part, le geste est demandé.
     if(typeof prefs.message==='string'&&!messageAutoPermis(prefs.message,'vinted'))return await stop('message_risque');
     let p;try{p=validerReglagesFavoris(prefs);}catch{return await stop('reglages');}
+    {const u=defautUniqueSiPartage(p,owner);if(u){p.message=u.message;p.variantes=u.variantes;}}   // 5.455.7
     const message=preparerMessageFavori(p.message,p.pourcentage).message;if(!message)return await stop('reglages');
     const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
     const archive=lire(ids[3]),capture0=lire(ids[0])||archive,trace=lire(ids[1]);
     if(!capture0||capture0.type!=='notifications'||String(capture0.uid)!==uid)return await stop('capture');
-    // Aucune création native observée sur ce compte : VRM ne sait encore à personne écrire.
-    if(!trace)return await stop('destinataire_non_prouve');
+    // 5.455.6 : plus d'arrêt faute de création native observée — chaque notification qui porte SES deux identités est prouvée
+    //    seule (`identiteDirecteFavori`) ; celles qui n'en portent pas sont sautées une à une (`destinataire_non_prouve`).
     if(archive&&(archive.archiveVersion!==1||String(archive.uid)!==uid||!Array.isArray(archive.payload?.notifications)))return await stop('capture');
     let capture;try{capture=notificationsCompletes(capture0,archive);}catch{return await stop('capture');}
     const lignes=favorisDepuisNotifications(capture.payload,capture.domain).lignes;
     const opts={uid,capture,trace,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};
-    let conversations=null,ailleurs=null;
+    let conversations=null,ailleurs=null;   // 5.455.6 : `trace` peut manquer — la preuve directe de chaque notification suffit
     const resoudre=async id=>{
       const essai=extra=>resoudreCiblesFavoris({...opts,...extra,selection:[id]})[0];
       try{return essai({});}catch(e){if(e.code!=='favoris_preuve_absente'&&e.code!=='favoris_identite_non_unique')throw e;}
@@ -151,15 +157,15 @@ export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
     if(tri.prets.length){
       // La paire : dressing COMPLET de moins de 24 h, et la garde des ventes ailleurs.
       const [dr]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt,pg:data->payload->pagination,items:data->payload->items`).then(r=>r.length?r:[null]);
-      const ed=etatDressingAuto(dr,maintenant);if(ed)return await stop(ed);
+      // 5.455.6 (Julien, 27 nov. 22:50 : « comme Vintex ») : un dressing ancien ou partiel, une garde des ventes ailleurs ou une
+      //    boîte de réception pas relues n'ARRÊTENT plus le mode auto : l'extension relit l'annonce et la conversation à l'envoi.
+      //    Une annonce PROUVÉE vendue, réservée, en pause ou fermée reste écartée ; « absente » d'un dressing pas sûr : pas su ⇒ on continue.
+      const drSur=!etatDressingAuto(dr,maintenant);
       const m=await lecture(req,`app_data?owner=eq.${owner}&id=eq.main&select=g:data->vinted_offres_garde`);
       const garde=m[0]?.g||null;
-      const gTout=gardeRefuse(garde,'0',maintenant);if(gTout&&gTout!=='vendue-ailleurs')return await stop('garde_absente');
-      // La boîte de réception, lue il y a moins de 24 h (« pas su » ⇒ rien).
-      const [bx]=await lecture(req,`app_data?owner=eq.${owner}&id=eq.harvest_${uid}_inbox&select=cap:data->>capturedAt`).then(r=>r.length?r:[null]);
-      const cb=Date.parse(bx?.cap||'');if(!Number.isFinite(cb)||maintenant-cb>24*3600000)return await stop('boite_ancienne');
       for(const pr of tri.prets.slice(0,5)){
-        const ea=etatAnnonceAuto(pr.cible.itemId,dr,gardeRefuse(garde,pr.cible.itemId,maintenant));
+        const g0=gardeRefuse(garde,pr.cible.itemId,maintenant),ea0=dr&&Array.isArray(dr.items)?etatAnnonceAuto(pr.cible.itemId,dr,g0):(g0==='vendue-ailleurs'?'vendue':null);
+        const ea=ea0==='annonce_absente'&&!drSur?null:ea0;
         if(ea){sauts.push({...pr,raison:ea});continue;}
         // Une conversation avec cette personne (n'importe quel article) : jamais.
         const n=Number(pr.cible.recipientId);if(!Number.isSafeInteger(n))continue;
@@ -208,7 +214,8 @@ async function apercuPourCarte(req,{owner,uid,cle,maintenant}){
   const ventesAilleurs=gardeRefuse(garde,'0',maintenant)&&gardeRefuse(garde,'0',maintenant)!=='vendue-ailleurs'?'pas_su':'ok';
   const opts={uid,capture,trace,traces:archive?.creations||[],lectures:archive?.lecturesLiees||[]};
   const passe=extra=>{
-    const prouve=id=>{if(!trace)return false;try{const t=resoudreCiblesFavoris({...opts,...extra,selection:[id]});return t.length===1&&String(t[0].notificationId)===String(id);}catch{return false;}};
+    // 5.455.6 : une notification qui porte SES deux identités est prouvée sans trace ; sinon la raison précise (`sans_acheteur`).
+    const prouve=id=>{try{const t=resoudreCiblesFavoris({...opts,...extra,selection:[id]});if(t.length===1&&String(t[0].notificationId)===String(id))return true;}catch{}return raisonSansPreuveFavori(capture,String(id),uid);};
     return apercuCarte({vue,prefs,capture,dressing:dr[0]||null,garde:gardeDe,prouve,maintenant});
   };
   let a=passe({});
@@ -241,10 +248,12 @@ export async function routeFavoris(req,res){
         const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`];
         const archiveId=`harvest_${uid}_favoris_archive`;
         const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],archiveId],ids[2]);
-        if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||ids.slice(1).some(id=>rows.filter(x=>x.id===id).length!==1))throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
+        // 5.455.6 : la création native observée (`wreq_api_v2_conversations`) n'est plus exigée — une notification qui porte ses
+        //    deux identités est prouvée seule ; seuls les RÉGLAGES (son message) le sont.
+        if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner)||rows.filter(x=>x.id===ids[2]).length!==1||rows.filter(x=>x.id===ids[1]).length>1)throw new RefusFavoris('Capture ou réglages indisponibles. Actualise et enregistre tes réglages avant de lancer.');
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
-        const p=validerReglagesFavoris(prefs),message=preparerMessageFavori(p.message,p.pourcentage).message;
+        const p=validerReglagesFavoris(prefs);
         if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
         const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
         if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
@@ -269,6 +278,9 @@ export async function routeFavoris(req,res){
           }
         }
         targets=ordreRecents(targets,t=>{const n=parId.get(t.notificationId);return n&&(n.updated_at||n.created_at);});
+        // 5.455.7 : le message par défaut PARTAGÉ d'avant (jamais écrit par lui) ⇒ SON jeu unique (graine = son compte VRM).
+        {const u=defautUniqueSiPartage(p,owner);if(u){p.message=u.message;p.variantes=u.variantes;}}
+        const message=preparerMessageFavori(p.message,p.pourcentage).message;
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
         decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre,
           // (19 nov., 5.409) Le rythme : celui choisi pour CET envoi (étape « Rythme » de la carte), sinon ses réglages ;

@@ -254,7 +254,11 @@ async function principal() {
     const g = monter();
     g.b.poser(`harvest_${UID}_listings`, { capturedAt: new Date(Date.now() - 30 * H).toISOString(), payload: { pagination: { total_entries: 1 }, items: [{ id: 101 }] } });
     const b = (await carte(g, 'apercu')).apercu;
-    dit(b && b.etat === 'bloque' && b.raison === 'dressing_ancien', 'dressing lu il y a plus de 24 h : « pas su » ⇒ rien n’est proposé', JSON.stringify(b));
+    // 5.455.6 (Julien, 27 nov. 22:50 : « comme Vintex ») : un dressing ancien n'ARRÊTE plus la liste — il est DIT
+    //    (`avertissement`) ; l'extension relit l'annonce et son prix à l'envoi. Rien ne part sans SON clic : l'aperçu n'a
+    //    créé aucune file chez VRM.
+    const files = [...g.b.lignes.values()].filter((r) => /^favoris_file_/.test(r.id) && r.data && Object.values(r.data.groupes || {}).some((x) => (x.jobs || []).length));
+    dit(b && b.etat === 'pret' && b.avertissement === 'dressing_ancien' && b.total > 0 && !files.length, 'dressing lu il y a plus de 24 h : la liste reste, l’avertissement est dit, rien ne part sans son clic', JSON.stringify({ e: b && b.etat, av: b && b.avertissement, n: b && b.total, files: files.length }));
   });
 
   await essai('B4', async () => {
