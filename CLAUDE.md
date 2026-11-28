@@ -484,9 +484,9 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **28 nov. · Mode ordinateur allumé, ext. 5.457.0 (`claude/ordinateur-serveur`)** (Julien : « un ordinateur allumé comme un serveur », un profil Chrome par compte) : veille rapide 1 min 30–3 min au hasard par défaut (moyenne 1 min 8, budget de lecture 40/h pour ce compte ; normale 4–7 min, 20/h), texte + compte dans la notification, tour d'écriture entre profils, `?tab=serveur`. `2026-11-28-ordinateur-serveur.md`. Geste : installer la 5.457.0 dans chaque profil, « Allumer » (veille rapide incluse).
+- **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
-- **27 nov. nuit · FAVORIS « comme Vintex » réécrit + CHRONOMÈTRE, ext. 5.455.4** (arthuror2, 18:42) : seule une AUTRE PERSONNE refuse ; transaction de la DEMANDE ; registre jamais deux fois ; le prix toujours lu ; compte à rebours vivant. `2026-11-27-favoris-tous-les-cas.md`. Geste : installer 5.455.4.
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier

@@ -21,7 +21,9 @@ export function lignesReleve(rows, x, enLigne) {
       // (21 nov., lot rentabilite) l'identifiant de L'ANNONCE vendue (par SA transaction) : le taux de vente ne la compte qu'une fois.
       item: itemLot || (t && t.item ? String(t.item) : null),
       // (24 nov., lot gains-reels) le N° de la fiche ([8] du relevé) : la porte de saisie du prix d'achat de CETTE paire.
-      num: String(r[8] || '') };
+      num: String(r[8] || ''),
+      // (27 nov., lot vrai-benefice) [12] les drapeaux de la fiche ('c' frais confirmés) : un net sans 'c' est un plafond (« au plus »).
+      dr: typeof r[12] === 'string' ? r[12] : '' };
   });
 }
 
