@@ -14,4 +14,4 @@
 .n-ext-observation-frise { margin: 0; padding: 8px 16px 12px 40px; font-size: 13px; line-height: 1.5; color: var(--n-texte, inherit); max-height: 420px; overflow: auto; overscroll-behavior: contain; }
 .n-ext-observation-frise li { padding: 2px 0; overflow-wrap: anywhere; }
 .n-ext-observation-frise time { color: var(--n-texte-2, #6e6e73); font-variant-numeric: tabular-nums; margin-right: 6px; }
-.n-ext-observation-frise li[data-obs-ton="refus"] span { color: var(--n-ambre, #b25000); }
+.n-ext-observation-frise li[data-obs-ton="refus"] span { color: var(--n-ambre, var(--n-ambre)); }

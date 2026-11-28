@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_textes_restes from './fr/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './fr/rangement.js';   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './fr/suiviVente.js';
@@ -138,6 +139,7 @@ import ecran_ebay_series from './fr/ebaySeries.js';   // (23 nov.) eBay en séri
 import ecran_parrainage20 from './fr/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_ameliorations27 from './fr/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_sites_soignes from './fr/sitesSoignes.js';   // (28 nov.) les pages des sites soignées
+import ecran_compta_finitions from './fr/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './fr/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './fr/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -146,6 +148,7 @@ import ecran_loupe_num from './fr/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -584,7 +587,7 @@ export default {
   "reglages.depannage.statut.q": "VRM semble en panne",
   "reglages.depannage.statut.r": "Regarde la page d’état. Tout y marche ? Recharge cette page.",
   "reglages.donnees.confidentialite": "politique de confidentialité",
-  "reglages.donnees.desc": "Tes ventes, achats et annonces dans un fichier, pour toi.",
+  "reglages.donnees.desc": "Ventes, achats, annonces : un fichier, pour toi.",
   "reglages.donnees.droits": "Tes autres droits :",
   "reglages.donnees.exporter": "Exporter",
   "reglages.donnees.exporterOu.dessous": "« Sauvegarde complète » ci-dessous",
@@ -1569,6 +1572,13 @@ export default {
   "ebay.param.livraison": "Livraison",
   "ebay.param.livraison.aide": "Tu ne paies jamais le port : l'acheteur le paie à eBay.",
   "ebay.param.livraison.geree": "Gérée par eBay",
+  "ebay.param.colis": "Poids et taille du colis",
+  "ebay.param.colis.aide": "Un colis moyen par défaut (1,2 kg) : eBay en calcule le port, payé par l’acheteur.",
+  "ebay.param.colis.mesures": "Poids (g) · longueur · largeur · hauteur (cm)",
+  "ebay.param.colis.poids": "Poids en grammes",
+  "ebay.param.colis.longueur": "Longueur en centimètres",
+  "ebay.param.colis.largeur": "Largeur en centimètres",
+  "ebay.param.colis.hauteur": "Hauteur en centimètres",
   "ebay.param.delaiEnvoi": "Délai d'envoi",
   "ebay.param.delaiEnvoi.aide": "Jours ouvrés entre le paiement et le dépôt.",
   "ebay.param.delai.jour": "Le jour même",
@@ -2486,6 +2496,7 @@ export default {
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
   ...ecran_sites_soignes,
+  ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
 };

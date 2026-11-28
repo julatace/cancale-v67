@@ -27,7 +27,7 @@ span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-bc-decision s { color: var(--fu-gris, #6e6e73); }
 .vrm-bc-decision small { font-size: 12px; color: var(--fu-gris, #6e6e73); }
 .vrm-bc-raison { font-size: 13px; color: var(--fu-gris, #6e6e73); line-height: 1.35; overflow-wrap: anywhere; }
-.vrm-bc-ligne.is-achat .vrm-bc-decision b { color: var(--sb-ambre, #764300); }
+.vrm-bc-ligne.is-achat .vrm-bc-decision b { color: var(--sb-ambre, var(--n-ambre)); }
 .vrm-bc-geste { flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; }
 .vrm-bc .vrm-bc-tout { min-height: 50px; width: 100%; }
 .vrm-bc-resume { margin: -4px 4px 6px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -51,7 +51,7 @@ span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-rf-texte { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .vrm-rf-texte b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .vrm-rf-geste { flex: none; min-height: 44px; padding: 0 12px; }
-.vrm-rf-bloque { font-size: 12px; color: var(--sb-ambre, #764300); }
+.vrm-rf-bloque { font-size: 12px; color: var(--sb-ambre, var(--n-ambre)); }
 .vrm-rf-note { margin: 2px 8px 2px 0; font-size: 12px; color: var(--sb-encre-2, #44546A); }
 @media (max-width: 420px) { .vrm-rf-geste { padding: 0 10px; } }
 /* (16 nov., intégration vague B) Dans la colonne étroite de Ma journée à l'ordinateur (~330 px), le texte de la ligne se

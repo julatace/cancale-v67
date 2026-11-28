@@ -2475,5 +2475,20 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
 
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., compta-finitions, pour rester sous 60 Ko)
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 - **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans compta-finitions, pour rester sous 60 Ko)
+- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., agent-rangement, pour rester sous 60 Ko)
+- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+
+### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., ebay-livraison, pour rester sous 60 Ko)
+- **28 nov. · Vendue expédiée encore « à imprimer » sans l'extension** : départ prouvé aussi par le n° de TRANSACTION d'un e-mail (sujet qui constate) et la vente finalisée ; colis vendus relus toutes les 15 min ; réimprimer un parti demande ; liste > 24 h ⇒ « à confirmer ». `2026-11-28-expedie-sans-extension.md`. Geste : transférer ses e-mails Vinted d'envoi.
+- **28 nov. · Compta finitions (Julien : « fais tout le reste parfaitement »)** : « avant tes dépenses » + « Je n'ai pas de dépenses » dans Argent (une fois), base URSSAF sous « Pourquoi ? », un seul « J'ai déclaré », « Rapport comptable » dans Déclarer → Récap, plus AUCUN orange (audit-style-vintex S6, marqueurs `couleur-objet`). Banc `compta-finitions` (écran natif). `2026-11-28-compta-finitions.md`. Geste : aucun.
+- **28 nov. · Assistant de rangement (agent-rangement)** : Stock → Meubles, une conversation (boutons, texte, photo) → plan pièces/meubles/étages dessiné, déplacements proposés, aucun N° changé ; IA sur la clé DU VENDEUR (coffre, `api/_lib/ia-cle.js`) sinon sans IA (`src/rangement/`). `2026-11-28-agent-rangement.md`. Geste : aucun.
+- **28 nov. · Livraison eBay (ebay-livraison)** : À envoyer avec limite eBay lue et transporteur, « Étiquette sur eBay » (`/ship/single/`), étiquette reçue par e-mail rangée par n° de commande et imprimée avec Vinted, suivi lu chez eBay ⇒ En route/Livrée, colis par défaut à la publication, port pour info et retiré du dû ; API Logistics refusée au `fetch`. `2026-11-28-ebay-livraison.md`. Geste : essayer à la 1re vente eBay.
+- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.

@@ -1,5 +1,6 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
 import ecran_textes_restes from './de/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
+import ecran_rangement from './de/rangement.js';   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './de/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './de/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './de/suiviVente.js';
@@ -133,6 +134,7 @@ import ecran_ebay_series from './de/ebaySeries.js';   // (23 nov.) eBay en séri
 import ecran_parrainage20 from './de/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_ameliorations27 from './de/ameliorations27.js';   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_sites_soignes from './de/sitesSoignes.js';   // (28 nov.) les pages des sites soignées
+import ecran_compta_finitions from './de/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
 import ecran_extension from './de/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './de/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './de/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -141,6 +143,7 @@ import ecran_loupe_num from './de/loupeNum.js';   // (26 nov.) « Tout sur le N�
 export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
+  ...ecran_rangement,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -579,7 +582,7 @@ export default {
   "reglages.depannage.statut.q": "VRM scheint gestört",
   "reglages.depannage.statut.r": "Schau auf die Statusseite. Alles läuft? Lade diese Seite neu.",
   "reglages.donnees.confidentialite": "Datenschutzerklärung",
-  "reglages.donnees.desc": "Deine Verkäufe, Einkäufe und Anzeigen in einer Datei, für dich.",
+  "reglages.donnees.desc": "Verkäufe, Einkäufe, Anzeigen: eine Datei für dich.",
   "reglages.donnees.droits": "Deine weiteren Rechte:",
   "reglages.donnees.exporter": "Exportieren",
   "reglages.donnees.exporterOu.dessous": "„Komplettes Backup“ unten",
@@ -1564,6 +1567,13 @@ export default {
   "ebay.param.livraison": "Lieferung",
   "ebay.param.livraison.aide": "Du zahlst nie Porto: Der Käufer zahlt es an eBay.",
   "ebay.param.livraison.geree": "Über eBay",
+  "ebay.param.colis": "Gewicht und Größe des Pakets",
+  "ebay.param.colis.aide": "Standardmäßig ein mittleres Paket (1,2 kg): eBay berechnet das Porto, das der Käufer zahlt.",
+  "ebay.param.colis.mesures": "Gewicht (g) · Länge · Breite · Höhe (cm)",
+  "ebay.param.colis.poids": "Gewicht in Gramm",
+  "ebay.param.colis.longueur": "Länge in Zentimetern",
+  "ebay.param.colis.largeur": "Breite in Zentimetern",
+  "ebay.param.colis.hauteur": "Höhe in Zentimetern",
   "ebay.param.delaiEnvoi": "Bearbeitungszeit",
   "ebay.param.delaiEnvoi.aide": "Werktage zwischen Zahlung und Abgabe.",
   "ebay.param.delai.jour": "Am selben Tag",
@@ -2481,6 +2491,7 @@ export default {
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
   ...ecran_sites_soignes,
+  ...ecran_compta_finitions,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
 };

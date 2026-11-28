@@ -46,7 +46,7 @@
 .vrm-impr-vignette-num { font-size: var(--d-t-13, 13px); font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-impr-absents { display: grid; gap: 4px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: var(--d-t-13, 13px); line-height: 1.4;
   background: var(--d-remplir, rgba(120,120,128,.10)); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
-.vrm-impr-absents > b { color: var(--d-ambre, var(--vrm-warn, #764300)); }
+.vrm-impr-absents > b { color: var(--d-ambre, var(--vrm-warn, var(--n-ambre))); }
 .vrm-impr-corrige { margin: 0 0 8px; padding: 12px; border-radius: 16px; background: var(--d-remplir, rgba(120,120,128,.08)); }
 .vrm-impr-corrige h3 { margin: 0 0 10px; font-size: var(--d-t-15, 15px); }
 .vrm-impr-tampons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }

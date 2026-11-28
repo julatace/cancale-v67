@@ -120,7 +120,7 @@
 .vrm-verif-marque svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .vrm-verif-rangee[data-etat="ok"] .vrm-verif-marque { background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); }
 .vrm-verif-rangee[data-etat="action"] .vrm-verif-marque { background: transparent; }
-.vrm-verif-rangee[data-etat="action"] .vrm-verif-marque::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); }
+.vrm-verif-rangee[data-etat="action"] .vrm-verif-marque::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, var(--n-ambre)); }
 .vrm-verif-ligne { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .vrm-verif-nom { font-size: 15px; font-weight: 600; line-height: 1.3; }
 .vrm-verif-etat { font-size: 13px; font-weight: 400; color: var(--d-gris, #6E6E73); white-space: nowrap; }

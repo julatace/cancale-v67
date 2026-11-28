@@ -21,7 +21,7 @@
 .vrm-acc-compte { font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-acc-ligne { display: flex; align-items: center; gap: var(--d-e-3, 12px); width: 100%; flex-wrap: wrap; }
 .vrm-acc-icone { color: var(--d-encre, #1D1D1F); font-weight: 600; }
-.vrm-acc-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); flex: 0 0 auto; }
+.vrm-acc-point { width: 8px; height: 8px; border-radius: 50%; background: var(--d-point-ambre, var(--n-ambre)); flex: 0 0 auto; }
 
 /* Le lien d'un geste : texte accent, cible de 44 px au doigt (36 à la souris). */
 :is(.vrm-app-shell, .vrm-fs, body) button.vrm-acc-lien {

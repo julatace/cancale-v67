@@ -7,11 +7,11 @@
 .vrm-tampons-el{position:absolute;box-sizing:border-box;cursor:move;outline:2px solid var(--vrm-accent,#16181D);outline-offset:1px;touch-action:none;background:rgba(22, 24, 29,.06);}
 .vrm-tampons-el-m{outline-style:dashed;}
 .vrm-tampons-el:focus-visible{outline-width:3px;}
-.vrm-tampons-el-refus{outline-color:#B25E00;background:rgba(178,94,0,.12);}
+.vrm-tampons-el-refus{outline-color:var(--n-ambre);background:var(--n-ambre-fond);}
 .vrm-tampons-el .vrm-tampon-poignee{position:absolute;right:-22px;bottom:-22px;width:44px;height:44px;display:grid;place-items:center;cursor:nwse-resize;}
 .vrm-tampons-el-compact .vrm-tampon-poignee{right:-16px;bottom:-16px;width:32px;height:32px;}
 /* Les zones interdites : hachurées PENDANT le geste (codes, QR et leur zone de silence, adresse). */
-.vrm-tampons-interdit{position:absolute;pointer-events:none;opacity:0;transition:opacity .12s;background:repeating-linear-gradient(45deg,rgba(178,94,0,.28) 0 4px,transparent 4px 9px);outline:1px solid rgba(178,94,0,.55);}
+.vrm-tampons-interdit{position:absolute;pointer-events:none;opacity:0;transition:opacity .12s;background:repeating-linear-gradient(45deg,var(--n-ambre-fond) 0 4px,transparent 4px 9px);outline:1px solid var(--n-ambre-bord);}
 .vrm-tampons-interdit-vu{opacity:1;}
 .vrm-tampons-apercu-liste{display:flex;flex-direction:column;gap:18px;margin-top:10px;}
 .vrm-tampons-apercu-item{display:flex;flex-direction:column;align-items:center;gap:6px;}

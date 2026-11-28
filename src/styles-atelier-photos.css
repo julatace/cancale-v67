@@ -33,8 +33,8 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 
 /* L'avis d'une photo : une pastille translucide, un point ambre, un mot. */
 .vrm-avis-photo { display: inline-flex; align-items: center; gap: 5px; max-width: calc(100% - 12px); padding: 3px 8px; border-radius: var(--d-r-pilule, 999px); font-size: var(--d-t-12, 12px); font-weight: 600; line-height: 1.3; color: #fff; background: rgb(0 0 0/.58); -webkit-backdrop-filter: saturate(180%) blur(12px); backdrop-filter: saturate(180%) blur(12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vrm-avis-photo.is-ligne { color: var(--d-ambre, #B25000); background: none; padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.vrm-avis-photo-point { width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); flex-shrink: 0; }
+.vrm-avis-photo.is-ligne { color: var(--d-ambre, var(--n-ambre)); background: none; padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.vrm-avis-photo-point { width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, var(--n-ambre)); flex-shrink: 0; }
 
 /* La dictée : ce qui est entendu, en direct. */
 .vrm-atl-direct { font-size: var(--d-t-15, 15px); color: var(--d-encre, inherit); font-style: italic; overflow-wrap: anywhere; }
@@ -60,7 +60,7 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 .vrm-atl-ligne-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-atl-ligne-txt b { font-size: var(--d-t-17, 17px); font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-atl-ligne-txt span { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-atl-ligne-txt em { font-style: normal; font-size: var(--d-t-13, 13px); color: var(--d-ambre, #B25000); }
+.vrm-atl-ligne-txt em { font-style: normal; font-size: var(--d-t-13, 13px); color: var(--d-ambre, var(--n-ambre)); }
 .vrm-atl-ligne.is-cochee .vrm-atl-ligne-txt b { color: var(--d-gris, #6E6E73); text-decoration: line-through; text-decoration-thickness: 1px; }
 .vrm-atl-coche { width: 44px; height: 44px; flex-shrink: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; padding: 0; }
 .vrm-atl-coche span { width: 26px; height: 26px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--d-filet-fort, rgb(0 0 0/.25)); display: grid; place-items: center; color: #fff; transition: background var(--d-m-court, 160ms), box-shadow var(--d-m-court, 160ms); }
@@ -87,5 +87,5 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 .vrm-atl-garde li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgb(0 0 0/.1)); }
 .vrm-atl-garde li small { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
 .vrm-atl-champ { width: 100%; box-sizing: border-box; min-height: 44px; border-radius: var(--d-r-ctrl, 12px); border: 0; background: var(--d-remplir, rgb(118 118 128/.12)); padding: 0 14px; font: inherit; font-size: 17px; color: var(--d-encre, inherit); }
-.vrm-atl-refus { font-size: var(--d-t-15, 15px); color: var(--d-encre, inherit); background: var(--d-ambre-fond, rgb(255 159 10/.12)); border-radius: 14px; padding: 12px 14px; margin: 0; }
+.vrm-atl-refus { font-size: var(--d-t-15, 15px); color: var(--d-encre, inherit); background: var(--d-ambre-fond, var(--n-ambre-fond)); border-radius: 14px; padding: 12px 14px; margin: 0; }
 .vrm-atl-pied { display: flex; flex-direction: column; gap: 8px; }

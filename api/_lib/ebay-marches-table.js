@@ -48,4 +48,9 @@ export function marcheDuCompte(c) {
 
 export const SYMBOLE = Object.freeze({ EUR: '€', GBP: '£', USD: '$' });
 export const lienAnnonce = (m, itemId) => `https://${(m || MARCHE_DEFAUT).domaine}/itm/${encodeURIComponent(String(itemId || ''))}`;
+// (28 nov., ebay-livraison) LA PAGE « EXPÉDIER » DE CETTE COMMANDE dans eBay (là où l'étiquette prépayée par le port
+// de l'acheteur s'imprime) : `https://{domaine}/ship/single/{orderId}` — l'adresse que la documentation de l'API
+// Logistics d'eBay donne pour imprimer l'étiquette d'une commande. ⚠️ NON MESURÉE sur son compte (aucune commande) :
+// la page de la commande (`lienCommande`) reste à côté, en repli. VRM n'achète rien : c'est eBay qui la sert.
+export const lienEtiquette = (m, orderId) => `https://${(m || MARCHE_DEFAUT).domaine}/ship/single/${encodeURIComponent(String(orderId || ''))}`;
 export const lienCommande = (m, orderId) => `https://${(m || MARCHE_DEFAUT).domaine}/sh/ord/details?orderid=${encodeURIComponent(String(orderId || ''))}`;
