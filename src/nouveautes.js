@@ -30,6 +30,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., ext. 5.455.8 — « un envoi ne peut pas échouer », « un vrai agent autonome ») docs/passation/2026-11-28-favoris-urgent.md
+  { id: 'favoris-envoi-direct', date: '2026-11-28', titre: 'Favoris : Envoyer part, toujours', phrase: 'Extension 5.455.8 : refus dit sur la rangée, la liste reste.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-agent', date: '2026-11-28', titre: 'Favoris : l’agent qui envoie seul', phrase: 'Un interrupteur par compte, ligne en direct et journal.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (28 nov., vitesse-fluide) src/composants/saisieDifferee.jsx, molette sous <main>, Annonces : nombres et liste gardés.
   { id: 'vitesse-fluide', date: '2026-11-28', titre: 'Recherche et défilement plus fluides', phrase: 'La lettre tapée s’affiche tout de suite, la molette ne fige plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (28 nov., messages-parfaits) src/ecrans/FilsTous.jsx, src/messages/ : photo de profil, filtre Site + Compte, statut daté.

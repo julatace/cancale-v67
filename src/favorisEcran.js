@@ -155,7 +155,9 @@ const INCERTAINES=['reponse_inconnue','incertain'];
 // Un job de la file qui BLOQUE un nouvel envoi à ce favori. La file du serveur (`connus`, api/_lib/favoris-file.js) relance
 // un job ANNULÉ, et un job REFUSÉ par le faux anti-robot ou sans rien d'écrit ; ici, un refus dont on ne SAIT pas ce qui est
 // parti (`ecrits` absent, files d'avant la 5.309) reste « pas envoyé » à l'écran — pas su ne vaut pas « à envoyer ».
-export const jobBloqueFavori=x=>!!x&&x.etat!=='annule'&&!(x.etat==='refuse'&&(x.raison==='vinted_robot'||x.ecrits===0));
+// 5.455.8 (revue 2, défaut 4) : un refus où NI l'offre NI le message ne sont partis (`aucunEnvoi`, dit par l'extension, gardé par
+//    le serveur) ne bloque pas non plus : le favori est à nouveau envoyable, la raison de la dernière tentative dite (`dernier`).
+export const jobBloqueFavori=x=>!!x&&x.etat!=='annule'&&!(x.etat==='refuse'&&(x.raison==='vinted_robot'||x.ecrits===0||x.aucunEnvoi===true));
 export function etatFavori({job=null,journal=[],vendue=false}={}){
   const j0=Array.isArray(journal)?journal[0]||null:null;
   const envoiJournal=Array.isArray(journal)?journal.find(x=>x?.etat==='envoye'):null;
@@ -171,6 +173,7 @@ export function etatFavori({job=null,journal=[],vendue=false}={}){
   // (21 nov., ext. 5.410.8) LA MÊME règle que la file du serveur (`connus` de api/_lib/favoris-file.js, `jobBloqueFavori`) :
   // un job ANNULÉ (une ancienne file arrêtée avant son tour) ou REFUSÉ sans rien d'écrit chez Vinted (ou par le faux
   // anti-robot) ne bloque pas ce favori — il est à nouveau « à envoyer », comme le serveur l'accepte au lancement.
+  if(job&&job.etat==='refuse'&&job.aucunEnvoi===true)return {code:'a_envoyer',dernier:CODE_RAISON[job.raison]||String(job.raison||'interrompu')};
   if(job&&!jobBloqueFavori(job))job=null;
   if(job){
     if(job.etat==='ignore')return {code:'pas_envoye',raison:CODE_RAISON[job.raison]==='trop_ancien'?'trop_ancien':'conversation'};

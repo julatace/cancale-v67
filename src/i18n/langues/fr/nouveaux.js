@@ -12,7 +12,7 @@ export default {
   "nouveaux.bilan.ventes": { one: "{n} vente cette année", other: "{n} ventes cette année" },
   "nouveaux.bilan.lecture": "Lecture de tes ventes…",
   "nouveaux.bilan.pasSu": "Ventes pas lues pour l’instant",
-  "nouveaux.bilan.auMoins.import": "Import de ton passé en cours.",
+  "nouveaux.bilan.auMoins.import": "Ton historique est encore en lecture.",
   "nouveaux.bilan.auMoins.manque": "Pas encore lu : {noms}.",
   "nouveaux.bilan.auMoins.montant": { one: "{n} vente au montant pas lu, hors du total.", other: "{n} ventes au montant pas lu, hors du total." },
   "nouveaux.bilan.auMoins.attente": "Une plateforme est encore en lecture.",

@@ -9,7 +9,7 @@ import {MESSAGE_PAR_DEFAUT} from '../../src/reglagesFavoris.js';
 //    ce qu'il a écrit n'est touché ; la ligne enregistrée ne change pas).
 function defautUniqueSiPartage(p,owner){if(!p||String(p.message||'').trim()!==MESSAGE_PAR_DEFAUT||(Array.isArray(p.variantes)&&p.variantes.length)||!owner)return null;const l=defautsFavorisUniques(String(owner),'fr',3);return {message:l[0],variantes:l.slice(1)};}
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile} from './favoris-file.js';
+import {ordreRecents,initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,trancherIncertain,reprendreFile,RefusFavoris,prolongerFile,expirerBail} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -18,7 +18,7 @@ import {preparerMessageFavori} from '../../src/favorisVinted.js';
 import {messageAutoPermis} from '../../src/messageSur.js';
 import {AUTO_FAVORI_MAX_MS} from '../../src/favorisAuto.js';
 import {DEMANDES_AUTO} from '../../src/favorisAuto.js';
-import {demanderAuto,etatAuto,reglerAuto,stopAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
+import {demanderAuto,etatAuto,reglerAuto,stopAuto,pauseAgentAuto,trierFavorisAuto,ajouterAuto,notificationsCompletes,favorisDepuisNotifications,etatDressingAuto,etatAnnonceAuto,gardeRefuse} from './favoris-auto.js';
 import {apercuCarte,resumeFileCarte} from './favoris-carte.js';
 import {traduireResultatFavori} from '../../src/favorisProgression.js';
 
@@ -105,7 +105,9 @@ async function notifierDemandeAuto(owner,code){
   });
 }
 export async function tourAuto(req,{owner,uid,cle,maintenant,extension=null}){
-  const avant=await modifierNeutre(cle,d=>({valeur:{e:etatAuto(d,owner,maintenant),vue:vueFile(initialiserFile(d),owner)}}));
+  // 5.455.8 (revue, défaut 4) : chaque tour de l'agent CONSTATE l'expiration d'un bail (un worker mort en plein envoi) — avant,
+  //    seul `suivant` le faisait, et l'agent restait « occupé » pour toujours.
+  const avant=await modifierNeutre(cle,d=>{const dd=initialiserFile(d);const ch=expirerBail(dd,maintenant);return {...(ch?{data:dd}:{}),valeur:{e:etatAuto(dd,owner,maintenant),vue:vueFile(dd,owner)}};});
   if(!avant)return {etat:'lecture',ajoute:false};
   if(avant.valeur.e.etat==='a_verifier'){const r=await modifierNeutre(cle,d=>demanderAuto(d,{owner,code:'a_verifier',maintenant}));return {etat:'a_verifier',ajoute:false,vue:avant.valeur.vue,...(r?.valeur?.nouvelle?{nouvelleDemande:'a_verifier'}:{})};}
   if(avant.valeur.e.etat!=='libre')return {etat:avant.valeur.e.etat,jusqua:avant.valeur.e.jusqua||null,ajoute:false,vue:avant.valeur.vue};
@@ -194,7 +196,8 @@ async function apercuPourCarte(req,{owner,uid,cle,maintenant}){
   const lu=await modifierNeutre(cle,d=>({valeur:vueFile(initialiserFile(d),owner)}));
   if(!lu)throw new RefusFavoris('L’état des envois n’a pas pu être relu. Réessaie dans un instant.',503);
   const vue=lu.valeur;
-  if(vue.active)return apercuCarte({vue,maintenant});
+  // 5.455.8 : une file active ne cache plus la liste (« Des messages partent déjà… » sans favoris, sans fin) : chaque favori est
+  //    montré avec SON état (en attente, en cours, envoyé), les autres restent envoyables.
   const ids=[`harvest_${uid}_notifications`,`harvest_${uid}_wreq_api_v2_conversations`,`vrm_favoris_reglages_${uid}`,`harvest_${uid}_favoris_archive`];
   const rows=await lireLignesFavoris(c=>lireCommeVendeur(req,c),owner,[ids[0],ids[1],ids[3]],ids[2]);
   if(!Array.isArray(rows)||rows.some(x=>x.owner!==owner))throw new RefusFavoris('Tes favoris n’ont pas pu être relus. Réessaie dans un instant.',503);
@@ -255,6 +258,8 @@ export async function routeFavoris(req,res){
         const lire=id=>rows.find(x=>x.id===id)?.data;
         const prefs=lire(ids[2]);if(prefs?.version!==1||prefs.envoisActifs!==false)throw new RefusFavoris('Relis et enregistre les réglages de ce compte.');
         const p=validerReglagesFavoris(prefs);
+        // Ce qu'il a vu est ce qui part : des réglages changés ailleurs depuis l'aperçu ⇒ refusé (409) ; 5.455.8 : l'extension relit
+        //    alors l'aperçu et relance UNE fois d'elle-même avec ses réglages à jour (aucun cul-de-sac).
         if(!c.reglages||JSON.stringify(validerReglagesFavoris(c.reglages))!==JSON.stringify(p))throw new RefusFavoris('Les réglages ont changé dans une autre fenêtre. Actualise et vérifie l’aperçu avant de lancer.');
         const archive=rows.find(x=>x.id===archiveId)?.data,capture=lire(ids[0])||archive;
         if(!capture||capture.type!=='notifications'||String(capture.uid)!==uid)throw new RefusFavoris('La capture de ce compte doit être actualisée.');
@@ -288,11 +293,13 @@ export async function routeFavoris(req,res){
           // absent (réglages d'avant) ⇒ « normal » (40–90 s au hasard, sa décision) ; `perso` ⇒ ses minutes.
           rythme:['normal','prudent'].includes(c.rythme)?c.rythme:p.rythme==='perso'?null:p.rythme==='prudent'?'prudent':'normal',
           // (20 nov., ext. 5.410) SA cadence : la plage de pause du compte (bornée par `plageValide`, 20 s à 4 min).
-          plage:c.plage&&typeof c.plage==='object'?{min:c.plage.min,max:c.plage.max}:null});
+          plage:c.plage&&typeof c.plage==='object'?{min:c.plage.min,max:c.plage.max}:null,ajouter:c.ajouter===true});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
         decision=d=>stopAuto(d,{owner,maintenant});
+      }else if(c.action==='auto_pause'){
+        decision=d=>pauseAgentAuto(d,{owner,pause:c.pause===true,maintenant});
       }else if(c.action==='auto'){
         // L'état de l'extension vu par l'app (onglet, compte, version) : seulement
         // pour DEMANDER un geste ; le serveur ne lui fait jamais confiance pour envoyer
@@ -314,7 +321,7 @@ export async function routeFavoris(req,res){
         // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est
         // celle de l'app (traduireResultatFavori), une seule règle, faite ici.
         const t=c.brut&&typeof c.brut==='object'&&!Array.isArray(c.brut)?traduireResultatFavori(c.brut):{resultat:c.resultat,raison:c.raison,ecrits:c.ecrits,variante:c.variante};
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null,etape:t.etape||null,cause:t.cause||null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null,etape:t.etape||null,cause:t.cause||null,aucunEnvoi:t.aucunEnvoi===true});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
@@ -336,6 +343,8 @@ export async function routeFavoris(req,res){
     }
     const r=await modifierNeutre(cle,decision);
     if(!r)throw new RefusFavoris('État non confirmé. Actualise la file : aucun nouvel envoi ne doit être lancé.',503);
+    // 5.455.8 (revue 2, défaut 3) : un renouvellement refusé (noté chez VRM) se dit en REFUS : l'extension arrête l'envoi avant sa prochaine écriture.
+    if(req.body?.action==='prolonger'&&r.valeur?.prolonge===false)throw new RefusFavoris('La tentative n’est plus en cours.',409);
     // (28 oct., « que ça me prévienne ») La file vient de finir : une notification
     // avec le bilan (catégorie « favoris », activée par défaut). Un échec d'envoi
     // ne change rien à la réponse : la file est déjà rangée.

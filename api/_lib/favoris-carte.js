@@ -126,7 +126,7 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
     const cochable = e.code === 'a_envoyer' && !raison;
     tous.push({ id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '',
-      envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(e.code === 'pas_envoye' && e.raison ? { raisonEnvoi: String(e.raison) } : {}), ...(raison ? { raison } : {}), cochable,
+      envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(e.code === 'pas_envoye' && e.raison ? { raisonEnvoi: String(e.raison) } : {}), ...(e.code === 'a_envoyer' && e.dernier ? { pasEnvoye: String(e.dernier) } : {}), ...(raison ? { raison } : {}), cochable,
       ...(cochable && offre && prixOffre != null ? { offre: Number(prixOffre) } : {}),
       ...(cochable && textes++ < FAVORIS_CARTE_TEXTES ? { texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, FAVORIS_CARTE_TEXTE) } : {}) });
   };

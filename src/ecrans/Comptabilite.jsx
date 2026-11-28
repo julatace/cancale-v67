@@ -635,7 +635,7 @@ const JaugeActions = aLaDemande(() => import('../JaugeActions.jsx'));
 // (le plus souvent la carte ne rend rien — un squelette puis rien ferait sauter Ma journée).
 const VeilleJourneeParesseux = lazySur(() => import('../VeilleJournee.jsx'));
 const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
-const ImportDepart = aLaDemande(() => import('../ImportDepart.jsx'));
+// 5.455.8 : ImportDepart n'est plus monté ici (plus de carte d'import).
 // (24 nov., francais-demarrage) Les cartes de l'accueil (src/accueilReste/), EN BAS de Ma journée : à la demande,
 // hors du démarrage avec leur français. Rien pendant le chargement (elles sont sous tout le reste : rien ne bouge au-dessus).
 const AccueilResteJournee = aLaDemandeDiscret(() => import('../accueilReste/AccueilReste.jsx').then((m) => ({ default: m.AccueilResteJournee })));
@@ -24788,7 +24788,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               <SheetShell titre={tr('tvb.titre')} sousTitre={tr('tvb.sous')} onClose={() => setFeuilleTvb(false)} maxWidth={560} data-feuille-tvb="">
                 <div className="vrm-day-task-list vrm-tvb-cartes">{AF.tvb || null}</div>
                 {nCtlFiab ? <ControleNuitLignes/> : null}
-                {!loading && accountsReady && Array.isArray(accounts) && accounts.length ? <ImportDepart comptes={accounts} variante="journee"/> : null}
+                {/* 5.455.8 : plus de carte « Import de ton passé » (Julien, 28 nov.) — l'extension lit tout l'historique seule. */}
                 <button type="button" className="sb-lien" data-tvb-parametres="" onClick={() => { setFeuilleTvb(false); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=toutvabien' })); } catch (_) {} }}>{tr('tvb.parametres')} ›</button>
               </SheetShell>
             ) : null}

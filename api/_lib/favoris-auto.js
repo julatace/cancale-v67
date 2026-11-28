@@ -14,7 +14,7 @@
 // Le serveur ne contacte jamais Vinted : c'est l'extension, depuis l'onglet
 // vinted.fr de CE compte, qui envoie (comme pour un envoi sur son clic).
 // « Pas su » ne vaut pas « oui » : toute lecture ratée ⇒ rien n'est ajouté.
-import {initialiserFile,vueFile,RefusFavoris} from './favoris-file.js';
+import {initialiserFile,vueFile,RefusFavoris,abandonRetient} from './favoris-file.js';
 import {AUTO_ESSAIS,DEMANDES_AUTO,ETATS_DEMANDE,validerAutoFavoris,dansPlageAuto,limiteJourAuto,attenteFavoriMs,AUTO_FAVORI_MAX_MS,AUTO_RECONTACT_MS,AUTO_AVANT_ECRITURE,AUTO_JOUR_MS,AUTO_HEURE_MS,etatDressingAuto,etatAnnonceAuto} from '../../src/favorisAuto.js';
 import {gardeRefuse} from '../../src/offresGarde.js';
 import {favorisDepuisNotifications} from '../../src/favorisVinted.js';
@@ -49,8 +49,23 @@ export function etatAuto(d,owner,maintenant){
   if(!a?.reglages?.actif)return {etat:'eteint'};
   const pause=Number(d.pauseAutoJusqua)||0;
   if(pause>maintenant)return {etat:'pause',jusqua:pause};
-  if(Object.values(d.groupes).some(x=>(x.jobs||[]).some(j=>j.etat==='incertain')))return {etat:'a_verifier'};
-  if(d.enCours||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
+  // 5.455.8 : un envoi « à vérifier » n'arrête plus l'agent (il bloquait tout, sans fin) ; il reste écarté pour SON favori seul.
+  // 5.455.8 (revue, défaut 4) : une tentative ABANDONNÉE (bail expiré, constaté par `expirerBail` à chaque tour de l'agent) ne
+  //    rend plus l'agent « occupé » pour toujours : elle le retient seulement pendant sa grâce.
+  // 5.455.8 (revue 2, défaut 1) : une file de CE compte qui ne fait qu'ATTENDRE (un favori automatique en tête, rien en vol, aucun
+  //    autre compte actif) n'est jamais « occupée » : l'agent doit la faire avancer (`a_reserver` ⇒ il demande `suivant`). Avant :
+  //    une réservation ratée (réseau, accusé pas rejoué, liste d'exclusion pas lue) laissait l'agent « occupé » pour toujours.
+  const enVol=(d.enCours&&!d.enCours.abandonne)||abandonRetient(d.enCours,maintenant);
+  if(!enVol&&g?.active&&!Object.entries(d.groupes).some(([o,x])=>o!==owner&&x.active)){
+    const j=g.jobs.find(x=>x.etat==='attente');
+    if(j&&j.auto===true&&!g.jobs.some(x=>x.etat==='reserve')){
+      if(a.pauseAgent)return {etat:'pause_agent'};
+      const pr=Math.max(g.prochain||0,d.prochainGlobal||0);
+      return {etat:'a_reserver',...(pr>maintenant?{jusqua:pr}:{})};
+    }
+  }
+  if(enVol||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
+  if(a.pauseAgent)return {etat:'pause_agent'};
   if(!dansPlageAuto(a.reglages,maintenant))return {etat:'hors_horaires'};
   const env=(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(t=>t>maintenant-AUTO_JOUR_MS);
   if(env.filter(t=>t>maintenant-AUTO_HEURE_MS).length>=a.reglages.parHeure)return {etat:'quota_heure',jusqua:Math.min(...env.filter(t=>t>maintenant-AUTO_HEURE_MS))+AUTO_HEURE_MS};
@@ -79,6 +94,13 @@ function arreterAutoGroupe(g,maintenant){
   if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;
 }
 // Stop immédiat : éteint, et retire le message auto pas encore parti.
+// 5.455.8 (revue) : « Pause » de l'agent, PAR COMPTE, chez VRM (tous les Chrome de ce compte la voient) ; « Reprendre » l'enlève.
+export function pauseAgentAuto(d,{owner,pause,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g?.auto)throw new RefusFavoris('L’agent n’est pas allumé sur ce compte.',400);
+  if(pause===true)g.auto.pauseAgent=maintenant;else delete g.auto.pauseAgent;
+  return {data:d,valeur:vueFile(d,owner)};
+}
 export function stopAuto(d,{owner,maintenant}){
   d=initialiserFile(d);const g=d.groupes[owner];
   if(!g?.auto)return {valeur:vueFile(d,owner)};

@@ -4,7 +4,7 @@
 //  Julien (26 nov., 5.453.1) : « Pas parti · Vérifie les envois incertains sur Vinted avant de préparer une nouvelle
 //  file. » — toute la file des favoris bloquée par UN envoi incertain, sans aucun geste pour en sortir. On juge, sur la
 //  VRAIE file du serveur (api/_lib/favoris-file.js) :
-//   T1. un incertain bloque une nouvelle file (garde-fou gardé : jamais un renvoi automatique) ;
+//   T1. (5.455.8) un incertain ne bloque que LUI (jamais renvoyé automatiquement) : un nouvel envoi aux autres part ;
 //   T2. « C'est parti » ⇒ envoyé, jamais recontacté ; la nouvelle file part ;
 //   T3. « Pas parti » ⇒ refusé SANS écriture (ecrits 0) : il peut être choisi à nouveau, par lui ;
 //   T4. trancher un envoi qui n'est pas incertain, ou sans choix clair ⇒ refusé, rien ne change ;
@@ -23,7 +23,11 @@ const dit = (b, q, d) => { if (b) { ok++; console.log('✅ ' + q); } else { ko++
   const lancer = (d, l, t) => FF.lancerFile(d, { owner, targets: l, message: 'Bonjour, ton favori est toujours dispo !', intervalleMinutes: 0, maintenant: t, lot: 'L' + t });
   const avecIncertain = () => { let d = lancer(null, [cible(1), cible(2)], T).data; const g = d.groupes[owner]; g.jobs[0].etat = 'incertain'; g.jobs[1].etat = 'annule'; g.active = false; return d; };
   // T1
-  { let e = null; try { lancer(avecIncertain(), [cible(3)], T + 1000); } catch (x) { e = x; } dit(e && /incertains/.test(e.message), 'T1 un envoi incertain bloque une nouvelle file (aucun renvoi automatique)', e && e.message); }
+  // 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer ») : un envoi incertain ne bloque plus TOUTE la file — seulement LUI
+  //    (jamais renvoyé : relancé, il est refusé « déjà préparé ») ; les autres favoris partent.
+  { let e = null, r = null; try { r = lancer(avecIncertain(), [cible(3)], T + 1000); } catch (x) { e = x; }
+    let e2 = null; try { lancer(avecIncertain(), [cible(1)], T + 1000); } catch (x) { e2 = x; }
+    dit(!e && r && r.valeur.active === true && r.valeur.jobs.some((j) => j.notificationId === 'n-3' && j.etat === 'attente') && e2 && /déjà été préparés/.test(e2.message), 'T1 un envoi incertain ne bloque que LUI (jamais renvoyé) : un nouvel envoi aux autres part', JSON.stringify({ e: e && e.message, e2: e2 && e2.message })); }
   // T2
   { const d0 = avecIncertain(); const r = FF.trancherIncertain(d0, { owner, notificationId: 'n-1', parti: true, maintenant: T + 2000 });
     const j = r.data.groupes[owner].jobs.find((x) => x.notificationId === 'n-1');

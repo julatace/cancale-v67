@@ -2474,10 +2474,10 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 ### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., fusion favoris-suite, pour rester sous 60 Ko)
 - **27 nov. nuit · FAVORIS, la suite, ext. 5.455.5** : bail de la tentative (fenêtres d'autorisation, envoi long, un compte à la fois) ; auto au prix lu maintenant ; fenêtre d'offre jamais laissée ouverte. `2026-11-27-favoris-suite.md`. Geste : installer 5.455.5.
 - **27 nov. · « Tout va bien ? » : ce qui tourne** : une rangée par morceau (extension, sites, e-mails, capture, favoris, serveur) — vert, phrase + geste, ou « — » et la raison ; « pas relu » d'Aujourd'hui y mène. Banc `tout-va-bien-sondes`. `historique-interface-stock.md`, fin.
+- **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 
 ### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov., compta-finitions, pour rester sous 60 Ko)
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
-- **27 nov. · Vrai bénéfice** : Statistiques › Gains « Par mois » (au versement, = l'export comptable, une seule fonction `beneficeReleve`) et « le compte qui vend le mieux » ; relevé [12] (frais confirmés, reçu). `2026-11-27-vrai-benefice.md`. Geste : aucun.
 
 - **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., fusion de main dans compta-finitions, pour rester sous 60 Ko)
@@ -2504,3 +2504,10 @@ de l'onglet « À expédier » (vide sous charge à 1512, §6.5).
 
 ### Ligne de CLAUDE.md §9 déplacée telle quelle (28 nov., vitesse-fluide, pour rester sous 60 Ko)
 - **28 nov. · Messages parfaits** : photo de profil (sinon l'initiale), filtre Site + Compte natif, fil en deux temps, statut de l'extension daté (3 états, revérifié avant chaque geste), « Autre prix » jamais sous le plancher sans forcer. `2026-11-28-messages-parfaits.md`. Geste : aucun.
+
+### Lignes de CLAUDE.md §9 déplacées telles quelles (28 nov. soir, fusion favoris-urgent, pour rester sous 60 Ko)
+- **27 nov. 23 h · FAVORIS : « Envoyer » par favori, six états (plus d'« Ignoré »), détail offre/message, messages uniques par compte, « Pourquoi c'est sûr », ext. 5.455.7** : `2026-11-27-favoris-panneau-uniques.md`. Geste : installer 5.455.7.
+- **27 nov. nuit · FAVORIS « acheteur pas confirmé » (jujuf38), ext. 5.455.6** : la notification se prouve SEULE (`offering_id`, lien d'application) ; plus aucun arrêt sur trace, dressing, garde ou boîte anciens. `2026-11-27-favoris-jujuf38.md`. Geste : installer 5.455.6.
+- **27 nov. · « Paires qui dorment », le plan (Julien)** : « Dorment » → > 21 j, par achat connu, vues de la courbe, Republier · Baisser au plancher · Favoris par `peutAgir`. `src/pairesDorment.js`, `historique-interface-stock.md`, fin. Geste : aucun.
+- **28 nov. · CRM eBay (ebay-crm)** : Ventes · eBay → Clients : fiche par identifiant, messages et avis auto éteints, exclus (favoris Vinted, paliers eBay). `2026-11-28-ebay-crm.md`. Geste : reconnecter eBay si besoin.
+- **28 nov. · FAVORIS 5.455.8 : « un envoi ne peut pas échouer » + agent autonome** : plus aucun refus pour envoi « à vérifier », file restée active ou liste ancienne ; un refus reste sur SA rangée, la liste ne disparaît plus ; offres > 7 j expirées ; plus d'import du passé ; interrupteur de l'agent (Favoris, écart protégé 3–12 min gardé) ; reprise sans cul-de-sac. `2026-11-28-favoris-urgent.md`. Geste : installer la 5.455.8.

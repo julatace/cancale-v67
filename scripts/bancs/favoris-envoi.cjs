@@ -241,6 +241,11 @@ const lireS = (pg) => pg.evaluate(() => {
       await clic(t.pg, '[data-fav-envoyer]');
       await t.pg.waitForTimeout(800);
       let e = await lireS(t.pg);
+      // 5.455.8 (Julien, 28 nov. : « tout prend du temps ») : « Envoyer » ouvre DIRECTEMENT le récapitulatif (étape 4, « Lancer ») ;
+      //    les étapes 1 à 3 restent atteignables par « Retour » (on y remonte pour les juger comme avant).
+      dit(e.f && e.etape === '4' && e.lancer !== null, `${T} E0 — « Envoyer » ouvre directement le récapitulatif et « Lancer »`, JSON.stringify({ et: e.etape, l: e.lancer }));
+      for (let k = 0; k < 3; k++) { await clic(t.pg, '[data-fav-etape-retour]'); await t.pg.waitForTimeout(400); }
+      e = await lireS(t.pg);
       // 5.420 — LE PARCOURS EN ÉTAPES : 1 Sélection · 2 Réduction · 3 Message · 4 Lancer.
       dit(e.f && e.etape === '1' && e.pas.length === 4 && e.nom && !e.taux && e.lancer === null && e.liste === 3, `${T} E1 — l’étape 1 « Sélection » s’ouvre : la barre des 4 étapes, les 3 favoris, ni taux ni « Lancer »`, JSON.stringify({ et: e.etape, pas: e.pas, nom: e.nom, taux: e.taux, l: e.lancer, n: e.liste }));
       await cap(t.pg, N('0-etape1-selection'));
@@ -327,7 +332,9 @@ const lireS = (pg) => pg.evaluate(() => {
       for (const id of ['f3', 'f5']) await clic(t.pg, `[data-fav-coche="${id}"]`);
       await clic(t.pg, '[data-fav-envoyer]'); await t.pg.waitForTimeout(800);
       e = await lireS(t.pg);
-      dit(e.etape === '1', `${T} E7 — un nouvel envoi recommence à l’étape 1`, e.etape);
+      dit(e.etape === '4', `${T} E7 — un nouvel envoi s’ouvre sur son récapitulatif (5.455.8)`, e.etape);
+      for (let k = 0; k < 3; k++) { await clic(t.pg, '[data-fav-etape-retour]'); await t.pg.waitForTimeout(400); }
+      e = await lireS(t.pg);
       await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(600);
       e = await lireS(t.pg);
       dit(e.taux === '7', `${T} E6 — la réduction s’ouvre sur le dernier choix (7 %)`, e.taux);

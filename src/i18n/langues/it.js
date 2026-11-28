@@ -919,6 +919,8 @@ export default {
   "historiqueSites.phrase.encoursVc": "Lettura in corso · {d}, con Vestiaire aperto.",
   "historiqueSites.phrase.encours": "Lettura in corso.",
   "historiqueSites.toutRecuperer": "Recupera tutto",
+  "importDepart.ligneAuto": "L’estensione legge da sola il tuo storico Vinted.",
+  "importDepart.ligneEncours": "L’estensione sta leggendo da sola il tuo storico Vinted.",
   // ── messages aux favoris, en trois temps (src/FavorisEtapes.jsx, lot favoris-clair)
   "favoris.titre": "Messaggi ai preferiti",
   "favoris.sousTitre": "Scrivi a chi ha salvato i tuoi annunci.",

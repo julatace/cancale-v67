@@ -43,9 +43,11 @@ test('5.455.4 : conversation pas relue ⇒ réessayée une fois après les autre
  const fin=f.valeur.jobs.find(x=>x.notificationId==='n1');assert.equal(fin.etat,'ignore');assert.equal(fin.raison,'fil_non_relu');
  const b=bilanFavoris(f.valeur.jobs);assert.equal(b.sautes,1);assert.equal(b.parSaut.fil_non_relu,1);assert.match(phraseBilanFavoris(b),/conversation pas relue chez Vinted/);
 });
-test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») arrêtait la file — la cause',()=>{
+// 5.455.8 : un refus propre à UN favori (identité non confirmée après une écriture) n'arrête plus la file : la raison précise
+//    est dite et les autres favoris partent.
+test('5.455.3 : le cas de Julien sur la 5.455.2 (identité refusée à l’étape « conversation ») — la cause dite, la file continue',()=>{
  const {d,owner}=unLot();const f=terminerFile(d,{owner,jeton:'j1',resultat:'refuse',raison:'identite_non_confirmee',ecrits:1,etape:'conversation',maintenant:102000});
- assert.equal(f.valeur.active,false);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
+ assert.equal(f.valeur.active,true);assert.ok(f.valeur.raison.startsWith(RAISONS_FAVORIS.identite_non_confirmee));
 });
 // 5.455.4 : trois conversations ouvertes de suite sans pouvoir être relues ⇒ la file s'arrête (avant : « ignore » ne comptait
 //    pas, une messagerie illisible ouvrait une conversation vide avec CHAQUE acheteur) ; et un saut après écriture garde le rythme.
@@ -86,5 +88,8 @@ test('5.455.5 : le bail renouvelé tient l’autorisation et la tentative ; sans
  // borne absolue
  let h=lancerFile(null,{owner,targets,message:'Bonjour',intervalleMinutes:0,maintenant:100000,lot:'lot4'}).data;h=reserverFile(h,{owner,maintenant:100000,jeton:'m1'}).data;
  for(let t=130000;t<100000+BAIL_MAX_MS;t+=60000)h=prolongerFile(h,{owner,jeton:'m1',maintenant:t}).data;
- assert.throws(()=>prolongerFile(h,{owner,jeton:'m1',maintenant:100000+BAIL_MAX_MS+1000}));
+ // 5.455.8 (revue 2) : au-delà de la borne, le renouvellement est REFUSÉ (la route rend 409) et ce refus est NOTÉ (la grâce en part).
+ const hr=prolongerFile(h,{owner,jeton:'m1',maintenant:100000+BAIL_MAX_MS+1000});
+ assert.equal(hr.valeur.prolonge,false);assert.equal(hr.data.enCours.refuseLe,100000+BAIL_MAX_MS+1000);assert.equal(hr.data.enCours.abandonne,true);
+ assert.equal(hr.data.groupes[owner].jobs[0].etat,'incertain');
 });

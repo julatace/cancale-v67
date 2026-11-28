@@ -919,6 +919,8 @@ export default {
   "historiqueSites.phrase.encoursVc": "Reading · {d}, with Vestiaire open.",
   "historiqueSites.phrase.encours": "Reading.",
   "historiqueSites.toutRecuperer": "Fetch everything",
+  "importDepart.ligneAuto": "Your Vinted history is read automatically by the extension.",
+  "importDepart.ligneEncours": "The extension is reading your Vinted history on its own.",
   // ── messages aux favoris, en trois temps (src/FavorisEtapes.jsx, lot favoris-clair)
   "favoris.titre": "Messages to favourites",
   "favoris.sousTitre": "Write to people who saved your listings.",

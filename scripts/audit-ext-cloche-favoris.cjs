@@ -148,7 +148,9 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
     const vSaute = file({ ok: !!r.ok, status: r.status, data: r.json }), vRefus = file({ ok: false, status: 0, data: { resultat: 'refuse', raison: 'onglet_vinted', ecrits: 0 } });
     const attente = (v) => (v.jobs || []).filter((j) => j.etat === 'attente').length;
     dit(vSaute.active === true && attente(vSaute) === 4 && (vSaute.jobs || []).map((j) => j.notificationId).join() === 'n2,n3,n4,n1', 'K3 rendu à la vraie file du serveur : ce favori ATTEND (repart après les 3 autres), la file reste ACTIVE', JSON.stringify({ a: vSaute.active, n: attente(vSaute), o: (vSaute.jobs || []).map((j) => j.notificationId + ':' + j.etat), r: vSaute.raison }));
-    dit(vRefus.active === false, 'K3 (témoin) une cause GLOBALE (onglet de travail fermé) met bien la file en pause', JSON.stringify({ a: vRefus.active, r: vRefus.raison })); }
+    // 5.455.8 (Julien, 28 nov. : « un envoi ne peut pas échouer ») : une cause GLOBALE sans rien d'écrit (onglet de travail fermé) fait
+    //    ATTENDRE la file — le favori repart, rien n'est refusé ; la file n'est jamais arrêtée pour ça.
+    dit(vRefus.active === true && attente(vRefus) === 4 && (vRefus.jobs || []).find((j) => j.notificationId === 'n1').etat === 'attente', 'K3 (témoin) une cause GLOBALE (onglet de travail fermé) fait ATTENDRE la file : le favori repart, rien n’est refusé', JSON.stringify({ a: vRefus.active, r: vRefus.raison })); }
 
   // ── K3b–K3e (5.440.2) : « trop ancien » SEULEMENT sur la liste de Vinted lue jusqu'à sa dernière page.
   const lst = (ids, page, tot) => ({ notifications: ids.map((id) => ({ id, entry_type: 20 })), pagination: { current_page: page, total_pages: tot, per_page: 20, total_entries: tot * 20 } });
@@ -247,11 +249,15 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
   { // K9 — les causes GLOBALES arrêtent toujours ; un 4xx propre à CE favori continue.
     const g = (data) => derouler([{ ok: false, data: Object.assign({ resultat: 'refuse', ecrits: 0 }, data) }])[0];
     const stop = [['pause_vinted', 'http_429'], ['vinted_robot', 'captcha'], ['compte_vinted_different', 'compte'], ['onglet_vinted', 'onglet'], ['vinted_refus', 'http_403'], ['vinted_refus', 'garde'], ['vinted_refus', '']].map(([raison, cause]) => [raison + '/' + cause, g({ raison, cause, etape: 'conversation' }).active]);
-    dit(stop.every((x) => x[1] === false), 'K9 vérification, 403/429, mauvais compte, onglet fermé, garde, refus sans cause ⇒ la file S’ARRÊTE', JSON.stringify(stop));
+    // 5.455.8 : seule la vérification de Vinted (et « Tout arrêter ») ARRÊTE la file ; une pause 403/429, le mauvais compte, l'onglet
+    //    fermé la font ATTENDRE (le favori repart) ; un refus propre à un favori le laisse de côté et la file CONTINUE.
+    dit(stop.find((x) => /^vinted_robot/.test(x[0]))[1] === false && stop.filter((x) => !/^vinted_robot/.test(x[0])).every((x) => x[1] === true), 'K9 la vérification de Vinted ⇒ la file S’ARRÊTE ; 403/429, mauvais compte, onglet fermé, garde, refus sans cause ⇒ elle attend ou continue, jamais arrêtée', JSON.stringify(stop));
+    { const w = g({ raison: 'pause_vinted', cause: 'http_429', etape: 'conversation' }); dit(w.active === true && (w.jobs || []).find((j) => j.notificationId === 'n1').etat === 'attente', 'K9 une pause 429 de Vinted, rien d’écrit ⇒ le favori ATTEND (repart après la pause), jamais refusé', JSON.stringify((w.jobs || []).map((j) => j.notificationId + ':' + j.etat))); }
     const v404 = g({ raison: 'vinted_refus', cause: 'http_404', etape: 'conversation' });
     dit(v404.active === true && attente(v404) === 4, 'K9 un 404 de Vinted pour CE favori (rien d’écrit) ⇒ sauté, la file continue', JSON.stringify({ a: v404.active }));
     const ecrit = derouler([{ ok: false, data: { resultat: 'refuse', raison: 'element_introuvable', ecrits: 2, etape: 'envoi', cause: 'element_absent:message-envoyer' } }])[0];
-    dit(ecrit.active === false, 'K9 un refus APRÈS une écriture chez l’acheteur (offre partie) arrête la file, comme avant', JSON.stringify({ a: ecrit.active })); }
+    // 5.455.8 : un refus APRÈS une écriture (offre partie) laisse CE favori de côté pour toujours (jamais deux fois) ; les autres partent.
+    dit(ecrit.active === true && (ecrit.jobs || []).find((j) => j.notificationId === 'n1').etat === 'refuse' && attente(ecrit) === (ecrit.jobs || []).length - 1, 'K9 un refus APRÈS une écriture chez l’acheteur (offre partie) : CE favori n’est jamais repris, les autres partent', JSON.stringify({ a: ecrit.active, j: (ecrit.jobs || []).map((j) => j.notificationId + ':' + j.etat) })); }
 
   console.log(`\n${ko ? '❌' : '✅'} favori absent de la cloche : ${ok} bon(s), ${ko} défaut(s)`);
   process.exit(ko ? 1 : 0);

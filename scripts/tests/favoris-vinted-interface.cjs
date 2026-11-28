@@ -46,8 +46,8 @@ juger('favoris-vinted-interface', [
   { garantie: 'aucun débordement horizontal ; cibles tactiles au moins 44 px', ou: [['panneau', /rien ne déborde, cibles ≥ 44 px/], ['panneau', /feuille : cibles ≥ 44 px/]] },
   { garantie: 'la fenêtre se referme pour retrouver la messagerie', ou: [['panneau', /Échap ferme la feuille, le panneau reste/]] },
   { garantie: 'réglages réhydratés après changement de compte', ou: [['reglages', /absence des réglages : défaut explicite non enregistré ; lecture exacte par propriétaire/], ['reglages', /sauvegarde et relecture conservent le message/]] },
-  { garantie: 'actualisation remet la sélection à zéro', ou: [['liste', /après le lancement, l’aperçu gardé est vidé : un second envoi exige une liste relue/], ['liste', /un aperçu de plus de 30 min ⇒ relire d’abord, rien ne part/]] },
-  { garantie: 'une erreur ne présente pas une ancienne liste comme actuelle', ou: [['file', /une capture absente est distincte d’une lecture en erreur ou ambiguë/], ['liste', /aucun aperçu lu sur ce navigateur ⇒ rien ne part/]] },
+  { garantie: 'actualisation remet la sélection à zéro', ou: [['liste', /après le lancement, l’aperçu gardé est vidé : un second envoi exige une liste relue/], ['liste', /un aperçu de plus de 30 min ⇒ relu d’abord chez VRM, puis l’envoi part/]] },
+  { garantie: 'une erreur ne présente pas une ancienne liste comme actuelle', ou: [['file', /une capture absente est distincte d’une lecture en erreur ou ambiguë/], ['liste', /aucun aperçu lu sur ce navigateur ⇒ relu chez VRM au moment d’envoyer, puis l’envoi part/]] },
   { garantie: 'réponse de l’ancien propriétaire rejetée', ou: [['file', /une réponse d’un autre propriétaire ou un changement de session est rejeté/], ['reglages', /absence de reçu exact ou changement de session : aucune confirmation de sauvegarde/]] },
   { garantie: 'seuls les réglages explicitement sauvegardés sont écrits, aucun envoi Vinted', ou: [['reglages', /cadence entière bornée et aucune activation cachée/], ['file', /message figé et aucun effet réseau au lancement/]] },
 ], JUGES);

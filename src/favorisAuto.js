@@ -35,6 +35,8 @@ export const AUTO_FAVORI_MAX_MS = 72 * 3600 * 1000;
 export const AUTO_RECONTACT_MS = 30 * 24 * 3600 * 1000;
 // Entre deux messages automatiques d'un même compte : 3 à 12 min, tiré au hasard
 // (déterministe sur le jeton : un comparer-et-échanger rejoué tire le même).
+// ⚠️ 5.455.8 : un défaut PROTÉGÉ (CLAUDE.md §3 « Ne PAS changer les défauts sans qu'il le demande ») — l'agent autonome le garde ;
+//    seule la pause de SES envois à la main est de 20 à 60 s. `audit-favoris-agent` le vérifie (mutation « ecart-20-60 »).
 export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];
 // Les réponses qui disent « ralentis » ou « robot » : le mode auto se met en
 // pause 24 h sur ce compte (dite dans l'app avec l'heure de reprise).
