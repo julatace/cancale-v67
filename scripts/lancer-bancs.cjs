@@ -73,6 +73,7 @@ const DUREES_CI = {
   'barre-depuis-journee': 15,
   'ecran-pret-une-fois': 80,   // (26 nov.) mesuré ici, seul : 77 s
   'compta-export': 240,   // (27 nov.) mesuré ici, seul : ~4 min (4 tailles × thèmes)
+  'tout-va-bien-sondes': 80,   // (27 nov.) mesuré ici : 77 s (la règle, ses 4 mutations, 8 contextes)
   'paires-dorment': 100,   // (27 nov.) mesuré ici, seul : ~1 min 30 (2 tailles × 2 thèmes × 3 scènes)
   // (27 nov., bancs-compta) Dix bancs compta remis au vert et ajoutés : durées ESTIMÉES ici (seuls, conteneur de session).
   'declare-urssaf': 330, 'achats-export': 300, 'suivi-urssaf': 270, 'dac7-comptes': 240, 'compta-claire': 210,

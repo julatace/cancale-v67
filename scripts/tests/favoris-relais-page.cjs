@@ -34,8 +34,15 @@ const fs=require('node:fs'),assert=require('node:assert/strict');const {chromium
  assert.equal(await p.evaluate(()=>document.querySelector('a').style.outlineStyle),'solid');n++;
  await p.click('a');
  await p.waitForFunction(()=>ouvertures===1);assert.equal(p.url(),'https://www.vinted.fr/inbox/900');n++;
+ // 5.455.6 (CI intermittente, #1451 / #1457) : la création part par un `fetch` NON attendu de la page ; la route de Playwright
+ //    (`creations`) et la trace d'inject.js (`writereq`) arrivent APRÈS `ouvertures===1`, au rythme de la machine. On attend
+ //    leur ÉTAT réel (borné à 10 s), jamais un délai fixe (§6.5).
+ const jusqua=async(f,ms=10000)=>{const fin=Date.now()+ms;for(;;){const v=await f();if(v)return v;if(Date.now()>fin)return v;await new Promise(r=>setTimeout(r,25));}};
+ await jusqua(()=>creations>=1);
  assert.equal(creations,1);n++;
- const trace=await cd.send('Runtime.evaluate',{contextId:executionContextId,expression:`messagesExt.filter(m=>m.kind==='writereq')`,returnByValue:true});assert.equal(trace.result.value.length,1);assert.equal(JSON.parse(trace.result.value[0].body).opposite_user_id,201);n++;
+ const lireTrace=()=>cd.send('Runtime.evaluate',{contextId:executionContextId,expression:`messagesExt.filter(m=>m.kind==='writereq')`,returnByValue:true});
+ await jusqua(async()=>(await lireTrace()).result.value.length>=1);
+ const trace=await lireTrace();assert.equal(trace.result.value.length,1);assert.equal(JSON.parse(trace.result.value[0].body).opposite_user_id,201);n++;
  for(const opts of [{cible:'https://evil.invalid/items/101/conversation/new'},{cible:'https://www.vinted.fr/api/v2/conversations/900/replies'},{sender:'another-extension'}]){assert.equal(await commande('ouvrir',opts),null);n++;}
  assert.equal(await commande('envoyerMessage'),null);n++;
  assert.equal(await p.evaluate(()=>ouvertures),1);assert.equal(creations,1);n++;
