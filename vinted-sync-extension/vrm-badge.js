@@ -6850,7 +6850,7 @@ function vrmVerifVisible(sel) {
     } else if (modeCx === 'mdp' && MDP_PERMIS) {
       corps = `${mail}
       <label class="lab" for="vrm-cx-mdp">${esc(TU('cx_mdp_lab'))}</label>
-      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="${esc(TU('cx_mdp_lab'))}" data-1p-ignore data-lpignore="true">
+      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" aria-label="${esc(TU('cx_mdp_lab'))}" data-1p-ignore data-lpignore="true">
       <div class="aide">${esc(TU('cx_mdp_aide'))}</div>
       ${verif}
       <button type="submit" class="b" data-principal data-me-connecter>${esc(TU('cx_me_connecter'))}</button>
@@ -6874,7 +6874,7 @@ function vrmVerifVisible(sel) {
       <div class="aide">${esc(TU('cx_code_aide'))}</div>
       ${pied}
       ${fourn}
-      ${MDP_PERMIS ? `<button type="button" class="b sec" data-basculer-mode>${esc(TU('cx_mdp_b'))}</button>` : ''}
+      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>' + esc(TU('cx_mdp_b')) + '</button>' : ''}
       <div class="cx-liens"><button type="button" class="lien" data-cx-creer>${esc(TU('cx_creer_b'))}</button>${relier}</div>`;
     }
     poserHtml(connexion, `${teteFeuille()}<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}</form>`);
