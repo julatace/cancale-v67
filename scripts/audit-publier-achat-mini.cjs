@@ -119,7 +119,7 @@ const MUTATIONS = [
   ['src/publier/avantPublier.js', "const raisons = g.raisons.filter((r) => r === 'zero' || r === 'plancher' || r === 'frappe');", "const raisons = g.raisons.filter((r) => r === 'zero');", 'garde du prix muette'],
   ['src/publier/avantPublier.js', "if (p != null && c > p) return { etat: 'refuse', c, raisons: ['au-dessus'] };", '', 'prix mini au-dessus du prix accepté'],
   ['src/publier/avantPublier.js', "return { min: String(Math.round(c) / 100), minAt: at };", "return { prixMini: String(Math.round(c) / 100), minAt: at };", 'un autre champ que `min`'],
-  ['src/publier/avantPublier.js', "if (contre) return { cle: autoAccepte === true ? 'ap.offres.contreEtAccepte' : 'ap.offres.contre', vars: { c: jusqua, min: miniC } };", "if (contre) return { cle: 'ap.offres.contre', vars: { c: Math.round(miniC * 0.8), min: miniC } };", 'ligne « Offres » sous le prix mini'],
+  ['src/publier/avantPublier.js', 'if (Number.isFinite(f) && f > 0) jusqua = Math.max(miniC, Math.round(f * 100));', 'if (Number.isFinite(f) && f > 0) jusqua = Math.round(miniC * 0.8);', 'ligne « Offres » sous le prix mini'],
 ];
 
 (async () => {

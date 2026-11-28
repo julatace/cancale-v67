@@ -90,6 +90,9 @@ const COUPLES = {
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
   // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
   'src/parrainage/EcranParrainage.jsx|wa.me': ['lien', LIEN + ' — « WhatsApp » du parrainage : le lien de partage (25 nov.)'],
+  'src/aPublier/HoteDossier.jsx|www.vinted.fr': ['lien', LIEN + ' — dossier « À publier » : l’annonce qu’un article est devenu (28 nov.)'],
+  'src/aPublier/PublierAussiDossier.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » : la tâche en file part quand le site est ouvert (28 nov., 5.458.0)'],
+  'src/aPublier/PublierAussiDossier.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » : la tâche en file part quand le site est ouvert (28 nov., 5.458.0)'],
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
   'src/connexions/EcranConnexions.jsx|www.vinted.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
   'src/connexions/EcranConnexions.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Connexions de l’extension » : ouvrir le site du compte pour le reconnecter (24 nov., agir-tout)'],
