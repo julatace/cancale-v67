@@ -1,0 +1,16 @@
+/* Le CRM eBay (28 nov., lot ebay-crm) — seulement ce que les composants natifs n'ont pas :
+   une zone de texte sur la forme de `.n-champ`, et la rangée de modèles d'une conversation. Jetons natifs seuls. */
+.crm-texte { display: flex; flex-direction: column; gap: 6px; margin: 0 var(--n-marge) 16px; }
+.crm-texte-libelle { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+.crm-texte-zone { box-sizing: border-box; width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--n-r-bouton);
+  background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); resize: vertical; outline: none; }
+.crm-texte-zone:focus { border-color: var(--n-accent); }
+.crm-texte-compte { font: var(--n-t-legende); color: var(--n-encre-2); align-self: flex-end; }
+.crm-pied { margin: -8px var(--n-marge) 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
+.crm-modeles { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none; }
+.crm-modeles::-webkit-scrollbar { display: none; }
+.crm-modele { flex: 0 0 auto; min-height: var(--n-cible); padding: 0 14px; border: 1px solid var(--n-trait); border-radius: var(--n-r-rond); background: var(--n-carte);
+  color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer; }
+.crm-modele:disabled { color: var(--n-sur-inactif); background: var(--n-inactif); cursor: default; }
+.crm-vues { margin: 0 var(--n-marge) 16px; }
+.crm-ligne-bouton { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 var(--n-marge) 16px; }

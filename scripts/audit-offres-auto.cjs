@@ -207,6 +207,15 @@ essaie('eBay', () => {
         const visite=node=>{if(!node || typeof node!=='object')return;if(node.type==='FunctionDeclaration' && node.id?.name==='repondreOffre' && node.start<=m.index && node.end>m.index)manuel=f.code.slice(node.start,node.end);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visite);else if(value && typeof value==='object')visite(value);};visite(ast);
         if(manuel && /b\.confirme\s*!==\s*true/.test(manuel) && /jeton\(owner\)/.test(manuel) && /lire\('GetBestOffers'/.test(manuel))continue;
       }
+      // (28 nov., lot ebay-automatismes, E3 — décision de Julien « fais pareil pour eBay ») LA CONTRE-OFFRE PAR PALIERS : une
+      // seule fonction, `contreOffrePalier`, dont l'Action est ÉCRITE « Counter » (jamais calculée), sans « Accept » ni
+      // « Decline » nulle part dedans : VRM n'accepte ni ne refuse jamais — c'est eBay, à SON seuil (§3).
+      if(m && quoi==='RespondToBestOffer' && f.rel===path.join('api','_lib','ebay-automatismes.js')){
+        const ast=parser.parse(f.code,{sourceType:'module'});let contre=null;
+        const visite=node=>{if(!node || typeof node!=='object')return;if(node.type==='FunctionDeclaration' && node.id?.name==='contreOffrePalier' && node.start<=m.index && node.end>m.index)contre=f.code.slice(node.start,node.end);for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visite);else if(value && typeof value==='object')visite(value);};visite(ast);
+        const autres=(f.code.match(/RespondToBestOffer/g)||[]).length;
+        if(contre && autres===1 && /<Action>Counter<\/Action>/.test(contre) && !/Accept|Decline/i.test(contre) && (contre.match(/<Action>/g)||[]).length===1)continue;
+      }
       if (m) fautes.push(`${f.rel} l.${ligneDe(f.code, m.index)} : ${quoi}`);
     }
   }

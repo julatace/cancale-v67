@@ -24,7 +24,8 @@ import './designV2/design-v2.css'; // (8 nov.) style de ./composants/SelectionSe
 import './designV2/argent-v2.css'; // (8 nov.) style de ./composants/SelectionSerie.jsx, gardé à sa place (son écran est chargé à la demande)
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, poserPanneauRetard, ouvrirPanneau } from './ouvrirPanneau.js';
-import { poserFaitsAgir, poserEnvoiAgir } from './agir/porte.js';
+import { poserFaitsAgir, poserEnvoiAgir, poserReverifAgir } from './agir/porte.js';
+import { poserSourcesSneakers } from './sneakers/stockage.js';   // (28 nov., lot sneakers-cote) les lectures de la feuille Sneakers, à la demande
 import { texteRaison as texteRaisonAgir, CreerVintedAgir, publierLbcDepuisVrm, EbayLectureSeule } from './agir/Agir.jsx';   // (24 nov., lot agir-si-connecte) LA porte de tous les gestes
 // (25 nov.) `requeteConnexions` chargé À LA DEMANDE (src/connexions/connexions.js n'est plus dans le premier JS de chaque écran).
 import { lirePresences as lirePresencesAgir, nouvelleCommandeDistance as commandeDistanceAgir, deposerCommandeDistance as deposerDistanceAgir, lireUneCommande as lireUneCommandeAgir } from './aDistance.js';
@@ -339,6 +340,7 @@ import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
 import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE, chargerFeuillesCopie } from './copieEcran.js';
 import { VueCopie } from './CopieEcran.jsx';
+import { AvatarPersonne } from './messages/AvatarPersonne.jsx';   // (28 nov., messages-parfaits) la photo de profil dans l'en-tête du fil
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -548,6 +550,9 @@ const FiltreSeulVentes = aLaDemandeDiscret(() => import('./natif/ecrans/VentesTa
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
 const RetoursVentes = aLaDemande(() => import('./natif/ecrans/RetoursVentes.jsx'));   // (20 nov.) Retours et litiges, une présentation
+// (28 nov., lot ebay-crm) Ventes · eBay → Clients (le CRM eBay) et l'hôte de la fiche acheteur (ouverte d'une vente, d'un message).
+const ClientsEbay = aLaDemande(() => import('./crm/ClientsEbay.jsx'));
+const HoteFicheAcheteur = aLaDemandeDiscret(() => import('./crm/HoteFicheAcheteur.jsx'));
 const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
 const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
 // ⟦→ ecrans/Comptabilite.jsx #39⟧
@@ -754,6 +759,8 @@ const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) =>
 const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
 const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
 const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
+// (28 nov., lot ebay-automatismes) eBay › Automatismes : baisse, offres, paliers, remise en vente, prix ajusté, masse, similaire.
+const AutomatismesEbay = aLaDemande(() => import('./ebay/AutomatismesEbay.jsx'));
 // (25 nov., régressions — captures iPhone de Julien : trois cartes grises sous « Personnaliser », pour toujours) Ce bloc
 // n'existe que s'il y a un versement à dire (le plus souvent : rien). En `aLaDemande`, son attente était le squelette de
 // trois rangées (`MorceauAttente`) : il paraissait puis s'en allait (un saut), et restait pour de bon quand le morceau
@@ -1483,6 +1490,8 @@ import './natif/natif.css'; // (8 nov.) style de ./RelanceFavorisCarte.jsx, gard
 import './styles-vendre-plus.css'; // (8 nov.) style de ./RelanceFavorisCarte.jsx, gardé à sa place (son écran est chargé à la demande)   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CalculetteAchat (était importé en statique)   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 const CalculetteAchat = aLaDemandeFeuille(() => import('./CalculetteAchat.jsx'));
+// (28 nov., lot sneakers-cote) La feuille « Sneakers » (cote VRM, valeur du stock, entonnoir, étiquettes, en masse) : à la demande.
+const FeuilleSneakers = aLaDemandeFeuille(() => import('./sneakers/FeuilleSneakers.jsx'));
 // ⟦→ ecrans/Comptabilite.jsx #84⟧
 import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
 // (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
@@ -1777,6 +1786,7 @@ import { poserForfaitEmballage } from './beneficePaire.js';   // (22 nov., inté
 import ForfaitEmballage from "./ForfaitEmballage.jsx";   // (21 nov., lot rentabilite ; 22 nov., intégration finale) le forfait de la fiche
 import RetraitsFiche from './RetraitsFiche.jsx';   // (21 nov., ext. 5.426) une paire vendue est retirée partout
 import { BoutonTraduire } from './TraduireLocal.jsx';   // (22 nov., intégration finale)
+import { planchersAPublier, memesPlanchers, PLANCHERS_CLE as PLANCHERS_EBAY_CLE } from './ebay/automatismes.js';   // (28 nov., lot ebay-automatismes)
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3745,6 +3755,12 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (28 nov., lot ebay-automatismes) Les automatismes eBay : LE PLANCHER de chaque N° (prix mini, achat) et les paires en
+  // vente, PUBLIÉS par l'app pour le serveur (src/ebay/automatismes.js `planchersAPublier`, §11) ; la majoration eBay par
+  // compte (« +x % sur eBay », SON choix) ; et « un automatisme est allumé » (alors seulement l'app publie le plancher).
+  'vrm_planchers_ebay','vrm_ebay_majoration','vrm_ebay_auto_actif',
+  // (28 nov., lot sneakers-cote) La référence fabricant, la pointure, la marque et les étiquettes de SES N° (src/sneakers/stockage.js) — SON geste seulement.
+  'vrm_sneakers',
   // (22 nov., choix n° 35) « Ce n'est pas un doublon » (Annonces · Photo en double) : { [ids du groupe]: at } — SON toucher, sur tous ses appareils (src/photoEnDouble.js).
   'vrm_photo_double_non',
   // (21 nov., lot rentabilite) Le forfait d'emballage qu'IL règle (éteint par défaut) : { actif, montant } — src/beneficePaire.js.
@@ -5494,6 +5510,9 @@ const lireComptaPourEcrire = () => {
   return p;
 };
 export { lireComptaPourEcrire };
+// (28 nov., messages-parfaits) le statut vrai de l'extension, dans Messages. Le commentaire reste AU-DESSUS : le test
+// isolation-comptes exécute ce bloc dans une vm et n'en retire que les lignes `export { … };` entières.
+export { reverifierExtension, extensionVerifiee };
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -5844,6 +5863,23 @@ const purgerCorbeille = () => {
   return _purgeCorbeilleEnVol;
 };
 onCloudReady(() => { setTimeout(() => { purgerCorbeille().catch(() => {}); }, 5000); });
+// (28 nov., lot ebay-automatismes) LE PLANCHER DE CHAQUE N° POUR LES AUTOMATISMES eBAY : publié (`vrm_planchers_ebay`)
+// quand un automatisme eBay est allumé (`vrm_ebay_auto_actif`), au chargement puis toutes les 6 h ; republié seulement
+// s'il a changé, ou après 12 h (le serveur n'agit plus sur une publication de plus de 72 h). Aucune fiche lue ⇒ rien
+// (« rien lu » ne vaut pas « rien » : une publication vide ne remplace jamais la précédente).
+const publierPlanchersEbay = () => {
+  try {
+    if (load('vrm_ebay_auto_actif', false) !== true || !AUTH.user?.id) return;
+    const fiches = load('vinted_annonce_numeros', null);
+    if (!fiches || typeof fiches !== 'object' || !Object.keys(fiches).length) return;
+    const neuf = planchersAPublier(fiches, load('vinted_buyprice_by_num', {}) || {}, load('vinted_nums_physiques', null));
+    const avant = load(PLANCHERS_EBAY_CLE, null);
+    if (avant && memesPlanchers(avant, neuf) && Date.now() - Number(avant.at || 0) < 12 * 3600000) return;
+    save(PLANCHERS_EBAY_CLE, neuf);
+  } catch (_) { /* une publication ratée : le serveur dit « plancher pas relu », rien ne bouge */ }
+};
+onCloudReady(() => { setTimeout(publierPlanchersEbay, 20000); try { setInterval(publierPlanchersEbay, 6 * 3600000); } catch (_) {} });
+try { window.addEventListener('vrm:planchers-ebay', publierPlanchersEbay); } catch (_) {}
 const lireListeCorbeille = () => listeCorbeille(load(CLE_CORBEILLE, {}));
 const dateCorbeille = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 // Paramètres → Corbeille : la plus récente en haut, la date, « Restaurer ».
@@ -9866,7 +9902,18 @@ const montantRecuEbay = (o) => {
   if (d.currency !== 'EUR') return { eur: null, raison: 'devise ' + (d.currency || 'inconnue') };
   if (!f) return { eur: null, raison: 'frais eBay inconnus' };
   if (f.currency !== 'EUR') return { eur: null, raison: 'devise ' + (f.currency || 'inconnue') };
-  return { eur: (Math.round(Number(d.value) * 100) - Math.round(Number(f.value) * 100)) / 100, raison: '' };
+  // (28 nov., ebay-livraison — §2.8) LE PORT N'ENTRE NULLE PART. En livraison gérée par eBay, si le dû au vendeur PORTE le port
+  // payé par l'acheteur (il est plus proche de « articles + port » que des articles seuls — `pricingSummary.priceSubtotal`,
+  // `deliveryCost` − `deliveryDiscount`, en euros), ce port est retiré : il paie l'étiquette, il n'est pas une recette. Les
+  // montants de la MÊME commande sont comparés, rien n'est deviné ; illisible ⇒ rien n'est retiré (le dû tel qu'avant).
+  const ps = o && o.pricingSummary, sous = lu(ps && ps.priceSubtotal), port = lu(ps && ps.deliveryCost), remise = lu(ps && ps.deliveryDiscount);
+  const dC = Math.round(Number(d.value) * 100);
+  let portC = 0;
+  if (sous && port && sous.currency === 'EUR' && port.currency === 'EUR') {
+    const pC = Math.max(0, Math.round(Number(port.value) * 100) - (remise && remise.currency === 'EUR' ? Math.abs(Math.round(Number(remise.value) * 100)) : 0)), sC = Math.round(Number(sous.value) * 100);
+    if (pC > 0 && Math.abs(dC - (sC + pC)) < Math.abs(dC - sC)) portC = pC;
+  }
+  return { eur: (dC - portC - Math.round(Number(f.value) * 100)) / 100, raison: '', ...(portC ? { portRetire: portC / 100 } : {}) };
 };
 // ⟦→ ecrans/Comptabilite.jsx #159⟧
 const netApresUrssafDe = (ca, tauxPct = tauxUrssaf()) => {
@@ -11046,6 +11093,10 @@ function vmrExecUn({ uid, method, endpoint, body, confirme }, timeoutMs = 15000)
 //    deux — `undefined` on vérifie · `null` elle ne répond pas · objet mesuré.
 //    L'état ne coûte AUCUNE requête Vinted (cookie + stockage de l'extension).
 let __vmrEtat = undefined, __vmrRates = 0;
+// (28 nov., messages-parfaits — Julien : le statut de l'extension « parfois faux ») L'HEURE de la dernière réponse du pont
+// (`battementExt`). Avant, l'état gardé n'avait pas de date : onglet caché, battement sauté, extension rechargée… l'app
+// redisait « compte de l'onglet » sur un état de plusieurs minutes. Daté, il se dit vieux (src/messages/statutExtension.js).
+let __vmrEtatAt = 0, __vmrVerifAt = 0;
 // ══ LE CODE QUI TOURNE N'EST PAS CELUI DU MANIFESTE (11 octobre) ═══════════
 // ⚠️⚠️ MESURÉ dans ses journaux, reproduit dans un vrai Chromium : sur 5 des 6
 //    Chrome qui travaillent pour lui, le dossier avait été remplacé par la
@@ -11385,6 +11436,20 @@ function LigneRelais({ quoi }) {
   );
 }
 let __vmrBattementEnVol = false, __vmrRelance = null;
+// (28 nov., messages-parfaits) REVÉRIFIER MAINTENANT : à l'ouverture de Messages et avant chaque geste (src/agir/porte.js),
+// on redemande l'état au pont au lieu de croire le dernier battement. Rend quand la réponse (ou le raté) est rangée ; au
+// plus `ms`. `extensionVerifiee()` : { at: la dernière réponse, essai: le dernier essai } (0 = jamais).
+function extensionVerifiee() { return { at: __vmrEtatAt, essai: __vmrVerifAt }; }
+async function reverifierExtension(ms = 2500) {
+  if (typeof window === 'undefined') return extensionVerifiee();
+  try { sonderPonts(); } catch (_) {}
+  if (!__vmrExtReady) { __vmrVerifAt = Date.now(); __vmrNotifier(); return extensionVerifiee(); }
+  let fini = false;
+  const tour = (async () => { try { if (__vmrBattementEnVol) { const t0 = Date.now(); while (__vmrBattementEnVol && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 80)); } else { __vmrRates = Math.min(__vmrRates, 1); await battementExt(); } } catch (_) {} fini = true; })();
+  await Promise.race([tour, new Promise((r) => setTimeout(r, ms))]);
+  if (!fini) { __vmrVerifAt = Date.now(); __vmrNotifier(); }
+  return extensionVerifiee();
+}
 // ⚠️ Un pont plus ancien que la 5.129 ne sait pas répondre à « état » : le
 //    questionner le faisait passer pour MUET au bout de 15 s, et l'app disait
 //    « recharge la page » à quelqu'un qui devait METTRE À JOUR — recharger ne
@@ -11410,7 +11475,8 @@ async function battementExt() {
     }
     if(!r)r=await vmrEtat(); // read-only fallback, never an action replay
   } finally { __vmrBattementEnVol = false; }
-  if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
+  __vmrVerifAt = Date.now();
+  if (r && r.ok) { __vmrEtat = r; __vmrRates = 0; __vmrEtatAt = Date.now(); if (r.cmds && typeof r.cmds === 'object') Object.assign(__vmrJobs, r.cmds); }
   else {
     __vmrRates++;
     // ⚠️ UN raté ne vaut pas « muette » : un service worker qui se réveille, un
@@ -16454,7 +16520,8 @@ function TeteFil({ onFermer, photo, nom, sensible = false, titre, compte, title,
       <button type="button" className="vrm-chat-back" aria-label={libelleFermer} onClick={onFermer} style={{color:C.accentTexte}}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      {photo?<PhotoVinted src={photo} alt="" style={{width:36,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<span className="vrm-chat-head-ph" style={{background:C.card2||C.bg,color:C.muted}}><Icon name="chat" size={17}/></span>}
+      {/* (28 nov., messages-parfaits) La photo de profil de la personne (ronde, 36 px fixes), sinon son initiale — plus la bulle. */}
+      <AvatarPersonne photo={photo} nom={typeof nom === 'string' ? nom : ''} taille={36} Photo={PhotoVinted} sensible={sensible} className="vrm-chat-head-av" attrs={{ 'data-fil-avatar': photo ? 'photo' : 'initiale' }}/>
       <div className="vrm-chat-head-t">
         <div className="vrm-chat-head-n" style={{color:C.text}}>{sensible ? <span className="vrm-sensible" data-stream-type="acheteur">{nom}</span> : nom}</div>
         {/* (revue) Le compte a sa propre place, jamais coupé : sur téléphone le
@@ -21805,6 +21872,8 @@ function useComptesEbay() {
 // ═══════════════════════════════════════════════════════════════════════════
 const depAgir = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: (l) => withOwner(l), conflit: SB_CONFLICT });
 const aleaAgir = () => { try { const b = new Uint8Array(6); crypto.getRandomValues(b); return Array.from(b, (x) => x.toString(36).padStart(2, '0')).join('').slice(0, 8); } catch (_) { return Math.random().toString(36).slice(2, 10); } };
+// (28 nov., messages-parfaits) Avant chaque geste : l'état du pont revérifié s'il a plus de 10 s (src/agir/porte.js).
+poserReverifAgir(async () => { if (Date.now() - __vmrEtatAt < 10000) return; await reverifierExtension(2500); await new Promise((r) => setTimeout(r, 60)); });
 poserEnvoiAgir({ deposer: async ({ geste, site, compte, args, confirme, num, avant }) => {
   const owner = AUTH.user && AUTH.user.id;
   const c = commandeDistanceAgir({ geste, site, compte, args, owner, confirme, num, avant, alea: aleaAgir() });
@@ -30887,7 +30956,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} lireCopie={lireCopieArrivee} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <HoteFicheAcheteur headers={enTeteSession} confirm={askConfirm}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} lireCopie={lireCopieArrivee} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
@@ -32324,6 +32393,9 @@ function AppCoeur() {
   // (10 nov., lot L) LA CALCULETTE D'ACHAT : ouverte par Achats (`vrm:calculette`) ou ⌘K ; elle n'écrit rien.
   const [calcOuverte,setCalcOuverte]=useState(false);
   useEffect(()=>{const ouvrir=()=>setCalcOuverte(true);window.addEventListener('vrm:calculette',ouvrir);return()=>window.removeEventListener('vrm:calculette',ouvrir);},[]);
+  // (28 nov., lot sneakers-cote) « Sneakers » : `vrm:sneakers` (detail : la vue — valeur · entonnoir · tags · masse).
+  const [snkOuverte,setSnkOuverte]=useState(null);
+  useEffect(()=>{const ouvrir=(e)=>setSnkOuverte(e&&typeof e.detail==='string'&&e.detail?e.detail:'valeur');window.addEventListener('vrm:sneakers',ouvrir);return()=>window.removeEventListener('vrm:sneakers',ouvrir);},[]);
   const [neuveRecente,setNeuveRecente]=useState(null);   // (3 nov.) la fiche dupliquée à l'instant (avant l'écriture différée de `save`)
   useEffect(()=>{const ouvrir=e=>{const n=e&&e.detail; if(typeof n!=='string'||!n.trim()||n.length>64)return; setFicheNum(n.trim());};window.addEventListener('vrm:fiche-paire',ouvrir);return()=>window.removeEventListener('vrm:fiche-paire',ouvrir);},[]);
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
@@ -32819,6 +32891,51 @@ function AppCoeur() {
     const g = grouperPrixMarche(sold, online);
     setPqmData({ groups: g, valo: valoriserStock(g, online) });
   })(); /* eslint-disable-next-line */ },[tab,platSub]);
+  // ── (28 nov., lot sneakers-cote) LES SOURCES DE LA FEUILLE « SNEAKERS » ET DE LA COTE À L'ACHAT ──
+  // Posées une fois, LUES À LA DEMANDE (la feuille ouverte, la calculette qui cherche une référence) : SES ventes Vinted
+  // (prix LU, jamais 0 €, annulées écartées) et eBay (le prix de la ligne en euros), avec le N° de la vente PAR IDENTITÉ
+  // (l'annonce `item_id` → sa fiche ; le SKU `VRM-{n°}`) et la date de mise en ligne de SON annonce (le délai) ; ses
+  // annonces Vinted et eBay quand l'écran Annonces n'a pas publié ses articles (src/sneakers/stockage.js). Aucune clé,
+  // aucune lecture de StockX (décision de Julien du 28 nov.). `null` = pas su, jamais [].
+  const vaSnk=useRef(vintedAccounts); vaSnk.current=vintedAccounts;
+  useEffect(()=>{ poserSourcesSneakers({
+    ventes: async()=>{
+      const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+      const [so, dress, eb]=await Promise.all([sb('app_data?id=like.harvest_*_orders_sold&select=mo:data->payload->my_orders'), lireDressings(sb,{uids:uidsLies(vaSnk.current)}), lireEbayTous('ebay_orders',SEL_EBAY_COMMANDES,'orders').catch(()=>null)]);
+      if(so===null) return null;
+      const fiches=load('vinted_annonce_numeros',{})||{}; const cree={};
+      for(const r of (dress||[])){ for(const it of ((r&&r.data&&r.data.payload&&r.data.payload.items)||[])){ if(!it||it.id==null) continue; const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts)?it.created_at_ts:(Number.isFinite(it.createdTs)?it.createdTs:null), id: it.id }, null); if(c!=null) cree[String(it.id)]=c; } }
+      const out=[]; const vus=new Set();
+      for(const r of so){ for(const o of (Array.isArray(r&&r.mo)?r.mo:[])){
+        const tx=String(o&&(o.transaction_id||o.id)||''); if(tx&&vus.has(tx)) continue; if(tx) vus.add(tx);
+        if(!o||classifyOrderStatus(o.status)==='cancelled') continue;
+        const eur=montantCommandeLu(o), t=tsCommande(o); if(eur==null||!t) continue;
+        const item=o.item_id!=null?String(o.item_id):''; const f=item?fiches[item]:null;
+        out.push({ site:'vinted', prix:eur, venduMs:t, misEnLigneMs:item?cree[item]??null:null, titre:o.title||'', taille:o.size||o.size_title||'', num:f&&f.numero!=null?String(f.numero):'', itemId:item }); } }
+      if(eb&&Array.isArray(eb.items)) for(const o of eb.items){
+        if(!o||(o.cancelStatus&&/CANCEL/i.test(String(o.cancelStatus.cancelState||'')))) continue;
+        const t=Date.parse(o.creationDate||''); if(!t) continue;
+        for(const li of (Array.isArray(o.lineItems)?o.lineItems:[])){ const m=li&&li.lineItemCost; if(!m||String(m.currency||'').toUpperCase()!=='EUR') continue;
+          const q=Number(li.quantity)||1; const v=Number(m.value); if(!Number.isFinite(v)||v<=0) continue;
+          const n=numDeSkuEbay(li.sku); out.push({ site:'ebay', prix:Math.round(v*100/q)/100, venduMs:t, titre:li.title||'', num:n?String(n):'' }); } }
+      return out;
+    },
+    annonces: async()=>{
+      const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); return r.ok?await r.json():null; }catch(_){ return null; } };
+      const rows=await lireDressings(sb,{uids:uidsLies(vaSnk.current)}); if(!rows) return null;
+      const lst=(await lireLignesEnLigne(rows)).lignes; const fiches=load('vinted_annonce_numeros',{})||{}; const buy=load('vinted_buyprice_by_num',{})||{};
+      const out=[];
+      for(const r of lst){ const uid=(String(r&&r.id||'').match(/^harvest_(\d+)_listings$/)||[])[1]||''; for(const it of ((r.data&&r.data.payload&&r.data.payload.items)||[])){
+        if(!it||it.id==null||it.is_closed) continue; const f=fiches[String(it.id)]||null;
+        out.push({ cle:'vinted:'+it.id, site:'vinted', id:String(it.id), compte:uid, titre:it.title||'', prix:montantCommandeLu(it), devise:'EUR', num:f&&f.numero!=null?String(f.numero):'', mini:f&&f.min!=null?montantCommandeLu({price:f.min}):null, achat:prixAchatDe(f,buy),
+          vues:Number.isFinite(it.view_count)?it.view_count:null, favoris:Number.isFinite(it.favourite_count)?it.favourite_count:null, enLigne:!it.is_hidden&&!it.is_draft, taille:it.size_title||it.size||'' }); } }
+      const eb=await lireEbayTous('ebay_listings',SEL_EBAY_ANNONCES,'items').catch(()=>null);
+      if(eb&&Array.isArray(eb.items)) for(const x of eb.items){ if(!x||x.itemId==null) continue; const n=numEbayLu(x.sku,x.itemId,null,x.depuis);
+        out.push({ cle:'ebay:'+x.itemId, site:'ebay', id:String(x.itemId), compte:x._compte||'', titre:x.title||'', prix:x.price!=null?Number(x.price):null, devise:String(x.currency||'EUR').toUpperCase(), num:n?String(n):'', mini:null, achat:n&&buy[n]!=null?Number(String(buy[n]).replace(',','.')):null, vues:null, favoris:null, enLigne:true, taille:x.taille||'' }); }
+      return out;
+    },
+    ebay: (s,p)=>envoisPrix({ appelEbay:(c)=>appelEbay(c), resultatReviseEbay:(x)=>resultatReviseEbay(x), corpsCompteEbay:(c)=>corpsCompteEbay(c), vmrCmdSuivi:()=>null, deposer:async()=>null }).ebay(s,p),
+  }); return ()=>poserSourcesSneakers(null); },[]);
   // ── VENTES LEBONCOIN PROUVÉES, pour le CA par plateforme du tableau de bord ──
   // §5 : une VENTE Leboncoin n'est comptée que si `isSeller===true` (le détail de
   // transaction le dit) — jamais déduite d'une transaction vue en liste. Lecture
@@ -32967,6 +33084,8 @@ function AppCoeur() {
   SITES_RELIES_COQUE.v = sitesRelies;   // les plateformes de « Plus » (une rangée par site relié)
   // (20 nov.) « Plus › eBay » : ce qu'eBay a en propre — ses comptes et réglages, ses recherches et alertes (sorties d'Achats).
   const [ebayRecherches, setEbayRecherches] = useState(false);
+  const [ebayAuto, setEbayAuto] = useState(false);   // (28 nov., lot ebay-automatismes) la page eBay › Automatismes
+  React.useEffect(() => { const f = () => setEbayAuto(true); window.addEventListener('vrm:ebay-automatismes', f); return () => window.removeEventListener('vrm:ebay-automatismes', f); }, []);
   React.useEffect(() => { const f = () => setEbayRecherches(true); window.addEventListener('vrm:ebay-recherches', f); return () => window.removeEventListener('vrm:ebay-recherches', f); }, []);
   React.useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.tache !== tab || !d.site) return; setPlatSub(d.site); retenirFiltre(d.tache, d.site, true); };
     window.addEventListener('vrm:site-tache', f); return () => window.removeEventListener('vrm:site-tache', f); }, [tab]);
@@ -35300,6 +35419,9 @@ function AppCoeur() {
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onReconnecter={allerComptesEbay}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onReconnecter={allerComptesEbay} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {/* (28 nov., lot ebay-crm) Le CRM eBay : acheteurs, automatismes, réponses, exclus, avis et litiges (src/crm/ClientsEbay.jsx). */}
+          {sec==='clients'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=>{ const c=(comptesEbay||[]).find((x)=>x.ref===ref); return <ClientsEbay key={'crm-'+ref} compte={ref} headers={enTeteSession} confirm={askConfirm} domaine={(c&&c.marche&&c.marche.domaine)||'www.ebay.fr'}/>; }}</EbayActionCompte></div>}
+          {sec==='auto'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><AutomatismesEbay key={'ea-'+ref} compte={ref} headers={enTeteSession} confirm={askConfirm} load={load} save={save}/>}</EbayActionCompte></div>}
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {/* (20 nov., « même squelette ») Achats · eBay : les achats gagnés sous « En route » (la disposition de Vinted) ; les
               recherches et alertes eBay vivent dans « Plus › eBay » (`vrm:ebay-recherches`). */}
@@ -36225,7 +36347,9 @@ function AppCoeur() {
             ouvrirNumero={(n)=>{ setRpOuvert(false); try{ window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)})); }catch(_){} }}
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
-        {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
+        {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)} load={load}/></GardeEcran>}
+        {snkOuverte && <GardeEcran nom="sneakers" feuille onFermer={()=>setSnkOuverte(null)}><FeuilleSneakers ouverte vue={snkOuverte} onFermer={()=>setSnkOuverte(null)} load={load} save={save}
+          confirmer={({n})=>askConfirm({ title: tr('snk.masse.appliquer',{n}), desc: tr('snk.masse.notePrix'), ok: tr('snk.masse.appliquer',{n}) })}/></GardeEcran>}
         {/* (16 nov., relier-fiable) « Reçu » de l'achat relié, ouvert depuis la fiche : au-dessus d'elle. */}
         {recuFicheVue && <FeuilleRecuAchat recu={recuFicheVue} z={Z_CONFIRMATION + 10} fermer={()=>setRecuFicheVue(null)}/>}
         {ficheNum && <FermeAuRetour fermer={()=>{ ficheDeLoupe.current=null; setFicheNum(null); }}/>}
@@ -36572,6 +36696,10 @@ function AppCoeur() {
             </>}</GardeEcran>}
         {tab==='messages'&&<GardeEcran nom="messages">{rendreTache('messages')}</GardeEcran>}
         {tab==='achats'&&<GardeEcran nom="achats">{rendreTache('achats')}</GardeEcran>}
+        {ebayAuto ? <GardeEcran nom="ebay-automatismes"><Natif.PagePoussee ouverte titre={tr('eauto.titre')} onRetour={() => setEbayAuto(false)} attrs={{ 'data-ebay-automatismes': '' }}>
+          <EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{(ref) => <AutomatismesEbay key={'ea-' + ref} compte={ref} headers={enTeteSession} confirm={askConfirm} load={load} save={save}
+            onBrouillons={() => { setEbayAuto(false); setTab('annonces'); setPlatSub(subDeTache('ebay', 'annonces')); }}/>}</EbayActionCompte>
+        </Natif.PagePoussee></GardeEcran> : null}
         {ebayRecherches ? <GardeEcran nom="ebay-recherches"><Natif.PagePoussee ouverte titre={tr('ebay.recherches.titre')} onRetour={() => setEbayRecherches(false)} attrs={{ 'data-ebay-recherches': '' }}>
           <Natif.Groupe><Natif.Rangee icone={<Icon name="gear" size={22}/>} titre={tr('ebay.recherches.compte')} fin="chevron" onClick={() => { setEbayRecherches(false); DEMANDE_REGLAGE_SOUS.id = 'ebay'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); }}/></Natif.Groupe>
           <EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette} sansGagnes/>

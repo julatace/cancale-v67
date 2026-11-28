@@ -39,6 +39,7 @@ import { retourDuSuivi, etapeRetourDuSuivi, ID_RETOURS_DEPOSES_CHAMP } from './_
 import { stampBordereau } from './_lib/stamp.js';
 // (9 nov., transporteurs inconnus) Le transporteur NOMMÉ dans le PDF du bordereau (sans IA, api/_lib/transporteur-pdf.js).
 import { transporteurDuPdf, champsPdf } from './_lib/transporteur-pdf.js';
+import { estEtiquetteEbay, lireEtiquetteEbay, idEtiquetteEbay } from './_lib/ebay-livraison.js';
 
 import { contexteVendeur, proprietaireCourant, duVendeur as duVendeurLib } from './_lib/owner.js';
 import { motsServeur } from './_lib/mots-vendeur.js';
@@ -2557,6 +2558,28 @@ export async function traiterEmail(req, res) {
   const now = (req && req.__recuLe) ? String(req.__recuLe) : new Date().toISOString();
 
   try {
+    // 00) (28 nov., ebay-livraison — §2.8) L'ÉTIQUETTE eBAY PRÉPAYÉE PAR L'ACHETEUR, reçue par e-mail : un e-mail d'eBay
+    // (l'expéditeur CLASSE l'e-mail ; le vendeur reste celui de l'adresse de réception) qui porte UN PDF et parle
+    // d'étiquette (api/_lib/ebay-livraison.js). Rangée par SON n° de commande eBay (`email_bordebay_{n°}`, jamais le
+    // titre) : « Imprimer N bordereaux » l'imprime avec ceux de Vinted. Sans n° unique ⇒ gardé entier « à vérifier »,
+    // jamais jeté ni deviné ; écriture ratée ⇒ 503 (rejeu). ⚠️ NON MESURÉ : aucun e-mail d'étiquette eBay en base.
+    if (estEtiquetteEbay({ from: mail.from, subject, attachments: mail.attachments })) {
+      const lu = lireEtiquetteEbay({ subject, text: corpsTexte, attachments: mail.attachments });
+      if (!lu.ok) {
+        await garderInconnu(corpsBrut, mail, 'étiquette eBay : ' + lu.raison, '');
+        await repondre(res, 200, { ok: false, type: 'etiquette-ebay', garde: true, raison: lu.raison });
+        return;
+      }
+      let luPdf = null;
+      try { luPdf = await transporteurDuPdf(lu.pdf.contentB64); } catch (_) { luPdf = null; }
+      const ok = await supabaseUpsert([{ id: idEtiquetteEbay(lu.orderId), data: {
+        type: 'etiquette-ebay', orderId: lu.orderId, ...(luPdf ? champsPdf(luPdf) : {}),
+        pdfB64: lu.pdf.contentB64, filename: lu.pdf.filename || `Etiquette-eBay-${lu.orderId}.pdf`, receivedAt: now } }]);
+      if (!ok) { await repondre(res, 503, { ok: false, erreur: 'ecriture', message: "L'étiquette eBay n'a pas pu être rangée : renvoie-la." }); return; }
+      await logEmail({ type: 'etiquette-ebay', subject, from: mail.from, orderId: lu.orderId });
+      await repondre(res, 200, { ok: true, type: 'etiquette-ebay', orderId: lu.orderId, pdf: true });
+      return;
+    }
     // 000) (11 nov., lot retours-litiges) LE BORDEREAU DE RETOUR D'UN ACHAT — par le SUJET
     // d'abord (api/_lib/retour-email.js). Avant : « aucune règle ne le reconnaît », gardé
     // TRONQUÉ ⇒ le PDF était perdu. Rangé par SON n° de transaction (`email_bordretour_{tx}`),

@@ -41,6 +41,7 @@ import { lireItemRelance, jugerRelance, xmlRelance, ID_ANNONCE_EBAY } from './_l
 import { jugerOffre, offreEnCours, offresEnCours, noterOffre } from './_lib/ebay-offre.js';   // (23 nov.) le prix vu, une offre par annonce
 import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { creerRemisesEbay } from './_lib/ebay-remises.js';
+import { creerAutomatismesEbay } from './_lib/ebay-automatismes.js';   // (28 nov., lot ebay-automatismes) E1-E6 : baisse, offres, paliers, relance, masse, similaire
 // (15 nov., eBay complet 2) L'argent réel (Finances, signé), le trafic, la santé du compte, les litiges.
 import { creerTableauEbay } from './_lib/ebay-tableau.js';
 import { creerGestesEbay } from './_lib/ebay-gestes.js';   // (15 nov., 2e tour) corriger, relier au catalogue, photos — sur SON clic
@@ -51,6 +52,8 @@ import { lireEtatJeton, keysReady, canConsent, ruName, authUrl, appToken, jetonA
   lireComptes, comptesActifs, rangerConnexion, apprendrePrincipal, apprendreTypes, resoudreCompte, deconnecterCompte, suffixeCompte, normaliserRegistre, cleCompteDe,
   montantOk, valideRegleOffre, seuilTropBas } from './_lib/ebay.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+// (28 nov., lot ebay-crm) Le CRM eBay : fiche acheteur, messages automatiques, évaluation auto, exclusions, avis, litiges.
+import { creerCrmEbay, lecteurCommandes } from './_lib/ebay-crm.js';
 
 // ── LE CONTEXTE D'UNE ACTION : QUI (le vendeur de la session) ET SUR QUEL
 // COMPTE eBAY (9 octobre, plusieurs comptes par vendeur). `ctx.compte.suffixe`
@@ -751,7 +754,7 @@ function itemXml(it) {
     `<ConditionID>${esc(it.conditionId || '3000')}</ConditionID>` + X.apresEtat +
     (pics ? `<PictureDetails>${pics}</PictureDetails>` : '') +
     (specs ? `<ItemSpecifics>${specs}</ItemSpecifics>` : '') +
-    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` +
+    `<DispatchTimeMax>${X.delai != null ? X.delai : parseInt(it.dispatchDays || 3, 10)}</DispatchTimeMax>` + (X.colis || '') +
     // ⚠️ LIVRAISON GÉRÉE PAR eBay. MESURÉ 3 fois à blanc sur son compte (27 sept.) :
     // eBay REFUSE tout <ShippingDetails> que VRM envoie — transporteur + coût ET
     // transporteur seul sortent « Item.ShippingDetails non valides ». Seul un item
@@ -1861,9 +1864,12 @@ async function handleRelire(ctx) {
   // garde de détail de `ebay_listings` : la liste d'eBay fait foi.
   const inactivesRange = annoncesRange ? await rangerInactives(ctx, liste, t0) : false;
   const ok = cmd.ok === true;
+  // (28 nov., lot ebay-crm) Les automatismes du CRM (éteints par défaut) passent APRÈS la relecture des commandes.
+  const crm = ok ? await passerCrmBorne(ctx) : { fait: false, raison: 'commandes-pas-relues' };
   return { status: ok ? 200 : (cmd.status || 502), body: {
     ok, reason: ok ? undefined : cmd.reason,
     lu: { commandes: cmd.range === true, annonces: annoncesRange, programmees: programmeesRange, messages: messagesRange, inactives: inactivesRange },
+    crm,
     commandes: { lues: cmd.lues == null ? null : cmd.lues },
     ...(ok ? {} : { error: cmd.reason === 'base' ? 'La base n\'a pas répondu — la dernière capture reste.' : 'eBay n\'a pas rendu tes commandes — la dernière capture reste.' }),
   } };
@@ -2077,6 +2083,12 @@ const chargerCommandesSuivantes=creerLectureCommandesEbay({lire:lireResumeComman
 // (11 nov., lot import-historique-sites) Tout l'historique des ventes eBay, fenêtre par fenêtre (api/_lib/ebay-historique.js).
 const importerHistoriqueEbay=creerHistoriqueEbay({lire:lireDonnee,modifier:modifierDonnee,jeton:jetonDe,json:ebayJson,apiOrigin:EBAY_API});
 const gestionEbay=creerGestionEbay({accessToken:jetonDe,ebayJson,tradingCall,apiOrigin:EBAY_API});
+// (28 nov., lot ebay-automatismes) Les automatismes eBay (api/_lib/ebay-automatismes.js). La modification en masse
+// passe par les MÊMES chemins que SON clic : `handleRevise` (prix vu relu, garde du prix, règle d'offre) et la fin
+// d'annonce (`terminerAnnonce` + sortie des règles d'offre).
+const automatismesEbay=creerAutomatismesEbay({lireDonnee,modifierDonnee,lireReglageVendeur,accessToken,fetcher:(...a)=>fetchAvecDelai(...a),marche:()=>marcheCourant(),
+  reviser:(b,ctx)=>handleRevise(b,ctx),
+  terminer:async(b,ctx)=>{const r=await gestionEbay.terminerAnnonce(b,ctx);if(r.body?.ok)r.body.reglesRange=await sortirDesRegles(String(b.itemId),ctx);return r;}});
 // (17 octobre) Après la vente : retours, annulations, promotion, achats.
 // Une annulation ACCEPTÉE marque la commande rangée « CANCELED » (comparer-et-
 // échanger) : elle sort aussitôt des colis à faire, sans attendre la synchro.
@@ -2099,6 +2111,11 @@ const tableauEbay=creerTableauEbay({accessToken:jetonDe,tradingCall,lireXml:lire
 // (15 nov., eBay complet 3) Les GESTES sur une annonce (diagnostic en lecture ; caractéristiques,
 // produit du catalogue, photos en écriture, confirmées, relues avant et après, journalisées).
 const gestesEbay=creerGestesEbay({accessToken:jetonDe,tradingCall,lireXml:lireXmlEbay,jetonApplication,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace});
+// (28 nov., lot ebay-crm) api/_lib/ebay-crm.js — les commandes rangées de TOUS ses comptes, projetées.
+const crmEbay=creerCrmEbay({accessToken:jetonDe,lireDonnee,modifierDonnee,tradingCall,apiOrigin:EBAY_API,
+  lireCommandes:lecteurCommandes({sbUrl:process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co',cle:()=>process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '',portee:porteeEbay,lireComptes,comptesActifs})});
+// Le passage des automatismes du CRM, borné (il ne retarde jamais la relecture de plus de 15 s).
+async function passerCrmBorne(ctx){let t;try{return await Promise.race([crmEbay.passer(ctx),new Promise(ok=>{t=setTimeout(()=>ok({fait:false,raison:'delai'}),15000);})]);}catch(_){return {fait:false,raison:'erreur'};}finally{clearTimeout(t);}}
 
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
@@ -2240,6 +2257,12 @@ async function handleApp(req, res) {
       res.status(r.status).json(r.body);
       return;
     }
+    // (28 nov., lot ebay-crm, C6) La liste d'exclusion est celle du VENDEUR, toutes plateformes : aucun compte eBay n'est exigé.
+    if (action === 'crmexclus' || action === 'crmexclure' || action === 'crmreintegrer') {
+      const r = action === 'crmexclus' ? await crmEbay.exclusLire(b, owner) : action === 'crmexclure' ? await crmEbay.exclure(b, owner) : await crmEbay.reintegrer(b, owner);
+      res.status(r.status).json(r.body);
+      return;
+    }
     if (action === 'apptoken') {
       const r = await appToken();
       res.status(r.status).json(r.ok ? { ok: true, works: true, expires_in: r.expires_in || null } : { ok: false, error: r.error, detail: r.detail || '' });
@@ -2371,7 +2394,24 @@ async function handleApp(req, res) {
       regleoffrelire: (ctx) => handleRegleOffreLire(b, ctx),
       // (3 nov.) Remettre en vente une inactive : vérifier (frais), puis relancer sur SON clic.
       relanceverif: (ctx) => handleRelance(b, ctx, true),
+      // (28 nov., lot ebay-crm) api/_lib/ebay-crm.js : lectures, réglages, et gestes sur SON clic (confirmés, journalisés).
+      crmacheteurs: (ctx) => crmEbay.acheteurs(b, ctx),
+      crmfiche: (ctx) => crmEbay.fiche(b, ctx),
+      crmreglages: (ctx) => crmEbay.reglages(b, ctx),
+      crmregler: (ctx) => crmEbay.regler(b, ctx),
+      crmpasser: async (ctx) => ({ status: 200, body: { ok: true, bilan: await passerCrmBorne(ctx) } }),
+      crmecrire: (ctx) => crmEbay.ecrireAcheteur(b, ctx),
+      crmavis: (ctx) => crmEbay.avis(b, ctx),
+      crmrepondreavis: (ctx) => crmEbay.repondreAvis(b, ctx),
+      crmlitiges: (ctx) => crmEbay.litiges(b, ctx),
+      crmcontester: (ctx) => crmEbay.contester(b, ctx),
       relancer: (ctx) => handleRelance(b, ctx, false),
+      // (28 nov., lot ebay-automatismes) La page eBay › Automatismes.
+      autolire: (ctx) => automatismesEbay.lire(b, ctx),
+      autoregler: (ctx) => automatismesEbay.regler(b, ctx),
+      autolancer: (ctx) => automatismesEbay.lancer(b, ctx),
+      masse: (ctx) => automatismesEbay.masse(b, ctx),
+      similaire: (ctx) => automatismesEbay.similaire(b, ctx),
     };
     if (!Object.prototype.hasOwnProperty.call(ACTIONS, action)) { res.status(400).json({ ok: false, error: 'action inconnue' }); return; }
     const rc = await resoudreCompte(b.compte, owner);
@@ -2390,7 +2430,7 @@ async function handleApp(req, res) {
         :'Je n\'ai pas pu relire sur quel site eBay ton compte est inscrit — rien n\'a été envoyé. Réessaie dans un moment.'});
       return;
     }
-    const commerciales=new Set(['corrigeraspects','lierproduit','ajouterphotos','poserremise','retirerremise','expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
+    const commerciales=new Set(['crmecrire','crmrepondreavis','crmcontester','corrigeraspects','lierproduit','ajouterphotos','poserremise','retirerremise','expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
     // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
     // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
     // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la

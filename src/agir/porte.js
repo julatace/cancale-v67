@@ -49,7 +49,13 @@ export function poserEnvoiAgir(d) { depsEnvoi = d || null; }
 // lecture lente de la base) ne dépose pas une seconde commande — la base ne la voyait pas encore (`deja` arrivait trop
 // tard) et le même message partait deux fois. Clé = le geste ET son contenu (un autre message, une autre offre passent).
 const enVol = new Set();
+// (28 nov., messages-parfaits — Julien : le statut « parfois faux ») AVANT CHAQUE GESTE, l'état de l'extension est REVÉRIFIÉ
+// (posé par l'app : un battement du pont s'il date de plus de 10 s, 2,5 s au plus) puis la porte relit SES faits — jamais
+// un geste décidé sur un état de plusieurs minutes. Sans fonction posée (bancs purs) : rien ne change.
+let reverif = null;
+export function poserReverifAgir(fn) { reverif = typeof fn === 'function' ? fn : null; }
 export async function envoyerGeste({ site, compte, geste, distGeste, args, confirme = false, num = '', avant = null }) {
+  if (reverif && site !== 'ebay') { try { await Promise.race([reverif(), new Promise((r) => setTimeout(r, 3000))]); } catch (_) {} }
   const v = agirMaintenant(site, compte, geste, 'file');
   if (!v.ok) return { ok: false, raison: v.raison, verdict: v };
   if (!depsEnvoi || typeof depsEnvoi.deposer !== 'function') return { ok: false, raison: 'envoi-absent' };

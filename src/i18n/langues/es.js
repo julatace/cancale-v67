@@ -1,6 +1,7 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
 import ecran_textes_restes from './es/textesRestes.js';   // (24 nov.) textes restés en dur : appareils connectés, porte, comptes liés
-import ecran_rangement from './es/rangement.js';   // (28 nov.) l'assistant de rangement
+import ecran_rangement from './es/rangement.js';
+import ecran_ebay_crm from './es/ebayCrm.js';   // (28 nov.) le CRM eBay   // (28 nov.) l'assistant de rangement
 import ecran_accessibilite from './es/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_groupes from './es/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './es/suiviVente.js';
@@ -23,6 +24,7 @@ import ecran_rentabilite from './es/rentabilite.js';   // (21 nov.) rentabilité
 import ecran_gains from './es/gains.js';   // (24 nov.) ce que tu gagnes vraiment
 import ecran_export_compta from './es/exportCompta.js';   // (27 nov.) export comptable et URSSAF
 import ecran_paires_dorment from './es/pairesDorment.js';   // (27 nov.) « Paires qui dorment », le plan
+import ecran_sneakers from './es/sneakers.js';   // (28 nov.) « Sneakers » : référence, cote VRM, étiquettes, en masse
 import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_a_distance from './es/aDistance.js';
@@ -53,6 +55,7 @@ import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './es/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './es/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './es/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_ebayauto from './es/ebayauto.js';   // (28 nov., lot ebay-automatismes) eBay › Automatismes
 import ecran_serie_selection from './es/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './es/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
@@ -134,6 +137,7 @@ import ecran_ebay_series from './es/ebaySeries.js';   // (23 nov.) eBay en séri
 import ecran_parrainage20 from './es/parrainage.js';   // (25 nov.) le parrainage à 20 %
 import ecran_ameliorations27 from './es/ameliorations27.js';
 import ecran_compta_finitions from './es/comptaFinitions.js';   // (28 nov.) finitions de la compta   // (27 nov.) prix manquants, lecture ancienne, ordinateur éteint
+import ecran_messages_parfaits from './es/messagesParfaits.js';   // (28 nov.) Messages : photo de profil, statut de l'extension, contre-offre
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 import ecran_accompagnement_demarrage from './es/accompagnementDemarrage.js';   // (23 nov.) Bien démarrer : l'accompagnement animé
 import ecran_litiges_tous from './es/litigesTous.js';   // (23 nov.) Litiges et retours, tous les sites
@@ -143,6 +147,7 @@ export default {
   ...ecran_textes_restes,
   ...ecran_loupe_num,
   ...ecran_rangement,
+  ...ecran_ebay_crm,
   ...ecran_accessibilite,
   ...ecran_groupes,
   ...ecran_perso,
@@ -1566,6 +1571,13 @@ export default {
   "ebay.param.livraison": "Entrega",
   "ebay.param.livraison.aide": "Nunca pagas el envío: el comprador lo paga a eBay.",
   "ebay.param.livraison.geree": "Gestionada por eBay",
+  "ebay.param.colis": "Peso y tamaño del paquete",
+  "ebay.param.colis.aide": "Un paquete mediano por defecto (1,2 kg): eBay calcula el envío, que paga el comprador.",
+  "ebay.param.colis.mesures": "Peso (g) · largo · ancho · alto (cm)",
+  "ebay.param.colis.poids": "Peso en gramos",
+  "ebay.param.colis.longueur": "Largo en centímetros",
+  "ebay.param.colis.largeur": "Ancho en centímetros",
+  "ebay.param.colis.hauteur": "Alto en centímetros",
   "ebay.param.delaiEnvoi": "Plazo de envío",
   "ebay.param.delaiEnvoi.aide": "Días hábiles entre el pago y el envío.",
   "ebay.param.delai.jour": "El mismo día",
@@ -2424,6 +2436,7 @@ export default {
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_ebayauto,
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
@@ -2483,6 +2496,8 @@ export default {
   ...ecran_parrainage20,
   ...ecran_ameliorations27,
   ...ecran_compta_finitions,
+  ...ecran_messages_parfaits,
   ...ecran_export_compta,
   ...ecran_paires_dorment,
+  ...ecran_sneakers,
 };
