@@ -33,6 +33,11 @@
 //                                              objet, regroupé (_lib/push-capte.js)
 //   POST { action:'distance', id }          → (22 nov., ext. 5.436) un geste commandé À DISTANCE a son issue : la route
 //                                              RELIT `cmd_dist_{id}` de CE vendeur, une notification par issue (_lib/distance-notif.js)
+//   POST { action:'serveur', evenements }    → (28 nov., ext. 5.457, « Mode ordinateur allumé ») la veille de l'extension a vu
+//                                              un message ou une offre NEUFS (identités) ou un compte déconnecté : relus ici,
+//                                              le TEXTE du message et le compte dits, une fois par objet (_lib/push-serveur.js)
+//   POST { action:'tour', quoi, appareil, compte } → (28 nov., ext. 5.457) le TOUR d'écriture des profils d'un ordinateur
+//                                              allumé : un seul compte agit à la fois (_lib/tour-ecriture.js)
 //   POST { action:'retraits' }               → (21 nov., ext. 5.426) un retrait « vendue ⇒ retirée partout » pas fait
 //                                              depuis 30 min : la route RELIT `vrm_retraits_partout` (_lib/retraits-retard-notif.js)
 // ────────────────────────────────────────────────────────────────────────────
@@ -56,6 +61,8 @@ import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 import { notifierCapte } from './_lib/push-capte.js';
 import { notifierRetraitsEnRetard } from './_lib/retraits-retard-notif.js';
 import { notifierDistance } from './_lib/distance-notif.js';
+import { notifierServeur } from './_lib/push-serveur.js';
+import { routeTour } from './_lib/tour-ecriture.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -206,6 +213,18 @@ async function traiter(req, res) {
     if (body.action === 'capte') {
       const r = await notifierCapte(body);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n || 0, ...(r.deja ? { deja: r.deja } : {}), ...(r.coupe ? { coupe: r.coupe } : {}), ...(r.rien ? { rien: r.rien } : {}), ...(r.calme ? { calme: true } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (28 nov., ext. 5.457, `serveur`) « Mode ordinateur allumé » : le message (son texte), l'offre, le compte déconnecté.
+    if (body.action === 'serveur') {
+      const r = await notifierServeur(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n || 0, ...(r.deja ? { deja: r.deja } : {}), ...(r.coupe ? { coupe: r.coupe } : {}), ...(r.rien ? { rien: r.rien } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (28 nov., ext. 5.457) Le tour d'écriture : un seul profil (un seul compte) écrit à la fois.
+    if (body.action === 'tour') {
+      const r = await routeTour(body);
+      res.status(r.status).json(r.status === 200 ? { ok: r.ok === true, ...(r.occupe ? { occupe: true, par: r.par, compte: r.compte } : {}), jusqua: r.jusqua || 0 } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {

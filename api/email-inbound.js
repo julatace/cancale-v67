@@ -32,6 +32,7 @@ import { proprietaireInstallation } from './_lib/signalement.js';
 import { texteArrivee } from './_lib/notif-textes.js';
 import { colisPerdu, normaliserSuivi } from './_lib/etat-colis-email.js';
 import { DESTINATIONS, conversationDeLEmail } from './_lib/lien-notif.js';
+import { serveurDejaSonne } from './_lib/push-serveur.js';   // (28 nov., ext. 5.457) l'ordinateur allumé a déjà sonné CETTE conversation
 import { estSuppressionLbc, lireSuppressionLbc, texteSuppressionLbc, jourParis, CAT_LBC_SUPPRESSION, FAMILLE_LBC_SUPPRESSION } from './_lib/lbc-suppression.js';
 // (5 nov.) Les textes des notifications : fabriqués là où l'aperçu de Paramètres → Notifications les lit.
 import { texteVendu, texteArgentRecu, texteVenduVestiaire, texteBordereau, texteOffre, texteMessage, texteAnnulation, texteRetourAchat, texteRetourDepose, texteRetourLivre, texteRembourse } from './_lib/notif-apercus.js';
@@ -3247,7 +3248,10 @@ export async function traiterEmail(req, res) {
       const buy = juge && juge.etat === 'unique' ? juge.prix : null;
       const net = null;
       const advice = phraseConseilOffre(juge, offerAmt);
-      try { await pushOnce({
+      // (28 nov., ext. 5.457, « Mode ordinateur allumé ») l'ordinateur allumé a déjà sonné CETTE conversation (son lien
+      //    /inbox/{id}) dans les 45 min : l'e-mail ne sonne pas une seconde fois (rangé quand même, plus bas).
+      const dejaServeurOffre = await serveurDejaSonne(conversationDeLEmail(mail), Date.now()).catch(() => false);
+      if (!dejaServeurOffre) try { await pushOnce({
         // (15 nov.) Sans le pseudo de l'acheteur ; le conseil du copilote, court (« à vérifier »).
         ...texteOffre({ montant, article, juge }),
         tag: `offer-${key}`, url: DESTINATIONS.offre({ conv: conversationDeLEmail(mail), compte: acc.uid }),
@@ -3304,7 +3308,9 @@ export async function traiterEmail(req, res) {
       const cleEntiere = crypto.createHash('sha256').update(`${subject}\n${corpsTexte}`).digest('hex').slice(0, 20);
       const cleEmail = mail.messageId ? `msg-id-${crypto.createHash('sha256').update(String(mail.messageId)).digest('hex').slice(0, 20)}` : '';
       const aliasAncien = corpsTexte.length <= 200 ? [`msg-${shortHash(subject + corpsTexte.slice(0, 200))}`] : [];
-      try { await pushOnce({
+      // (28 nov., ext. 5.457) déjà sonné par l'ordinateur allumé (même conversation, 45 min) ⇒ l'e-mail se tait.
+      const dejaServeur = await serveurDejaSonne(conversationDeLEmail(mail), Date.now()).catch(() => false);
+      if (!dejaServeur) try { await pushOnce({
         ...texteMessage({ paire, qui, compte: acc.login, extrait }),
         tag: cleEmail || `msg-${cleEntiere}`, url: DESTINATIONS.message({ conv: conversationDeLEmail(mail), compte: acc.uid }),
         _cat: 'message',
