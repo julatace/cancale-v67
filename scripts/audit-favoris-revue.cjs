@@ -31,7 +31,7 @@ const MUTATIONS = {
   'lancement-annule': ['api/_lib/favoris-file.js', "  if(!g.active&&g.jobs.some(j=>j.etat==='attente'))", "  if(g.jobs.some(j=>j.etat==='attente'))"],
   'relance-reglages': [BG, "return { ok: false, code: 'reglages_changes',", "if (f2.ok && f2.apercu) { reglagesL = f2.apercu.reglages; r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, confirme: true }); } if (r.ok) {} else return { ok: false, code: 'reglages_changes',"],
   'pause-locale': ['api/_lib/favoris-auto.js', "  if(a.pauseAgent)return {etat:'pause_agent'};", ''],
-  'recharge-son-onglet': [BG, "  if (!pg.refus && pg.tabId !== id) return false;   // la page qui travaille n'est pas l'onglet de VRM : on n'y touche pas", "  if (!pg.refus) id = pg.tabId;"],
+  'recharge-son-onglet': [BG, "  if (id == null) return false;\n  if (!pg.refus && pg.tabId !== id) return false;", "  if (!pg.refus) id = pg.tabId;\n  if (id == null) return false;"],
   'offre-sans-date-eternelle': ['src/offresVinted.js', "  return Number.isFinite(tc) && maintenant - tc > OFFRE_VIE_MS;", "  return false;"],
 };
 const argMut = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
@@ -76,6 +76,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
         if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return { status: 201, body: { inquiry_id: 'q0', conversation_id: UU } };
         if (e.methode === 'GET' && e.chemin.split('?')[0] === '/messaging/main/conversations/' + UU) return { status: 200, body: { conversation: { id: UU, allow_reply: true, opposite_users: [{ id: 3000000001 }], transaction: { id: txConv }, data: {}, messages: [] } } };
         // 6001 relue NE DIT ni l'article ni la personne (forme jamais mesurée) : pas une preuve.
+        if (e.methode === 'GET' && e.chemin === '/api/v2/items/7000000180') return { status: 200, body: { item: { id: 7000000180, price: { amount: '55.0', currency_code: 'EUR' }, is_closed: false, is_reserved: false, is_hidden: false } } };   // le prix connu : seule l'absence de transaction prouvée retient l'offre
         if (e.methode === 'GET' && e.chemin === '/api/v2/transactions/6001') return { status: 200, body: { transaction: { id: 6001, seller_id: 123, item: { price: { amount: '80.0', currency_code: 'EUR' } } } } };
         return null; } });
       const r = await envoyer(m, 'jn0'); const w = W(m);

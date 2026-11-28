@@ -19,7 +19,7 @@ const path = require('path'), fs = require('fs'), os = require('os'), cp = requi
 const RACINE = process.env.FAV_AGENT_RACINE ? path.resolve(process.env.FAV_AGENT_RACINE) : path.join(__dirname, '..');
 const MUTATIONS = {
   'ecart-20-60': ['src/favorisAuto.js', 'export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];', 'export const AUTO_ECART_MS = [20000, 60000];'],
-  'sans-pause': ['vinted-sync-extension/background.js', "    if (st.pause && st.pause[uid]) return fin('pause_agent', { uid });", ''],
+  'sans-pause': ['vinted-sync-extension/background.js', "  const w = await apiFavorisCarte(o.uid, 'auto_pause', { pause: msg.quoi === 'pause' });", "  const w = { ok: true };"],
   'sans-captcha': ['vinted-sync-extension/background.js', "    if (av && av.stop) return fin(av.stop, { uid });     // captcha ('verification'), Tout arrêter, stockage : ARRÊT", ''],
   'sans-journal': ['vinted-sync-extension/background.js', "      st.journal[uid] = [{ at: maintenant,", "      st.journal[uid + 'x'] = [{ at: maintenant,"],
   'eteint-ignore': ['vinted-sync-extension/background.js', "    if (!r.actif) return fin('eteint', { uid });", ''],

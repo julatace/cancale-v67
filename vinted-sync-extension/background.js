@@ -25418,7 +25418,7 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     if (!uid) return fin('onglet');
     // 5.455.8 (Julien, 28 nov. : « un vrai agent autonome ») : « Pause » sur le panneau, par compte — rien ne part, l'interrupteur
     //    reste allumé ; « Reprendre » le relance. (« Arrêter » éteint l'interrupteur chez VRM : `favorisAuto`.)
-    if (st.pause && st.pause[uid]) return fin('pause_agent', { uid });
+    // (revue) la pause est tenue CHEZ VRM (`auto_pause` ⇒ l'état « pause_agent » du tour) ; ce navigateur n'en garde que le reflet.
     st.relu = st.relu && typeof st.relu === 'object' ? st.relu : {};
     let r = st.relu[uid];
     if (!r || !(maintenant - Number(r.at) < PILOTE_RELECTURE_MS)) {
