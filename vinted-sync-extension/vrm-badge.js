@@ -2747,7 +2747,7 @@ function vrmVerifVisible(sel) {
     if (!r) return '';
     const on = r.on === true, ag = favAgent6 || {};
     const texte = (r.textes[0] || '').replace(/\s+/g, ' ').trim();
-    const desc = [texte ? TU('afv_message', { t: texte.length > 80 ? texte.slice(0, 78) + '…' : texte }) : '', r.taux != null ? TU('afv_offre', { t: r.taux }) : TU('fr_sans_offre'), TU('afv_plancher')].filter(Boolean).join(' · ');
+    const desc = [texte ? TU('afv_message', { t: texte.length > 80 ? texte.slice(0, 78) + '…' : texte }) : '', r.taux != null ? TU('afv_offre', { t: r.taux }) : TU('fr_sans_offre'), TU('afv_plancher'), on && r.parHeure ? TU('e10_par_h', { n: r.parHeure }) : ''].filter(Boolean).join(' · ');
     const inter = `<button type="button" class="ag6-int" role="switch" aria-checked="${on}" data-ag-switch="${on ? 'on' : 'off'}"${agEnVol ? ' disabled' : ''}><span class="ag6-t"><b>${esc(TU('afv_titre'))}</b><small>${esc(desc)}</small></span><i class="ag6-i" aria-hidden="true"></i></button>`;
     const conf = !on && agConfirme ? `<div class="ag6-conf" data-ag-confirme role="alertdialog"><p>${esc(TU('afv_conf'))}</p><div class="ag6-b"><button type="button" class="vu-btn" data-ag-non>${esc(TU('ra_annuler'))}</button><button type="button" class="vu-btn vu-plein" data-ag-oui${agEnVol ? ' disabled' : ''}>${esc(TU('afv_allumer'))}</button></div></div>` : '';
     let vivant = '';

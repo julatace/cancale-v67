@@ -112,7 +112,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
     console.log('\nA5. Éteint, « Arrêter », « Pause »');
     const m5 = await nouveauMonde({ allumer: false });
     const v5 = await tours(m5, 10);
-    dit(W(m5, /inquiries$|replies$|offers$/).length === 0 && v5.includes('eteint'), 'A5 jamais allumé ⇒ rien ne part (son geste est l’autorisation)', JSON.stringify(v5));
+    dit(W(m5, /inquiries$|replies$|offers$/).length === 0 && v5.includes('eteint') && !m5.vrmAppels.some((x) => /^auto:/.test(x)), 'A5 jamais allumé ⇒ rien ne part, l’agent ne demande même rien au serveur (son geste est l’autorisation)', JSON.stringify({ v5, appels: m5.vrmAppels.slice(0, 8) }));
     m5.fin();
     const m6 = await nouveauMonde();
     const sender = m6.sender;

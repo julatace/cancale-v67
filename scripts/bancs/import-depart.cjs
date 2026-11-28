@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BANC : TON HISTORIQUE VINTED (11 nov., lot import-depart, extension 5.344)
+// BANC : TON HISTORIQUE VINTED (11 nov., lot import-depart, extension 5.344) — 5.455.8 : juge le RETRAIT de l'import (voir plus bas)
 //        npm run build && BANC_PORT=$((20000+RANDOM%20000)) node -r ./scripts/bancs/_porte-banc.cjs scripts/bancs/import-depart.cjs
 // ═══════════════════════════════════════════════════════════════════════════
 // Le VRAI écran Paramètres → Mes comptes → Mon historique Vinted, et la VRAIE Ma journée,
@@ -112,33 +112,27 @@ async function page(b, T, { sombre = false, version = '5.344.0', onglet = '222' 
   return { ctx, pg, errs, ecrits };
 }
 
+// ⚠️ 5.455.8 (Julien, 28 nov. : « Import de ton passé : je t'avais demandé de l'enlever ») : plus AUCUNE carte ni bouton
+//    d'import — ni « Tout récupérer », ni barres, ni « Import de ton passé » ; l'extension lit tout l'historique seule. Ce banc
+//    juge désormais ce RETRAIT : Réglages → Mon historique dit UNE ligne sans bouton (« en cours » quand un import tourne) ;
+//    Ma journée ne montre rien, même pendant un import ; aucune commande `importTout` ne part.
 const ouvrirReglages = async (pg) => {
   await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-import-reglages]:visible, [data-sous-ouvrir="historique"]:visible').first().waitFor({ timeout: 30000 }).catch(() => {});
   if (!(await pg.locator('[data-import-reglages]').first().isVisible().catch(() => false))) await pg.locator('[data-sous-ouvrir="historique"]').first().click().catch(() => {});
-  await pg.waitForSelector('[data-import-ligne]', { timeout: 20000 }).catch(() => {});
-  await pg.waitForFunction(() => document.querySelectorAll('[data-import-ligne][data-import-etat="encours"]').length > 0, null, { timeout: 15000 }).catch(() => {});
-  await pg.waitForTimeout(400);
+  await pg.waitForSelector('[data-import-ligne-unique]', { timeout: 20000 }).catch(() => {});
+  await pg.waitForFunction(() => { const x = document.querySelector('[data-import-ligne-unique]'); return x && x.getAttribute('data-import-ligne-unique') === 'encours'; }, null, { timeout: 8000 }).catch(() => {});
+  await pg.waitForTimeout(300);
 };
 const lireR = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-import-reglages]'); if (!s) return null;
-  const L = {}; for (const e of s.querySelectorAll('[data-import-ligne]')) {
-    const ty = {}; for (const t of e.querySelectorAll('[data-import-type]')) { const bar = t.querySelector('.vrm-imp-barre > i'), cadre = t.querySelector('.vrm-imp-barre');
-      ty[t.getAttribute('data-import-type')] = { lus: t.getAttribute('data-import-lus'), total: t.getAttribute('data-import-total'), fini: t.getAttribute('data-import-fini'), texte: t.innerText.replace(/\s+/g, ' ').trim(),
-        pc: bar && cadre ? Math.round(bar.getBoundingClientRect().width / cadre.getBoundingClientRect().width * 100) : null, h: cadre ? cadre.getBoundingClientRect().height : null }; }
-    const btn = e.querySelector('[data-import-tout]');
-    L[e.getAttribute('data-import-ligne')] = { etat: e.getAttribute('data-import-etat'), onglet: e.getAttribute('data-import-onglet'), ty, bouton: btn ? { off: btn.disabled, h: btn.getBoundingClientRect().height } : null, texte: e.innerText.replace(/\s+/g, ' ').trim() }; }
-  return { L, ext: (s.querySelector('[data-import-ext]') || {}).innerText || '', issue: (s.querySelector('[data-import-issue]') || { getAttribute: () => null }).getAttribute('data-import-issue'),
-    deb: document.documentElement.scrollWidth - document.documentElement.clientWidth, texte: s.innerText }; });
+  const u = s.querySelectorAll('[data-import-ligne-unique]');
+  return { lignes: u.length, etat: u[0] ? u[0].getAttribute('data-import-ligne-unique') : null, boutons: s.querySelectorAll('button, [data-import-tout]').length + document.querySelectorAll('[data-import-tout]').length,
+    barres: s.querySelectorAll('.vrm-imp-barre').length, texte: s.innerText, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
 const ouvrirJournee = async (pg) => {
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector('[data-import-journee]', { timeout: 30000 }).catch(() => {});
-  await pg.waitForTimeout(500);
+  await pg.waitForTimeout(3000);
 };
-const lireJ = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-import-journee]'); if (!s) return null;
-  return { n: Number(s.getAttribute('data-import-journee')), comptes: [...s.querySelectorAll('[data-import-compte]')].map((e) => e.getAttribute('data-import-compte') + ':' + e.getAttribute('data-import-etat')), texte: s.innerText.replace(/\s+/g, ' ').trim(),
-    h: s.getBoundingClientRect().height, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
 const cmds = (pg) => pg.evaluate(() => window.__cmds.slice());
-const relacher = (pg, resp) => pg.evaluate((r) => window.__relacher(r), resp);
 const capture = async (pg, nom, sel) => { if (!CAPT) return; fs.mkdirSync(CAPT, { recursive: true }); await pg.waitForTimeout(300);
   if (sel) { const el = pg.locator(sel).first(); await el.scrollIntoViewIfNeeded().catch(() => {}); }
   await pg.screenshot({ path: path.join(CAPT, nom + '.png'), fullPage: false }).catch(() => {}); };
@@ -156,66 +150,23 @@ const capture = async (pg, nom, sel) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const { ctx, pg, errs, ecrits } = await page(b, T, { sombre });
           await ouvrirReglages(pg);
           const s = await lireR(pg);
-          const L = s ? s.L : {};
-          dit(L['111'] && L['111'].etat === 'encours' && L['111'].ty.ventes && L['111'].ty.ventes.lus === '400' && L['111'].ty.ventes.total === '1250', 'A1 atelier_test : « 400 sur 1 250 » ventes, en cours', s && JSON.stringify(L['111']));
-          dit(L['111'] && L['111'].ty.ventes.pc >= 30 && L['111'].ty.ventes.pc <= 34 && L['111'].ty.ventes.h > 0 && L['111'].ty.ventes.h <= 6, 'A2 une barre FINE, remplie au tiers (400/1 250)', s && JSON.stringify(L['111'] && L['111'].ty.ventes));
-          dit(L['111'] && /Lecture de ton historique/.test(L['111'].texte) && /environ 50 min/.test(L['111'].texte), 'A3 la phrase dit l’estimation (« environ 50 min, Vinted ouvert »)', L['111'] && L['111'].texte);
-          dit(L['111'] && L['111'].ty.achats && L['111'].ty.achats.total === '' && /Ensuite/.test(L['111'].ty.achats.texte), 'A4 achats : total pas encore donné ⇒ « Ensuite », jamais un « 0 sur 0 »', L['111'] && JSON.stringify(L['111'].ty.achats));
-          dit(L['222'] && L['222'].etat === 'fini' && /Tout est récupéré/.test(L['222'].texte) && /2 160 ✓/.test(L['222'].ty.ventes.texte.replace(/\u202f|\u00a0/g, ' ')), 'A5 second_test : « Tout est récupéré ✓ » · 2 160 ventes', L['222'] && L['222'].texte);
-          dit(L['333'] && L['333'].etat === 'aucun' && /Ouvre vinted\.fr sur ce compte/.test(L['333'].texte), 'A6 troisieme : rien lu ⇒ « Ouvre vinted.fr sur ce compte » (jamais « fini »)', L['333'] && L['333'].texte);
-          dit(L['222'] && L['222'].bouton && !L['222'].bouton.off && L['222'].bouton.h >= 43.5 && !L['111'].bouton && !L['333'].bouton, 'A7 « Tout récupérer » seulement sur le compte de l’onglet (44 px)', JSON.stringify({ a: L['111'] && L['111'].bouton, b: L['222'] && L['222'].bouton, c: L['333'] && L['333'].bouton }));
-          dit(s && s.deb <= 0, 'A8 aucun défilement horizontal', s && s.deb);
+          dit(s && s.lignes === 1 && s.etat === 'encours' && /lecture par l’extension/.test(s.texte), 'A1 Réglages → Mon historique : UNE ligne, « en cours de lecture par l’extension, toute seule »', s && JSON.stringify(s));
+          dit(s && s.boutons === 0 && s.barres === 0 && !/Import de ton passé|Tout récupérer/.test(s.texte), 'A2 ni bouton « Tout récupérer », ni barre, ni « Import de ton passé »', s && JSON.stringify(s));
+          dit(s && s.deb <= 0, 'A3 aucun défilement horizontal', s && s.deb);
           await capture(pg, `reglages-${suf}`, '[data-import-reglages]');
-          await pg.locator('[data-import-tout="222"]').click();
-          await pg.waitForFunction(() => window.__cmds.length > 0, null, { timeout: 5000 }).catch(() => {});
           const c = await cmds(pg);
-          dit(c.length === 1 && c[0].cmd === 'importTout' && c[0].uid === '222', 'A9 le clic envoie UNE commande importTout pour 222', JSON.stringify(c));
-          await relacher(pg, { accepte: true, etape: 'file' });
-          await pg.waitForSelector('[data-import-issue]', { timeout: 5000 }).catch(() => {});
-          const s2 = await lireR(pg);
-          dit(s2 && s2.issue === 'ok', 'A10 réponse acceptée ⇒ « Lecture lancée »', s2 && s2.issue);
-          dit(!ecrits.some((u) => /SELECT_DATA|import_vinted_|harvest_/.test(u)), 'A11 l’app n’écrit jamais la ligne de l’extension ni une capture ; aucun select=data', JSON.stringify(ecrits.filter((u) => /SELECT_DATA|import_vinted_|harvest_/.test(u)).slice(0, 2)).slice(0, 300));
-          dit(!errs.length, 'A12 aucune erreur de page', errs.join(' | ').slice(0, 200));
-          await ctx.close();
-        });
-        await essaie('B' + suf, async () => {
-          ROWS = ROWS_DEFAUT();
-          const { ctx, pg } = await page(b, T, { sombre, version: '5.341.0' });
-          await ouvrirReglages(pg);
-          const s = await lireR(pg);
-          dit(s && new RegExp("Mets l'extension à jour \\(" + EXT_ATTENDUE_APP.replace(/\./g, '\\.') + "\\)").test(s.ext) && !Object.values(s.L).some((x) => x.bouton), 'B1 extension 5.341 : « Mets l’extension à jour (5.344.0) », aucun bouton', s && s.ext);
+          dit(!c.length, 'A4 aucune commande importTout ne part', JSON.stringify(c));
+          dit(!ecrits.some((u) => /SELECT_DATA|import_vinted_|harvest_/.test(u)), 'A5 l’app n’écrit jamais la ligne de l’extension ni une capture ; aucun select=data', JSON.stringify(ecrits));
+          dit(!errs.length, 'A6 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });
         await essaie('C' + suf, async () => {
           ROWS = ROWS_DEFAUT();
           const { ctx, pg, errs } = await page(b, T, { sombre });
           await ouvrirJournee(pg);
-          const j = await lireJ(pg);
-          dit(j && j.comptes.join(' ') === '111:encours 222:fini', 'C1 Ma journée : 111 en cours, 222 fini il y a 2 h ; 333 (rien) ne prend aucune place', j && j.comptes.join(' '));
-          dit(j && /400 sur 1/.test(j.texte) && /atelier_test/.test(j.texte), 'C2 la barre dit « 400 sur 1 250 » et le compte', j && j.texte.slice(0, 160));
-          dit(j && j.deb <= 0, 'C3 aucun défilement horizontal', j && j.deb);
-          dit(!errs.length, 'C4 aucune erreur de page', errs.join(' | ').slice(0, 200));
-          await capture(pg, `journee-${suf}`, '[data-import-journee]');
-          await ctx.close();
-        });
-        await essaie('D' + suf, async () => {
-          ROWS = [ligne('222', { etat: 'fini', ventes: { lus: 2160, total: 2160, pages: 22, fini: true }, achats: { lus: 340, total: 340, pages: 4, fini: true }, resteMin: 0, fin: auj - 30 * 3600e3 })];
-          const { ctx, pg } = await page(b, T, { sombre });
-          await ouvrirJournee(pg);
-          await pg.waitForTimeout(1500);
-          const j = await lireJ(pg);
-          dit(j === null, 'D1 tout fini depuis plus d’un jour : Ma journée ne montre rien', j && j.comptes.join(' '));
-          await ctx.close();
-        });
-        await essaie('E' + suf, async () => {
-          ROWS = [ligne('111', { etat: 'encours', at: auj - 3600e3, capturedAt: iso(auj - 3600e3), ventes: { lus: 400, total: 1250, pages: 4, fini: false }, achats: { lus: 0, total: null, pages: 0, fini: false }, resteMin: 50 }),
-            ligne('222', { etat: 'pause', cause: 'vinted', repriseA: auj + 25 * 60e3, ventes: { lus: 900, total: 2160, pages: 9, fini: false }, achats: { lus: 0, total: null, pages: 0, fini: false }, resteMin: 70 })];
-          const { ctx, pg } = await page(b, T, { sombre });
-          await ouvrirJournee(pg);
-          const j = await lireJ(pg);
-          dit(j && j.comptes.join(' ') === '111:arrete 222:pause', 'E1 sans nouvelles depuis 1 h ⇒ « arrêté » ; Vinted freine ⇒ « pause »', j && j.comptes.join(' '));
-          dit(j && /ouvre vinted\.fr sur ce compte/.test(j.texte) && /Vinted freine\. Reprise à \d\d:\d\d/.test(j.texte), 'E2 le geste et l’heure de reprise sont dits', j && j.texte.slice(0, 200));
-          await capture(pg, `journee-pause-${suf}`, '[data-import-journee]');
+          const n = await pg.evaluate(() => document.querySelectorAll('[data-import-journee], [data-import-tout]').length + (/Import de ton passé|Tout récupérer/.test(document.body.innerText) ? 1 : 0));
+          dit(n === 0, 'C1 Ma journée : aucune carte d’import, même pendant un import', String(n));
+          dit(!errs.length, 'C2 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });
       }
