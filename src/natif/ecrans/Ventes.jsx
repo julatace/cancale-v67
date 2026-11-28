@@ -232,10 +232,10 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     const sousR = sousDe(r);
     const sous = sousCommun && nCommun >= 2 && sousR === sousCommun ? '' : sousR;
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
-      sous: joint(marqueTaille(r), sous), statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
+      sous: joint(surEnvoyer && r.aConfirmer ? tr('envois.aConfirmerCourt') : '', marqueTaille(r), sous), statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
       texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sousR].filter(Boolean).join(' '),
       attrs: surEnvoyer
-        ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-site': r.site, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
+        ? { 'data-vn-rang': r.cle, 'data-vn-a-confirmer': r.aConfirmer ? '1' : undefined, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-site': r.site, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
         : { 'data-vt-site': r.site, 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length), 'data-vt-statut': st, 'data-vt-transporteur': r.transporteurCle || '' } };
   });
   const presses = surEnvoyer ? rangsVus.filter((r) => r.echeance && r.echeance.ambre).length : 0;

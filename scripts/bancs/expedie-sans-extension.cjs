@@ -23,7 +23,7 @@ const MAINTENANT = Date.now(), H = 3600000;
 const ilYaH = (h) => new Date(MAINTENANT - h * H).toISOString();
 const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_a', domain: 'www.vinted.fr', updated_at: ilYaH(0) }];
 const TITRE = 'Nike Dunk Low Panda taille 42';
-const V = [{ tx: 9301, suivi: 'XW300000001TS', num: '31' }, { tx: 9302, suivi: 'XW300000002TS', num: '32' }, { tx: 9303, suivi: 'XW300000003TS', num: '33' }];
+const V = [{ tx: 9300000301, suivi: 'XW300000001TS', num: '31' }, { tx: 9300000302, suivi: 'XW300000002TS', num: '32' }, { tx: 9300000303, suivi: 'XW300000003TS', num: '33' }];
 
 async function pdfInvente(code) {
   const { PDFDocument, StandardFonts } = require(path.join(NM, 'pdf-lib'));
@@ -91,21 +91,21 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
   const vu = await pg.waitForFunction(() => {
     const r = [...document.querySelectorAll('[data-vn-rang], [data-bord-card][data-tx-colis]')].map((e) => (e.getAttribute('data-vn-rang') || 'v:' + e.getAttribute('data-tx-colis')));
-    return r.includes('v:9302') && r.includes('v:9303') && !r.includes('v:9301');
+    return r.includes('v:9300000302') && r.includes('v:9300000303') && !r.includes('v:9300000301');
   }, null, { timeout: 25000 }).then(() => true).catch(() => false);
-  await pg.waitForTimeout(600);
+  await pg.waitForFunction(() => !document.querySelector('.vrm-splash, [data-splash], #vrm-demarrage'), null, { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(2500);
   const rangs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang], [data-bord-card][data-tx-colis]')].map((e) => ({ cle: e.getAttribute('data-vn-rang') || 'v:' + e.getAttribute('data-tx-colis'), conf: e.getAttribute('data-vn-a-confirmer') || (e.querySelector('[data-colis-a-confirmer]') ? '1' : '') })));
   dit(vu, `${nom} : A la vente prouvée partie (n° de transaction de l'e-mail) n'est plus « à envoyer », ses deux jumelles y restent`, JSON.stringify(rangs));
-  const conf = rangs.filter((x) => x.cle === 'v:9302' || x.cle === 'v:9303');
+  const conf = rangs.filter((x) => x.cle === 'v:9300000302' || x.cle === 'v:9300000303');
   dit(conf.length >= 2 && conf.every((x) => x.conf === '1'), `${nom} : C les deux qui restent disent « À confirmer » (liste des ventes de plus de 24 h)`, JSON.stringify(conf));
   const txt = await pg.evaluate(() => document.body.innerText);
   dit(/À confirmer/.test(txt), `${nom} : C le mot est écrit (« À confirmer : Vinted pas relu »)`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `expedie-${nom}${sombre ? '-sombre' : ''}-a-envoyer.png`) });
   // B : « En route ».
-  const route = await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-vn-onglet], [role="tab"], button')].find((x) => /En route|Envoy/i.test(x.innerText || '') && x.offsetParent); if (b) { b.click(); return true; } return false; });
+  const route = await pg.evaluate(() => { const b = [...document.querySelectorAll('[role="tab"], [data-vn-onglet], button')].find((x) => /^\s*En route/i.test(x.innerText || '') && x.offsetParent); if (b) { b.click(); return true; } return false; });
   await pg.waitForTimeout(1200);
   const enRoute = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-route], [data-vn-rang], [data-colis-ident]')].map((e) => e.getAttribute('data-vn-route') || e.getAttribute('data-vn-rang') || e.getAttribute('data-colis-ident')));
-  dit(route && enRoute.includes('v:9301'), `${nom} : B elle est dans « En route » (jamais cachée)`, JSON.stringify(enRoute).slice(0, 200));
+  dit(route && enRoute.includes('v:9300000301') && !enRoute.includes('v:9300000302'), `${nom} : B elle est dans « En route » (jamais cachée)`, JSON.stringify(enRoute).slice(0, 200));
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `expedie-${nom}${sombre ? '-sombre' : ''}-en-route.png`) });
   const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   dit(deb <= 1, `${nom} : D rien ne déborde`, String(deb));
@@ -122,7 +122,7 @@ let srvPret;
       { id: 'harvest_111_orders_sold', data: { capturedAt: ilYaH(40), payload: { my_orders: V.map((v, i) => ({ transaction_id: v.tx, title: TITRE, size_title: '42', price: { amount: '60', currency_code: 'EUR' }, status: 'Bordereau d’envoi envoyé au vendeur', transaction_user_status: 'needs_action', date: ilYaH(44 + i) })) } } },
       ...V.map((v) => ({ id: `harvest_111_txn_${v.tx}`, data: { capturedAt: ilYaH(40), payload: { transaction: { id: v.tx, item_id: `i${v.tx}` } } } })),
       ...await Promise.all(V.map(async (v) => ({ id: 'email_bord_' + v.tx, data: { transaction: String(v.tx), uid: '111', filename: `bordereau-${v.tx}.pdf`, modele: TITRE, article: TITRE, receivedAt: ilYaH(43), pdfB64: await pdfInvente(String(v.tx)), suivi: v.suivi } }))),
-      { id: 'email_track_vinted_tx9301', data: { type: 'suivi', carrier: 'vinted', suivi: '', status: 'transit', statusLabel: 'En transit', subject: 'Votre objet a été expédié', transaction: '9301', sens: 'sortant', receivedAt: ilYaH(3), emailAt: ilYaH(3), account: 'compte_a' } },
+      { id: 'email_track_vinted_tx9300000301', data: { type: 'suivi', carrier: 'vinted', suivi: '', status: 'transit', statusLabel: 'En transit', subject: 'Votre objet a été expédié', transaction: '9300000301', sens: 'sortant', receivedAt: ilYaH(3), emailAt: ilYaH(3), account: 'compte_a' } },
     ];
     b = await lancer(PW_NAV, { executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const sombre of [false, true]) {
