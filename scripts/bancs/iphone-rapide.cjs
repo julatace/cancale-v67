@@ -3,7 +3,11 @@
 //  Récit et chiffres : docs/passation/2026-11-20-iphone-rapide.md.
 //
 //    node scripts/bancs/iphone-rapide.cjs <dist> [port]
-//    CPU=4 (×4 par défaut ; 6 = un iPhone plus ancien) · JSON=<fichier> (relevé complet) · TOURS=1 · ETAPES=demarrage,onglets,defilement
+//    CPU=4 (×4 par défaut ; 6 = un iPhone plus ancien) · JSON=<fichier> (relevé complet) · TOURS=1 · ETAPES=demarrage,onglets,defilement,gestes
+//    (28 nov., vitesse-fluide) LARGEUR=1512 : l'ordinateur (1512 × 945, souris, barre latérale) au lieu de l'iPhone ; le
+//    réseau et le processeur restent ceux réglés. ETAPES=…,gestes : l'INP (Event Timing : du geste à l'image suivante) d'une
+//    frappe dans la recherche d'Annonces et de Ventes, d'une case cochée, de l'ouverture d'une fiche. Chaque changement
+//    d'onglet rapporte aussi son INP (`inp`).
 //
 //  COMME UN IPHONE : Chromium, 390 × 844, densité 3, tactile, mobile, processeur ×CPU (CDP), réseau 4G réaliste pour les
 //  fichiers de l'app (CDP : 150 ms d'aller-retour, 9 Mbit/s descendant, 3 Mbit/s montant) ; la base est servie par le banc
@@ -44,6 +48,10 @@ const RTT = 150, DEBIT = Number(process.env.MBIT || 9) * 1e6 / 8;   // octets/s 
 const RESEAU = { offline: false, latency: RTT, downloadThroughput: DEBIT, uploadThroughput: Math.min(3e6, DEBIT * 8 / 2) / 8 };
 let LECTURES = []; let T_NAV = 0;
 const ETAPES = String(process.env.ETAPES || 'demarrage,onglets,defilement').split(',');
+const ORDI = Number(process.env.LARGEUR || 390) >= 1000;
+// Un toucher au téléphone, un clic à l'ordinateur ; un onglet est dans la barre du bas OU dans la barre latérale.
+const TAP = (loc, o) => (ORDI ? loc.click(o) : loc.tap(o));
+const SEL_ONGLET = (cle) => `[data-n-onglet="${cle}"], [data-n-laterale] [data-n-entree="${cle}"]`;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Les fichiers de l'app, comme Vercel : compressés, /assets immuables, index.html jamais en cache ──
@@ -70,6 +78,9 @@ function jalons() {
   window.__vrmIphone = J;
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) J.longues.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true }); } catch (_) {}
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.name === 'first-contentful-paint') J.fcp = Math.round(e.startTime); }).observe({ type: 'paint', buffered: true }); } catch (_) {}
+  // (28 nov.) Event Timing : chaque interaction (toucher, clic, frappe) — durée du geste à l'image suivante (c'est l'INP).
+  J.evts = [];
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.interactionId) J.evts.push({ n: e.name, d: Math.round(e.duration), t: Math.round(e.startTime), p: Math.round(e.processingEnd - e.processingStart) }); }).observe({ type: 'event', durationThreshold: 16, buffered: true }); } catch (_) {}
   const voir = () => {
     const t = Math.round(performance.now());
     if (J.coque == null && document.querySelector('[data-n-onglets] [data-n-onglet]')) J.coque = t;
@@ -247,6 +258,7 @@ async function tracer(pg, cdp, geste, pret) {
   await cdp.send('Tracing.start', { categories: 'devtools.timeline,toplevel,disabled-by-default-devtools.timeline' + (process.env.SELECTEURS ? ',disabled-by-default-blink.debug' : '') + (process.env.INVAL ? ',disabled-by-default-devtools.timeline.invalidationTracking' : ''), transferMode: 'ReportEvents' });
   await attendre(150);
   if (process.env.PROFIL_ONGLETS) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
+  const p0 = await pg.evaluate(() => performance.now()).catch(() => 0);
   const t0 = Date.now();
   await geste();
   let mur = null;
@@ -302,8 +314,9 @@ async function tracer(pg, cdp, geste, pret) {
     while (pile.length) fermer(pile.pop());
     console.log('      ' + [...propre.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => k + ' ' + Math.round(v)).join(' · '));
   }
+  const inp = await pg.evaluate((p0) => { const l = ((window.__vrmIphone || {}).evts || []).filter((e) => e.t >= p0 - 5); return l.length ? Math.max(...l.map((e) => e.d)) : 0; }, p0).catch(() => null);
   const elementsStyle = style.reduce((a, e) => a + ((e.args && (e.args.elementCount || (e.args.data && e.args.data.elementCount))) || 0), 0);
-  return { cpu: Math.round(cpu), plusLongue: Math.round(plusLongue), longues, mur, pireStyle: Math.round(pireStyle * 10) / 10, style: somme(style), page: somme(surFil('Layout')), script: somme(surFil('FunctionCall').concat(surFil('EvaluateScript'), surFil('TimerFire'), surFil('EventDispatch'), surFil('FireAnimationFrame'), surFil('RunMicrotasks'))), elementsStyle };
+  return { inp, cpu: Math.round(cpu), plusLongue: Math.round(plusLongue), longues, mur, pireStyle: Math.round(pireStyle * 10) / 10, style: somme(style), page: somme(surFil('Layout')), script: somme(surFil('FunctionCall').concat(surFil('EvaluateScript'), surFil('TimerFire'), surFil('EventDispatch'), surFil('FireAnimationFrame'), surFil('RunMicrotasks'))), elementsStyle };
 }
 
 const CLE = (id) => (id === 'annonces' ? 'paires' : id);
@@ -313,7 +326,7 @@ const CLE = (id) => (id === 'annonces' ? 'paires' : id);
 // Argent ; on juge l'écran Argent atteint en moins de 20 s, et on dit les PDF lus, les signaux d'étiquette et les validations.
 async function argentApresSequence(pg, cdp) {
   const surEcran = (id) => new Function(`const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === ${JSON.stringify(id)};`);
-  const aller = async (id) => { const t0 = Date.now(); await pg.locator(`[data-n-onglet="${CLE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); const ok = await pg.waitForFunction(surEcran(id), null, { timeout: 60000, polling: 100 }).then(() => true, () => false); return ok ? Date.now() - t0 : null; };
+  const aller = async (id) => { const t0 = Date.now(); await TAP(pg.locator(SEL_ONGLET(CLE(id))).first(), { timeout: 30000 }).catch(() => {}); const ok = await pg.waitForFunction(surEcran(id), null, { timeout: 60000, polling: 100 }).then(() => true, () => false); return ok ? Date.now() - t0 : null; };
   const compteurs = () => pg.evaluate(() => ({ pdf: Object.values(window.__vrmPdf || {}).reduce((t, x) => t + x.n, 0), signaux: window.__vrmSignauxEtiq || 0, validations: (window.__vrmCommits || {}).n || 0 }));
   const out = {};
   out.annonces = await aller('annonces'); await calme(pg, 1500, 20000);
@@ -346,7 +359,7 @@ async function argentApresSequence(pg, cdp) {
 async function onglets(pg, cdp) {
   const sortie = [];
   const surEcran = (id) => new Function(`const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === ${JSON.stringify(id)} && !document.querySelector('[data-attente-ecran="${id === 'compta' ? '' : id}"][data-attente="attente"]');`);
-  const toucher = (id) => async () => { await pg.locator(`[data-n-onglet="${CLE(id)}"]`).first().tap({ timeout: 30000 }); };
+  const toucher = (id) => async () => { await TAP(pg.locator(SEL_ONGLET(CLE(id))).first(), { timeout: 30000 }); };
   const ordre = ['annonces', 'ventes', 'achats', 'compta', 'journee'];
   const tours = +(process.env.TOURS || 2);
   for (let t = 1; t <= tours; t++) {
@@ -361,29 +374,65 @@ async function onglets(pg, cdp) {
       if (process.env.COMMITS) { const c = await pg.evaluate(() => { const C = window.__vrmCommits || { n: 0, par: {} }; const top = Object.entries(C.par).sort((a, b) => b[1] - a[1]).slice(0, 12); const r = { n: C.n, top, ex: top.slice(0, 4).map(([k]) => [k.slice(0, 40), (C.ex || {})[k]]) }; window.__vrmCommits = { n: 0, par: {} }; return r; }); console.log('      validations : ' + c.n + ' ' + JSON.stringify(c.top)); console.log('      exemples : ' + JSON.stringify(c.ex)); const piles = await pg.evaluate(() => { const P = window.__vrmPiles || {}; window.__vrmPiles = {}; return P; }); const pdf = await pg.evaluate(() => { const P = window.__vrmPdf || {}; window.__vrmPdf = {}; return P; }); console.log('      pdf : ' + Object.keys(pdf).length + ' lignes, ' + Object.values(pdf).reduce((t, x) => t + x.n, 0) + ' lectures ; ' + JSON.stringify(Object.entries(pdf).slice(0, 3))); }
       if (process.env.ECRITURES) { const e = await pg.evaluate(() => { const x = window.__vrmEcrits || {}; window.__vrmEcrits = {}; return Object.entries(x).sort((a, b) => b[1] - a[1]).slice(0, 8); }); console.log('      écritures : ' + JSON.stringify(e)); }
       sortie.push({ geste: `${t === 1 ? '1er' : '2e'} → ${id}`, ...m, memoire: await memoire(cdp) });
-      console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
+      console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} INP ${String(m.inp).padStart(4)} ms · CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
     }
   }
   // « Plus » (la feuille derrière la photo du profil), puis la fermer.
   {
-    const m = await tracer(pg, cdp, async () => { await pg.locator('[data-n-coque-plus]').first().tap({ timeout: 30000 }); }, () => !!document.querySelector('[data-n-feuille-plus]'));
-    sortie.push({ geste: 'Plus (ouvrir)', ...m }); console.log(`  Plus (ouvrir)  CPU ${m.cpu} ms · plus longue ${m.plusLongue} ms · écran ${m.mur} ms`);
+    const m = await tracer(pg, cdp, async () => { await TAP(pg.locator('[data-n-coque-plus]').first(), { timeout: 30000 }); }, () => !!document.querySelector('[data-n-feuille-plus]'));
+    sortie.push({ geste: 'Plus (ouvrir)', ...m }); console.log(`  Plus (ouvrir)  INP ${m.inp} ms · CPU ${m.cpu} ms · plus longue ${m.plusLongue} ms · écran ${m.mur} ms`);
     await pg.keyboard.press('Escape').catch(() => {}); await attendre(600);
-    if (await pg.evaluate(() => !!document.querySelector('[data-n-feuille-plus]'))) { await pg.locator('[data-n-coque-plus]').first().tap({ timeout: 5000 }).catch(() => {}); await attendre(600); }
+    if (await pg.evaluate(() => !!document.querySelector('[data-n-feuille-plus]'))) { await TAP(pg.locator('[data-n-coque-plus]').first(), { timeout: 5000 }).catch(() => {}); await attendre(600); }
   }
   // Une fiche depuis Annonces, et le retour.
   {
-    await pg.locator(`[data-n-onglet="paires"]`).first().tap({ timeout: 30000 });
+    await TAP(pg.locator(SEL_ONGLET('paires')).first(), { timeout: 30000 });
     await pg.waitForSelector('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])', { timeout: 30000 }).catch(() => {}); await attendre(1500);
     const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue; const x = r.left + Math.min(r.width / 2, 190), y = r.top + r.height / 2; if (e.contains(document.elementFromPoint(x, y))) return { x, y }; } return null; });
     if (cible) {
-      const m = await tracer(pg, cdp, () => pg.touchscreen.tap(cible.x, cible.y), () => !!document.querySelector('[data-fiche-paire]'));
-      sortie.push({ geste: 'fiche (ouvrir)', ...m }); console.log(`  fiche (ouvrir) CPU ${m.cpu} ms · plus longue ${m.plusLongue} ms · écran ${m.mur} ms`);
+      const m = await tracer(pg, cdp, () => (ORDI ? pg.mouse.click(cible.x, cible.y) : pg.touchscreen.tap(cible.x, cible.y)), () => !!document.querySelector('[data-fiche-paire]'));
+      sortie.push({ geste: 'fiche (ouvrir)', ...m }); console.log(`  fiche (ouvrir) INP ${m.inp} ms · CPU ${m.cpu} ms · plus longue ${m.plusLongue} ms · écran ${m.mur} ms`);
       const r = await tracer(pg, cdp, async () => { await pg.goBack().catch(() => {}); }, () => !document.querySelector('[data-fiche-paire]'));
-      sortie.push({ geste: 'fiche (retour)', ...r }); console.log(`  fiche (retour) CPU ${r.cpu} ms · plus longue ${r.plusLongue} ms · écran ${r.mur} ms`);
+      sortie.push({ geste: 'fiche (retour)', ...r }); console.log(`  fiche (retour) INP ${r.inp} ms · CPU ${r.cpu} ms · plus longue ${r.plusLongue} ms · écran ${r.mur} ms`);
     } else console.log('  fiche : aucune rangée à toucher');
   }
   return sortie;
+}
+
+// ── (28 nov., vitesse-fluide) LES GESTES : l'INP d'une frappe dans la recherche, d'une case cochée, d'une fiche ──
+// Event Timing (`jalons`) : la durée de chaque interaction, du geste à l'image suivante (arrondie à 8 ms par le navigateur).
+async function gestes(pg, cdp) {
+  const out = [];
+  const evtsDepuis = (p0) => pg.evaluate((p0) => ((window.__vrmIphone || {}).evts || []).filter((e) => e.t >= p0 - 5), p0).catch(() => []);
+  const resumer = (nom, l, cpu) => { const d = l.map((e) => e.d).sort((a, b) => a - b); const r = { geste: nom, interactions: d.length, inp: d.length ? d[d.length - 1] : 0, mediane: d.length ? d[Math.floor(d.length / 2)] : 0, traitementMax: l.reduce((m, e) => Math.max(m, e.p), 0), cpu };
+    out.push(r); console.log(`  ${nom.padEnd(30)} INP ${String(r.inp).padStart(4)} ms · médiane ${r.mediane} ms · traitement max ${r.traitementMax} ms · ${r.interactions} interaction(s)${cpu != null ? ' · CPU ' + cpu + ' ms' : ''}`); return r; };
+  for (const id of ['annonces', 'ventes', 'achats']) {
+    await TAP(pg.locator(SEL_ONGLET(CLE(id))).first(), { timeout: 30000 }).catch(() => {});
+    await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === x; }, id, { timeout: 60000 }).catch(() => {});
+    await calme(pg, 2000, 30000);
+    // La recherche de l'écran : le premier champ visible.
+    const champ = pg.locator('.vrm-main input[type="search"]:visible').first();
+    if (await champ.count()) {
+      await TAP(champ, { timeout: 10000 }).catch(() => {}); await attendre(400);
+      const p0 = await pg.evaluate(() => performance.now());
+      const m = await tracer(pg, cdp, async () => { await pg.keyboard.type('nike', { delay: 180 }); }, () => true);
+      resumer(`${id} · taper « nike »`, (await evtsDepuis(p0)).filter((e) => /^key|^input|^beforeinput/.test(e.n)), m.cpu);
+      await calme(pg, 1500, 20000);
+      const p1 = await pg.evaluate(() => performance.now());
+      const m2 = await tracer(pg, cdp, async () => { for (let i = 0; i < 4; i++) { await pg.keyboard.press('Backspace'); await attendre(180); } }, () => true);
+      resumer(`${id} · effacer`, (await evtsDepuis(p1)).filter((e) => /^key|^input|^beforeinput/.test(e.n)), m2.cpu);
+      await pg.keyboard.press('Escape').catch(() => {}); await calme(pg, 1500, 20000);
+    } else console.log(`  ${id} : aucun champ de recherche visible`);
+    // Une case : la première case visible de la liste (sélection d'un lot).
+    const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('.vrm-main input[type="checkbox"], .vrm-main [role="checkbox"]')) { const r = e.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.top < 60 || r.bottom > innerHeight - 90) continue; const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); if (h && (e === h || e.contains(h) || h.contains(e) || (h.closest && h.closest('label') && h.closest('label').contains(e)))) return { x, y }; } return null; });
+    if (cible) {
+      const p0 = await pg.evaluate(() => performance.now());
+      const m = await tracer(pg, cdp, () => (ORDI ? pg.mouse.click(cible.x, cible.y) : pg.touchscreen.tap(cible.x, cible.y)), () => true);
+      resumer(`${id} · cocher une case`, (await evtsDepuis(p0)).filter((e) => /pointer|click|touch|mouse/.test(e.n)), m.cpu);
+      await (ORDI ? pg.mouse.click(cible.x, cible.y) : pg.touchscreen.tap(cible.x, cible.y)).catch(() => {}); await calme(pg, 1500, 20000);
+    } else console.log(`  ${id} : aucune case visible`);
+  }
+  return out;
 }
 
 // ── Le défilement : un balayage tactile synthétisé (CDP), images par seconde et tâches longues ──
@@ -395,11 +444,13 @@ async function defiler(pg, cdp, id) {
   await pg.evaluate(() => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > 3000 || performance.now() - t0 > 60000) { clearInterval(iv); ok(); } }, 250); }));
   await pg.evaluate(() => { window.__vrmImages = []; window.__vrmLongues = []; const boucle = (t) => { window.__vrmImages.push(t); window.__vrmRaf = requestAnimationFrame(boucle); }; window.__vrmRaf = requestAnimationFrame(boucle);
     try { window.__vrmObsL = new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__vrmLongues.push(Math.round(e.duration)); }); window.__vrmObsL.observe({ type: 'longtask' }); } catch (_) {} });
+  if (process.env.PROFIL_DEFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   const t0 = Date.now();
   // Le geste (CDP) : 6 balayages — « mouse » par défaut (le geste « touch » synthétisé ne fait pas défiler la coque native
   // sous Chromium émulé : 0 px mesuré) ; vers le bas, 1 400 px chacun à 1 600 px/s (un pouce rapide).
   for (let i = 0; i < 6; i++) await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 560, yDistance: -1400, speed: 1600, gestureSourceType: process.env.GESTE || 'mouse', repeatCount: 1, preventFling: false });
   const duree = Date.now() - t0;
+  if (process.env.PROFIL_DEFIL) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL_DEFIL + '-' + id + '.json', JSON.stringify(agreger(profile), null, 1)); }
   const r = await pg.evaluate(() => { cancelAnimationFrame(window.__vrmRaf); try { window.__vrmObsL.disconnect(); } catch (_) {} const im = window.__vrmImages; const ecarts = im.slice(1).map((t, i) => t - im[i]);
     let haut = window.scrollY; for (const e of document.querySelectorAll('*')) if (e.scrollTop > haut) haut = e.scrollTop; return { images: im.length, duree: im.length > 1 ? im[im.length - 1] - im[0] : 0, pireImage: ecarts.length ? Math.round(Math.max(...ecarts)) : 0, saccades: ecarts.filter((x) => x > 50).length, longues: window.__vrmLongues, haut: Math.round(haut), noeuds: document.getElementsByTagName('*').length }; });
   const ips = r.duree ? Math.round(r.images / (r.duree / 1000)) : 0;
@@ -468,7 +519,7 @@ async function instantane(ctx) {
       await pg.waitForSelector('[data-attente-ecran="journee"][data-attente="pret"]', { timeout: 120000 }).catch(() => {});
       for (const id of ecrans) {
         if (id === 'messages') await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'messages' })));
-        else await pg.locator(`[data-n-onglet="${ONGLET_DE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+        else await TAP(pg.locator(SEL_ONGLET(ONGLET_DE(id))).first(), { timeout: 30000 }).catch(() => {});
         await pg.waitForSelector(`[data-attente-ecran="${id}"][data-attente="pret"]`, { timeout: 60000 }).catch(() => {});
         await calme(pg, 1500, 15000); await attendre(3500);
       }
@@ -509,7 +560,7 @@ async function instantane(ctx) {
       await calme(pg, 1500, 20000);
       await poserSonde(pg, id, id !== 'messages');
       if (id === 'messages') await pg.evaluate(() => { window.__vrmContenu.t0 = performance.now(); window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'messages' })); });
-      else await pg.locator(`[data-n-onglet="${ONGLET_DE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+      else await TAP(pg.locator(SEL_ONGLET(ONGLET_DE(id))).first(), { timeout: 30000 }).catch(() => {});
       await pg.waitForFunction(() => window.__vrmContenu && window.__vrmContenu.t != null, null, { timeout: 30000, polling: 50 }).catch(() => {});
       const C = await pg.evaluate(() => window.__vrmContenu).catch(() => null);
       const r = { theme, ecran: id, premierContenuMs: C && C.t != null ? Math.round(C.t) : null, par: C && C.par };
@@ -525,13 +576,14 @@ async function instantane(ctx) {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
   const sortie = { dist: DIST, cpu: CPU, reseau: '4G 150 ms · 9 Mbit/s', base: { annonces: 1200, ventes: 1500, achats: 800 } };
   try {
-    const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR',
+    const ctx = await nav.newContext(ORDI ? { viewport: { width: 1512, height: 945 }, screen: { width: 1512, height: 982 }, deviceScaleFactor: 2, isMobile: false, hasTouch: false, locale: 'fr-FR', serviceWorkers: 'allow' }
+      : { viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1', serviceWorkers: 'allow' });
     // (22 nov.) `BANC_MAINTENANT` : l'horloge de la page posée à cette heure-là (elle avance ensuite normalement), la même
     // que celle de la base inventée (`_base-volume`).
     if (process.env.BANC_MAINTENANT) await ctx.clock.install({ time: new Date(process.env.BANC_MAINTENANT) });
     await preparer(ctx);
-    console.log(`iPhone 390 × 844 @3 · CPU ×${CPU} · 4G (150 ms, ${DEBIT * 8 / 1e6} Mbit/s) · ${path.relative(process.cwd(), DIST) || DIST}`);
+    console.log(`${ORDI ? 'Ordinateur 1512 × 945 @2' : 'iPhone 390 × 844 @3'} · CPU ×${CPU} · 4G (150 ms, ${DEBIT * 8 / 1e6} Mbit/s) · ${path.relative(process.cwd(), DIST) || DIST}`);
     // 1) à froid
     const froid = await ouvrirApp(ctx, 'froid');
     const dire = (r) => console.log(`  ${r.quand.padEnd(9)} 1re peinture ${r.fcp} ms · coque ${r.coque} ms · écran utile ${r.utile} ms · chiffres ${r.chiffres} ms · JS+CSS ${r.jsKo} Ko (${r.fichiers}) · ${r.longuesAvantUtile} tâches longues avant l'écran utile (${r.longuesMsAvantUtile} ms, max ${r.plusLongue}) · tas ${r.memoire.tasMo} Mo · ${r.memoire.noeuds} nœuds${r.erreurs.length ? ' · ERREURS ' + r.erreurs.join(' | ') : ''}`);
@@ -546,6 +598,7 @@ async function instantane(ctx) {
     const chaud = seulInstantane ? { r: {}, pg: null, cdp: null } : await ouvrirApp(ctx, 'chaud 2'); if (chaud.pg) dire(chaud.r);
     sortie.demarrage = { froid: froid.r, chaud1: chaud1 && chaud1.r, chaud2: chaud.r };
     if (ETAPES.includes('onglets')) { console.log('Changements d\'onglet (temps de fil, CPU ×' + CPU + ')'); sortie.onglets = await onglets(chaud.pg, chaud.cdp); }
+    if (ETAPES.includes('gestes')) { console.log('Gestes (INP : du geste à l\'image suivante)'); sortie.gestes = await gestes(chaud.pg, chaud.cdp); }
     if (ETAPES.includes('argent')) { console.log('Argent après Annonces → Ventes → Achats (défaut « Argent bloqué », 22 nov.)' + (process.env.BANC_MAINTENANT ? ' · horloge ' + process.env.BANC_MAINTENANT : '')); sortie.argent = await argentApresSequence(chaud.pg, chaud.cdp); }
     if (ETAPES.includes('defilement')) { console.log('Défilement'); sortie.defilement = []; for (const id of ['annonces', 'ventes', 'achats']) { try { sortie.defilement.push(await defiler(chaud.pg, chaud.cdp, id)); } catch (e) { console.log(`  défilement ${id} : pas mesuré (${String(e.message || e).split('\n')[0].slice(0, 100)})`); } } }
     if (ETAPES.includes('instantane')) { console.log('Affichage instantané (1re visite de chaque onglet, page neuve, service worker)'); sortie.instantane = await instantane(ctx); }

@@ -358,7 +358,14 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     const d = a.annonces.filter((x) => x.etat === 'enligne' && x.depuis != null).map((x) => x.depuis);
     return d.length ? Math.floor((opts.maintenant - Math.min(...d)) / JOUR) : null;
   };
-  const comptes = modele ? compterArticles(modele.articles, opts) : null;
+  // (28 nov., vitesse-fluide) Les nombres des segments (30 passes de `filtrerArticles` sur tous les articles) et la liste
+  // filtrée étaient refaits à CHAQUE rendu — chaque lettre de la recherche, chaque case. Gardés tant que les articles, le
+  // seuil, le filtre et la recherche sont les mêmes ; l'heure de la règle « Dorment » (`opts.maintenant`) est reprise à la
+  // minute (la même règle : une paire qui passe le seuil y entre à la minute suivante, comme à un rendu suivant).
+  const minuteRendu = Math.floor(opts.maintenant / 60000);
+  const comptes = React.useMemo(() => (modele ? compterArticles(modele.articles, opts) : null),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [modele, seuil, minuteRendu]);
   // (25 nov.) Les entrées du filtre de l'onglet : les sites PRÉSENTS (la règle commune, src/filtrePlateforme.js, sur les annonces
   // de chaque article), chacune avec le nombre de SON segment (`compterArticles`, la règle des segments) au téléphone ; le tableau
   // de l'ordinateur compte ses rangées (`nRangeesSite`, plus bas). Un choix retenu sans entrée ⇒ « Toutes » (jamais un filtre vide).
@@ -424,7 +431,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return out.sort((p, q) => q.jours - p.jours);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modele, releves, prio, joursPV]);
-  const qPrio = String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  // La recherche tapée s'affiche tout de suite (`q`) ; les listes suivent en arrière-plan (`qListe`, interruptible).
+  const qListe = React.useDeferredValue(q);
+  const qPrio = String(qListe || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const lignesPrio = prio ? (qPrio ? prio.liste.filter((l) => [l.article.titre, l.numero ? 'n' + l.numero + ' ' + l.numero : '', l.annonce.pseudo].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(qPrio)) : prio.liste) : [];
   const selPrio = usePrioSelection(lignesPrio);
   // SON toucher sur « Republier N » : l'atelier Republier du PANNEAU de l'extension, sur vinted.fr, ces annonces cochées. Rien ne part d'ici.
@@ -458,7 +467,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     contenu: <PhotoEnDouble res={photoRes} euros={(n) => fmt(n)} Icon={Icon} onPasDoublon={pasDoublon}
       onAnnonce={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } else if (a.url) { try { window.open(a.url, '_blank', 'noopener'); } catch (_) {} } }}/>,
   };
-  const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
+  const liste = React.useMemo(() => (modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: qListe })) : modele),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [modele, seuil, minuteRendu, filtre.site, filtre.etat, qListe]);
   const nomSite = (s) => NOM_SITE[s] || s;
   const limites = limitesDe(sites).map((l) => tr('egalite.limite.' + l.quoi, { site: nomSite(l.site) }));
   const manque = lu && lu.manque && lu.manque.length && lu.manque.some((s) => sites.includes(s) || s === 'vinted') ? tr('egalite.pasSu') : '';

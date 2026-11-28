@@ -554,7 +554,8 @@ import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration f
 import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
 import { etatChezMoi, publierChezMoi, etatAchatChezMoi } from '../achatChezMoi.js';   // (22 nov., intégration finale)
 import { avecRemboursements, coutAchatNet, enAttenteDe, publierRemboursements, coutFicheNet } from '../coutAchatNet.js';   // (22 nov., intégration finale)
-import { publierAchatsSite } from '../achats/nombresAchatsSites.js';   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
+import { publierAchatsSite } from '../achats/nombresAchatsSites.js';
+import { InputDiffere } from '../composants/saisieDifferee.jsx';   // (28 nov., vitesse-fluide) la lettre d'abord, l'écran ensuite   // (25 nov.) le nombre d'achats Vinted montrés, pour le filtre par plateforme d'Achats
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -20836,7 +20837,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {/* (2 nov., 22 h) La recherche et la période ne sont plus sur l'écran (maquette FusionVentes) :
                 elles sont ici, à un geste — les mêmes états (`ordSearch`, `periode`). */}
             {sales.items && sales.items.length>0 && <div className="vrm-outils-recherche" data-outils-recherche="" style={{display:'flex',flexDirection:'column',gap:8,padding:'4px 4px 10px'}}>
-              <div className="vrm-list-search"><Icon name="search" size={17}/><input aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder="Rechercher"
+              <div className="vrm-list-search"><Icon name="search" size={17}/><InputDiffere aria-label="Rechercher dans les ventes Vinted" type="search" value={ordSearch} onValeur={setOrdSearch} placeholder="Rechercher"
                 style={{width:'100%',boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 13px',fontSize:17,background:C.card,color:C.text,outline:'none',minHeight:44}}/><MicDictee nu titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></div>
               <PeriodePicker value={periode} onChange={setPeriode} titre="Période des ventes" datation="Date de vente"/>
             </div>}
@@ -25914,7 +25915,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             qui dépassait de sa colonne : la calculette va à côté de « Relier achats et ventes », avec son nom. */}
         {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && (
-          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
+          <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><InputDiffere type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onValeur={setOrdSearch} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
         {/* (23 nov., revue UX #9) Au téléphone, UN bouton nommé « Filtres » (la période des achats) ; la calculette passe dans « ⋯ ». */}
