@@ -378,6 +378,9 @@ function vrmVerifVisible(sel) {
   .panneau { margin-top: 8px; }
   .lu { font-size: 12px; color: var(--doux); margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
   .rangs { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; border-radius: 12px; }
+  .os-etapes { margin: 8px 0; padding: 0 0 0 4px; list-style: none; display: grid; gap: 8px; }
+  .os-etapes li { display: grid; gap: 2px; }
+  .os-etapes small { color: var(--gris, inherit); opacity: .85; }
   .rang { display: grid; grid-template-columns: 46px 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 56px; padding: 6px 4px; color: var(--texte); text-decoration: none; font-size: 13px;
     content-visibility: auto; contain-intrinsic-size: 56px; -webkit-tap-highlight-color: transparent; }
   a.rang:active { opacity: .55; }
@@ -5280,6 +5283,44 @@ function vrmVerifVisible(sel) {
     else if (r.n != null && typeof r.actif !== 'boolean') bouts.push(TU(Number(r.n) === 1 ? 'sr_n_1' : 'sr_n', { n: r.n }));
     return bouts.join(' · ') || '—';
   }
+  // 5.457 (28 nov., « Mode ordinateur allumé ») : l'interrupteur de CE profil (un profil Chrome = un compte Vinted), son
+  //    état (compte, dernière lecture, prochaine dans N s), les AUTRES profils de l'ordinateur, et l'installation guidée.
+  //    L'état est lu au fond (`serveurCarte`) ; rien ne part chez Vinted d'ici.
+  let srvVue = null, srvEnVol = false, srvLu = 0, srvMinuteur = null;
+  function lireServeur(forcer) {
+    if (srvEnVol || (!forcer && Date.now() - srvLu < 5000)) return;
+    srvEnVol = true; srvLu = Date.now();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'serveur', quoi: 'etat' }, (r) => { void chrome.runtime.lastError; srvEnVol = false; if (r && r.ok) { srvVue = r; rendre(); } }); } catch (_) { srvEnVol = false; }
+  }
+  function srvDuree(ms) { const s0 = Math.max(0, Math.round(Number(ms) / 1000)); if (!Number.isFinite(s0)) return '—'; return s0 < 60 ? TU('os_s', { s: s0 }) : (s0 % 60 ? TU('os_ms', { m: Math.floor(s0 / 60), s: s0 % 60 }) : TU('os_m', { m: Math.floor(s0 / 60) })); }
+  function serveurHtml() {
+    lireServeur(false);
+    if (!srvMinuteur) srvMinuteur = setInterval(() => { if (document.querySelector('[data-serveur-panneau]')) { const el = document.querySelector('[data-os-prochain]'); const t = Number(el && el.getAttribute('data-os-t')); if (el && t) el.textContent = TU('os_prochain', { dans: srvDuree(t - Date.now()) }); } }, 1000);
+    const v = srvVue, s0 = v && v.serveur ? v.serveur : null, on = !!(s0 && s0.on);
+    const code = s0 ? (s0.deconnecte ? 'deconnecte' : s0.captcha ? 'captcha' : s0.pause ? 'pause' : s0.prudence ? 'prudence' : s0.budget ? 'budget' : 'pret') : '';
+    const etat = !v ? `<p class="note5" role="status">${esc(TU('os_lecture'))}</p>`
+      : !on ? `<p class="note5" data-os-etat="off">${esc(TU('os_off'))}</p>`
+      : `<div class="rg6" data-os-etat="${esc(code)}"><span><b>${esc(TU('os_c_' + code, { nom: s0.nom || s0.uid || '—' }))}</b><small>${s0.lu ? esc(TU('os_lu', { age: srvDuree(Date.now() - s0.lu) })) : esc(TU('os_pas_lu'))}${s0.prochain && code === 'pret' ? ` · <span data-os-prochain data-os-t="${Number(s0.prochain)}">${esc(TU('os_prochain', { dans: srvDuree(s0.prochain - Date.now()) }))}</span>` : ''}${s0.actions != null && s0.cap ? ' · ' + esc(TU('os_actions', { n: s0.actions, cap: s0.cap })) : ''}</small></span></div>`;
+    const autres = v && Array.isArray(v.autres) ? v.autres.filter((l) => l && l.code !== 'eteint' || (l && l.compte)) : [];
+    const lignesAutres = autres.length ? `<ul class="rangs" data-os-autres="${autres.length}">${autres.slice(0, 8).map((l) => `<li class="rg6" data-os-autre="${esc(l.code)}"><span><b>${esc(TU('os_c_' + (['pret', 'deconnecte', 'captcha', 'pause', 'prudence', 'budget', 'off', 'eteint'].includes(l.code) ? l.code : 'eteint'), { nom: l.nom || l.compte || '—' }))}</b></span></li>`).join('')}</ul>` : '';
+    const etapes = ['profil', 'extension', 'connecter', 'vinted', 'allumer', 'garder'];
+    return `<section class="grp5" data-serveur-panneau data-os-on="${on ? '1' : '0'}"><h3>${esc(TU('os_titre'))}</h3><p class="note5">${esc(TU('os_note'))}</p>
+      ${etat}
+      <div class="outils"><button type="button" class="vu-btn${on ? '' : ' vu-plein'}" data-os-basculer="${on ? 'eteindre' : 'allumer'}"${srvEnVol ? ' disabled' : ''}>${esc(TU(on ? 'os_eteindre' : 'os_allumer'))}</button></div>
+      ${lignesAutres ? `<p class="note5"><b>${esc(TU('os_autres'))}</b></p>${lignesAutres}` : ''}
+      <details class="detail" data-os-guide><summary><span>${esc(TU('os_guide'))}</span></summary>
+        <ol class="os-etapes">${etapes.map((k) => `<li data-os-etape="${k}"><b>${esc(TU('os_e_' + k))}</b><small>${esc(TU('os_e_' + k + '_sous'))}</small></li>`).join('')}</ol>
+        <p class="note5">${esc(TU('os_regle'))}</p>
+      </details>
+    </section>`;
+  }
+  function brancherServeur(R) {
+    const b = R.querySelector('[data-os-basculer]'); if (b) b.addEventListener('click', () => {
+      const quoi = b.getAttribute('data-os-basculer');
+      srvEnVol = true; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'serveur', quoi }, (r) => { void chrome.runtime.lastError; srvEnVol = false; if (r && r.ok) srvVue = r; srvLu = Date.now(); rendre(); }); } catch (_) { srvEnVol = false; rendre(); }
+    });
+  }
   function sauvegardeHtml() {
     const a = srAp;
     const lignes = a && Array.isArray(a.changements) ? a.changements : [];
@@ -5874,6 +5915,7 @@ function vrmVerifVisible(sel) {
     };
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
     brancherSauvegarde(racine);
+    brancherServeur(racine);
     // 5.432 : le seuil de la garde du prix (desserrer au-delà de 40 % ⇒ SA confirmation).
     { const gs = racine.querySelector('[data-gp-seuil]'); if (gs) { gs.addEventListener('input', () => { gpBrouillon = Number(gs.value); gpConfirme = false; gpEtat = null; const o = racine.querySelector('[data-gp-v]'); if (o) o.textContent = gs.value + ' %'; const e = racine.querySelector('[data-gp-enregistrer]'); if (e) e.disabled = false; }); gs.addEventListener('change', () => rendre()); } }
     const gpEnvoyer = (confirme) => {
@@ -6360,6 +6402,7 @@ function vrmVerifVisible(sel) {
       ${precieuxHtml()}
       ${gardePrixHtml()}
       ${sauvegardeHtml()}
+      ${serveurHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
       <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>
