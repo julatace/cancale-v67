@@ -6832,8 +6832,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       try { const rs = await lireEbayParCompte('ebay_suivis', 'p:data->parCommande', r.comptes);
         for (const { compte, ligne } of ((rs && rs.lignes) || [])) { const pc = ligne && ligne.p && typeof ligne.p === 'object' ? ligne.p : null; if (pc) for (const [k, v] of Object.entries(pc)) if (v && Array.isArray(v.suivis)) suivisE[compte.ref + ':' + k] = v.suivis; }
       } catch (_) { suivisE = {}; }
-      try { const le = await lireTout(`id=like.${PREFIXE_ETIQUETTE_EBAY}*&select=id,pdf:meta->>_pdf,suivi:meta->>s,imprimeLe:meta->>imprimeLe`, { strict: true });
-        for (const x of (Array.isArray(le) ? le : [])) { const k = String(x.id || '').slice(PREFIXE_ETIQUETTE_EBAY.length); if (k && x.pdf) etiqE[k] = { suivi: x.suivi || '' }; }
+      try { const le = await lireTout(`id=like.${PREFIXE_ETIQUETTE_EBAY}*&select=id,pdf:meta->>_pdf,suivi:meta->>suiviPdf,transporteur:meta->>transporteurPdf`, { strict: true });
+        for (const x of (Array.isArray(le) ? le : [])) { const k = String(x.id || '').slice(PREFIXE_ETIQUETTE_EBAY.length); if (k && x.pdf) etiqE[k] = { suivi: x.suivi || '', transporteur: x.transporteur || '' }; }
       } catch (_) { etiqE = {}; }
     }
     setEbayCmd((!r || r.illisibles.length) ? null : r.items.map((o) => {
@@ -20976,7 +20976,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (`shipByDate`, le délai de préparation de l'annonce) en jour et heure de Paris (`limiteEbay`) — la règle du nombre
       // « à envoyer » ne change pas (`colisEbay`) : chaque commande y est une fois.
       ...((voitSite('ebay') && colisEb && colisEb.aPoster) || []).map((x) => { const o = x.ordre || {}; const et = o._etiquetteEbay || null;
-        const tr = transporteurDuColis({ declare: transporteurEbay(o, o._suivisEbay), suivi: (et && et.suivi) || '' });
+        const tr = transporteurDuColis({ declare: transporteurEbay(o, o._suivisEbay) || (et && et.transporteur) || '', suivi: (et && et.suivi) || '' });
         return { __autre: 'eb', key: 'e:' + x.compte + ':' + x.orderId, x, tr, trNom: nomEnvoye(tr), dl: x.jours, lim: limiteEbay(o), etiquette: !!et }; }),
       ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];

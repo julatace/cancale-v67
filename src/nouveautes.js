@@ -30,6 +30,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (28 nov., ebay-livraison) api/_lib/ebay-livraison.js : limite eBay, étiquette, suivi lu chez eBay, colis par défaut.
+  { id: 'ebay-livraison', date: '2026-11-28', titre: 'eBay : colis, étiquette et suivi dans Ventes', phrase: 'Date limite eBay, étiquette prépayée par l’acheteur, En route puis Livrée.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (28 nov., compta-finitions — « fais tout le reste parfaitement ») src/natif/ecrans/DepensesMois.jsx, ArgentMois.jsx, src/ecrans/Compta.jsx
   { id: 'compta-finitions', date: '2026-11-28', titre: 'Argent : avant tes dépenses, rapport comptable', phrase: 'Un seul « J’ai déclaré », chaque montant une fois, plus d’orange.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (28 nov., expedie-sans-extension) api/_lib/depart-vente.js : n° de transaction des e-mails, vente finalisée ; Colis.
