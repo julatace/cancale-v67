@@ -37,7 +37,9 @@ export function traduireResultatFavori(r){
   // (élément absent + son nom de code, statut HTTP, garde, onglet…) — jamais une valeur, jamais un texte.
   const etape=ETAPE_ACCUSE.test(String(r?.data?.etape||''))?String(r.data.etape):undefined;
   const cause=CAUSE_ACCUSE.test(String(r?.data?.cause||''))?String(r.data.cause):undefined;
-  return {resultat,raison,ecrits,...(variante?{variante}:{}),...(apresMs?{apresMs}:{}),...(etape?{etape}:{}),...(cause?{cause}:{})};
+  // 5.455.8 (revue 2, défaut 4) : l'extension dit que NI l'offre NI le message ne sont partis (la conversation seule ouverte).
+  const aucunEnvoi=resultat==='refuse'&&r?.data?.aucunEnvoi===true;
+  return {resultat,raison,ecrits,...(aucunEnvoi?{aucunEnvoi:true}:{}),...(variante?{variante}:{}),...(apresMs?{apresMs}:{}),...(etape?{etape}:{}),...(cause?{cause}:{})};
 }
 export const ETAPE_ACCUSE=/^(?:autorisation|cloche|conversation|verification|historique|ecriture|attente_message|attente_offre|offre|envoi|confirmation)$/;
 export const CAUSE_ACCUSE=/^(?:element_absent|favori_absent|page_autre|lien_autre|compte|onglet|file|garde|frein|captcha|autorisation|variable|http_[1-5]\d\d)(?::[a-z][a-z-]{1,39})?$/;

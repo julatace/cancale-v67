@@ -52,7 +52,19 @@ export function etatAuto(d,owner,maintenant){
   // 5.455.8 : un envoi « à vérifier » n'arrête plus l'agent (il bloquait tout, sans fin) ; il reste écarté pour SON favori seul.
   // 5.455.8 (revue, défaut 4) : une tentative ABANDONNÉE (bail expiré, constaté par `expirerBail` à chaque tour de l'agent) ne
   //    rend plus l'agent « occupé » pour toujours : elle le retient seulement pendant sa grâce.
-  if((d.enCours&&!d.enCours.abandonne)||abandonRetient(d.enCours,maintenant)||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
+  // 5.455.8 (revue 2, défaut 1) : une file de CE compte qui ne fait qu'ATTENDRE (un favori automatique en tête, rien en vol, aucun
+  //    autre compte actif) n'est jamais « occupée » : l'agent doit la faire avancer (`a_reserver` ⇒ il demande `suivant`). Avant :
+  //    une réservation ratée (réseau, accusé pas rejoué, liste d'exclusion pas lue) laissait l'agent « occupé » pour toujours.
+  const enVol=(d.enCours&&!d.enCours.abandonne)||abandonRetient(d.enCours,maintenant);
+  if(!enVol&&g?.active&&!Object.entries(d.groupes).some(([o,x])=>o!==owner&&x.active)){
+    const j=g.jobs.find(x=>x.etat==='attente');
+    if(j&&j.auto===true&&!g.jobs.some(x=>x.etat==='reserve')){
+      if(a.pauseAgent)return {etat:'pause_agent'};
+      const pr=Math.max(g.prochain||0,d.prochainGlobal||0);
+      return {etat:'a_reserver',...(pr>maintenant?{jusqua:pr}:{})};
+    }
+  }
+  if(enVol||Object.values(d.groupes).some(x=>x.active))return {etat:'occupe'};
   if(a.pauseAgent)return {etat:'pause_agent'};
   if(!dansPlageAuto(a.reglages,maintenant))return {etat:'hors_horaires'};
   const env=(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(t=>t>maintenant-AUTO_JOUR_MS);

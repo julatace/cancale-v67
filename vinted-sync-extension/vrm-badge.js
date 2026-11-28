@@ -2626,7 +2626,7 @@ function vrmVerifVisible(sel) {
   const W6F = { prix: '128px', acheteur: '150px', date: '116px', etat: '210px' };
   const mot6 = (k, d) => { const v = TU(k); return v === k ? TU(d) : v; };
   const RAISON_F6 = { annonce_indisponible: 'vendu', article_vendu: 'vendu', conversation_deja_contactee: 'deja', conversation_existante: 'deja', offre_sous_plancher: 'sous_mini',
-    conversation_refusee: 'conv', texte_interdit: 'texte', texte_refuse: 'texte', vinted_robot: 'robot', vinted_frein: 'frein', pause_vinted: 'frein', offre_refusee: 'offre_refusee',
+    conversation_refusee: 'conv', offre_prix_inconnu: 'offre_prix', texte_interdit: 'texte', texte_refuse: 'texte', vinted_robot: 'robot', vinted_frein: 'frein', pause_vinted: 'frein', offre_refusee: 'offre_refusee',
     non_prouve: 'non_prouve', sans_acheteur: 'sans_acheteur', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
   const raison6 = (c) => mot6('f6_r_' + (RAISON_F6[c] || c || 'autre'), 'f6_r_autre');
   // La file qui compte pour les rangées : en cours, ou finie depuis moins de 6 h (la même borne que la ligne d'envoi).
@@ -2652,6 +2652,8 @@ function vrmVerifVisible(sel) {
     if (Number(f.m) > 0) l.push(Number.isInteger(f.v) && f.v > 0 ? TU('f6_d_message_v', { h: heure6(f.m), v: f.v }) : TU('f6_d_message', { h: heure6(f.m) }));
     // 5.455.8 : le refus de Vinted, SA phrase, tant que le favori n'est pas parti depuis.
     if (typeof f.refus === 'string' && f.refus && !(Number(f.m) > Number(f.refusAt))) l.push(TU('f6_d_refus', { t: f.refus, h: heure6(f.refusAt) }));
+    // 5.455.8 (revue 2) : Vinted n'a rien dit (404…) ⇒ la raison quand même, avec SON code : jamais une raison vide.
+    else if (Number(f.refusStatut) > 0 && !(Number(f.m) > Number(f.refusAt))) l.push(TU('f6_d_refus_statut', { s: Number(f.refusStatut), h: heure6(f.refusAt) }));
     return l;
   }
   function etatRaison6(raison, base) {
@@ -2679,10 +2681,14 @@ function vrmVerifVisible(sel) {
       }
       if (et === 'incertain') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
       if (et === 'annule') return { k: 'nouveau', t: TU('f6_e_nouveau') };
+      // 5.455.8 (revue 2, défaut 4) : ni offre ni message partis (VRM le garde envoyable, `cochable`) ⇒ « Pas envoyé · la raison »,
+      //    « Envoyer » sur la rangée. Une offre ou un message réellement partis ne reviennent jamais ici (le serveur les tient « connus »).
+      if (et === 'refuse' && x.cochable === true && !(f && (Number(f.m) > 0 || Number(f.o) > 0))) return { k: 'nouveau', t: TU('f6_e_pas'), ton: 'ambre', raison: raison6(j[2] || x.pasEnvoye), refus: true };
       if (f && Number(f.m) > 0) return { k: f.o ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
       return etatRaison6(j[2], et);
     }
     if (f && Number(f.m) > 0) return { k: f.o ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
+    if (x.cochable === true && x.pasEnvoye && !(f && Number(f.o) > 0)) return { k: 'nouveau', t: TU('f6_e_pas'), ton: 'ambre', raison: raison6(x.pasEnvoye), refus: true };
     if (x.cochable === true) return { k: 'nouveau', t: TU('f6_e_nouveau') };
     if (x.envoi === 'envoye') return { k: x.offreFaite ? 'offre' : 'envoye', t: TU('f6_e_envoye') };
     if (x.envoi === 'en_cours') return { k: 'attente', t: TU('f6_e_attente') };

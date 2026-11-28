@@ -321,7 +321,7 @@ export async function routeFavoris(req,res){
         // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est
         // celle de l'app (traduireResultatFavori), une seule règle, faite ici.
         const t=c.brut&&typeof c.brut==='object'&&!Array.isArray(c.brut)?traduireResultatFavori(c.brut):{resultat:c.resultat,raison:c.raison,ecrits:c.ecrits,variante:c.variante};
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null,etape:t.etape||null,cause:t.cause||null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null,etape:t.etape||null,cause:t.cause||null,aucunEnvoi:t.aucunEnvoi===true});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');
@@ -343,6 +343,8 @@ export async function routeFavoris(req,res){
     }
     const r=await modifierNeutre(cle,decision);
     if(!r)throw new RefusFavoris('État non confirmé. Actualise la file : aucun nouvel envoi ne doit être lancé.',503);
+    // 5.455.8 (revue 2, défaut 3) : un renouvellement refusé (noté chez VRM) se dit en REFUS : l'extension arrête l'envoi avant sa prochaine écriture.
+    if(req.body?.action==='prolonger'&&r.valeur?.prolonge===false)throw new RefusFavoris('La tentative n’est plus en cours.',409);
     // (28 oct., « que ça me prévienne ») La file vient de finir : une notification
     // avec le bilan (catégorie « favoris », activée par défaut). Un échec d'envoi
     // ne change rien à la réponse : la file est déjà rangée.

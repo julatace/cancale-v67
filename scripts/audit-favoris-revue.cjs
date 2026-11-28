@@ -14,6 +14,13 @@
 //   V6 réglages changés ailleurs (409) ⇒ jamais relancé avec d'autres réglages : le nouveau récapitulatif, rien ne part ;
 //   V7 pause de l'agent chez VRM, par compte ; le rechargement ne touche QUE l'onglet de travail de VRM ; une offre sans date est
 //      expirée par la date de sa conversation.
+//  Revue 2 (re-relecture de 15887d1f8) :
+//   V8 un favori automatique en file dont la réservation n'a pas eu lieu (réseau, liste d'exclusion pas lue) : jamais « occupé »
+//      pour toujours — l'agent redemande lui-même (« a_reserver »), la raison est dite ;
+//   V9 « Pause » de l'agent tenue par la réservation ET l'autorisation d'un favori automatique ;
+//   V10 un envoi qui dépasse son bail (refusé, ou sans renouvellement réussi depuis 100 s) s'arrête AVANT sa prochaine écriture ; la grâce part du refus ;
+//   V11 ni offre ni message partis ⇒ le favori reste envoyable (« Pas envoyé · la raison ») ; un message parti, jamais deux fois ;
+//      l'acheteur lu dans toutes ses formes (buyer_user_id, opposite_user côté vendeur, offer_request.user_id).
 //  `--prouve` : chaque mutation rend l'audit rouge. Données inventées.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -22,11 +29,22 @@ const RACINE = process.env.FAV_REVUE_RACINE ? path.resolve(process.env.FAV_REVUE
 const BG = 'vinted-sync-extension/background.js';
 const MUTATIONS = {
   'tx-conv-sans-preuve': [BG, "if(txDeConv&&!(artTx===body.itemId&&achTx===body.recipientId))", "if(txDeConv&&artTx&&artTx!==body.itemId)"],
-  'sans-tx-message-quand-meme': [BG, "    if(offreIci&&!tx){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}\n", "    if(offreIci&&!tx){op=null;}\n"],
+  'sans-tx-message-quand-meme': [BG, "    if(offreIci&&!tx){noterDiag('favori_offre_sans_transaction');return repRien(0,'offre_prix_inconnu');}\n", "    if(offreIci&&!tx){op=null;}\n"],
+  // Revue 2 (re-relecture de 15887d1f8)
+  'agent-occupe-file-en-attente': ['api/_lib/favoris-auto.js', "    if(j&&j.auto===true&&!g.jobs.some(x=>x.etat==='reserve')){", "    if(false){"],
+  'agent-ignore-a-reserver': [BG, "const aReserver = !t.json.ajoute && t.json.etat === 'a_reserver'", "const aReserver = false && t.json.etat === 'a_reserver'"],
+  'reserve-malgre-pause': ['api/_lib/favoris-file.js', "  if(j.auto&&g.auto?.pauseAgent)return {valeur:", "  if(false)return {valeur:"],
+  'consomme-malgre-pause': ['api/_lib/favoris-file.js', "  if(j.auto&&g.auto?.pauseAgent)throw new RefusFavoris(", "  if(false)throw new RefusFavoris("],
+  'grace-sans-refus': ['api/_lib/favoris-file.js', "const finBail=e=>Math.max(depuisBail(e),Number(e.refuseLe)||0);", "const finBail=e=>depuisBail(e);"],
+  'ecrit-sur-bail-perdu': [BG, "  if (!bailFavoriVivant()) { noterDiag('favori_bail_perdu_ecriture');", "  if (false) { noterDiag('favori_bail_perdu_ecriture');"],
+  'bail-local-sans-borne': [BG, "BAIL_LOCAL_RENOUVELLEMENT_MS = 100000,", "BAIL_LOCAL_RENOUVELLEMENT_MS = 3600000,"],
+  'refus-mort-pour-toujours': ['api/_lib/favoris-file.js', "&&!(x.etat==='refuse'&&x.aucunEnvoi===true)&&(x.etat!=='refuse'||", "&&(x.etat!=='refuse'||"],
+  'refus-sans-aucun-envoi': [BG, "if(!repriseMoitie)x.json.aucunEnvoi=true;return x;", "return x;"],
+  'acheteur-buyer-seul': [BG, "  return p(tr.buyer_id) || p(tr.buyer) || p(tr.buyer_user_id) || (vendeur ? p(tr.opposite_user) : '')", "  return p(tr.buyer_id) || p(tr.buyer) || ('' && vendeur)"],
   'reprise-ignore-acheteur': [BG, "      if(acheteurAEcritFavori(cv.messages,body.recipientId)===true)", "      if(false)"],
   'auteur-user-id-seul': [BG, "  for (const v of [m.user_id, m.sender_id, m.author_id, e.user_id, e.sender_id, e.author_id,", "  for (const v of [m.user_id, e.user_id,"],
   'reprise-prix-affiche': [BG, "prix:op?Number(op.prix):repriseMoitie?pxFait:prixAnnonce};", "prix:op?Number(op.prix):prixAnnonce};"],
-  'agent-occupe-pour-toujours': ['api/_lib/favoris-auto.js', "if((d.enCours&&!d.enCours.abandonne)||abandonRetient(d.enCours,maintenant)||", "if(d.enCours||"],
+  'agent-occupe-pour-toujours': ['api/_lib/favoris-auto.js', "const enVol=(d.enCours&&!d.enCours.abandonne)||abandonRetient(d.enCours,maintenant);", "const enVol=!!d.enCours;"],
   'sans-grace': ['api/_lib/favoris-file.js', "  if(abandonRetient(d.enCours,maintenant))return {valeur:{vue:vueFile(d,owner)}};", ''],
   'lancement-annule': ['api/_lib/favoris-file.js', "  if(!g.active&&g.jobs.some(j=>j.etat==='attente'))", "  if(g.jobs.some(j=>j.etat==='attente'))"],
   'relance-reglages': [BG, "return { ok: false, code: 'reglages_changes',", "if (f2.ok && f2.apercu) { reglagesL = f2.apercu.reglages; r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, confirme: true }); } if (r.ok) {} else return { ok: false, code: 'reglages_changes',"],
@@ -99,8 +117,10 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       m.fin();
     }
     { const m = await monde(racine, { n: 1, onglets: [{ id: 9, url: 'about:blank', status: 'complete' }], store: { vrmOngletTravail: { tabId: 9, uid: '123', maj: Date.now() } } });
-      await envoyer(m, 'jn0'); const rt = m.f.store.vrmFavorisRoutes || {};
-      dit(rt['123'] && rt['123'].page && rt['123'].page.route === 'recharger' && !rt.page && Number(rt['123'].page.at) > 0, 'V2 la route retenue l’est PAR COMPTE, datée (périmée après 7 jours), jamais une clé globale', JSON.stringify(rt));
+      const r = await envoyer(m, 'jn0'); const rt = m.f.store.vrmFavorisRoutes;
+      const src = fs.readFileSync(path.join(racine, BG), 'utf8');
+      // (revue 2) plus AUCUNE route retenue : rien n'est écrit, rien n'est relu — l'ordre est toujours le même.
+      dit(r && r.resultat === 'envoye' && rt === undefined && !/vrmFavorisRoutes|retenirRouteFavori|routeFavori\(/.test(src), 'V2 aucune « route apprise » : ni écrite ni lue (le chemin est toujours le même)', JSON.stringify({ r: r && r.resultat, rt }));
       m.fin(); }
 
     console.log('\nV3. La reprise d’un envoi à moitié fait');
@@ -181,6 +201,106 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       const OV = await import(path.join(racine, 'src', 'offresVinted.js') + '?r=' + Math.random());
       const vieux = OV.offreVintedEnAttente(conv(1, 30 * J).payload.conversation, maint), frais = OV.offreVintedEnAttente(conv(2, 3600000).payload.conversation, maint);
       dit(l.length === 1 && l[0].conv === '2' && vieux === null && frais, 'V7 une offre SANS date ni date de lecture : expirée par la date de sa conversation (30 j), gardée si récente', JSON.stringify({ l: l.map((x) => x.conv), vieux, frais: !!frais })); }
+
+    // ═══ Revue 2 (re-relecture de 15887d1f8) : quatre défauts neufs ═══
+    console.log('\nV8. L’agent : un favori automatique en file sans réservation n’est jamais « occupé » pour toujours');
+    { let d = F.initialiserFile(null);
+      d.groupes[o] = { jobs: [], active: false, prochain: 0, auto: { reglages: REG, allumeLe: T - 86400000, journal: [] } };
+      const choisi = { l: { id: 'n1', date: new Date(T - 3600000).toISOString() }, cible: tgt(1) };
+      d = app(d, A.ajouterAuto(d, { owner: o, maintenant: T, choisi, message: 'm', offre: null }));
+      const r0 = F.reserverFile(d, { owner: o, maintenant: T + 1000, jeton: '00000000-0000-4000-8000-000000000011', exclus: null }); d = app(d, r0);
+      const etat0 = d.groupes[o].jobs.map((j) => j.etat).join(','), raison0 = F.vueFile(d, o).raison;
+      const e1 = A.etatAuto(d, o, T + 600000), e2 = A.etatAuto(d, o, T + 86400000);
+      const r1 = F.reserverFile(d, { owner: o, maintenant: T + 600000, jeton: '00000000-0000-4000-8000-000000000012', exclus: new Set() });
+      dit(!r0.valeur.travail && etat0 === 'attente' && /exclusion/.test(raison0 || '') && e1.etat === 'a_reserver' && e2.etat === 'a_reserver' && r1.valeur.travail && r1.valeur.travail.notificationId === 'n1',
+        'V8 liste d’exclusion pas lue ⇒ le favori ATTEND, la raison dite ; l’agent voit « a_reserver » (jamais « occupé »), et la réservation suivante part', JSON.stringify({ etat0, raison0, e1, e2, r1: !!r1.valeur.travail })); }
+    try { const MIN = 60000, REGA = { actif: true, attenteMin: 10, attenteMax: 15, heureDebut: 0, heureFin: 24, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 15 };
+      const m = await monde(racine, { n: 1, notifAt: (i, T0) => T0 - 20 * MIN, avant: async ({ call, h }) => { const t = h.t; h.t = t - 30 * MIN; await call('auto_regler', { reglages: REGA, confirme: true }); h.t = t; } });
+      // Le 1er `suivant` de l'agent se perd (réseau) — avant : l'agent restait « occupé » pour toujours, rien ne partait.
+      let perdus = 0; const f0 = m.f.ctx.fetch; m.f.ctx.fetch = async (url, op = {}) => { if (/vrm\.center\/api\/compte/.test(String(url)) && op.body && JSON.parse(op.body).action === 'suivant' && perdus < 1) { perdus++; throw new TypeError('Failed to fetch'); } return f0(url, op); };
+      const vus = [];
+      for (let k = 0; k < 30 && !m.f.j.vinted.some((v) => v.methode === 'POST' && /replies$/.test(v.chemin)); k++) {
+        const st0 = m.f.store.vrmPiloteFavoris || {}; if (Number(st0.prochain) > m.h.t) m.h.t = Number(st0.prochain) + 1;
+        const r = await m.f.ctx.piloteFavorisTick(m.h.t); vus.push(r && r.etat); m.h.t += 1000; }
+      const msg = m.f.j.vinted.filter((v) => v.methode === 'POST' && /replies$/.test(v.chemin)).length;
+      dit(perdus === 1 && msg === 1 && !vus.includes('occupe'), 'V8 (vrai agent) le 1er `suivant` perdu : l’agent redemande seul, le favori part — jamais « occupé »', JSON.stringify({ perdus, msg, vus }));
+      m.fin(); } catch (x) { dit(false, 'V8 (vrai agent) a levé', String(x && x.stack || x)); }
+
+    console.log('\nV9. « Pause » de l’agent : un favori automatique en file ATTEND (ni réservé, ni autorisé)');
+    { let d = F.initialiserFile(null);
+      d.groupes[o] = { jobs: [], active: false, prochain: 0, auto: { reglages: REG, allumeLe: T - 86400000, journal: [] } };
+      d = app(d, A.ajouterAuto(d, { owner: o, maintenant: T, choisi: { l: { id: 'n1', date: new Date(T - 3600000).toISOString() }, cible: tgt(1) }, message: 'm', offre: null }));
+      d = app(d, A.pauseAgentAuto(d, { owner: o, pause: true, maintenant: T + 10 }));
+      const r = F.reserverFile(d, { owner: o, maintenant: T + 20, jeton: '00000000-0000-4000-8000-000000000021' }); d = app(d, r);
+      const etatP = d.groupes[o].jobs.map((j) => j.etat).join(',');
+      // Réservé AVANT la pause, puis « Pause » : l'autorisation est refusée (rien ne part).
+      let d2 = F.initialiserFile(null);
+      d2.groupes[o] = { jobs: [], active: false, prochain: 0, auto: { reglages: REG, allumeLe: T - 86400000, journal: [] } };
+      d2 = app(d2, A.ajouterAuto(d2, { owner: o, maintenant: T, choisi: { l: { id: 'n1', date: new Date(T - 3600000).toISOString() }, cible: tgt(1) }, message: 'm', offre: null }));
+      d2 = app(d2, F.reserverFile(d2, { owner: o, maintenant: T + 20, jeton: '00000000-0000-4000-8000-000000000022' }));
+      d2 = app(d2, A.pauseAgentAuto(d2, { owner: o, pause: true, maintenant: T + 25 }));
+      let refuse = ''; try { F.consommerFile(d2, { owner: o, jeton: '00000000-0000-4000-8000-000000000022', maintenant: T + 30 }); } catch (x) { refuse = x.message; }
+      d = app(d, A.pauseAgentAuto(d, { owner: o, pause: false, maintenant: T + 40 }));
+      const r2 = F.reserverFile(d, { owner: o, maintenant: T + 50, jeton: '00000000-0000-4000-8000-000000000023' });
+      dit(!r.valeur.travail && etatP === 'attente' && /pause/i.test(refuse) && r2.valeur.travail && r2.valeur.travail.notificationId === 'n1', 'V9 en pause : ni réservé (il attend), ni autorisé s’il l’était ; « Reprendre » le libère', JSON.stringify({ travail: !!r.valeur.travail, etatP, refuse, apres: !!r2.valeur.travail })); }
+
+    console.log('\nV10. Un envoi qui dépasse son bail s’arrête AVANT sa prochaine écriture ; la grâce part du refus');
+    try { let d = F.initialiserFile(null);
+      d = app(d, F.lancerFile(d, { owner: o, targets: [tgt(1), tgt(2)], message: 'm', intervalleMinutes: 0, maintenant: T }));
+      const J1 = '00000000-0000-4000-8000-000000000031'; d = app(d, F.reserverFile(d, { owner: o, maintenant: T, jeton: J1 }));
+      for (let t = T + 30000; t <= T + 15 * 60000; t += 30000) d = app(d, F.prolongerFile(d, { owner: o, jeton: J1, maintenant: t }));
+      const ref = F.prolongerFile(d, { owner: o, jeton: J1, maintenant: T + 15.5 * 60000 }); d = app(d, ref);
+      const rA = F.reserverFile(d, { owner: o, maintenant: T + 19.4 * 60000, jeton: '00000000-0000-4000-8000-000000000032' }); d = app(d, rA);
+      const rB = F.reserverFile(d, { owner: o, maintenant: T + 19.6 * 60000, jeton: '00000000-0000-4000-8000-000000000033' });
+      dit(ref.valeur.prolonge === false && d.enCours && d.enCours.refuseLe === T + 15.5 * 60000 && !rA.valeur.travail && rB.valeur.travail && rB.valeur.travail.notificationId === 'n2', 'V10 le renouvellement refusé (+15,5 min) est NOTÉ ; aucun autre favori avant +19,5 min (4 min après le refus), puis le suivant', JSON.stringify({ ref: ref.valeur, refuseLe: d.enCours && d.enCours.refuseLe, a: !!rA.valeur.travail, b: !!(rB.valeur.travail) })); } catch (x) { dit(false, 'V10 le renouvellement refusé est noté', String(x && x.message || x)); }
+    for (const cas of ['refus409', 'muet']) {
+      try { let mm = null; const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b), vinted: (e) => {
+          // « muet » : VRM injoignable pour les renouvellements, et la demande de conversation met 2 min à revenir : aucun
+          //    renouvellement réussi depuis plus de 100 s (VRM abandonne à 120 s) ⇒ l'extension s'arrête d'elle-même.
+          if (cas === 'muet' && mm && e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') mm.h.t += 2 * 60000;
+          return null; } });
+        mm = m;
+        const f0 = m.f.ctx.fetch; m.f.ctx.fetch = async (url, op = {}) => { if (cas === 'muet' && /vrm\.center\/api\/compte/.test(String(url)) && op.body && JSON.parse(op.body).action === 'prolonger') throw new TypeError('Failed to fetch'); if (cas === 'refus409' && /vrm\.center\/api\/compte/.test(String(url)) && op.body && JSON.parse(op.body).action === 'prolonger') return { ok: false, status: 409, json: async () => ({ message: 'La tentative n’est plus en cours.' }) }; return f0(url, op); };
+        m.h.t += 15 * 60000;
+        const ap = await m.call('apercu'); await m.call('lancer', { selection: ['jn0'], reglages: ap.body.apercu.reglages });
+        const s = await m.call('suivant'); const tr = s.body.travail;
+        m.f.ctx.__vrmBailFavoriMs = 1;
+        const r = await m.f.ctx.avecBailFavori(m.UID, tr.jeton, async () => { if (cas === 'refus409') await new Promise((ok) => setTimeout(ok, 40)); return m.f.ctx.executerMessageFavori(m.UID, ACC(m), tr, { manuel: true }); });
+        const w = W(m).map((x) => x.c), reg = ((m.f.store.vrmFavorisFaits || {})['123'] || {})['7000000180:3000000001'] || {};
+        dit(r && r.json && r.json.raison === 'autorisation_expiree' && !w.some((c) => /offers$|replies$/.test(c)) && !reg.m && !reg.o, `V10 ${cas === 'refus409' ? 'bail REFUSÉ par VRM (409)' : 'aucun renouvellement réussi depuis 2 min (VRM muet)'} ⇒ arrêt avant l’écriture suivante : ni offre ni message, rien au registre`, JSON.stringify({ r: r && r.json, w, reg }));
+        m.fin(); } catch (x) { dit(false, 'V10 ' + cas + ' a levé', String(x && x.stack || x)); }
+    }
+
+    console.log('\nV11. Ni offre ni message partis (offre refusée, 404, transaction pas prouvée) ⇒ le favori reste envoyable');
+    for (const scen of ['refus', '404']) {
+      let mm = null; const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b), vinted: (e) => {
+        if (mm && e.methode === 'POST' && /\/offers$/.test(e.chemin) && mm.f.j.vinted.filter((v) => v.methode === 'POST' && /\/offers$/.test(v.chemin)).length <= 1) return scen === 'refus' ? { status: 400, body: { code: 106, message: 'Offre refusée' } } : { status: 404, body: {} };
+        return null; } });
+      mm = m;
+      const r = await envoyer(m, 'jn0');
+      const fa = ((m.f.store.vrmFavorisFaitsN || {})['123'] || {}).jn0 || {};
+      m.h.t += 3600000;
+      const ap2 = await m.call('apercu'); const row = ((ap2.body.apercu && ap2.body.apercu.tous) || []).find((x) => x.id === 'jn0') || {};
+      const r2 = await envoyer(m, 'jn0'); const w = W(m).map((x) => x.c);
+      dit(r && r.aucunEnvoi === true && row.cochable === true && row.pasEnvoye === 'offre_refusee' && (scen === 'refus' ? fa.refus === 'Offre refusée' : fa.refusStatut === 404) && r2 && r2.resultat === 'envoye' && w.filter((c) => /replies$/.test(c)).length === 1 && w.filter((c) => /offers$/.test(c)).length === 2,
+        `V11 offre ${scen === 'refus' ? 'refusée (sa phrase gardée)' : '404 (« Vinted 404 » gardé)'} ⇒ « Pas envoyé · offre refusée », envoyable ; renvoyé : l’offre puis UN message`, JSON.stringify({ r, row: { c: row.cochable, p: row.pasEnvoye }, fa, r2, w }));
+      m.fin();
+    }
+    { // Un favori dont le message est réellement PARTI ne redevient jamais envoyable (jamais deux fois).
+      const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b) });
+      const r = await envoyer(m, 'jn0'); m.h.t += 3600000;
+      const ap2 = await m.call('apercu'); const row = ((ap2.body.apercu && ap2.body.apercu.tous) || []).find((x) => x.id === 'jn0') || {};
+      dit(r && r.resultat === 'envoye' && row.cochable === false, 'V11 un message réellement parti ⇒ jamais envoyable à nouveau', JSON.stringify({ r: r && r.resultat, c: row.cochable })); m.fin(); }
+    for (const [nom, forme] of [['buyer_user_id', (tx) => ({ id: tx, item_id: 7000000180, buyer_user_id: 3000000001 })], ['opposite_user (côté vendeur)', (tx) => ({ id: tx, item_id: 7000000180, current_user_side: 'seller', opposite_user: { id: 3000000001 } })], ['offer_request.user_id', (tx) => ({ id: tx, item: { id: 7000000180 }, offer_request: { user_id: 3000000001 } })]]) {
+      const m = await monde(racine, { n: 1, avant: async ({ b }) => reglagesPrix(b), vinted: (e) => {
+        if (e.methode === 'POST' && e.chemin === '/messaging/main/inquiries') return { status: 201, body: { inquiry_id: 'q0', conversation_id: UU } };
+        if (e.methode === 'GET' && e.chemin.split('?')[0] === '/messaging/main/conversations/' + UU) return { status: 200, body: { conversation: { id: UU, allow_reply: true, opposite_users: [{ id: 3000000001 }], transaction: { id: 6000 }, data: {}, messages: [] } } };
+        if (e.methode === 'GET' && e.chemin === '/api/v2/transactions/6000') return { status: 200, body: { transaction: Object.assign(forme(6000), { item_title: 'salomon XT-6' }) } };
+        if (e.methode === 'GET' && e.chemin === '/api/v2/items/7000000180') return { status: 200, body: { item: { id: 7000000180, price: { amount: '55.0', currency_code: 'EUR' }, is_closed: false, is_reserved: false, is_hidden: false } } };
+        return null; } });
+      const r = await envoyer(m, 'jn0'); const w = W(m).map((x) => x.c);
+      dit(r && r.resultat === 'envoye' && w.includes('/api/v2/transactions/6000/offers'), `V11 l’acheteur lu par \`${nom}\` ⇒ transaction prouvée, l’offre part`, JSON.stringify({ r, w })); m.fin();
+    }
   } catch (e) { ko++; console.log('  ❌ V0 a levé : ' + (e && e.stack || e)); }
   console.log(ko ? `❌ revue des favoris : ${ko} rouge(s), ${ok} vert(s)` : `✅ revue des favoris : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);

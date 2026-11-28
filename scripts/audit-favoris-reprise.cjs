@@ -20,7 +20,7 @@
 const path = require('path'), fs = require('fs'), os = require('os'), cp = require('child_process');
 const RACINE = process.env.FAV_REPRISE_RACINE ? path.resolve(process.env.FAV_REPRISE_RACINE) : path.join(__dirname, '..');
 const MUTATIONS = {
-  'sans-recharger': ['vinted-sync-extension/background.js', "  if(pg.refus==='onglet'&&await rechargerPageFavori(acc)){pg=await pageVintedPour(acc);if(!pg.refus)await retenirRouteFavori(uid,'page','recharger');}\n", ''],
+  'sans-recharger': ['vinted-sync-extension/background.js', "  if(pg.refus==='onglet'&&await rechargerPageFavori(acc)){pg=await pageVintedPour(acc);if(!pg.refus)noterDiag('favori_page_rechargee');}\n", ''],
   'offre-404-message-quand-meme': ['vinted-sync-extension/background.js', "      if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');", "      if(!faite&&o.status!==404)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');"],
   'sans-tx-conversation': ['vinted-sync-extension/background.js', "if(t2.tx){tx=t2.tx;txDeConv=true;", "if(false){tx=t2.tx;txDeConv=true;"],
   'reprise-cul-de-sac': ['vinted-sync-extension/background.js', "      if(deja&&deja.o){repriseMoitie=true;noterDiag('favori_req_reprise_moitie');}}", "      if(deja&&deja.o){return rep('ignore',0,'conversation_deja_contactee');}}"],
@@ -91,7 +91,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
         return null; } });
       const r = await envoyer(m, 'jn0');
       const off = corps(m, /\/offers$/);
-      dit(r && r.resultat === 'envoye' && off.length === 1 && off[0].offer.price === '49.5' && m.f.j.vinted.some((v) => v.methode === 'POST' && v.chemin === '/api/v2/transactions/6000/offers') && ((m.f.store.vrmFavorisRoutes || {})['123'] || {}).transaction, 'R3 la transaction de la conversation (même article) porte l’offre ; la route est retenue', JSON.stringify({ r, w: ecr(m), routes: m.f.store.vrmFavorisRoutes }));
+      dit(r && r.resultat === 'envoye' && off.length === 1 && off[0].offer.price === '49.5' && m.f.j.vinted.some((v) => v.methode === 'POST' && v.chemin === '/api/v2/transactions/6000/offers') && m.f.store.vrmFavorisRoutes === undefined, 'R3 la transaction de la conversation (même article) porte l’offre ; aucune route « retenue » (revue 2)', JSON.stringify({ r, w: ecr(m), routes: m.f.store.vrmFavorisRoutes }));
       m.fin(); }
 
     console.log('\nR4. Un envoi à moitié fait (l’offre partie, le message pas) : repris sans doublon');

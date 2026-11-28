@@ -53,7 +53,8 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
       await P2.clic('[data-fav-envoyer]'); await P2.pg.waitForTimeout(500); await P2.clic('.fav6-feuille [data-fav-lancer]'); await P2.pg.waitForTimeout(500);
       await m2.tours(8, () => P2.pg.waitForTimeout(200)); await P2.pg.waitForTimeout(900);
       l = await P2.lire();
-      dit(l.tableau && /Refusé par Vinted/.test((l.rangs.jn0 || {}).texte || '') && /Message envoyé/.test((l.rangs.jn1 || {}).texte || ''), `${o.T} : un refus de Vinted sur SA rangée, l’autre envoyée, la liste reste`, JSON.stringify(Object.values(l.rangs).map((x) => x.texte.slice(0, 120))));
+      // (revue 2) ni offre ni message partis ⇒ « Pas envoyé · offre refusée par Vinted », « Envoyer » toujours là.
+      dit(l.tableau && /Pas envoyé/.test((l.rangs.jn0 || {}).texte || '') && /offre refusée par Vinted/.test((l.rangs.jn0 || {}).texte || '') && (l.rangs.jn0 || {}).un && /Message envoyé/.test((l.rangs.jn1 || {}).texte || ''), `${o.T} : une offre refusée sur SA rangée (« Pas envoyé · offre refusée », « Envoyer » gardé), l’autre envoyée, la liste reste`, JSON.stringify(Object.values(l.rangs).map((x) => x.texte.slice(0, 120))));
       await cap(P2, o.T + '-4-refus');
       dit(!P.erreurs.length && !P2.erreurs.length, `${o.T} : aucune erreur de page`, JSON.stringify(P.erreurs.concat(P2.erreurs)));
       await P2.ctx.close(); m2.fin();

@@ -16731,6 +16731,8 @@ async function prixFavoriVivant(acc, uid, itemId, reponseDemande) {
 function ecritureFavoriPermise(adresse) { const a = String(adresse || ''); return ECRITURES_FAVORI.some((re) => re.test(a)); }
 function adresseMessagerieApi(domaine, suite) { const d = String(domaine || 'www.vinted.fr').toLowerCase().replace(/^www\./, ''); return /^vinted\.(fr|com|it|de)$/.test(d) ? `https://api.${d}/messaging/main/${suite}` : ''; }
 async function vintedPageFavori(acc, adresse, corps, options = {}) {
+  // 5.455.8 (revue 2, défaut 3) : le bail de la tentative perdu (refusé, trop vieux) ⇒ RIEN ne part (vérifié avant chaque écriture).
+  if (!bailFavoriVivant()) { noterDiag('favori_bail_perdu_ecriture'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'bail', bailPerdu: true }; }
   if (!ecritureFavoriPermise(adresse)) { noterDiag('favori_req_adresse_refusee'); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'ecriture', raison: RAISON_ECRITURE_REQUETE }; }
   return requeteVinted('api', async () => {
     const pg = await pageVintedPour(acc);
@@ -16778,14 +16780,10 @@ async function vintedPageFavori(acc, adresse, corps, options = {}) {
 //   · un envoi À MOITIÉ fait (l'offre partie, le message pas) : la conversation est RELUE ; un message de lui déjà là ⇒ fait,
 //     rien ne repart ; sinon le message seul part (jamais une 2ᵉ offre) ;
 //   · la boîte de l'offre absente (pas de transaction dans la réponse de Vinted, ou l'adresse de l'offre en 404) : la transaction
-//     de la CONVERSATION relue d'abord ; sinon le message d'abord, puis l'offre depuis la conversation relue ;
-//   · la route qui a marché est RETENUE par étape (`vrmFavorisRoutes`) : la fois suivante, elle est prise directement.
+//     de la CONVERSATION relue, prise seulement PROUVÉE (cet article, cette personne) ; sinon rien ne part (jamais le message d'abord) ;
+//   · (revue 2) plus aucune route « retenue » : l'ordre et le chemin sont TOUJOURS les mêmes (offre puis message) ; un rechargement
+//     de page qui a marché, une transaction prouvée par la conversation sont seulement notés au diagnostic.
 //  Cul-de-sac vrai seulement : refus de Vinted (sa phrase), vérification, 403/429, article vendu, plancher.
-const ROUTES_FAV = 'vrmFavorisRoutes';
-// 5.455.8 (revue) : retenues PAR COMPTE (uid) et pour 7 jours ; aucune ne change plus l'ORDRE d'un envoi (offre puis message).
-const ROUTES_FAV_MS = 7 * 86400000;
-async function routeFavori(uid, etape) { try { const m = (await chrome.storage.local.get(ROUTES_FAV))[ROUTES_FAV] || {}; const r = m[String(uid)] && m[String(uid)][String(etape)]; return r && typeof r === 'object' && Date.now() - Number(r.at) < ROUTES_FAV_MS ? String(r.route || '') : ''; } catch (_) { return ''; } }
-async function retenirRouteFavori(uid, etape, route) { if (!/^\d{1,20}$/.test(String(uid || ''))) return; try { const m = (await chrome.storage.local.get(ROUTES_FAV))[ROUTES_FAV] || {}; for (const u of Object.keys(m)) if (!/^\d{1,20}$/.test(u)) delete m[u]; const c = m[String(uid)] = Object.assign({}, m[String(uid)] || {}); c[String(etape)] = { route: String(route).slice(0, 40), at: Date.now() }; for (const k of Object.keys(c)) if (!(Date.now() - Number(c[k] && c[k].at) < ROUTES_FAV_MS)) delete c[k]; await chrome.storage.local.set({ [ROUTES_FAV]: m }); noterDiag('favori_route_apprise_' + String(etape).replace(/[^a-z_]/g, '') + '_' + String(route).replace(/[^a-z_]/g, '')); } catch (_) {} }
 async function rechargerPageFavori(acc) {
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
   // 5.455.8 (revue) : SEUL l'onglet de travail que VRM a ouvert lui-même (`vrmOngletTravail`) est ramené ou rechargé — jamais un
@@ -16867,6 +16865,17 @@ function convMessagerieLue(j, uuid) {
   return [c.id, c.uuid, c.conversation_id].some((v) => typeof v === 'string' && v.toLowerCase() === u) ? c : null;
 }
 // 5.455.3 : l'identifiant d'une personne de `opposite_users` (nombre ou chiffres : `id`, `user_id`, `user.id`) ; sinon ''.
+// 5.455.8 (revue 2, défaut 4) : l'ACHETEUR d'une transaction relue, dans TOUTES ses formes connues — `buyer_id`, `buyer.id`,
+//    `buyer_user_id`, `opposite_user.id` quand CE compte y est le vendeur (`current_user_side: 'seller'`), et `user_id` de la
+//    demande d'offre (`offer_request`, `offer`). Rien de lu ⇒ '' (pas su : jamais « la bonne personne »).
+function acheteurTransactionFavori(tr) {
+  if (!tr || typeof tr !== 'object') return '';
+  const p = (v) => idPersonneFavori(v);
+  const vendeur = String(tr.current_user_side || '') === 'seller';
+  return p(tr.buyer_id) || p(tr.buyer) || p(tr.buyer_user_id) || (vendeur ? p(tr.opposite_user) : '')
+    || (tr.offer_request && typeof tr.offer_request === 'object' ? p(tr.offer_request.user_id) || p(tr.offer_request.user) : '')
+    || (tr.offer && typeof tr.offer === 'object' ? p(tr.offer.user_id) : '');
+}
 function idPersonneFavori(x) {
   const num = (v) => ((typeof v === 'number' && Number.isSafeInteger(v) && v > 0) || (typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v))) ? String(v) : '';
   if (typeof x === 'number' || typeof x === 'string') return num(x);
@@ -18908,6 +18917,8 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? Object.assign({}, d) : {};
+  // 5.455.8 (revue 2, défaut 3) : un geste d'un FAVORI ne part jamais sur un bail perdu (refusé ou trop vieux chez VRM).
+  if (x.favori && !bailFavoriVivant()) { noterDiag('favori_bail_perdu_geste'); return { ok: false, status: 0, rienParti: true, bailPerdu: true, sansPage: 'bail' }; }
   // 5.432 (`gardeprix`) : un PRIX ou une OFFRE ne s'écrit qu'avec le billet de la garde (même site, même prix, récent).
   if (geste === 'prix' || geste === 'offre') {
     const t = x.garde; delete x.garde;
@@ -22375,6 +22386,7 @@ async function noterChoixFavori(uid, body, conv, version, offreFaite) {
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
 function raisonFavoriInterface(r) {
   if (!r) return 'vinted_refus';
+  if (r.bailPerdu) return 'autorisation_expiree';   // 5.455.8 (revue 2) : le bail perdu, rien n'est parti
   if (r.sansPage === 'compte') return 'compte_vinted_different';
   if (r.sansPage === 'identite') return 'identite_non_confirmee';
   if (r.sansPage === 'element') return 'element_introuvable';
@@ -22717,7 +22729,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // ouvert sur ce compte, RIEN ne part.
   let pg=await pageVintedPour(acc);
   // 5.455.8 : la page pas prête ⇒ l'onglet de travail ramené une fois sur vinted.fr, puis l'étape refaite.
-  if(pg.refus==='onglet'&&await rechargerPageFavori(acc)){pg=await pageVintedPour(acc);if(!pg.refus)await retenirRouteFavori(uid,'page','recharger');}
+  if(pg.refus==='onglet'&&await rechargerPageFavori(acc)){pg=await pageVintedPour(acc);if(!pg.refus)noterDiag('favori_page_rechargee');}
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
   // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
   const refuseesIci=await versionsRefusees(uid);
@@ -22779,7 +22791,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     //  conversation, le prix du dressing. Gardés : son clic + l'autorisation du serveur, les plafonds réservés, la pause
     //  403/429/captcha, une requête à la fois, le compte de l'onglet, la liste blanche `ECRITURES_FAVORI`, le plancher.
     const garde=async()=>{const g=await gardeStricte(uid,acc,{lecture:true});if(!g)return null;const c=g.code;return rep('refuse',0,c==='vinted-pause'?'pause_vinted':c==='vinted-autre'?'compte_vinted_different':c==='vinted-absent'?'compte_vinted_absent':c==='verification'?'vinted_robot':'vinted_refus','garde');};
-    const fin=(x)=>{if(x&&!x.rienParti&&partie(x)&&ecritureFavoriPartie(x))ecrits++;if(x&&x.rienParti)return rep('refuse',0,'onglet_vinted');if(frein)return rep('refuse',x.status);return null;};
+    const fin=(x)=>{if(x&&!x.rienParti&&partie(x)&&ecritureFavoriPartie(x))ecrits++;if(x&&x.bailPerdu)return rep(ecrits>0?'incertain':'refuse',0,'autorisation_expiree','autorisation');if(x&&x.rienParti)return rep('refuse',0,'onglet_vinted');if(frein)return rep('refuse',x.status);return null;};
     const telephone=async(x)=>x.status===400&&(await telephoneAVerifierVinted(acc))===true?(noterDiag('favori_telephone_a_verifier'),rep('refuse',x.status,'telephone_a_verifier')):null;
     etape('verification');
     try{
@@ -22797,7 +22809,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(!adrQ)return rep('refuse',0,'onglet_vinted');
     let q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});
     // 5.455.8 : rien n'est parti (la page n'a pas répondu) ⇒ la page ramenée une fois, la demande refaite (Vinted rend la MÊME conversation).
-    if(q&&q.rienParti&&q.sansPage==='onglet'&&await rechargerPageFavori(acc)){q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});if(q&&!q.rienParti)await retenirRouteFavori(uid,'page','recharger');}
+    if(q&&q.rienParti&&q.sansPage==='onglet'&&await rechargerPageFavori(acc)){q=await vintedPageFavori(acc,adrQ,{item_ids:[body.itemId],receiver_id:body.recipientId});if(q&&!q.rienParti)noterDiag('favori_page_rechargee');}
     {const f=fin(q);if(f)return f;}
     if(q.incertain||!q.status)return rep('incertain',0,'creation_non_confirmee');
     {const t=await telephone(q);if(t)return t;}
@@ -22861,12 +22873,11 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       // 5.455.8 (revue, défaut 1) : celle de la CONVERSATION (repli) n'est prise que PROUVÉE par sa relecture : CET article ET CETTE
       //    personne, tous deux lus. Sinon elle est écartée (une offre demandée ⇒ rien de plus ; sans offre, le message part).
       let txEcartee=false;
-      const achTx=tr&&typeof tr==='object'?String(tr.buyer_id||(tr.buyer&&tr.buyer.id)||''):'';
+      const achTx=acheteurTransactionFavori(tr);
       if(txDeConv&&!(artTx===body.itemId&&achTx===body.recipientId)){noterDiag('favori_req_tx_conv_non_prouvee');tx='';txAutre=true;txEcartee=true;}
       else if(artTx&&artTx!==body.itemId){noterDiag('favori_req_tx_autre_article');return rep('refuse',t.status,'article_different');}   // la transaction de LA DEMANDE dit un autre article : jamais une offre dessus
-      if(txDeConv&&!txEcartee)await retenirRouteFavori(uid,'transaction','conversation');   // prouvée : retenue pour CE compte
       if(!txEcartee&&tr&&typeof tr==='object'){
-        const ach=String(tr.buyer_id||(tr.buyer&&tr.buyer.id)||'');
+        const ach=acheteurTransactionFavori(tr);
         if(ach&&ach!==body.recipientId){noterDiag('favori_req_tx_autre_acheteur');return rep('refuse',t.status,'destinataire_different');}
         {const ind=annonceIndisponible(tr.item&&typeof tr.item==='object'?tr.item:null,null,null);if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('ignore',t.status,'annonce_indisponible');}}
         const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
@@ -22893,13 +22904,16 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     //    ⇒ rien ne part (« offre_prix_inconnu », dit sur sa rangée, à refaire plus tard) : jamais un message qui annoncerait une offre
     //    jamais faite. Un envoi à moitié fait (l'offre déjà partie) garde SON offre : jamais une 2ᵉ.
     const offreIci=offre&&!repriseMoitie;
-    if(offreIci&&!tx){noterDiag('favori_offre_sans_transaction');return rep('refuse',0,'offre_prix_inconnu');}
+    // 5.455.8 (revue 2, défaut 4) : ni offre ni message partis (la conversation seule ouverte) ⇒ `aucunEnvoi` : le favori RESTE
+    //    envoyable chez VRM (« Pas envoyé · la raison », « Envoyer »). Jamais sur une reprise (l'offre y est déjà partie).
+    const repRien=(st,raison,txt)=>{const x=rep('refuse',st,raison);if(!repriseMoitie)x.json.aucunEnvoi=true;return x;};
+    if(offreIci&&!tx){noterDiag('favori_offre_sans_transaction');return repRien(0,'offre_prix_inconnu');}
     if(offreIci){
-      if(!(Number(prixAnnonce)>0)){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}   // TOUTES les sources ont échoué
-      if(String(devise)!=='EUR'){noterDiag('favori_offre_autre_devise');return rep('refuse',0,'offre_prix_inconnu');}   // l'argent reste en euros
+      if(!(Number(prixAnnonce)>0)){noterDiag('favori_offre_prix_inconnu');return repRien(0,'offre_prix_inconnu');}   // TOUTES les sources ont échoué
+      if(String(devise)!=='EUR'){noterDiag('favori_offre_autre_devise');return repRien(0,'offre_prix_inconnu');}   // l'argent reste en euros
       op=choixV.op||await offreAvecPlancher(body.itemId,prixAnnonce,offre);
       if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
-      if(!op.prix||!prixOffrePage(op.prix)){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+      if(!op.prix||!prixOffrePage(op.prix)){noterDiag('favori_offre_prix_inconnu');return repRien(0,'offre_prix_inconnu');}
       const gpV=await gardePrixEcriture({sorte:'offre',site:'vinted',uid,id:String(body.itemId||''),prixC:Math.round(Number(op.prix)*100),actuelC:Math.round(Number(prixAnnonce)*100),mode:'auto'});
       if(!gpV.ok){noterDiag('favori_offre_garde');return rep('ignore',0,'offre_garde_prix');}
     }
@@ -22923,8 +22937,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
       noterDiag(faite?'favori_offre_ok':'favori_offre_refusee_'+o.status);
       if(faite||o.status>=500)await noterRegistreFavori(uid,body.itemId,body.recipientId,'o');   // 6b. faite (ou peut-être) : jamais une 2ᵉ
       if(faite)await noterFaitFavori(uid,body.notificationId,{o:Date.now(),px:Number(op.prix)});
-      if(!faite&&(o.status>=400&&o.status<500||o.ok))await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(o.json)||'',refusAt:Date.now()});   // 5.455.8 : SA phrase de Vinted, sur la rangée
-      if(!faite)return o.status>=400&&o.status<500||o.ok?rep('refuse',o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
+      // 5.455.8 : SA phrase de Vinted, sur la rangée — et TOUJOURS une raison, même sans phrase (404) : « l'offre n'a pas pu être faite (Vinted 404) ».
+      if(!faite&&(o.status>=400&&o.status<500||o.ok))await noterFaitFavori(uid,body.notificationId,{refus:messageRefusVinted(o.json)||'',refusStatut:Number(o.status)||0,refusAt:Date.now()});
+      if(!faite)return o.status>=400&&o.status<500||o.ok?repRien(o.status,'offre_refusee'):rep('incertain',o.status,'offre_incertaine');
       attente=jeton;
       const att=await attendreOffreMessage(jeton,{uid:String(uid),convId:uuid,texte:texteV,variante:versionV.n,tRes,suivi:grant.suivi||null,itemId:body.itemId,recipientId:body.recipientId,requetes:true,acc},(nom,x)=>{if(grant.suivi)notifierApp({type:'favoris',uid:String(uid),suivi:grant.suivi,etape:nom,...(x||{})});});
       if(!att.ok){noterDiag('favori_message_pas_parti_'+att.raison);return rep('refuse',0,att.raison);}
@@ -22938,6 +22953,7 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     await noterRegistreFavori(uid,body.itemId,body.recipientId,'m');
     if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);attente=null;}
     const r=await vintedPageFavori(acc,adresseMessagerieApi(acc.domain,`conversations/${uuid}/replies`),{content:texteV,is_personal_data_sharing_check_skipped:false,photo_temp_uuids:null});
+    if(r&&r.bailPerdu)await effacerRegistreFavori(uid,body.itemId,body.recipientId,'m');   // 5.455.8 (revue 2) : rien n'est parti
     {const f=fin(r);if(f)return f;}
     if(r.incertain||!r.status){await noterTexteRecent(uid,texteV);return rep('incertain',0,'reponse_inconnue');}
     if(r.ok){noterDiag('favori_req_envoye');variante=Number.isInteger(versionV.n)&&versionV.n>0?versionV.n:null;await noterFaitFavori(uid,body.notificationId,{m:Date.now(),...(variante?{v:variante}:{}),t:String(texteV||'').slice(0,160)});await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,uuid,versionV,!!op);await noterTexteRecent(uid,texteV);etape('confirmation');return rep('envoye',r.status);}
@@ -23266,13 +23282,26 @@ async function terminerFavoriServeur(uid, jeton, brut) {
 //    passent plus pour « incertain » ; deux Chrome sur le même compte attendent le bail de l'autre. Worker tué ⇒ plus de
 //    renouvellement ⇒ abandon au bout de 2 min, comme avant (jamais un renvoi).
 const BAIL_FAVORI_MS = 30000;
+// 5.455.8 (revue 2, défaut 3) : le bail est VÉRIFIÉ avant chaque écriture chez Vinted (`bailFavoriVivant`, lu par
+//    `vintedPageFavori` et `interfaceVinted`) : un renouvellement REFUSÉ par VRM, ou aucun renouvellement réussi depuis 100 s (VRM
+//    abandonne à 120 s), ou 14 min passées (VRM borne à 15) ⇒ la tentative S'ARRÊTE avant sa prochaine écriture, « à vérifier » si
+//    quelque chose est déjà parti. Les bornes d'ici sont TOUJOURS plus courtes que celles de VRM : jamais une écriture après
+//    l'abandon constaté chez VRM, et la grâce de VRM (4 min) couvre la requête déjà en vol.
+const BAIL_LOCAL_RENOUVELLEMENT_MS = 100000, BAIL_LOCAL_MAX_MS = 14 * 60000;
+let _bailFavori = null;   // { jeton, debut, ok, refuse } — une tentative à la fois (le verrou du compte est chez VRM)
+function bailFavoriVivant(maintenant = Date.now()) {
+  const b = _bailFavori; if (!b) return true;   // hors d'une tentative de la file (rien à vérifier ici)
+  return !b.refuse && maintenant - b.ok < BAIL_LOCAL_RENOUVELLEMENT_MS && maintenant - b.debut < BAIL_LOCAL_MAX_MS;
+}
 async function avecBailFavori(uid, jeton, fn) {
   let fini = false, enVol = false;
   const ms = Number(globalThis.__vrmBailFavoriMs) > 0 ? Number(globalThis.__vrmBailFavoriMs) : BAIL_FAVORI_MS;
   let t = null;
-  const tour = () => { t = setTimeout(async () => { if (fini) return; if (!enVol) { enVol = true; try { const r = await apiFavorisCarte(String(uid), 'prolonger', { jeton }); noterDiag(r && r.ok ? 'favori_bail_renouvele' : 'favori_bail_refuse'); } catch (_) {} enVol = false; } if (!fini) tour(); }, ms); };
+  const b = { jeton, debut: Date.now(), ok: Date.now(), refuse: false };
+  _bailFavori = b;
+  const tour = () => { t = setTimeout(async () => { if (fini) return; if (!enVol) { enVol = true; try { const r = await apiFavorisCarte(String(uid), 'prolonger', { jeton }); if (r && r.ok) b.ok = Date.now(); else if (r && r.status === 409) b.refuse = true; /* VRM refuse ce bail (expiré, remplacé) : arrêt avant la prochaine écriture */ noterDiag(r && r.ok ? 'favori_bail_renouvele' : 'favori_bail_refuse'); } catch (_) {} enVol = false; } if (!fini) tour(); }, ms); };
   tour();
-  try { return await fn(); } finally { fini = true; try { clearTimeout(t); } catch (_) {} }
+  try { return await fn(); } finally { fini = true; if (_bailFavori === b) _bailFavori = null; try { clearTimeout(t); } catch (_) {} }
 }
 async function rejouerTerminers() {
   let l = []; try { l = (await chrome.storage.local.get(TERMINER_EN_ATTENTE))[TERMINER_EN_ATTENTE]; } catch (_) { return false; }
@@ -25435,15 +25464,19 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     if (!t.ok || !t.json) return fin('vrm', { uid });
     // 5.455.8 : l'heure que le SERVEUR donne (espacement 20–60 s, plafond de l'heure, pause de 24 h après un frein) devient le
     //    prochain tour de l'agent — il repart seul à l'heure dite, sans attendre le réveil suivant de 2 à 5 min.
-    if (!t.json.ajoute) {
+    // 5.455.8 (revue 2, défaut 1) : un favori automatique déjà en file, rien en vol (une réservation ratée avant : réseau, accusé pas
+    //    rejoué, liste d'exclusion pas lue) ⇒ « a_reserver » : l'agent redemande `suivant` lui-même — jamais « occupé » pour toujours.
+    const aReserver = !t.json.ajoute && t.json.etat === 'a_reserver' && !(Number(t.json.jusqua) > (Number(t.json.serveur) || maintenant));
+    if (!t.json.ajoute && !aReserver) {
       const jq = Number(t.json.jusqua) - (Number(t.json.serveur) || maintenant) + maintenant;
       if (Number.isFinite(jq) && jq > maintenant && jq - maintenant < PILOTE_ECART_MS[1]) { st.prochain = jq + 500; planifierPilote(jq + 500 - maintenant); }
       return fin(String(t.json.etat || 'rien').slice(0, 30), { uid, ...(Number.isFinite(jq) && jq > maintenant ? { jusqua: jq } : {}) });
     }
-    if (!(await rejouerTerminers())) return fin('vrm', { uid });
+    if (!(await rejouerTerminers())) { st.prochain = maintenant + 60000; planifierPilote(60000); return fin('vrm', { uid }); }
     const s2 = await apiFavorisCarte(uid, 'suivant');
     const tr = s2.ok && s2.json && s2.json.travail;
-    if (!tr || typeof tr.jeton !== 'string') return fin('pret', { uid });
+    // Pas réservé (réseau, liste d'exclusion pas lue, espacement) : le favori reste en file ; l'agent redemande dans une minute.
+    if (!tr || typeof tr.jeton !== 'string') { st.prochain = maintenant + 60000; planifierPilote(60000); return fin('pret', { uid, ...(s2.json && s2.json.vue && s2.json.vue.raison ? { raison: String(s2.json.vue.raison).slice(0, 200) } : {}) }); }
     let x = null; try { x = await avecBailFavori(uid, tr.jeton, () => executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true })); } catch (_) { x = null; }
     const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
     await terminerFavoriServeur(uid, tr.jeton, brut);
@@ -25818,11 +25851,12 @@ async function pauseFavori(quoi, uid) {
 //    compte, conversation, texte prêt, fin prévue — jamais dans la base). Si Chrome
 //    endort le service worker pendant l'attente, le réveil `vrm-offres` (1 min) la
 //    REPREND (`reprendreMessagesFavoris`) avec les mêmes vérifications ; trop
-//    tard (10 min après la fin prévue) ⇒ rien ne part, c'est noté.
+//    tard (3 min après la fin prévue — 5.455.8, revue 2 : toujours avant la fin de la grâce de VRM, pour qu'aucun autre favori de ce
+//    compte ne soit réservé pendant qu'un worker repris écrit encore ; 10 min avant) ⇒ rien ne part, c'est noté.
 const OFFRE_MESSAGE_S = [8, 20];
 const FAVORI_ATTENTE = 'vrmFavoriAttente';
 const FAVORI_ATTENTE_TRANCHE_MS = 2000;
-const FAVORI_ATTENTE_TROP_TARD_MS = 10 * 60000;
+const FAVORI_ATTENTE_TROP_TARD_MS = 3 * 60000;
 const _favorisAttenteIci = new Set();   // les attentes tenues par CE worker (un worker neuf n'en a aucune)
 // (15 nov., 5.392) Le tirage « au hasard, jamais deux fois de suite la même valeur » (à la seconde,
 // la dernière gardée sous `cle` dans `chrome.storage.local`, §4.9) — partagé par l'attente offre →
