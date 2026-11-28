@@ -51,7 +51,8 @@ const lire = (pg) => pg.evaluate(() => {
   const de = (id) => { const e = [...document.querySelectorAll(`[data-vn-rang="${id}"], [data-tt-ligne="${id}"]`)].filter(vis)[0]; if (!e) return null;
     const c = e.querySelector('input'); return { limite: e.getAttribute('data-vn-limite') || (e.querySelector('[data-vn-limite]') || { getAttribute: () => null }).getAttribute('data-vn-limite'), coche: c ? !c.disabled : null, tr: e.getAttribute('data-vt-transporteur') || '' }; };
   const seg = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente button, .n-vt-segment .n-segmente button')].filter(vis).map((b) => b.textContent.replace(/\s+/g, ' ').trim());
-  return { cles, e1: de('e:principal:E-1'), e2: de('e:principal:E-2'), seg, deb: document.documentElement.scrollWidth - innerWidth, texte: document.body.innerText.slice(0, 200) };
+  const nb = (document.querySelector('[data-vn="ventes"] [data-tt-nombre]') || { getAttribute: () => null }).getAttribute('data-tt-nombre');
+  return { cles, e1: de('e:principal:E-1'), e2: de('e:principal:E-2'), seg, nb, deb: document.documentElement.scrollWidth - innerWidth, texte: document.body.innerText.slice(0, 200) };
 });
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
@@ -69,7 +70,7 @@ const lire = (pg) => pg.evaluate(() => {
       const nE1 = m.cles.filter((c) => c === 'e:principal:E-1').length, nE2 = m.cles.filter((c) => c === 'e:principal:E-2').length;
       dit(nE1 === 1 && nE2 === 1, 'À envoyer : E-1 et E-2 y sont, une fois chacune', m.cles.filter((c) => /^e:/.test(c)));
       dit(m.cles.some((c) => /^v:/.test(c)), 'À envoyer : avec les colis Vinted (même liste)');
-      const n0 = Number(((m.seg[0] || '').match(/\d+/) || [])[0]);
+      const n0 = Number(((m.seg[0] || '').match(/\d+/) || [])[0] || m.nb);
       dit(n0 === m.cles.length, `le segment « À envoyer » compte le tout (Vinted + eBay) : ${n0} = ${m.cles.length} rangées`, m.seg);
       dit(!m.cles.some((c) => /E-3|E-4/.test(c)), 'les commandes expédiées ne sont pas « à envoyer »');
       dit(m.e1 && m.e1.limite === 'lue', 'E-1 : la date limite est LUE (shipByDate d\'eBay)', m.e1);

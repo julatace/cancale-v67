@@ -21292,6 +21292,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }
   // (28 nov., ebay-livraison) Le détail d'une commande eBay : le port PAYÉ PAR L'ACHETEUR, POUR INFO (§2.8 : ni recette ni
   // charge — `montantRecuEbay` ne le lit pas, la compta non plus) et l'argent que tu reçois (la règle de la compta).
+  // Le prix de vente d'une commande eBay (les articles, `pricingSummary.priceSubtotal`, sans le port) — en euros seulement.
+  const prixVenteEbay = (o) => { const v = o && o.pricingSummary && o.pricingSummary.priceSubtotal; const n = v && v.currency === 'EUR' ? Number(v.value) : NaN; return Number.isFinite(n) ? montant(n) : ''; };
   const detailEbayNatif = (o) => { if (!o) return null; let port = null, recu = null; try { port = portAcheteurEbay(o); } catch (_) { port = null; } try { recu = montantRecuEbay(o); } catch (_) { recu = null; }
     const pv = port && port.devise === 'EUR' ? montant(port.montant) : ''; const rv = recu && Number.isFinite(recu.eur) ? montant(recu.eur) : '';
     return { vendu: rv, pourToi: rv, portAcheteur: pv, etapes: null }; };
@@ -21321,7 +21323,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           marque: extractBrand(String(titre || '')) || '', achat: achatAutreSiteDe({ site, ordre: e.__autre === 'eb' ? (x.ordre || null) : null, num, annonce: annonceA, titre }),
           t: [v.date, v.soldAt, v.dateVente, x.date, x.creationDate, x.ordre && x.ordre.creationDate, o.date, o.createdAt], compte: e.__autre === 'eb' ? (x.pseudo || x.compte || '') : '',
           echeance: e.lim ? echeanceCourteColis(e.lim) : null, limiteEstimee: !!(e.lim && e.lim.limite === 'estimee'), presse: avantDemainColis(e), attente: attenteColis(e),
-          ...(e.__autre === 'eb' ? { pdf: !!e.etiquette, detail: detailEbayNatif(x.ordre) } : {}),
+          ...(e.__autre === 'eb' ? { pdf: !!e.etiquette, detail: detailEbayNatif(x.ordre), prix: prixVenteEbay(x.ordre) } : {}),
           ligneLot: lotPar.get(cle) || null, coches, place: num ? (() => { try { return emplacementVente(ouDansMeubles(num)); } catch (_) { return null; } })() : null,
           fiche: attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + cle, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre }),
           gestes: {
@@ -21512,7 +21514,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const o = x.o || null; const cle = String(x.cle); const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
     const so = sousDe ? sousDe(x) : { t: '', ambre: false };
     const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || x.suiviEbay || '';
-    const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
+    const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : x.site === 'ebay' ? prixVenteEbay(x.ordre) : '';
     return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : (x.site === 'ebay' && x.ordre ? (x.ordre._pseudo || '') : ''), achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, ordre: x.ordre || null, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : x.ordre ? ((((x.ordre.lineItems || [])[0]) || {}).legacyItemId || null) : null, titre: x.titre || '' }),
       ...(x.site === 'ebay' ? { detail: detailEbayNatif(x.ordre) } : {}),
       marque: (o && (o.brand_title || o.brand)) || extractBrand(String(x.titre || '')) || '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
