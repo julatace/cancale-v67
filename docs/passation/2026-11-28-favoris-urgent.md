@@ -92,3 +92,27 @@ Scripts du relecteur : `scripts/_revue/` (s1–s5).
 Risques traités : pause de l'agent chez VRM par compte (`auto_pause`, `pauseAgent`) ; `rechargerPageFavori` ne touche que l'onglet
 de travail de VRM ; grâce d'une tentative abandonnée (aucune 2ᵉ écriture simultanée) ; offre sans date expirée par la date de sa
 conversation (`updated_at`).
+
+## Re-relecture (sur 15887d1f8) — 4 défauts neufs, corrigés
+
+Les 6 corrections d'avant sont confirmées, et le cas de Julien aussi (2 favoris ⇒ 2 offres + 2 messages, 24 s d'écart).
+Repros : `scripts/_revue/s6.cjs`, `s6b.cjs`, `s7.mjs`, `s8.cjs`. Contrôles permanents : `audit-favoris-revue` V8–V11.
+Lancé sur 15887d1f8, 12 de ces contrôles sont rouges ; seul le témoin « un message réellement parti n'est jamais renvoyé » est vert.
+Toutes les mutations de `--prouve` rendent l'audit rouge.
+
+1. **Agent « occupé » pour toujours** quand une réservation a raté (réseau, accusé pas rejoué, liste d'exclusion pas lue).
+   - Correction : une file de CE compte qui ne fait qu'attendre un favori automatique, sans rien en vol, rend `a_reserver` (`etatAuto`). L'agent redemande alors `suivant` lui-même, et réessaie dans 60 s si la réservation n'a pas eu lieu.
+   - Liste d'exclusion pas lue : le favori attend, et la raison est posée sur la file.
+2. **« Pause » de l'agent** : elle est maintenant tenue par `reserverFile` (le favori automatique attend, il n'est pas annulé) et par `consommerFile` (refus). « Reprendre » libère le favori.
+3. **Bail dépassé**.
+   - Côté extension : le bail est vérifié avant chaque écriture (`bailFavoriVivant`, lu par `vintedPageFavori` et `interfaceVinted`). L'envoi s'arrête dans trois cas : renouvellement refusé (409), aucun renouvellement réussi depuis 100 s (VRM abandonne à 120 s), ou 14 min passées (VRM borne à 15). Le résultat est « autorisation expirée » (« à vérifier » si quelque chose est parti), et le registre du message est effacé.
+   - Côté serveur : un renouvellement refusé est noté (`refuseLe`), et la grâce de 4 min se compte depuis ce refus.
+   - La reprise d'un message après la mort du worker est bornée à 3 min (10 avant), pour rester sous l'abandon + la grâce de VRM.
+4. **Favori mort pour toujours**.
+   - Cas visés : offre refusée, offre en 404, prix ou transaction pas prouvés.
+   - Correction : ni offre ni message partis ⇒ `aucunEnvoi` (extension), gardé par le serveur pour les envois manuels. Le favori n'est plus « connu » : il reste envoyable, affiché « Pas envoyé · la raison » avec « Envoyer ».
+   - Le 404 est dit : « L'offre n'a pas pu être faite (Vinted 404) ».
+   - L'acheteur est lu dans toutes ses formes (`buyer_id`, `buyer.id`, `buyer_user_id`, `opposite_user` côté vendeur, `offer_request.user_id`).
+   - Une offre ou un message réellement partis ne repartent jamais. Un favori automatique n'en profite pas (aucune boucle).
+
+Les « routes retenues » (`vrmFavorisRoutes`) sont retirées : ni écrites, ni lues.
